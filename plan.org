@@ -37,6 +37,10 @@ Prepare configuration files in `/etc/`, those will be used by systemd.
 Handle failures of m0d processes.  Consul watcher to trigger Pacemaker
 to do failover?
 
+*** HA notifications
+
+We need those for EES.
+
 *** m0d heartbeats
 
 Do we want to utilize `ha_link` or come with a simpler mechanism?
@@ -44,7 +48,3 @@ Do we want to utilize `ha_link` or come with a simpler mechanism?
 *** ? rg2kv
 
 We might want to store subset of Halon's resource graph in Consul KV.
-
-*** ? HA notifications
-
-Do we need those for EES?
