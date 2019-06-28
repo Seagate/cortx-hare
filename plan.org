@@ -1,0 +1,50 @@
+* Hare - Halon replacement
+
+** the "fortnight" prototype (due 2019-Jul-15)
+
+We are able to start and stop m0d services in EOS configuration (aka
+"1+0" configuration): 1 data unit, no parity units, 2 hosts or 1 host.
+Halon is not used.
+
+Some amount of fault tolerance is required. (If we decided to go quick
+and fragile way of not supporting failures in the prototype, we
+wouldn't need Consul to achieve this.  But the whole point of this
+prototyping exercise is prove that Mero cluster can work without
+Halon.)
+
+*** initial (bootstrap) configuration
+
+Host names, IP addresses, disks specification, where to run confd, RM,
+IO services.  Something similar to the `m0genfacts`' "mini config"
+file format.
+
+*** conf.xc
+
+Static file will do.  Bonus points for getting this data from Consul
+KV.
+
+*** entrypoint requests processor
+
+Static replies will do.  Bonus points for getting this data from
+Consul KV.
+
+*** start/stop m0d services
+
+Prepare configuration files in `/etc/`, those will be used by systemd.
+
+*** fault tolerance
+
+Handle failures of m0d processes.  Consul watcher to trigger Pacemaker
+to do failover?
+
+*** m0d heartbeats
+
+Do we want to utilize `ha_link` or come with a simpler mechanism?
+
+*** ? rg2kv
+
+We might want to store subset of Halon's resource graph in Consul KV.
+
+*** ? HA notifications
+
+Do we need those for EES?
