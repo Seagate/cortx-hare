@@ -22,8 +22,8 @@ file format.
 
 **** collect-facts
 
-in: m0cluster.yaml
-out: m0cluster-facts/*.json
+- in: m0cluster.yaml
+- out: m0cluster-facts/*.json
 
 *collect-facts* script reads m0cluster.yaml, ssh-es to the hosts
 mentioned in it, collects configuration data needed for conf.xc
@@ -32,8 +32,8 @@ mentioned in it, collects configuration data needed for conf.xc
 
 **** genconf
 
-in: m0cluster-facts/*.json
-out: conf.xc; Consul KV?
+- in: m0cluster-facts/*.json
+- out: conf.xc; Consul KV?
 
 *genconf* builds internal representation of Mero conf graph from
 m0cluster-facts data and creates ~conf.xc~ file(s) using Spiel API.
