@@ -12,16 +12,31 @@ wouldn't need Consul to achieve this.  But the whole point of this
 prototyping exercise is prove that Mero cluster can work without
 Halon.)
 
-*** initial (bootstrap) configuration
+*** cluster configuration
+
+**** m0cluster.yaml
 
 Host names, IP addresses, disks specification, where to run confd, RM,
-IO services.  Something similar to the `m0genfacts`' "mini config"
+IO services.  Something similar to the ~m0genfacts~' "mini config"
 file format.
 
-*** conf.xc
+**** collect-facts
 
-Static file will do.  Bonus points for getting this data from Consul
-KV.
+in: m0cluster.yaml
+out: m0cluster-facts/*.json
+
+*collect-facts* script reads m0cluster.yaml, ssh-es to the hosts
+mentioned in it, collects configuration data needed for conf.xc
+(e.g., ~facter --json processors | jq .processors.count~,
+~facter memorysize_mb~) and saves this data in local files.
+
+**** genconf
+
+in: m0cluster-facts/*.json
+out: conf.xc; Consul KV?
+
+*genconf* builds internal representation of Mero conf graph from
+m0cluster-facts data and creates ~conf.xc~ file(s) using Spiel API.
 
 *** entrypoint requests processor
 
@@ -30,7 +45,7 @@ Consul KV.
 
 *** start/stop m0d services
 
-Prepare configuration files in `/etc/`, those will be used by systemd.
+Prepare configuration files in ~/etc/~, those will be used by systemd.
 
 *** fault tolerance
 
@@ -43,7 +58,7 @@ We need those for EES.
 
 *** m0d heartbeats
 
-Do we want to utilize `ha_link` or come with a simpler mechanism?
+Do we want to utilize ~ha_link~ or come with a simpler mechanism?
 
 *** ? rg2kv
 
