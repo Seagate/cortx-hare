@@ -1,0 +1,9 @@
+#!/usr/bin/env python3
+
+
+def hello(s: str):
+    print('Hello, {}!'.format(s))
+
+
+if __name__ == '__main__':
+    hello('world')
