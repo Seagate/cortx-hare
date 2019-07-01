@@ -20,4 +20,4 @@ pep8: $(PYTHON_SOURCES)
 check-dhall: m0conf.dhall
 	xcode() { sort | $(M0_SRC_DIR)/utils/m0confgen; };\
  dhall-to-text < $< | xcode |\
- cmp - <(grep -E '^.(root|node|process-24)\>' _misc/conf.cg | xcode)
+ diff -u - <(grep -E '^.(root|node|process-24)\>' _misc/conf.cg | xcode)
