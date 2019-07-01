@@ -12,7 +12,7 @@ wouldn't need Consul to achieve this.  But the whole point of this
 prototyping exercise is prove that Mero cluster can work without
 Halon.)
 
-*** cluster configuration
+*** [@vvv] cluster configuration
 
 **** m0cluster.yaml
 
@@ -38,12 +38,19 @@ mentioned in it, collects configuration data needed for conf.xc
 *genconf* builds internal representation of Mero conf graph from
 m0cluster-facts data and creates ~conf.xc~ file(s) using Spiel API.
 
-*** entrypoint requests processor
+*** ? Hazel, EQ, BQ
+
+- Hazel - the leader (analogous to Halon's RC)
+- EQ - event queue
+- BQ - broadcast queue (of HA notifications)
+
+*** [@mandar] entrypoint requests processor
 
 Static replies will do.  Bonus points for getting this data from
 Consul KV.
 
-*** start/stop m0d services
+*** [@dima.c] bootstrapping: Ansible or Salt
+**** start/stop m0d services
 
 Prepare configuration files in ~/etc/~, those will be used by systemd.
 
@@ -55,6 +62,14 @@ to do failover?
 *** HA notifications
 
 We need those for EES.
+
+*** [@konstantin] fid generation
+
+**** option 1: use the [[https://docs.google.com/document/d/1-td9_sO-bqErDtJYx40J9UEp2zJh4JJUp_yPmm9Knuc/edit][UFID generator]] (the one used by the s3server team)
+
+**** option 2: the RC increments some counter field in the KV
+
+***** Consul has some atomic increments ([[https://en.wikipedia.org/wiki/Compare-and-swap][CAS]])
 
 *** m0d heartbeats
 
