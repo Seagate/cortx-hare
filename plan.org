@@ -12,7 +12,13 @@ wouldn't need Consul to achieve this.  But the whole point of this
 prototyping exercise is prove that Mero cluster can work without
 Halon.)
 
-*** [@vvv] cluster configuration
+*** [@andriy] m0sk, EQ, BQ
+
+- m0sk - Mero Services' Koordinator [sic] (analogous to Halon's RC)
+- EQ - Event Queue
+- BQ - Broadcast Queue (HA notifications)
+
+*** [@vvv] initial cluster configuration
 
 **** m0cluster.yaml
 
@@ -33,37 +39,32 @@ mentioned in it, collects configuration data needed for conf.xc
 **** genconf
 
 - in: m0cluster-facts/*.json
-- out: conf.xc; Consul KV?
+- out: conf.xc; Consul KV
 
 *genconf* builds internal representation of Mero conf graph from
-m0cluster-facts data and creates ~conf.xc~ file(s) using Spiel API.
-
-*** ? Hazel, EQ, BQ
-
-- Hazel - the leader (analogous to Halon's Recovery Coordinator)
-- EQ - Event Queue
-- BQ - Broadcast Queue (of HA notifications)
-
-*** [@mandar] entrypoint requests processor
-
-Static replies will do.  Bonus points for getting this data from
-Consul KV.
+m0cluster-facts data and creates ~conf.xc~ file(s).
 
 *** [@dima.c] bootstrapping: Ansible or Salt
+
 **** start/stop m0d services
 
 Prepare configuration files in ~/etc/~, those will be used by systemd.
+
+*** [@mandar] entrypoint server
+
+~m0ham~-based.  Static replies will do.  Bonus points for getting this
+data from Consul KV.
+
+*** HA notifications
+
+We need those for EES.
 
 *** fault tolerance
 
 Handle failures of m0d processes.  Consul watcher to trigger Pacemaker
 to do failover?
 
-*** HA notifications
-
-We need those for EES.
-
-*** [@konstantin] fid generation
+*** [@kostya] fid generator
 
 **** option 1: use the [[https://docs.google.com/document/d/1-td9_sO-bqErDtJYx40J9UEp2zJh4JJUp_yPmm9Knuc/edit][UFID generator]] (the one used by the s3server team)
 
@@ -78,3 +79,29 @@ Do we want to utilize ~ha_link~ or come with a simpler mechanism?
 *** ? rg2kv
 
 We might want to store subset of Halon's resource graph in Consul KV.
+
+** work distribution; Jira tickets
+
+*** 'hare' prototype work
+
+**** @andriy - [[https://jts.seagate.com/browse/EOS-689][EOS-689]] ~m0sk~: design and prototype the RC replacement
+
+**** @vvv - [[https://jts.seagate.com/browse/EOS-690][EOS-690]] initial cluster configuration
+
+Dhall-elujah!
+
+**** @mandar - [[https://jts.seagate.com/browse/EOS-691][EOS-691]] entrypoint server
+
+m0ham-based
+
+**** @dima.c - [[https://jts.seagate.com/browse/EOS-692][EOS-692]] bootstrapping
+
+Ansible
+
+**** @kostya - [[https://jts.seagate.com/browse/EOS-693][EOS-693]] fid generator
+
+UFID application
+
+*** 'hare' scoping work
+
+This document.
