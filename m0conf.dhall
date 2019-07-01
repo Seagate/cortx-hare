@@ -54,8 +54,7 @@ let Oid =
 let mkOid = \(type : ObjT) -> \(cont7 : Natural) -> \(key : Natural) ->
     { type = type, cont7 = cont7, key = key } : Oid
 
-let mkOids = \(objT : ObjT) -> \(keys : List Natural) ->
-    List/map Natural Oid (mkOid objT 0) keys : List Oid
+let zoid = \(objt : ObjT) -> \(key : Natural) -> mkOid objt 0 key
 
 let Oid/toConfGen = \(x : Oid) ->
     let cont : Text =
@@ -176,45 +175,65 @@ let Obj/toConfGen : Obj -> Text =
 let Objs/toConfGen = \(objs : List Obj) ->
     Text/concatSep "\n" (List/map Obj Text Obj/toConfGen objs) ++ "\n"
 
-let root : Obj =
-    let id = mkOid ObjT.Root 0 0
-    in
-    Obj.Root
-      { id = id
-      , verno = 1
-      , rootfid = id
-      , mdpool = mkOid ObjT.Pool 0 1
-      , imeta_pver = Some (mkOid ObjT.Pver 0 2)
-      , mdredundancy = 1
-      , params = [] : List Text
-      , nodes = [ mkOid ObjT.Node 0 6 ]
-      , sites = [ mkOid ObjT.Site 0 3 ]
-      , pools = mkOids ObjT.Pool [ 69, 48, 1 ]
-      , profiles = [ mkOid ObjT.Profile 0 77 ]
-      , fdmi_flt_grps = [] : List Oid
-      }
+let ids =
+  { root       = zoid ObjT.Root 0
+  , node       = zoid ObjT.Node 6
+  , process_24 = zoid ObjT.Process 24
+  , process_27 = zoid ObjT.Process 27
+  , process_30 = zoid ObjT.Process 30
+  , process_38 = zoid ObjT.Process 38
+  , process_40 = zoid ObjT.Process 40
+  , process_42 = zoid ObjT.Process 42
+  , process_44 = zoid ObjT.Process 44
+  , process_46 = zoid ObjT.Process 46
+  , service_25 = zoid ObjT.Service 25
+  , service_26 = zoid ObjT.Service 26
+  , site       = zoid ObjT.Site 3
+  , pool_1     = zoid ObjT.Pool 1
+  , pool_48    = zoid ObjT.Pool 48
+  , pool_69    = zoid ObjT.Pool 69
+  , pver_2     = zoid ObjT.Pver 2
+  , pver_49    = zoid ObjT.Pver 49
+  , pver_63    = zoid ObjT.Pver 63
+  , profile    = zoid ObjT.Profile 77
+  }
 
-let node : Obj =
-    Obj.Node
-      { id = mkOid ObjT.Node 0 6
-      , memsize = 2846
-      , nr_cpu = 3
-      , last_state = 0
-      , flags = 0
-      , processes = mkOids ObjT.Process [ 24, 44, 46, 30, 27, 38, 42, 40 ]
-      }
+let root = Obj.Root
+  { id = ids.root
+  , verno = 1
+  , rootfid = ids.root
+  , mdpool = ids.pool_1
+  , imeta_pver = Some ids.pver_2
+  , mdredundancy = 1
+  , params = [] : List Text
+  , nodes = [ ids.node ]
+  , sites = [ ids.site ]
+  , pools = [ ids.pool_69, ids.pool_48, ids.pool_1 ]
+  , profiles = [ ids.profile ]
+  , fdmi_flt_grps = [] : List Oid
+  }
 
-let process_24 : Obj =
-    Obj.Process
-      { id = mkOid ObjT.Process 0 24
-      , cores = [7]
-      , mem_limit_as = 134217728
-      , mem_limit_rss = 2914304
-      , mem_limit_stack = 2914304
-      , mem_limit_memlock = 2914304
-      , endpoint = "172.28.128.3@tcp:12345:34:101"
-      , services = mkOids ObjT.Service [ 26, 25 ]
-      }
+let node = Obj.Node
+  { id = ids.node
+  , memsize = 2846
+  , nr_cpu = 3
+  , last_state = 0
+  , flags = 0
+  , processes = [ ids.process_24, ids.process_44, ids.process_46
+                , ids.process_30, ids.process_27, ids.process_38
+                , ids.process_42, ids.process_40 ]
+  }
+
+let process_24 = Obj.Process
+  { id = ids.process_24
+  , cores = [7]
+  , mem_limit_as = 134217728
+  , mem_limit_rss = 2914304
+  , mem_limit_stack = 2914304
+  , mem_limit_memlock = 2914304
+  , endpoint = "172.28.128.3@tcp:12345:34:101"
+  , services = [ ids.service_26, ids.service_25 ]
+  }
 
 let objs = [ root, node, process_24 ]
 
