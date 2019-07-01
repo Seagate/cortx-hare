@@ -1,5 +1,5 @@
-let Function/compose = https://prelude.dhall-lang.org/Function/compose
 let List/map = https://prelude.dhall-lang.org/List/map
+let Text/concatMapSep = https://prelude.dhall-lang.org/Text/concatMapSep
 let Text/concatSep = https://prelude.dhall-lang.org/Text/concatSep
 
 let ObjT =
@@ -81,11 +81,23 @@ let Root =
   , fdmi_flt_grps : List Oid
   }
 
+let List/toConfGen : forall (a : Type) -> (a -> Text) -> List a -> Text
+  = \(a : Type)
+ -> \(f : a -> Text)
+ -> \(xs : List a)
+ ->
+    "[" ++ Text/concatMapSep ", " a f xs ++ "]"
+
+let id = \(a : Type) -> \(x : a) -> x
+
+let join =
+  { Naturals = List/toConfGen Natural Natural/show
+  , Oids = List/toConfGen Oid Oid/toConfGen
+  , Texts = List/toConfGen Text (id Text)
+  }
+
 let nat = Natural/show
 let oid = Oid/toConfGen
-let join = Text/concatSep ", "
-let joinOids = Function/compose (List Oid) (List Text) Text
-    (List/map Oid Text oid) join
 
 let Root/toConfGen = \(x : Root) ->
     let imeta = Optional/fold Oid x.imeta_pver Text oid "(0,0)"
@@ -96,12 +108,12 @@ let Root/toConfGen = \(x : Root) ->
  ++ " mdpool=${oid x.mdpool}"
  ++ " imeta_pver=${imeta}"
  ++ " mdredundancy=${nat x.mdredundancy}"
- ++ " params=[${join x.params}]"
- ++ " nodes=[${joinOids x.nodes}]"
- ++ " sites=[${joinOids x.sites}]"
- ++ " pools=[${joinOids x.pools}]"
- ++ " profiles=[${joinOids x.profiles}]"
- ++ " fdmi_flt_grps=[${joinOids x.fdmi_flt_grps}]"
+ ++ " params=${join.Texts x.params}"
+ ++ " nodes=${join.Oids x.nodes}"
+ ++ " sites=${join.Oids x.sites}"
+ ++ " pools=${join.Oids x.pools}"
+ ++ " profiles=${join.Oids x.profiles}"
+ ++ " fdmi_flt_grps=${join.Oids x.fdmi_flt_grps}"
  ++ ")"
 
 -- m0_conf_node
@@ -120,12 +132,36 @@ let Node/toConfGen = \(x : Node) ->
  ++ " nr_cpu=${nat x.nr_cpu}"
  ++ " last_state=${nat x.last_state}"
  ++ " flags=${nat x.flags}"
- ++ " processes=[${joinOids x.processes}]"
+ ++ " processes=${join.Oids x.processes}"
+ ++ ")"
+
+-- m0_conf_process
+let Process =
+  { id : Oid
+  , cores : List Natural
+  , mem_limit_as : Natural
+  , mem_limit_rss : Natural
+  , mem_limit_stack : Natural
+  , mem_limit_memlock : Natural
+  , endpoint : Text
+  , services : List Oid
+  }
+
+let Process/toConfGen = \(x : Process) ->
+    "(${oid x.id}"
+ ++ " cores=${join.Naturals x.cores}"
+ ++ " mem_limit_as=${nat x.mem_limit_as}"
+ ++ " mem_limit_rss=${nat x.mem_limit_rss}"
+ ++ " mem_limit_stack=${nat x.mem_limit_stack}"
+ ++ " mem_limit_memlock=${nat x.mem_limit_memlock}"
+ ++ " endpoint=${Text/show x.endpoint}"
+ ++ " services=${join.Oids x.services}"
  ++ ")"
 
 let Obj =
   < Root : Root
   | Node : Node
+  | Process : Process
   >
 
 let Obj/toConfGen : Obj -> Text =
@@ -133,6 +169,7 @@ let Obj/toConfGen : Obj -> Text =
     let conv =
       { Root = Root/toConfGen
       , Node = Node/toConfGen
+      , Process = Process/toConfGen
       }
     in merge conv x
 
@@ -167,6 +204,18 @@ let node : Obj =
       , processes = mkOids ObjT.Process [ 24, 44, 46, 30, 27, 38, 42, 40 ]
       }
 
-let objs = [ root, node ]
+let process_24 : Obj =
+    Obj.Process
+      { id = mkOid ObjT.Process 0 24
+      , cores = [7]
+      , mem_limit_as = 134217728
+      , mem_limit_rss = 2914304
+      , mem_limit_stack = 2914304
+      , mem_limit_memlock = 2914304
+      , endpoint = "172.28.128.3@tcp:12345:34:101"
+      , services = mkOids ObjT.Service [ 26, 25 ]
+      }
+
+let objs = [ root, node, process_24 ]
 
 in Objs/toConfGen objs
