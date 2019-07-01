@@ -1,6 +1,6 @@
 * Hare - Halon replacement
 
-** the "fortnight" prototype (due 2019-Jul-15)
+** The "Fortnight" Prototype (due 2019-Jul-15)
 
 We are able to start and stop m0d services in EOS configuration (aka
 "1+0" configuration): 1 data unit, no parity units, 2 hosts or 1 host.
@@ -40,9 +40,9 @@ m0cluster-facts data and creates ~conf.xc~ file(s) using Spiel API.
 
 *** ? Hazel, EQ, BQ
 
-- Hazel - the leader (analogous to Halon's RC)
-- EQ - event queue
-- BQ - broadcast queue (of HA notifications)
+- Hazel - the leader (analogous to Halon's Recovery Coordinator)
+- EQ - Event Queue
+- BQ - Broadcast Queue (of HA notifications)
 
 *** [@mandar] entrypoint requests processor
 

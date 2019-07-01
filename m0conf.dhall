@@ -159,16 +159,44 @@ let Process/toConfGen = \(x : Process) ->
 
 let Obj =
   < Root : Root
+  -- | FdmiFltGrp : FdmiFltGrp
+  -- | FdmiFilter : FdmiFilter
   | Node : Node
   | Process : Process
+  -- | Service : Service
+  -- | Sdev : Sdev
+  -- | Site : Site
+  -- | Rack : Rack
+  -- | Enclosure : Enclosure
+  -- | Controller : Controller
+  -- | Drive : Drive
+  -- | Pool : Pool
+  -- | Pver : Pver
+  -- | PverF : PverF
+  -- | Objv : Objv
+  -- | Profile : Profile
   >
 
 let Obj/toConfGen : Obj -> Text =
     \(x : Obj) ->
     let conv =
       { Root = Root/toConfGen
+      -- , FdmiFltGrp = FdmiFltGrp/toConfGen
+      -- , FdmiFilter = FdmiFilter/toConfGen
       , Node = Node/toConfGen
       , Process = Process/toConfGen
+      -- , Service = Service/toConfGen
+      -- , Sdev = Sdev/toConfGen
+      -- , Site = Site/toConfGen
+      -- , Rack = Rack/toConfGen
+      -- , Enclosure = Enclosure/toConfGen
+      -- , Controller = Controller/toConfGen
+      -- , Drive = Drive/toConfGen
+      -- , Pool = Pool/toConfGen
+      -- , Pver = Pver/toConfGen
+      -- , PverF = PverF/toConfGen
+      -- , Objv = Objv/toConfGen
+      -- , Profile = Profile/toConfGen
       }
     in merge conv x
 
