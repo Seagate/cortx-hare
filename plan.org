@@ -12,9 +12,9 @@ wouldn't need Consul to achieve this.  But the whole point of this
 prototyping exercise is prove that Mero cluster can work without
 Halon.)
 
-*** [@andriy] m0sk, EQ, BQ
+*** [@andriy] RC
 
-- m0sk - Mero Services' Koordinator [sic] (analogous to Halon's RC)
+- RC - Recovery Coordinator
 - EQ - Event Queue
 - BQ - Broadcast Queue (HA notifications)
 
@@ -55,7 +55,7 @@ Prepare configuration files in ~/etc/~, those will be used by systemd.
 ~m0ham~-based.  Static replies will do.  Bonus points for getting this
 data from Consul KV.
 
-*** HA notifications
+*** [@kostya] HA notifications
 
 We need those for EES.
 
@@ -64,9 +64,11 @@ We need those for EES.
 Handle failures of m0d processes.  Consul watcher to trigger Pacemaker
 to do failover?
 
-*** [@kostya] fid generator
+*** ? fid generator
 
-**** option 1: use the [[https://docs.google.com/document/d/1-td9_sO-bqErDtJYx40J9UEp2zJh4JJUp_yPmm9Knuc/edit][UFID generator]] (the one used by the s3server team)
+**** ? option 1: use the [[https://docs.google.com/document/d/1-td9_sO-bqErDtJYx40J9UEp2zJh4JJUp_yPmm9Knuc/edit][UFID generator]] (the one used by the s3server team)
+
+It generates only 20 bits of a ~m0_fid~.
 
 **** option 2: the RC increments some counter field in the KV
 
