@@ -90,6 +90,8 @@ We might want to store subset of Halon's resource graph in Consul KV.
 
 Dhall-elujah!
 
+***** @prasanna - [[https://jts.seagate.com/browse/EOS-717][EOS-717]] ~Obj~ definitions in m0conf.dhall
+
 **** @mandar - [[https://jts.seagate.com/browse/EOS-691][EOS-691]] entrypoint server
 
 m0ham-based

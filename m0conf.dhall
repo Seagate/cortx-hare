@@ -64,22 +64,6 @@ let Oid/toConfGen = \(x : Oid) ->
     in
     "${ObjT/show x.type}-${cont}${Natural/show x.key}"
 
--- m0_conf_root
-let Root =
-  { id : Oid
-  , verno : Natural
-  , rootfid : Oid
-  , mdpool : Oid
-  , imeta_pver : Optional Oid
-  , mdredundancy : Natural
-  , params : List Text
-  , nodes : List Oid
-  , sites : List Oid
-  , pools : List Oid
-  , profiles : List Oid
-  , fdmi_flt_grps : List Oid
-  }
-
 let List/toConfGen : forall (a : Type) -> (a -> Text) -> List a -> Text
   = \(a : Type)
  -> \(f : a -> Text)
@@ -97,6 +81,22 @@ let join =
 
 let nat = Natural/show
 let oid = Oid/toConfGen
+
+-- m0_conf_root
+let Root =
+  { id : Oid
+  , verno : Natural
+  , rootfid : Oid
+  , mdpool : Oid
+  , imeta_pver : Optional Oid
+  , mdredundancy : Natural
+  , params : List Text
+  , nodes : List Oid
+  , sites : List Oid
+  , pools : List Oid
+  , profiles : List Oid
+  , fdmi_flt_grps : List Oid
+  }
 
 let Root/toConfGen = \(x : Root) ->
     let imeta = Optional/fold Oid x.imeta_pver Text oid "(0,0)"
