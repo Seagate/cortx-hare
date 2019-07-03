@@ -8,6 +8,8 @@ editor: Valery V. Vorotyntsev <valery.vorotyntsev@seagate.com>
 
 ## ha-tx: HA Messages Transmitter
 
+![ha-tx](ha-tx.png)
+
 When Consul agents are started, each of them configures a [watch](https://www.consul.io/docs/agent/watches.html) that will monitor "BQ/" keyprefix in the Consul KV:
 ```
 {

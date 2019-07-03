@@ -8,6 +8,8 @@ editor: Valery V. Vorotyntsev <valery.vorotyntsev@seagate.com>
 
 ## eps: Entrypoint Server
 
+![eps](eps.png)
+
 ### Data flow
 
 1. `m0d` sends entrypoint request to `eps` via ha-link.
