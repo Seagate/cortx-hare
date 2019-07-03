@@ -1,6 +1,17 @@
 #!/usr/bin/env bash
 set -eu -o pipefail
 
+#
+# This is the handler for RC Leader election.
+#
+# It creates the session with confd health checker and
+# tries to acquire the leader lock with this session.
+#
+# Use it like this:
+#
+# $ consul watch -type=key -key leader elect-rc-leader
+#
+
 get_session_id() {
   consul kv get -detailed leader | awk '/Session/ {print $2}'
 }
@@ -24,9 +35,11 @@ SID=`echo "$SRES" | jq -r '.ID' 2>/dev/null` || true
 
 test -n "$SID" || die "Session creation failed: $SRES"
 
+# Try to acquire the lock until it's already acquired by someone:
 while get_session_id | grep -q ^- || exit 0; do
   consul kv put -acquire -session=$SID leader `hostname` 2>/dev/null && break
   sleep 5
 done
 
+# We acquired the lock! Start the EQ watcher.
 $HOME/hare/new-rc-leader &
