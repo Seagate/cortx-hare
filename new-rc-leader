@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+set -eu -o pipefail
+
+# We are elected!
+#
+# Check confd and register EQ watcher (for RC handler).
+#
+
+get_our_session_id()
+{
+  consul kv get -detailed -recurse leader/ | grep Session | awk '{print $2}'
+}
+
+fail()
+{
+  echo "confd check failed"
+  curl -X PUT http://localhost:8500/v1/session/destroy/`get_our_session_id`
+  exit 1
+}
+
+pgrep -af 'm0d.*44:101' > /dev/null || fail
+
+consul watch -type=keyprefix -prefix eq/ $HOME/hare/proto-rc
