@@ -3,19 +3,20 @@ set -eu -o pipefail
 
 # We are elected!
 #
-# Check confd and register EQ watcher (for RC handler).
+# Notify Mero about the new principal RM (by revoking conf-read-lock) and
+# register EQ watcher (for RC handler).
 #
 
+# XXX: notify Mero here
+
 get_our_session_id() {
-    consul kv get -detailed -recurse leader/ | awk '/Session/ {print $2}'
+    consul kv get -detailed leader | awk '/Session/ {print $2}'
 }
 
-fail() {
-    echo 'confd check failed' >&2
-    curl -X PUT http://localhost:8500/v1/session/destroy/$(get_our_session_id)
-    exit 1
-}
+SID=$(get_our_session_id)
 
-pgrep -af 'm0d.*44:101' > /dev/null || fail
+# Start EQ watcher:
+consul watch -type=keyprefix -prefix eq/ $HOME/hare/proto-rc || true
 
-consul watch -type=keyprefix -prefix eq/ $HOME/hare/proto-rc
+# Release session:
+consul kv put -release -session=$SID leader &>/dev/null

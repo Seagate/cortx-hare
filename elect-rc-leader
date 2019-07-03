@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -eu -o pipefail
+
+get_session_id() {
+  consul kv get -detailed leader | awk '/Session/ {print $2}'
+}
+
+# Cleanup EQ watcher if there is no session or exit if there is.
+SID=$(get_session_id)
+if [ "x$SID" == "x-" ]; then
+  pkill -f -9 'consul.*prefix eq' || true
+else
+  exit 0
+fi
+
+die() {
+  echo $1
+  exit 0
+}
+
+SPAYLD='{"Name": "leader", "Checks": ["serfHealth", "service:confd"]}'
+SRES=`curl -sX PUT -d "$SPAYLD" http://localhost:8500/v1/session/create`
+SID=`echo "$SRES" | jq -r '.ID' 2>/dev/null` || true
+
+test -n "$SID" || die "Session creation failed: $SRES"
+
+while get_session_id | grep -q ^- || exit 0; do
+  consul kv put -acquire -session=$SID leader `hostname` 2>/dev/null && break
+  sleep 5
+done
+
+$HOME/hare/new-rc-leader &
