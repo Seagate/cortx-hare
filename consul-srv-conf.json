@@ -1,0 +1,15 @@
+{
+  "enable_local_script_checks" : true,
+  "service": {
+    "id": "confd",
+    "name": "confd",
+    "address": "192.168.180.162@tcp:12345:44",
+    "port": 101,
+    "checks": [
+      {
+        "args": ["sh", "-c", "test -f /tmp/confd || exit 2"],
+        "interval": "10s"
+      }
+    ]
+  }
+}
