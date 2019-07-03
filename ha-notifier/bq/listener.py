@@ -5,6 +5,7 @@ import os
 import json
 import base64
 import logging
+import subprocess
 
 
 def filter_old_messages(msg_list):
@@ -31,6 +32,18 @@ def setup_logging():
     logging.basicConfig(level=logging.DEBUG, filename='listener.log')
 
 
+def forward(message):
+    # XXX replace with m0ham and m0hagen
+    p = subprocess.Popen(['/usr/bin/cat'],
+                         stdin=subprocess.PIPE,
+                         stdout=subprocess.PIPE,
+                         stderr=subprocess.PIPE,
+                         encoding='utf8')
+
+    out, err = p.communicate(input=message)
+    logging.debug("Output: {}".format(out))
+
+
 def main():
     setup_logging()
     lines = []
@@ -40,7 +53,7 @@ def main():
     logging.debug("Input: {}".format(raw_in))
     msgs = get_messages(raw_in)
     for m in msgs:
-        print(m)
+        forward(m)
 
 
 if __name__ == "__main__":
