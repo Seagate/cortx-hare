@@ -16,10 +16,12 @@ get_session_id() {
   consul kv get -detailed leader | awk '/Session/ {print $2}'
 }
 
-# Cleanup EQ watcher if there is no session or exit if there is.
+# If there is no session on the leader key - we should cleanup
+# EQ watcher and currently running RC handler before continuing.
+# Otherwise just exit - there is nothing to do.
 SID=$(get_session_id)
 if [ "x$SID" == "x-" ]; then
-  pkill -f -9 'consul.*prefix eq' || true
+  pkill -f -9 proto-rc || true
 else
   exit 0
 fi
