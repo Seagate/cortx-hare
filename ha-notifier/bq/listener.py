@@ -12,6 +12,9 @@ def filter_old_messages(msg_list):
     # XXX to be implemented later
     return msg_list
 
+def get_mero_path():
+    # TODO move this to a config?
+    return os.path.expanduser('~') + '/projects/mero/'
 
 def extract_value(msg):
     assert isinstance(msg, dict)
@@ -33,15 +36,23 @@ def setup_logging():
 
 
 def forward(message):
-    # XXX replace with m0ham and m0hagen
-    p = subprocess.Popen(['/usr/bin/cat'],
-                         stdin=subprocess.PIPE,
-                         stdout=subprocess.PIPE,
-                         stderr=subprocess.PIPE,
-                         encoding='utf8')
+    path = get_mero_path() + 'utils'
+    to_xcode = subprocess.Popen(['{}/m0hagen'.format(path)],
+                                stdin=subprocess.PIPE,
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE,
+                                encoding='utf8')
 
-    out, err = p.communicate(input=message)
+    to_m0d = subprocess.Popen(['{}/m0ham'.format(path)],
+                              stdin=to_xcode.stdout,
+                              stdout=subprocess.PIPE,
+                              stderr=subprocess.PIPE,
+                              encoding='utf8')
+
+    out, err = to_xcode.communicate(input=message)
+    to_m0d.wait()
     logging.debug("Output: {}".format(out))
+    logging.debug("stderr: {}".format(err))
 
 
 def main():
