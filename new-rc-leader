@@ -9,14 +9,14 @@ set -eu -o pipefail
 
 # XXX: notify Mero here
 
-get_our_session_id() {
+get_session_id() {
     consul kv get -detailed leader | awk '/Session/ {print $2}'
 }
 
-SID=$(get_our_session_id)
+SID=$(get_session_id)
 
 # Start EQ watcher:
 consul watch -type=keyprefix -prefix eq/ $HOME/hare/proto-rc || true
 
-# Release session:
-consul kv put -release -session=$SID leader &>/dev/null
+# Cleanup after ourselves:
+curl -sX PUT http://localhost:8500/v1/session/destroy/$SID &>/dev/null
