@@ -1,16 +1,25 @@
 #!/usr/bin/env python
 
-import sys
-import os
-import json
 import base64
+import json
 import logging
+import os
 import subprocess
+import sys
 
 
 def filter_old_messages(msg_list):
     # XXX to be implemented later
     return msg_list
+
+
+def get_endpoint():
+    v = '0@lo:12345:34:101'
+    if len(sys.argv) > 1:
+        v = sys.argv[1]
+    logging.debug('Using "{}" as ha_link endpoint'.format(v))
+    return v
+
 
 def get_mero_path():
     # TODO move this to a config?
@@ -21,7 +30,6 @@ def extract_value(msg):
     assert isinstance(msg, dict)
     v = msg['Value']
     v = base64.b64decode(v)
-    logging.debug("Decoded: {}".format(v))
     return v.decode('utf-8')
 
 
@@ -37,7 +45,7 @@ def setup_logging():
     logging.basicConfig(level=logging.DEBUG, filename='listener.log')
 
 
-def forward(message):
+def forward(message, endpoint):
     path = get_mero_path() + 'utils'
     to_xcode = subprocess.Popen(['{}/m0hagen'.format(path)],
                                 stdin=subprocess.PIPE,
@@ -46,7 +54,7 @@ def forward(message):
                                 env={},
                                 encoding='utf8')
 
-    to_m0d = subprocess.Popen(['{}/m0ham'.format(path)],
+    to_m0d = subprocess.Popen(['{}/m0ham'.format(path), endpoint],
                               stdin=to_xcode.stdout,
                               stdout=subprocess.PIPE,
                               stderr=subprocess.PIPE,
@@ -68,6 +76,7 @@ def forward(message):
 
 def main():
     setup_logging()
+    m0_endpoint = get_endpoint()
     lines = []
     for line in sys.stdin:
         lines.append(line)
@@ -75,7 +84,7 @@ def main():
     logging.debug("Input: {}".format(raw_in))
     msgs = get_messages(raw_in)
     for m in msgs:
-        forward(m)
+        forward(m, m0_endpoint)
 
 
 if __name__ == "__main__":
