@@ -8,7 +8,7 @@ editor: Valery V. Vorotyntsev <valery.vorotyntsev@seagate.com>
 
 ## Configuration Generation
 
-![m0conf](m0conf.svg)
+![m0conf](m0conf.png)
 
 ### Cluster Description
 
