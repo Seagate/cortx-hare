@@ -6,16 +6,14 @@ set -eu -o pipefail
 # Check confd and register EQ watcher (for RC handler).
 #
 
-get_our_session_id()
-{
-  consul kv get -detailed -recurse leader/ | grep Session | awk '{print $2}'
+get_our_session_id() {
+    consul kv get -detailed -recurse leader/ | awk '/Session/ {print $2}'
 }
 
-fail()
-{
-  echo "confd check failed"
-  curl -X PUT http://localhost:8500/v1/session/destroy/`get_our_session_id`
-  exit 1
+fail() {
+    echo 'confd check failed' >&2
+    curl -X PUT http://localhost:8500/v1/session/destroy/$(get_our_session_id)
+    exit 1
 }
 
 pgrep -af 'm0d.*44:101' > /dev/null || fail
