@@ -10,25 +10,28 @@ editor: Valery V. Vorotyntsev <valery.vorotyntsev@seagate.com>
 
 ![m0conf](m0conf.png)
 
-### Cluster Description
+### Cluster Description File
 
-This file is provided by cluster administrator.  Format:
+This file (`cluster.yaml` on the diagram) is provided by cluster administrator.  It is a YAML file with the following schema:
 ```yaml
 hosts:
-  - name: <str>
-    m0_servers:
+  - name: <str>  # hostname
+    m0_servers:  # m0d processes
       - endpoint: <str>
-        confd: <bool>  # optional; defaults to `false`
-        io_disks: <str>  # glob pattern; optional; defaults to `''` (no IOS)
-    c0_clients:
+        confd: <bool>  # Will confd service be running on this m0d?
+                       # Optional; defaults to `false`.
+        io_disks: <str>  # Glob pattern.
+                         # Optional; defaults to `''`, meaning that no
+                         # IO services will be running on this m0d.
+    c0_clients:  # clovis applications
       - endpoint: <str>
     m0t1fs_clients:
       - endpoint: <str>
-pools:  # optional; by default a single pool is created
+pools:  # Optional; by default a single pool is created.
   - name: <str>
     disks:
       - host: <str>
-        filter: <str>  # regexp; optional; defaults to `.`
+        filter: <str>  # Regexp. Optional; defaults to `.`.
     data_units: <int>
     parity_units: <int>
     allowed_failures:

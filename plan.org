@@ -20,29 +20,9 @@ Halon.)
 
 *** [@vvv] initial cluster configuration
 
-**** m0cluster.yaml
+See [[file:rfc/3/README.md][3/CONFGEN]].
 
-Host names, IP addresses, disks specification, where to run confd, RM,
-IO services.  Something similar to the ~m0genfacts~' "mini config"
-file format.
-
-**** collect-facts
-
-- in: m0cluster.yaml
-- out: m0cluster-facts/*.json
-
-*collect-facts* script reads m0cluster.yaml, ssh-es to the hosts
-mentioned in it, collects configuration data needed for conf.xc
-(e.g., ~facter --json processors | jq .processors.count~,
-~facter memorysize_mb~) and saves this data in local files.
-
-**** genconf
-
-- in: m0cluster-facts/*.json
-- out: conf.xc; Consul KV
-
-*genconf* builds internal representation of Mero conf graph from
-m0cluster-facts data and creates ~conf.xc~ file(s).
+**** Q: Can [[https://www.consul.io/docs/commands/catalog.html][consul catalog]] command be of use to us?
 
 *** [@dima.c] bootstrapping: Ansible or Salt
 
@@ -52,12 +32,11 @@ Prepare configuration files in ~/etc/~, those will be used by systemd.
 
 *** [@mandar] entrypoint server
 
-~m0ham~-based.  Static replies will do.  Bonus points for getting this
-data from Consul KV.
+See [[file:rfc/1/README.md][1/EPS]].
 
 *** [@kostya] HA notifications
 
-We need those for EES.
+See [[file:rfc/2/README.md][2/HATX]].
 
 *** fault tolerance
 
@@ -82,30 +61,3 @@ Do we want to utilize ~ha_link~ or come with a simpler mechanism?
 
 We might want to store subset of Halon's resource graph in Consul KV.
 
-** work distribution; Jira tickets
-
-*** 'hare' prototype work
-
-**** @andriy - [[https://jts.seagate.com/browse/EOS-689][EOS-689]] ~m0sk~: design and prototype the RC replacement
-
-**** @vvv - [[https://jts.seagate.com/browse/EOS-690][EOS-690]] initial cluster configuration
-
-Dhall-elujah!
-
-***** @prasanna - [[https://jts.seagate.com/browse/EOS-717][EOS-717]] ~Obj~ definitions in m0conf.dhall
-
-**** @mandar - [[https://jts.seagate.com/browse/EOS-691][EOS-691]] entrypoint server
-
-m0ham-based
-
-**** @dima.c - [[https://jts.seagate.com/browse/EOS-692][EOS-692]] bootstrapping
-
-Ansible
-
-**** @kostya - [[https://jts.seagate.com/browse/EOS-693][EOS-693]] fid generator
-
-UFID application
-
-*** 'hare' scoping work
-
-This document.
