@@ -13,7 +13,7 @@ set -eu -o pipefail
 #
 # Run it like this:
 #
-#   $ consul watch -type=keyprefix -prefix eq/ proto-rc.sh
+#   $ consul watch -type=keyprefix -prefix eq/ proto-rc
 #
 
 cat | sed 's/null//' | jq -r '.[] | "\(.Key) \(.Value | @base64d)"' |
