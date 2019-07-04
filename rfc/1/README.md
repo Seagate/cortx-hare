@@ -15,13 +15,18 @@ contributors:
 ### Data flow
 
 1. `m0d` sends entrypoint request to `eps` via ha-link.
-2. `eps` gets entrypoint reply data from the Consul KV store:
-   * list on confd services -- from `consul catalog nodes -service=confd`
-   * principal RM is co-located with the RC leader node:
+2. `eps` gets entrypoint reply data from Consul:
+   * list of confd services, example:
+     ```bash
+     $ curl -sX GET http://localhost:8500/v1/catalog/service/confd | jq -r '.[] | "\(.Node) \(.ServiceAddress):\(.ServicePort)"'
+     node1 192.168.180.162@tcp:12345:44:101
+     node2 192.168.180.166@tcp:12345:44:101
+     ```
+   * principal RM is co-located with the RC Leader:
      ```bash
      # get session id from the "leader" key
-     consul kv get -detailed -recurse leader/ | grep Session
+     SID=`consul kv get -detailed -recurse leader/ | grep Session | awk '{print $2}'`
      # use session id to find the leader
-     curl -sX GET http://localhost:8500/v1/session/info/<session-id> | jq -r '.[].Node'
+     curl -sX GET http://localhost:8500/v1/session/info/$SID | jq -r '.[].Node'
      ```
 3. `eps` sends entrypoint reply to `eps` via ha-link.
