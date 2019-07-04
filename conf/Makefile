@@ -17,7 +17,7 @@ pep8: $(PYTHON_SOURCES)
 	pycodestyle $^
 
 .PHONY: check-dhall
-check-dhall: m0conf.dhall
+check-dhall: confd.dhall
 	xcode() { sort | $(M0_SRC_DIR)/utils/m0confgen; };\
  dhall-to-text < $< | xcode |\
  diff -u - <(grep -E '^.(root|node|process-24)\>' _misc/conf.cg | xcode)
