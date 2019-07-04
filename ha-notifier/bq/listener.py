@@ -41,12 +41,14 @@ def forward(message):
                                 stdin=subprocess.PIPE,
                                 stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE,
+                                env={},
                                 encoding='utf8')
 
     to_m0d = subprocess.Popen(['{}/m0ham'.format(path)],
                               stdin=to_xcode.stdout,
                               stdout=subprocess.PIPE,
                               stderr=subprocess.PIPE,
+                              env={},
                               encoding='utf8')
 
     out, err = to_xcode.communicate(input=message)
