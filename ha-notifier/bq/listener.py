@@ -16,10 +16,12 @@ def get_mero_path():
     # TODO move this to a config?
     return os.path.expanduser('~') + '/projects/mero/'
 
+
 def extract_value(msg):
     assert isinstance(msg, dict)
     v = msg['Value']
     v = base64.b64decode(v)
+    logging.debug("Decoded: {}".format(v))
     return v.decode('utf-8')
 
 
@@ -51,10 +53,17 @@ def forward(message):
                               env={},
                               encoding='utf8')
 
+    logging.debug("Forwarding the following message as an input to m0hagen: {}".format(message))
     out, err = to_xcode.communicate(input=message)
-    to_m0d.wait()
-    logging.debug("Output: {}".format(out))
-    logging.debug("stderr: {}".format(err))
+    ham_out, ham_err = to_m0d.communicate()
+    logging.debug("m0hagen exited with code {}".format(to_xcode.returncode))
+    logging.debug("m0ham exited with code {}".format(to_m0d.returncode))
+    logging.debug("-------------------------")
+    logging.debug("m0hagen Output: {}".format(out))
+    logging.debug("m0hagen stderr: {}".format(err))
+    logging.debug("m0ham Output: {}".format(ham_out))
+    logging.debug("m0ham stderr: {}".format(ham_err))
+    logging.debug("=========================")
 
 
 def main():
