@@ -1,4 +1,66 @@
 #!/usr/bin/env python3
 
+import argparse
+import sys
+
+
+__version__ = '0.1'
+__author__ = 'Valery V. Vorotyntsev <valery.vorotyntsev@seagate.com>'
+
+
+def parse_opts(argv):
+    p = argparse.ArgumentParser(
+        usage='%(prog)s [-o <output-dir>] [--singlenode] [--mock]')
+
+    default_output_dir = 'cluster-facts'
+    p.add_argument('-o', metavar='output-dir',
+                   help='directory to store generated files in;'
+                   " defaults to '{}'".format(default_output_dir),
+                   dest='output_dir', default=default_output_dir)
+
+    p.add_argument('--singlenode',
+                   help='gather information about local host only',
+                   action='store_true')
+    p.add_argument('--mock',
+                   help='Generate pseudo-random facts.'
+                   ' The hosts specified in the cluster description file'
+                   ' (see below) will not be visited and don\'t even have'
+                   ' to exist.', action='store_true')
+    p.add_argument('-V', '--version', action='version',
+                   version='%(prog)s ' + __version__)
+    return p.parse_args(argv)
+
+
+def main(argv=None):
+    opts = parse_opts(argv)
+    validate_input()
+    store_facts(collect_facts(load_cluster(opts.mock)), opts.output_dir)
+
+
+def validate_input():
+    pass
+
+
+class Cluster:
+    pass
+
+
+def load_cluster(mock_p: bool = False) -> Cluster:
+    pass
+
+
+class Facts:
+    pass
+
+
+def collect_facts(cluster: Cluster) -> Facts:
+    pass
+
+
+def store_facts(facts: Facts, output_dir: str = None):
+    pass
+
+
 if __name__ == '__main__':
-    print('XXX IMPLEMENTME')
+    print('XXX {!r}'.format(parse_opts(None)), file=sys.stderr)
+    # main()
