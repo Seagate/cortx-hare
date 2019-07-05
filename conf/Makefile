@@ -1,20 +1,20 @@
-PYTHON_SOURCES = genconf
+PYTHON_SCRIPTS = collect-facts m0conf
 
 # XXX YMMV
 M0_SRC_DIR = ~/src/mero
 
 SHELL = bash
 
-.PHONY: all
-all: typecheck pep8
-
-.PHONY: typecheck
-typecheck: $(PYTHON_SOURCES)
-	mypy $^
+.PHONY: check
+check: flake8 typecheck check-dhall
 
 .PHONY: pep8
-pep8: $(PYTHON_SOURCES)
-	pycodestyle $^
+flake8: $(PYTHON_SCRIPTS)
+	flake8 $^
+
+.PHONY: typecheck
+typecheck: $(PYTHON_SCRIPTS)
+	set -e -o pipefail; for f in $^; do mypy $$f; done
 
 .PHONY: check-dhall
 check-dhall: confd.dhall
