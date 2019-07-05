@@ -1,4 +1,4 @@
-PYTHON_SCRIPTS = collect-facts m0conf
+PYTHON_SCRIPTS = collect-facts cfgen
 
 # XXX YMMV
 M0_SRC_DIR = ~/src/mero

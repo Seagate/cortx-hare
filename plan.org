@@ -20,7 +20,7 @@ Halon.)
 
 *** [@vvv] initial cluster configuration
 
-See [[file:rfc/3/README.md][3/CONFGEN]].
+See [[file:rfc/3/README.md][3/CFGEN]].
 
 **** Q: Can [[https://www.consul.io/docs/commands/catalog.html][consul catalog]] command be of use to us?
 
