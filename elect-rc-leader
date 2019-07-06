@@ -12,8 +12,10 @@ set -eu -o pipefail
 # $ consul watch -type=key -key leader elect-rc-leader
 #
 
+SRC_DIR="$(dirname $(readlink -f $0))"
+
 get_session_id() {
-  consul kv get -detailed leader | awk '/Session/ {print $2}'
+    consul kv get -detailed leader | awk '/Session/ {print $2}'
 }
 
 # If the session is already set - the leader is elected, so
@@ -23,28 +25,28 @@ get_session_id | grep -q ^- || exit 0
 # Cleanup EQ watcher and currently running RC handler (if any).
 pkill -f -9 proto-rc || true
 
-exit0() {
-  echo "$@"
-  exit 0 # Don't stop the watcher.
+# Create session with the service:confd Health Checker:
+PAYLD='{"Name": "leader", "Checks": ["serfHealth", "service:confd"]}'
+RES=$(curl -sX PUT -d "$PAYLD" http://localhost:8500/v1/session/create)
+SID=$(echo "$RES" | jq -r '.ID' 2>/dev/null || true)
+
+[[ -n $SID ]] || {
+    echo "Session creation failed: $RES" >&2
+    exit 0  # don't stop the watcher
 }
 
-# Create session with the service:confd Health Checker:
-PAYLD='{"Name": "leader", "Checks": ["serfHealth", "service:confd"]}'
-RES=`curl -sX PUT -d "$PAYLD" http://localhost:8500/v1/session/create`
-SID=`echo "$RES" | jq -r '.ID' 2>/dev/null` || true
-
-[ -n "$SID" ] || exit0 "Session creation failed: $RES"
-
 clean_exit() {
-  curl -sX PUT http://localhost:8500/v1/session/destroy/$SID &>/dev/null || true
-  exit 0
+    curl -sX PUT http://localhost:8500/v1/session/destroy/$SID &>/dev/null ||
+        true
+    exit 0
 }
 
 # Try to acquire the lock unless it's already acquired by someone else:
-while get_session_id | grep -q ^- || clean_exit; do
-  sleep $((RANDOM % 10))
-  consul kv put -acquire -session=$SID leader `hostname` 2>/dev/null && break
+while true; do
+    get_session_id | grep -q ^- || clean_exit
+    sleep $((RANDOM % 10))
+    consul kv put -acquire -session=$SID leader `hostname` 2>/dev/null && break
 done
 
 # We've got the lock! Start EQ watcher.
-$HOME/hare/new-rc-leader &
+$SRC_DIR/new-rc-leader &
