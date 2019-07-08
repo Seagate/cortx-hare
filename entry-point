@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -eu -o pipefail
+
+SID=`consul kv get -detailed leader | awk '/Session/ {print $2}'`
+
+echo confd-list:
+curl -sX GET http://localhost:8500/v1/catalog/service/confd |
+  jq -r '.[] | "  - node: \(.Node)
+    address: \(.ServiceAddress):\(.ServicePort)"'
+
+echo -n "Principal RM: "
+curl -sX GET http://localhost:8500/v1/session/info/$SID |
+  jq -r '.[] | .Node'
