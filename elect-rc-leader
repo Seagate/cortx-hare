@@ -41,8 +41,8 @@ clean_exit() {
 
 # Try to acquire the lock unless it's already acquired by someone else:
 while get_session_id | grep -q ^- || clean_exit; do
+  sleep $((RANDOM % 10))
   consul kv put -acquire -session=$SID leader `hostname` 2>/dev/null && break
-  sleep 5
 done
 
 # We've got the lock! Start the EQ watcher.
