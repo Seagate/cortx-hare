@@ -26,16 +26,14 @@ contributors:
 
 ### Querying Consul for Entrypoint Data
 
-* List of confd services:
-  ```bash
-  $ curl -sX GET http://localhost:8500/v1/catalog/service/confd | jq -r '.[] | "\(.Node) \(.ServiceAddress):\(.ServicePort)"'
-  node1 192.168.180.162@tcp:12345:44:101
-  node2 192.168.180.166@tcp:12345:44:101
-  ```
-* Principal RM is co-located with the RC Leader:
-  ```bash
-  # get session id from the "leader" key
-  SID=$(consul kv get -detailed leader | awk '/Session/ {print $2}')
-  # use session id to find the leader
-  curl -sX GET http://localhost:8500/v1/session/info/$SID | jq -r '.[].Node'
-  ```
+See `entrypoint` script for the reference implementation.
+
+```bash
+$ ./entrypoint
+principal-RM: sage75c1
+confds:
+  - node: sage75
+    address: 192.168.180.162@tcp:12345:44:101
+  - node: sage75c1
+    address: 192.168.180.166@tcp:12345:44:101
+```
