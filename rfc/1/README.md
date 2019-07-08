@@ -30,3 +30,18 @@ contributors:
      curl -sX GET http://localhost:8500/v1/session/info/$SID | jq -r '.[].Node'
      ```
 3. `eps` sends entrypoint reply to `eps` via ha-link.
+
+### `m0ham`, `get-entrypoint`
+
+- Start m0ham in "listen" mode.
+- m0d sends entrypoint request to m0ham.
+- m0ham's entrypoint request handler makes `popen("get-entrypoint")` call.
+- `get-entrypoint` is a simple bash pipeline:
+  ```bash
+  curl ... | awk ... | m0hagen
+  ```
+  - curl queries Consul;
+  - awk converts curl's output to an entrypoint reply in YAML format;
+  - m0hagen converts that to xcode string.
+- m0ham reads the output of popen() and passes it to `m0_xcode_read()`, which builds `m0_ha_entrypoint_rep` object.
+- m0ham sends `m0_ha_entrypoint_rep` back to the m0d.
