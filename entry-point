@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -eu -o pipefail
 
+#
+# Get and return Entry Point result in YAML format.
+#
+
 SID=`consul kv get -detailed leader | awk '/Session/ {print $2}'`
 
 echo confd-list:
