@@ -25,7 +25,7 @@ contributors:
    * principal RM is co-located with the RC Leader:
      ```bash
      # get session id from the "leader" key
-     SID=`consul kv get -detailed -recurse leader/ | grep Session | awk '{print $2}'`
+     SID=`consul kv get -detailed leader | awk '/Session/ {print $2}'`
      # use session id to find the leader
      curl -sX GET http://localhost:8500/v1/session/info/$SID | jq -r '.[].Node'
      ```
