@@ -6,9 +6,9 @@ M0_SRC_DIR = ~/src/mero
 SHELL = bash
 
 .PHONY: check
-check: flake8 typecheck check-dhall
+check: flake8 typecheck
 
-.PHONY: pep8
+.PHONY: flake8
 flake8: $(PYTHON_SCRIPTS)
 	flake8 $^
 
