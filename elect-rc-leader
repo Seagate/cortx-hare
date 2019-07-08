@@ -23,16 +23,17 @@ get_session_id | grep -q ^- || exit 0
 # Cleanup EQ watcher and currently running RC handler (if any).
 pkill -f -9 proto-rc || true
 
-die() {
-  echo $1
+exit0() {
+  echo "$@"
   exit 0 # Don't stop the watcher.
 }
 
+# Create session with the service:confd Health Checker:
 PAYLD='{"Name": "leader", "Checks": ["serfHealth", "service:confd"]}'
 RES=`curl -sX PUT -d "$PAYLD" http://localhost:8500/v1/session/create`
 SID=`echo "$RES" | jq -r '.ID' 2>/dev/null` || true
 
-test -n "$SID" || die "Session creation failed: $RES"
+[ -n "$SID" ] || exit0 "Session creation failed: $RES"
 
 clean_exit() {
   curl -sX PUT http://localhost:8500/v1/session/destroy/$SID &>/dev/null || true
@@ -41,9 +42,9 @@ clean_exit() {
 
 # Try to acquire the lock unless it's already acquired by someone else:
 while get_session_id | grep -q ^- || clean_exit; do
+  sleep $((RANDOM % 10))
   consul kv put -acquire -session=$SID leader `hostname` 2>/dev/null && break
-  sleep 5
 done
 
-# We've got the lock! Start the EQ watcher.
+# We've got the lock! Start EQ watcher.
 $HOME/hare/new-rc-leader &
