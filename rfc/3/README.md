@@ -13,23 +13,20 @@ editor: Valery V. Vorotyntsev <valery.vorotyntsev@seagate.com>
 ### `collect-facts`
 
 ```
-Usage: collect-facts [--mock] [-o <output-dir>] [--singlenode]
+usage: collect-facts [-o <output-dir>] [--mock]
 
-Options:
+optional arguments:
+  -h, --help     show this help message and exit
+  --help-schema  show cluster description file schema
+  -o output-dir  directory to store generated files in (defaults to
+                 'collected-facts')
+  --mock         Generate pseudo-random "facts". The hosts specified in the
+                 cluster description file will not be visited and don't even
+                 have to exist.
+  -V, --version  show program's version number and exit
 
-  -o <output-dir>  Directory to store generated files in; defaults to
-                   `cluster-facts/`.
-  --singlenode  Gather information about local host only.
-  --mock        Generate pseudo-random facts.  The hosts specified in
-                <cluster-desc> file are not visited and don't even have
-                to exist.
-  -h, --help    Show this help and exit.
-
-When executed without `--singlenode` option, the program reads cluster
-description file from standard input.  This should be YAML file with
-the following schema:
-
-XXX TODO
+The program reads cluster description in YAML format from the standard input;
+'--help-schema' option shows the schema.
 ```
 
 **collect-facts** ssh-es to the hosts mentioned in the cluster description file, collects "facts" about them (e.g., `facter --json processors | jq .processors.count`, `facter memorysize_mb`) and saves that data locally as [Dhall](https://dhall-lang.org/) expressions (`cluster-facts/*.dhall`).
