@@ -1,7 +1,7 @@
 ---
 domain: gitlab.mero.colo.seagate.com
 shortname: 4/KV
-name: Entrypoint Server
+name: Consul KV Schema
 status: raw
 editor: Valery V. Vorotyntsev <valery.vorotyntsev@seagate.com>
 contributors:
