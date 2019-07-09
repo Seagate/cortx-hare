@@ -2,8 +2,16 @@
 set -eu -o pipefail
 
 #
-# Get and return Entry Point result in YAML format.
+# Get entrypoint data from Consul.
+# See rfc/1/README.md for more details.
 #
+#   $ ./get-entrypoint
+#   principal-RM: sage75c1
+#   confds:
+#     - node: sage75
+#       address: 192.168.180.162@tcp:12345:44:101
+#     - node: sage75c1
+#       address: 192.168.180.166@tcp:12345:44:101
 
 SID=$(consul kv get -detailed leader | awk '/Session/ {print $2}')
 
