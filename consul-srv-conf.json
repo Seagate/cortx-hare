@@ -1,12 +1,5 @@
 {
   "server" : true,
-  "watches": [
-    {
-      "type": "key",
-      "key": "leader",
-      "args": ["/opt/seagate/consul/elect-rc-leader"]
-    }
-  ],
   "enable_local_script_checks" : true,
   "service": {
     "id": "confd",
