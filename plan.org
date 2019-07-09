@@ -24,7 +24,8 @@ See [[file:rfc/3/README.md][3/CFGEN]].
 
 **** Q: Can [[https://www.consul.io/docs/commands/catalog.html][consul catalog]] command be of use to us?
 
-*** [@dima.c] bootstrapping: Ansible or Salt
+*** [@dima.c] bootstrapping
+Ansible?
 
 **** start/stop m0d services
 
@@ -34,9 +35,46 @@ Prepare configuration files in ~/etc/~, those will be used by systemd.
 
 See [[file:rfc/1/README.md][1/EPS]].
 
+**** ~get-entrypoint~ script: How to fill [[file:~/src/mero/ha/entrypoint_fops.h::struct%20m0_ha_entrypoint_rep%20{][m0_ha_entrypoint_rep]]?
+#+BEGIN_SRC c
+struct m0_ha_entrypoint_rep {
+	uint32_t                        hae_quorum;        // XXX
+	struct m0_fid_arr               hae_confd_fids;    // XXX ? @andriy
+	const char                    **hae_confd_eps;
+	struct m0_fid                   hae_active_rm_fid; // XXX
+	char                           *hae_active_rm_ep;  // XXX
+	/** Data passed back to client to control query flow */
+	enum m0_ha_entrypoint_control   hae_control;
+	/* link parameters */
+	struct m0_ha_link_params        hae_link_params;   // XXX ? @max
+	bool                            hae_link_do_reconnect; // XXX @max
+};
+#+END_SRC
+
+***** check how ~halond~ fills those
+
+***** discuss the rest with @andriy and @max
+*NB:* Please do document the takeaways of those discussions in the respective RFCs ([[file:rfc/4/README.md][4/KV]], [[file:rfc/1/README.md][1/EPS]]).
+
+**** How will ~m0ham~ consume ~get-entrypoint~ output?
+#+BEGIN_SRC c
+ep_rep = xcode_read_as(m0_ha_entrypoint_rep_xc, buf, &rc);
+#+END_SRC
+
+***** 1) make ~m0_ha_entrypoint_rep~ XCODE-able
+***** 2) two options:
+****** output xcode of ~m0_ha_entrypoint_rep~ from ~get-entrypoint~
+****** add support ~m0_ha_entrypoint_rep~ objects to ~m0hagen~
+
 *** [@kostya] HA notifications
 
 See [[file:rfc/2/README.md][2/HATX]].
+
+*** rg2kv
+
+See [[file:rfc/4/README.md][4/KV]].
+
+We might want to store subset of Halon's resource graph in Consul KV.
 
 *** fault tolerance
 
@@ -56,8 +94,4 @@ It generates only 20 bits of a ~m0_fid~.
 *** m0d heartbeats
 
 Do we want to utilize ~ha_link~ or come with a simpler mechanism?
-
-*** ? rg2kv
-
-We might want to store subset of Halon's resource graph in Consul KV.
 
