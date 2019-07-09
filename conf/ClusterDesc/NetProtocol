@@ -1,0 +1,9 @@
+{-*- dhall -*-}
+
+let NetProtocol =
+  < lo
+  | tcp : { tcp : Optional Natural }    -- optional digit after "@tcp"
+  | o2ib : { o2ib : Optional Natural }  -- optional digit after "@o2ib"
+  >
+
+in NetProtocol

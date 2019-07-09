@@ -1,0 +1,11 @@
+{-*- dhall -*-}
+
+let FailVec =
+  { site : Natural
+  , rack : Natural
+  , encl : Natural
+  , ctrl : Natural
+  , disk : Natural
+  }
+
+in FailVec

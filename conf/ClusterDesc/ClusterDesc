@@ -1,0 +1,33 @@
+{-*- dhall -*-}
+
+-- m0d
+let M0Server =
+  { endpoint : ./Endpoint
+  , runs_confd : Bool      -- whether to run confd on this m0d
+  , io_disks :
+      { path_regex : Text  -- if not empty, the m0d will run an IO service
+      }
+  }
+
+let Host =
+  { name : Text  -- hostname
+  , disks : { path_glob : Text }  -- disks which may be used by Mero
+  , m0_servers : List M0Server    -- m0d processes
+  , c0_clients : List ./Endpoint    -- clovis applications
+  , m0t1fs_clients : List ./Endpoint
+  }
+
+let Pool =
+  { name : Text
+  , disks : ./PoolDisks
+  , data_units : Natural    -- N
+  , parity_units : Natural  -- K
+  , allowed_failures : Optional ./FailVec
+  }
+
+let ClusterDesc =
+  { hosts : List Host
+  , pools : List Pool
+  }
+
+in ClusterDesc
