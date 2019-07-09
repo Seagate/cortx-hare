@@ -18,12 +18,12 @@ get_session_id() {
     consul kv get -detailed leader | awk '/Session/ {print $2}'
 }
 
+# Cleanup EQ watcher and currently running RC handler (if any).
+pkill -f -9 proto-rc || true
+
 # If the session is already set - the leader is elected, so
 # there is nothing for us to do.
 get_session_id | grep -q ^- || exit 0
-
-# Cleanup EQ watcher and currently running RC handler (if any).
-pkill -f -9 proto-rc || true
 
 # Create session with the service:confd Health Checker:
 PAYLD='{"Name": "leader", "Checks": ["serfHealth", "service:confd"]}'
