@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 
 # TODO:
-# - validate input schema
+#
+# - Validate input file.  One simple way to do this is to use
+#   `yaml-to-dhall ./ClusterDesc/ClusterDesc`, but this requires
+#   `yaml-to-dhall` executable that includes
+#   https://github.com/dhall-lang/dhall-haskell/pull/1083 bugfix.
 
 import argparse
 import json
@@ -87,13 +91,14 @@ pools:
 
 def main(argv=None):
     opts = parse_opts(argv)
-    cluster = Cluster(yaml.safe_load(sys.stdin))
-    for host in cluster.hosts:
+    cluster_desc = yaml.safe_load(sys.stdin)
+    for host in cluster_desc['hosts']:
         # These fact names correspond to version 2.4.1 of `facter`.
         # See https://puppet.com/docs/puppet/6.6/core_facts.html#legacy-facts
-        facts = get_facts(host.name, opts.mock, 'hostname', 'processorcount',
-                          'memorysize_mb', 'ipaddress', 'macaddress')
-    # store_facts(collect_facts(load_cluster_desc(opts)), opts.output_dir)
+        host['facts'] = get_facts(host['name'], opts.mock,
+                                  'hostname', 'processorcount',
+                                  'memorysize_mb', 'ipaddress', 'macaddress')
+    print(f'XXX {cluster_desc}', file=sys.stderr)
 
 
 def get_facts(hostname: str, mock_p: bool, *args: str) -> Dict[str, Any]:
@@ -102,7 +107,7 @@ def get_facts(hostname: str, mock_p: bool, *args: str) -> Dict[str, Any]:
     if mock_p:
         return fabricate_facts(hostname, *args)
 
-    cmd = []
+    cmd = []  # type: List[str]
     if hostname not in ('localhost', '127.0.0.1'):
         cmd = ['ssh', hostname]
     cmd.extend(['facter', '--json'])
@@ -122,6 +127,17 @@ def fabricate_facts(hostname: str, *args: str) -> Dict[str, Any]:
             rng(256), rng(256), rng(256), rng(256), rng(256), rng(256)]),
     }
     return dict((k, fabricated[k]) for k in args)
+
+
+#XXX# def register_confobj_types():
+#XXX#     for t in ('dir', 'root', 'profile', 'filesystem', 'pool', 'pver', 'objv',
+#XXX#               'node', 'process', 'service', 'sdev', 'rack', 'enclosure',
+#XXX#               'controller', 'disk'):
+#XXX#         globals()['conf_' + t] = type('conf_' + t, (ConfObj,), {})
+#XXX#
+#XXX#
+#XXX# def build_conf_graph(cluster_desc: Dict[str, Any]):
+#XXX#     XXX
 
 
 #XXX## XXX ----------------------------------------------------------------

@@ -1,16 +1,18 @@
+SHELL = bash
+
 PYTHON_SCRIPTS = collect-facts cfgen
+
+FLAKE8_OPTS =
 
 # XXX YMMV
 M0_SRC_DIR = ~/src/mero
-
-SHELL = bash
 
 .PHONY: check
 check: flake8 typecheck
 
 .PHONY: flake8
 flake8: $(PYTHON_SCRIPTS)
-	flake8 $^
+	flake8 $(FLAKE8_OPTS) $^
 
 .PHONY: typecheck
 typecheck: $(PYTHON_SCRIPTS)

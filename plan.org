@@ -22,8 +22,21 @@ Halon.)
 
 See [[file:rfc/3/README.md][3/CFGEN]].
 
-**** Q: Can [[https://www.consul.io/docs/commands/catalog.html][consul catalog]] command be of use to us?
+**** XXX
+#+BEGIN_SRC dhall
+let mkNode = \(a : XXX) -> \(b : YYY) ->
+  { id = ids.node
+  , memsize = a
+  , nr_cpu = b
+  , last_state = 0
+  , flags = 0
+  , processes = c
+  }
+let node_13 = ./mkNode.dhall memsize nr_cpu [ proc_100, proc_500 ]
+in [ ..., node_13, ... ]
+#+END_SRC
 
+**** Q: Can [[https://www.consul.io/docs/commands/catalog.html][consul catalog]] command be of use to us?
 *** [@dima.c] bootstrapping
 Ansible?
 
