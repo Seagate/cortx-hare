@@ -18,8 +18,10 @@ get_session_id() {
     consul kv get -detailed leader | awk '/Session/ {print $2}'
 }
 
-# Cleanup EQ watcher and currently running RC handler (if any).
-pkill -f -9 proto-rc || true
+# Stop the EQ watcher (if any):
+pkill -9 -f 'consul watch.*prefix eq' || true
+# Nicely stop currently running RC handler (if any):
+pkill -f 'proto-rc' || true
 
 # If the session is already set - the leader is elected, so
 # there is nothing for us to do.
@@ -30,9 +32,9 @@ PAYLD='{"Name": "leader", "Checks": ["serfHealth", "service:confd"]}'
 RES=$(curl -sX PUT -d "$PAYLD" http://localhost:8500/v1/session/create)
 SID=$(echo "$RES" | jq -r '.ID' 2>/dev/null || true)
 
-[[ -n $SID ]] || {
+[[ $SID ]] || {
     echo "Session creation failed: $RES" >&2
-    exit 0  # don't stop the watcher
+    exit 0  # don't stop our watcher
 }
 
 clean_exit() {

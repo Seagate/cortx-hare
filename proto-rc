@@ -16,9 +16,19 @@ set -eu -o pipefail
 #   $ consul watch -type=keyprefix -prefix eq/ proto-rc
 #
 
+STOP=0
+sig_handler() {
+    echo "RC: signal caught! Exiting..."
+    STOP=1
+}
+
 cat | sed 's/null//' | jq -r '.[] | "\(.Key) \(.Value | @base64d)"' |
+  {
+    trap sig_handler TERM
     while read EPOCH EVENT; do
         echo "RC: $CONSUL_INDEX: Process $EPOCH $EVENT..."
         sleep 10
         consul kv delete $EPOCH
+        [[ $STOP -eq 1 ]] && exit 1 || true
     done
+  }
