@@ -12,7 +12,7 @@ set -eu -o pipefail
 # $ consul watch -type=key -key leader elect-rc-leader
 #
 
-SRC_DIR="$(dirname $(readlink -f $0))"
+export SRC_DIR="$(dirname $(readlink -f $0))"
 
 get_session_id() {
     consul kv get -detailed leader | awk '/Session/ {print $2}'
@@ -22,7 +22,7 @@ get_session_id() {
 # there is nothing for us to do.
 get_session_id | grep -q ^- || exit 0
 
-# Stop the EQ watcher (if any):
+# Stop the EQ watch (if any):
 pkill -9 -f 'consul watch.*prefix eq' || true
 # Nicely stop currently running RC handler (if any):
 pkill -f 'proto-rc' || true
@@ -34,7 +34,7 @@ SID=$(echo "$RES" | jq -r '.ID' 2>/dev/null || true)
 
 [[ $SID ]] || {
     echo "Session creation failed: $RES" >&2
-    exit 0  # don't stop our watcher
+    exit 0  # don't stop our watch
 }
 
 clean_exit() {
@@ -50,5 +50,14 @@ while true; do
     consul kv put -acquire -session=$SID leader `hostname` 2>/dev/null && break
 done
 
-# We've got the lock! Start EQ watcher.
-$SRC_DIR/new-rc-leader &
+# We've got the lock! Start the leader in background:
+export SID
+(
+    # XXX: notify Mero about new Principal RM here
+
+    # Start EQ watch:
+    consul watch -type=keyprefix -prefix eq/ $SRC_DIR/proto-rc || true
+
+    # Cleanup after ourselves:
+    curl -sX PUT http://localhost:8500/v1/session/destroy/$SID &>/dev/null
+) &
