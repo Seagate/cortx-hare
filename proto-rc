@@ -16,6 +16,10 @@ set -eu -o pipefail
 #   $ consul watch -type=keyprefix -prefix eq/ proto-rc
 #
 
+# Redirect all printouts to the log file with the timestamp prefix:
+exec &>> /tmp/consul-$(basename $0).log
+exec &> >(stdbuf -oL gawk '{ print strftime("%Y-%m-%d %H:%M:%S"), $0 }')
+
 STOP=0
 sig_handler() {
     echo 'RC: signal caught! Exiting...'
