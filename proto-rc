@@ -18,12 +18,11 @@ set -eu -o pipefail
 
 STOP=0
 sig_handler() {
-    echo "RC: signal caught! Exiting..."
+    echo 'RC: signal caught! Exiting...'
     STOP=1
 }
 
-cat | sed 's/null//' | jq -r '.[] | "\(.Key) \(.Value | @base64d)"' |
-  {
+sed 's/null//' | jq -r '.[] | "\(.Key) \(.Value | @base64d)"' | {
     trap sig_handler TERM
     while read EPOCH EVENT; do
         echo "RC: $CONSUL_INDEX: Process $EPOCH $EVENT..."
@@ -31,4 +30,4 @@ cat | sed 's/null//' | jq -r '.[] | "\(.Key) \(.Value | @base64d)"' |
         consul kv delete $EPOCH
         [[ $STOP -eq 1 ]] && exit 1 || true
     done
-  }
+}
