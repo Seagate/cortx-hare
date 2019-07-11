@@ -1,6 +1,7 @@
-from ctypes import cdll
+import ctypes
 
-lib = cdll.LoadLibrary('./hax.so')
+lib = ctypes.cdll.LoadLibrary('./hax.so')
+lib.init_halink.argtypes = [ctypes.py_object]
 
 
 class HaLink(object):
