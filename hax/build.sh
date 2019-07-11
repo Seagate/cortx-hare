@@ -7,4 +7,7 @@ MERODIR=${MERODIR:-"${CWD}/../../mero"}
 #LIBMERO="${MERODIR}/mero/.libs/libmero.so.1.0.4"
 LIBMERO="${MERODIR}/mero/.libs/"
 
-gcc  ./hax.c -I ${MERODIR} -L ${LIBMERO} -lmero -Wno-attributes -Werror -g -DM0_INTERNAL= -DM0_EXTERN=extern -o ./hax
+gcc  ./hax.c \
+  $(python-config --includes) \
+  $(python-config --libs) \
+  -I ${MERODIR} -L ${LIBMERO} -lmero -Wno-attributes -Werror -g -DM0_INTERNAL= -DM0_EXTERN=extern -o ./hax
