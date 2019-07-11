@@ -10,4 +10,7 @@ LIBMERO="${MERODIR}/mero/.libs/"
 gcc  ./hax.c \
   $(python-config --includes) \
   $(python-config --libs) \
-  -I ${MERODIR} -L ${LIBMERO} -lmero -Wno-attributes -Werror -g -DM0_INTERNAL= -DM0_EXTERN=extern -o ./hax
+  -I ${MERODIR} -L ${LIBMERO} -lmero -Wno-attributes -Werror -g -DM0_INTERNAL= -DM0_EXTERN=extern \
+  -shared \
+  -fPIC \
+  -o ./hax.so
