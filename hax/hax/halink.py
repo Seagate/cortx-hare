@@ -1,6 +1,11 @@
+from ctypes import cdll
+
+lib = cdll.LoadLibrary('./hax.so')
+
+
 class HaLink(object):
     def __init__(self, node_uuid=""):
-        self._ha_ctx = init_halink(self)
+        self._ha_ctx = lib.init_halink(self)
         if not self._ha_ctx:
             raise RuntimeError("Could not initialize ha_link")
 
