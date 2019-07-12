@@ -1,5 +1,42 @@
 * Hare - Halon replacement
 
+** hare v0.1 scoping
+
+*** DONE [2w] study Consul, describe high-level design, write PoC scripts
+
+*** [2w] integration with Mero -- nearest demo
+
+*** [2w] initial configuration
+
+*** [2-4w] bootstrap
+
+*** [2w] health checking
+m0d-s, s3servers
+
+**** setup health checkers
+Every N seconds.
+
+*** RC business logic
+
+**** [2w] RC rule: unhealthy smth appears ==> an item is put into BQ
+
+**** [2w] m0d failure, node failure ==> Mero continues operation (in degraded read mode)
+This can be /any/ node, including the one running Consul leader.
+
+***** ST
+
+**** [2w] disk failure ==> SNS repair/rebalance
+
+***** ST
+
+*** __components :ARCHIVE:
+
+**** cfgen
+
+**** RC scripts
+
+**** hax: Consul<-->m0d HA bridge
+
 ** The "Fortnight" Prototype (due 2019-Jul-15)
 
 We are able to start and stop m0d services in EOS configuration (aka
@@ -107,4 +144,3 @@ It generates only 20 bits of a ~m0_fid~.
 *** m0d heartbeats
 
 Do we want to utilize ~ha_link~ or come with a simpler mechanism?
-
