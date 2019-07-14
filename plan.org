@@ -1,31 +1,211 @@
 * Hare - Halon replacement
 
-** hare v0.1 scoping
+** design constraints
+
+*** design SHOULD NOT require changes of other subsystems (Mero, SSPL, etc.)
+
+Hare is a drop-in Halon replacement.
+
+** definitions
+
+*** BQ (Broadcast Queue)
+
+Consul KV entries whose keys have "bq/<N>" format, where <N> is a natural number.  Value is a pair of *conf object* fid and *HA state*.
+
+*** conf object
+
+Information about cluster's hardware or software entity:
+- static attributes (e.g., identifier)
+- current *HA status*
+*** EQ (Event Queue)
+
+Consul KV entries whose keys have "eq/<N>" format, where <N> is a natural number.  Values are *events*.
+
+*** epoch
+
+Counter value stored in Consul KV under "epoch" key.  The epoch is used to generate unique ordered identifiers for *EQ* and *BQ* entries.
+
+See also [[#hare.new_epoch][hare.new_epoch()]].
+
+*** event
+
+Cluster event, an item of the *EQ*.  Events originate from Mero processes and SSPL, and are enqueued to the *EQ* by hare scripts (e.g., ~hax~).  Events are consumed by the *RC* script, which processes and dequeues them.
+
+An event has /type/ and /payload/.  Proposed encoding: "<type> <payload>".
+
+*** HA state
+
+Availability of a *conf object*, e.g., "online", "starting", "failed", etc.  Represented by ~m0_ha_obj_state~ in Mero code.
+
+*** Mero configuration
+
+Subset of *RG* data, cached by *Mero processes*.
+
+*** Mero process
+
+m0d process, Clovis application, m0t1fs kernel module.  Mero process uses confc API to cache *Mero configuration*.
+
+*** RC (Recovery Coordinator?)
+*** RG (Resource Graph)
+
+Information about *conf objects* and their interrelations. Stored in Consul.
+
+** requirements
+
+*** build the Resource Graph
+
+*** start Mero processes
+
+*** provide Mero confd services with initial cluster configuration
+
+**** TODO Q: Can m0d load configuration from xcode string?
+
+- Does m0d CLI still have that option?
+
+**** we'll have to use Spiel API unless confd can read confd.xc
+
+*** build and update the RG
+
+*** communication with Mero processes
+
+Mero process and Consul agent cannot communicate directly.  Implement a bridge, one side of which accepts connections from Mero processes, the other side communicates with Consul agent over HTTP.
+
+**** entrypoint request
+
+- [hax] from Mero: ~m0_ha_entrypoint_req~ fop
+- [hax] get entrypoint data from Consul
+- [hax] to Mero: ~m0_ha_entrypoint_rep~ fop
+
+**** HA states request
+
+- [hax] from Mero: ~m0_ha_msg_nvec~ (~M0_HA_NVEC_GET~)
+- [hax] query Consul
+- [hax] to Mero: ~m0_ha_msg_nvec~ (~M0_HA_NVEC_SET~)
+
+**** HA states update
+
+- [hax] from Consul: "BQ updated" HTTP POST request from Consul's [[https://www.consul.io/docs/agent/watches.html#http-endpoint][watch handler]]
+- [hax] to Mero: ~m0_ha_msg_nvec~ (~M0_HA_NVEC_SET~)
+
+**** IO error
+
+- [hax] from Mero: ~m0_stob_ioq_error~
+- [hax] to Consul: [[#hare.enqueue_event][hare.enqueue_event()]]
+
+*** communication with SSPL
+
+Reference: [[https://docs.google.com/presentation/d/1L1_1XgzK7yRHGKKtcGedT5gJVP0tVSbCKK8v9goH3h4/edit#slide=id.g3f241aae34_2_0][SSPL v2 Overview]]
+
+**** sensor messages
+
+- from SSPL: JSON message in ~sensor-queue~
+- to Consul: [[#hare.enqueue_event][enqueue event]]
+
+SSPL process and Consul agent cannot communicate directly.  Implement a bridge, one side of which accepts connections from Mero processes, the other side communicates with Consul agent over HTTP.
+
+**** actuator requests & responses
+
+Sending of "run SMART test" actuator requests to SSPL is not required for EES.
+
+XXX Are there any other actuator requests? Should Hare support them?
+
+**** IEM
+
+XXX What are those? Should Hare support them?
+
+*** health checking
+
+- m0d processes
+- m0d locales
+- m0d services
+- RC
+
+*** events processing
+
+- EQ
+- RC
+- rules
+- BQ
+
+*** HA state updates broadcasting
+
+*** high availability
+
+- XXX Is RC a daemon or a short-lived process?
+- XXX How RC failures will be handled?
+
+** hare API
+
+*** enqueue_event
+:PROPERTIES:
+:CUSTOM_ID: hare.enqueue_event
+:END:
+
+#+BEGIN_SRC haskell
+enqueue_event :: Event -> EpochId -> IO ()
+#+END_SRC
+
+Append new item to the EQ.
+(Sends HTTP POST request to the local Consul agent.)
+
+*** new_epoch
+:PROPERTIES:
+:CUSTOM_ID: hare.new_epoch
+:END:
+
+#+BEGIN_SRC haskell
+new_epoch :: IO EpochId
+#+END_SRC
+
+Increment the epoch counter in Consul KV by [[https://www.consul.io/docs/commands/kv/put.html#cas][check-and-set]] operation and return its value.
+
+The function blocks until the epoch is returned or an error occurs.
+
+See the [[https://docs.google.com/document/d/1cR-BbxtMjGuZPj8NOc95RyFjqmeFsYf4JJ5Hw_tL1zA/edit#bookmark=id.whq5d31z34][prototype]].
+
+** [XXX-DELETEME] hare v0.1 scoping :ARCHIVE:
 
 *** DONE [2w] study Consul, describe high-level design, write PoC scripts
 
 *** [2w] integration with Mero -- nearest demo
 
+*** RG representation ([[file:rfc/4/README.md][4/KV]])
+
 *** [2w] initial configuration
+- the same sdev MUST have the same fid
+- the same disk MUST have the same fid
 
 *** [2-4w] bootstrap
 
-*** [2w] health checking
+*** HOLD [2w] health checking                                        :HOLD:
+- State "HOLD"       from              [2019-07-12 Fri 12:38] \\
+  Not required for EES, because m0d-s will be monitored by Corosync/Pacemaker.
 m0d-s, s3servers
 
-**** setup health checkers
-Every N seconds.
+Every N seconds:
+- check health of process
+- check health of each locale ("ping fop")
+- [bonus] check health of services (send fop)
 
-*** RC business logic
+**** setup Consul health checkers
 
-**** [2w] RC rule: unhealthy smth appears ==> an item is put into BQ
+*** HOLD RC business logic                                           :HOLD:
 
-**** [2w] m0d failure, node failure ==> Mero continues operation (in degraded read mode)
+- State "HOLD"       from              [2019-07-12 Fri 12:39] \\
+  Corosync/Pacemaker will do HA for EES.
+**** [2w] RC rule: unhealthy smth appears ==> RC puts new item into BQ
+
+**** HOLD [2w] m0d failure, node failure ==> Mero continues operation (in degraded read mode) :HOLD:
+- State "HOLD"       from              [2019-07-12 Fri 12:21] \\
+  Not needed for EES.
+
 This can be /any/ node, including the one running Consul leader.
 
 ***** ST
 
-**** [2w] disk failure ==> SNS repair/rebalance
+**** HOLD [2w] disk failure ==> SNS repair/rebalance                :HOLD:
+- State "HOLD"       from              [2019-07-12 Fri 12:22] \\
+  Not needed for EES.
 
 ***** ST
 
@@ -37,7 +217,7 @@ This can be /any/ node, including the one running Consul leader.
 
 **** hax: Consul<-->m0d HA bridge
 
-** The "Fortnight" Prototype (due 2019-Jul-15)
+** [XXX-DELETEME] The "Fortnight" Prototype (due 2019-Jul-15) :ARCHIVE:
 
 We are able to start and stop m0d services in EOS configuration (aka
 "1+0" configuration): 1 data unit, no parity units, 2 hosts or 1 host.
@@ -125,6 +305,20 @@ See [[file:rfc/2/README.md][2/HATX]].
 See [[file:rfc/4/README.md][4/KV]].
 
 We might want to store subset of Halon's resource graph in Consul KV.
+
+#+BEGIN_SRC yaml
+/path/to/disks:
+  - disk-1: { attrs }
+
+/path/to/controllers:
+  - ctrl-1: { disks: [ disk-1 ], attrs }
+  - ctrl-2: { disks: [ disk-2 ], attrs }
+
+---
+
+disk-1: { attrs }
+ctrl-1: { attrs, disks: [ disk-1 ] }
+#+END_SRC
 
 *** fault tolerance
 
