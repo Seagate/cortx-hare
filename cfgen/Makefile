@@ -2,8 +2,6 @@ SHELL = bash
 
 PYTHON_SCRIPTS = collect-facts cfgen
 
-FLAKE8_OPTS =
-
 # XXX YMMV
 M0_SRC_DIR = ~/src/mero
 
