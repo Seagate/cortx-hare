@@ -9,16 +9,18 @@ typedef struct hax_context {
   PyObject* handler;
 } hax_context;
 
-long init_halink(PyObject *obj);
+hax_context*  init_halink(PyObject *obj);
 
-void destroy_halink(long ctx);
+void destroy_halink(unsigned long long ctx);
 
-int start( long ctx
+int start( unsigned long long ctx
           , const char *local_rpc_endpoint
           , const struct m0_fid *process_fid
           , const struct m0_fid *ha_service_fid
           , const struct m0_fid *rm_service_fid);
 
+
+void test( unsigned long long ctx );
 
 #endif  // __HAX_H__
 

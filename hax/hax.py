@@ -9,6 +9,8 @@ def setup_logging():
 def main():
     setup_logging()
     l = HaLink()
+    l.start()
+    l.test()
 
 
 if __name__ == "__main__":
