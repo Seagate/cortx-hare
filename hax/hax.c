@@ -30,20 +30,16 @@ PyObject* getModule(const char* module_name)
 PyObject* toFid(const struct m0_fid* fid)
 {
   PyObject* hax_mod = getModule("hax.types");
-  printf("Module loaded? %d\n", hax_mod != NULL ? 1 : 0);
-  PyObject* instance = PyObject_CallMethod(hax_mod, "Fid", "(KK)", fid->f_container, fid->f_key, NULL);
-  printf("Instance created? %d\n", instance != NULL ? 1 : 0);
-  printf("toFid - 4\n");
+  PyObject* instance = PyObject_CallMethod(hax_mod, "Fid", "(KK)", fid->f_container, fid->f_key);
+  Py_DECREF(hax_mod);
   return instance;
 }
 
 PyObject* toUid128(const struct m0_uint128* val)
 {
-  printf("toUid128 - ENTER\n");
-
   PyObject* hax_mod = getModule("hax.types");
-  printf("Module loaded? %d\n", hax_mod != NULL ? 1 : 0);
-  PyObject* instance = PyObject_CallMethod(hax_mod, "Uint128", "(KK)", val->u_hi, val->u_lo, NULL);
+  PyObject* instance = PyObject_CallMethod(hax_mod, "Uint128", "(KK)", val->u_hi, val->u_lo);
+  Py_DECREF(hax_mod);
   return instance;
 }
 
@@ -58,14 +54,9 @@ void entrypoint_request_cb( struct m0_halon_interface         *hi
                           ) {
   /*Py_BEGIN_ALLOW_THREADS*/
   struct hax_context* hax = (struct hax_context*) hi;
-  printf("Context addr: %p\n", hax);
-  printf("handler addr: %p\n", hax->handler);
   PyObject* py_fid = toFid(process_fid);
   PyObject* py_req = toUid128(req_id);
   
-  printf("Here\n");
-
-
   PyObject_CallMethod(
       hax->handler,
       "_entrypoint_request_cb",
@@ -137,6 +128,7 @@ hax_context* init_halink(PyObject *obj)
   // Since we do depend on the Python object, we don't want to let it die before us.
   Py_INCREF(obj);
 
+  // [KN] Debug stuff. In real life we don't need this assignment (this happens inside m0_halon_interface_init)
   hi = calloc(1, sizeof(struct m0_halon_interface));
   /*int rc = m0_halon_interface_init(*/
       /*&hi,*/
