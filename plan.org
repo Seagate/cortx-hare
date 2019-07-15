@@ -2,7 +2,7 @@
 
 ** design constraints
 
-*** design SHOULD NOT require changes of other subsystems (Mero, SSPL, etc.)
+*** design [[https://tools.ietf.org/html/rfc2119#section-4][SHOULD NOT]] require changes of other subsystems (Mero, SSPL, etc.)
 
 Hare is a drop-in Halon replacement.
 
@@ -46,19 +46,40 @@ Subset of *RG* data, cached by *Mero processes*.
 m0d process, Clovis application, m0t1fs kernel module.  Mero process uses confc API to cache *Mero configuration*.
 
 *** RC (Recovery Coordinator?)
+
+A program executed by Consul watch whenever the *EQ* is modified.
+
 *** RG (Resource Graph)
 
 Information about *conf objects* and their interrelations. Stored in Consul.
 
 ** requirements
 
-*** build the Resource Graph
+*** initial cluster configuration
 
-*** start Mero processes
+**** systemd configuration
 
-*** provide Mero confd services with initial cluster configuration
+See also:
+- [[https://docs.google.com/document/d/1cR-BbxtMjGuZPj8NOc95RyFjqmeFsYf4JJ5Hw_tL1zA/edit#bookmark=id.7c6yyeenu47i][systemd dependencies proposal]]
+- [[https://www.consul.io/docs/commands/services/register.html][Consul Agent Service Registration]]
+- [[file:rfc/3/README.md][3/CFGEN]]
+
+**** confd.xc
+
+Provide Mero confd services with initial cluster configuration.
+
+**** Consul KV imports
+
+*** bootstrap
+
+- start Consul agent
+- start hax
+- start Mero processes
 
 *** XXX build and update the RG
+
+What exactly we have to put there?
+Perhaps we'll gradually come to the answer by tackling other requirements.
 
 *** communication with Mero processes
 
@@ -114,9 +135,12 @@ Use Consule health checking mechanism.
 - m0d processes
 - m0d locales
 - m0d services
-- RC
+- hax
 
-*** events processing
+**** setup Consul watches that will [[https://docs.google.com/document/d/1cR-BbxtMjGuZPj8NOc95RyFjqmeFsYf4JJ5Hw_tL1zA/edit#heading=h.zgvalvz417v1][health-check m0ds]]
+NB: This requires sending of current HA states of _all_ services (not only those that changed HA state).
+
+*** RC script (events processing)
 
 - EQ
 - RC
@@ -129,8 +153,34 @@ BQ changes ==> Consul [[https://www.consul.io/docs/agent/watches.html][watch han
 
 *** high availability
 
-- XXX Is RC a daemon or a short-lived process?
+XXX [[https://learn.hashicorp.com/consul/developer-configuration/elections][Leader Election Guide]]
+
+- Q: Is RC a daemon or a short-lived process?
+  A: Short-lived process, triggered by Consul watch handler when the EQ is modified.
 - XXX How RC failures will be handled?
+** scoping                                                        :QUESTION:
+
+- XXX Q: Should this scoping only cover EES?
+- XXX Add DoDs (definitions of done).
+
+*** RC script
+
+*** bootstrap
+
+**** write the RFC
+
+*** initial cluster configuration
+*** hax
+
+Support entrypoint fops and ha-msgs.
+
+*** rabbix (RabbitMQ exchanger)                                  :QUESTION:
+
+XXX Do we have to process SSPL sensor messages for EES?
+
+*** health checking
+
+**** write the RFC
 
 ** hare API
 
