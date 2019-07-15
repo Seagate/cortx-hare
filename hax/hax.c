@@ -43,7 +43,6 @@ PyObject* toUid128(const struct m0_uint128* val)
   return instance;
 }
 
-
 void entrypoint_request_cb( struct m0_halon_interface         *hi
                           , const struct m0_uint128           *req_id
                           , const char             *remote_rpc_endpoint
@@ -122,26 +121,26 @@ void link_disconnected_cb ( struct m0_halon_interface *hi
   // TODO Implement me
 }
 
-hax_context* init_halink(PyObject *obj)
+hax_context* init_halink(PyObject *obj, const char* node_uuid)
 {
   struct m0_halon_interface* hi;
   // Since we do depend on the Python object, we don't want to let it die before us.
   Py_INCREF(obj);
 
   // [KN] Debug stuff. In real life we don't need this assignment (this happens inside m0_halon_interface_init)
-  hi = calloc(1, sizeof(struct m0_halon_interface));
-  /*int rc = m0_halon_interface_init(*/
-      /*&hi,*/
-      /*M0_VERSION_GIT_REV_ID,*/
-      /*M0_VERSION_BUILD_CONFIGURE_OPTS,*/
-      /*NULL,*/
-      /*NULL);*/
+  /*hi = calloc(1, sizeof(struct m0_halon_interface));*/
+  int rc = m0_halon_interface_init(
+      &hi,
+      M0_VERSION_GIT_REV_ID,
+      M0_VERSION_BUILD_CONFIGURE_OPTS,
+      NULL,
+      node_uuid);
 
-  /*if (rc != 0)*/
-  /*{*/
-    /*free(hi);*/
-    /*return 0;*/
-  /*}*/
+  if (rc != 0)
+  {
+    free(hi);
+    return 0;
+  }
 
 
   printf("I'm here\n");

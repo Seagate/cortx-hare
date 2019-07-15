@@ -8,7 +8,7 @@ def setup_logging():
 
 def main():
     setup_logging()
-    l = HaLink()
+    l = HaLink(node_uuid="This is a test")
     l.start()
     l.test()
 

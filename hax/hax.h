@@ -9,7 +9,7 @@ typedef struct hax_context {
   PyObject* handler;
 } hax_context;
 
-hax_context*  init_halink(PyObject *obj);
+hax_context* init_halink(PyObject *obj, const char* node_uuid);
 
 void destroy_halink(unsigned long long ctx);
 
