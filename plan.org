@@ -58,13 +58,7 @@ Information about *conf objects* and their interrelations. Stored in Consul.
 
 *** provide Mero confd services with initial cluster configuration
 
-**** TODO Q: Can m0d load configuration from xcode string?
-
-- Does m0d CLI still have that option?
-
-**** we'll have to use Spiel API unless confd can read confd.xc
-
-*** build and update the RG
+*** XXX build and update the RG
 
 *** communication with Mero processes
 
@@ -87,7 +81,7 @@ Mero process and Consul agent cannot communicate directly.  Implement a bridge, 
 - [hax] from Consul: "BQ updated" HTTP POST request from Consul's [[https://www.consul.io/docs/agent/watches.html#http-endpoint][watch handler]]
 - [hax] to Mero: ~m0_ha_msg_nvec~ (~M0_HA_NVEC_SET~)
 
-**** IO error
+**** IO errors, rpc timeouts, etc.
 
 - [hax] from Mero: ~m0_stob_ioq_error~
 - [hax] to Consul: [[#hare.enqueue_event][hare.enqueue_event()]]
@@ -115,6 +109,8 @@ XXX What are those? Should Hare support them?
 
 *** health checking
 
+Use Consule health checking mechanism.
+
 - m0d processes
 - m0d locales
 - m0d services
@@ -128,6 +124,8 @@ XXX What are those? Should Hare support them?
 - BQ
 
 *** HA state updates broadcasting
+
+BQ changes ==> Consul [[https://www.consul.io/docs/agent/watches.html][watch handlers]] trigger
 
 *** high availability
 
