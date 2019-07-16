@@ -20,7 +20,7 @@ typecheck: $(PYTHON_SCRIPTS)
 check-dhall: confd.dhall
 	xcode() { sort | $(M0_SRC_DIR)/utils/m0confgen; };\
  dhall-to-text < $< | xcode |\
- diff -u - <(grep -E '^.(controller-7\
+ diff -u - <(grep -E "^.(controller-7\
 |drive-(1[13579]|2[13]|71)\
 |enclosure-5\
 |node\
@@ -34,4 +34,4 @@ check-dhall: confd.dhall
 |root\
 |sdev-(1[02468]|2[02]|70|8)\
 |service-(2[5689]|3[1-79]|4[1357])\
-|site)\>' _misc/conf.cg | xcode)
+|site)\>" _misc/conf.cg | xcode)
