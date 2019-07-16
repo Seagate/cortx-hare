@@ -158,29 +158,91 @@ XXX [[https://learn.hashicorp.com/consul/developer-configuration/elections][Lead
 - Q: Is RC a daemon or a short-lived process?
   A: Short-lived process, triggered by Consul watch handler when the EQ is modified.
 - XXX How RC failures will be handled?
-** scoping                                                        :QUESTION:
 
-- XXX Q: Should this scoping only cover EES?
+** _sprint-4
+
+- [X] andriy
+- [X] kostya
+- [X] mandar
+- [X] prasanna
+- [ ] rajanikant
+- [X] vvv
+
+*** hax
+
+**** [@kostya] python/c
+
+**** [@mandar] c (libcurl, libjson)
+
+**** ? haskell
+
+**** HOLD go (Consul Go bindings)                              :HOLD:
+
+- State "HOLD"  from              [2019-07-16 Tue 12:46] \\
+  Learning curve, however short, is still to be accounted for.
+
+**** CANCELLED c++/c (Consul C++ bindings)                     :CANCELLED:
+
+- State "CANCELLED"  from              [2019-07-16 Tue 12:45] \\
+  HTTP API is as stable (if not more stable) as language bindings are.
+
+*** [@andriy] health checking
+
+*** [@vvv] confd.xc
+
+*** [@prasanna] initial-rg.json
+
+** scoping
+
 - XXX Add DoDs (definitions of done).
 
-*** RC script
+*** health checking
+
+**** write the RFC
+
+**** HA state updates via health checking
+
+- Consul [health] [[https://www.consul.io/docs/agent/checks.html][check]] on each node (e.g., ~pgrep m0d~)
+- Consul check watch on each node. Sends HA states (of *all* services) to the local ~hax~.
+
+*** cluster configuration
+
+**** initial
+
+***** confd.xc
+
+***** initial-rg.json
+
+[[https://www.consul.io/docs/commands/kv/import.html][Consul KV import]] files (JSON).
+
+- write the RFC ([[file:rfc/4/README.md][4/KV]])
+- generate the JSONs
+
+**** RG: disks
+
+*** hax
+
+Support entrypoint fops and ha-msgs.
 
 *** bootstrap
 
 **** write the RFC
 
-*** initial cluster configuration
-*** hax
+**** systemd scripts (with [[https://docs.google.com/document/d/1cR-BbxtMjGuZPj8NOc95RyFjqmeFsYf4JJ5Hw_tL1zA/edit#bookmark=id.7c6yyeenu47i][dependencies between Consul/confd/ios]])
 
-Support entrypoint fops and ha-msgs.
+**** /etc config
+
+*** RC                                                           :QUESTION:
+
+XXX Q: What of this is needed in EES?
+
+- EQ
+- rules
+- BQ
 
 *** rabbix (RabbitMQ exchanger)                                  :QUESTION:
 
 XXX Do we have to process SSPL sensor messages for EES?
-
-*** health checking
-
-**** write the RFC
 
 ** hare API
 
