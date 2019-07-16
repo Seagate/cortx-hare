@@ -170,13 +170,13 @@ XXX [[https://learn.hashicorp.com/consul/developer-configuration/elections][Lead
 
 *** hax
 
-**** [@kostya] python/c
+**** [@kostya] Python/C
 
-**** [@mandar] c (libcurl, libjson)
+***** NEXT test the threading model (~m0_thread_adopt~)
 
-**** ? haskell
+**** C (libcurl, libjson)
 
-**** HOLD go (Consul Go bindings)                              :HOLD:
+**** HOLD Go (Consul Go bindings)                              :HOLD:
 
 - State "HOLD"  from              [2019-07-16 Tue 12:46] \\
   Learning curve, however short, is still to be accounted for.
@@ -191,6 +191,8 @@ XXX [[https://learn.hashicorp.com/consul/developer-configuration/elections][Lead
 *** [@vvv] confd.xc
 
 *** [@prasanna] initial-rg.json
+
+*** [@rajanikant] ?
 
 ** scoping
 
@@ -218,7 +220,7 @@ XXX [[https://learn.hashicorp.com/consul/developer-configuration/elections][Lead
 - write the RFC ([[file:rfc/4/README.md][4/KV]])
 - generate the JSONs
 
-**** RG: disks
+**** RG: disks, pools
 
 *** hax
 
@@ -232,15 +234,17 @@ Support entrypoint fops and ha-msgs.
 
 **** /etc config
 
-*** RC                                                           :QUESTION:
+**** bootstrap script (pdsh)
 
-XXX Q: What of this is needed in EES?
+*** RC
+
+XXX Needed only if we want Hare to handle events that cannot be handled with Consul health checks (e.g., rpc timeouts or IO errors reported by Mero processes).
 
 - EQ
 - rules
 - BQ
 
-*** rabbix (RabbitMQ exchanger)                                  :QUESTION:
+*** rabbix (RabbitMQ exchanger)
 
 XXX Do we have to process SSPL sensor messages for EES?
 
