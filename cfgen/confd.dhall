@@ -45,16 +45,16 @@ let ObjT/show : ObjT -> Text =
       }
     in merge conv x
 
+-- Object identifier.
 let Oid =
   { type : ObjT
   , cont7 : Natural -- fid.f_container & M0_FID_TYPE_MASK
   , key : Natural
   }
 
-let mkOid = \(type : ObjT) -> \(cont7 : Natural) -> \(key : Natural) ->
-    { type = type, cont7 = cont7, key = key } : Oid
-
-let zoid = \(objt : ObjT) -> \(key : Natural) -> mkOid objt 0 key
+-- Create an `Oid` value with zeroed `cont7` field.
+let zoid = \(objt : ObjT) -> \(key : Natural) ->
+  { cont7 = 0 } /\ { type = objt, key = key } : Oid
 
 let Oid/toConfGen = \(x : Oid) ->
     let cont : Text =
@@ -81,9 +81,8 @@ let join =
 
 let nat = Natural/show
 let oid = Oid/toConfGen
-let text = Text/show
 
--- m0_conf_root
+-- m0_confx_root
 let Root =
   { id : Oid
   , verno : Natural
@@ -116,7 +115,37 @@ let Root/toConfGen = \(x : Root) ->
  ++ " fdmi_flt_grps=${join.Oids x.fdmi_flt_grps}"
  ++ ")"
 
--- m0_conf_node
+-- m0_confx_fdmi_flt_grp
+let FdmiFltGrp =
+  { id : Oid
+  , rec_type : Natural
+  , filters : List Oid  -- XXX s/Oid/Fid/
+  }
+
+let FdmiFltGrp/toConfGen = \(x : FdmiFltGrp) ->
+    "(${oid x.id}"
+ ++ " rec_type=${nat x.rec_type}"
+ ++ " filters=${join.Oids x.filters}"
+ ++ ")"
+
+-- m0_confx_fdmi_filter
+let FdmiFilter =
+  { id : Oid
+  , filter_id : Oid  -- XXX s/Oid/Fid/
+  , filter_root : Text
+  , node : Oid  -- XXX s/Oid/Fid/
+  , endpoints : List Text
+  }
+
+let FdmiFilter/toConfGen = \(x : FdmiFilter) ->
+    "(${oid x.id}"
+ ++ " id=${oid x.filter_id}"
+ ++ " root=${Text/show x.filter_root}"
+ ++ " node=${oid x.node}"
+ ++ " endpoints=${join.Texts x.endpoints}"
+ ++ ")"
+
+-- m0_confx_node
 let Node =
   { id : Oid
   , memsize : Natural
@@ -135,31 +164,7 @@ let Node/toConfGen = \(x : Node) ->
  ++ " processes=${join.Oids x.processes}"
  ++ ")"
 
--- FdmiFilter
-let FdmiFilter =
-  { id : Natural   -- fid
-  , root : Text
-  , endpoints : List Text
-  }
-
-let FdmiFilter/toConfGen = \(x : FdmiFilter) ->
-    "(id=${nat x.id}"
- ++ " root=${text x.root}"
- ++ " endpoints=${join.Texts x.endpoints}"
- ++ ")"
-
--- FdmiFltGrp
-let FdmiFltGrp =
-  { rec_type : Natural
-  , filters : List Oid
-  }
-
-let FdmiFltGrp/toConfGen = \(x : FdmiFltGrp) ->
-    "(rec_type=${nat x.rec_type}"
- ++ " filters=${join.Oids x.filters}"
- ++ ")"
-
--- m0_conf_process
+-- m0_confx_process
 let Process =
   { id : Oid
   , cores : List Natural
@@ -182,7 +187,88 @@ let Process/toConfGen = \(x : Process) ->
  ++ " services=${join.Oids x.services}"
  ++ ")"
 
--- controller
+-- m0_confx_service
+let Service =
+  { id : Oid
+  , type : Natural  -- XXX make it a union
+  , endpoints : List Text
+  , params : List Text
+  , sdevs : List Oid
+  }
+
+let Service/toConfGen = \(x : Service) ->
+    "(${oid x.id}"
+ ++ " type=${nat x.type}"
+ ++ " endpoints=${join.Texts x.endpoints}"
+ ++ " params=${join.Texts x.params}"
+ ++ " sdevs=${join.Oids x.sdevs}"
+ ++ ")"
+
+-- m0_confx_sdev
+let Sdev =
+  { id : Oid
+  , dev_idx : Natural
+  , iface : Natural  -- XXX make it a union
+  , media : Natural  -- XXX make it a union
+  , bsize : Natural
+  , size : Natural
+  , last_state : Natural
+  , flags : Natural
+  , filename : Text
+  }
+
+let Sdev/toConfGen = \(x : Sdev) ->
+    "(${oid x.id}"
+ ++ " dev_idx=${nat x.dev_idx}"
+ ++ " iface=${nat x.iface}"
+ ++ " media=${nat x.media}"
+ ++ " bsize=${nat x.bsize}"
+ ++ " size=${nat x.size}"
+ ++ " last_state=${nat x.last_state}"
+ ++ " flags=${nat x.flags}"
+ ++ " filename=${Text/show x.filename}"
+ ++ ")"
+
+-- m0_confx_site
+let Site =
+  { id : Oid
+  , racks : List Oid
+  , pvers : List Oid
+  }
+
+let Site/toConfGen = \(x : Site) ->
+    "(${oid x.id}"
+ ++ " racks=${join.Oids x.racks}"
+ ++ " pvers=${join.Oids x.pvers}"
+ ++ ")"
+
+-- m0_confx_rack
+let Rack =
+  { id : Oid
+  , encls : List Oid
+  , pvers : List Oid
+  }
+
+let Rack/toConfGen = \(x : Rack) ->
+    "(${oid x.id}"
+ ++ " encls=${join.Oids x.encls}"
+ ++ " pvers=${join.Oids x.pvers}"
+ ++ ")"
+
+-- m0_confx_enclosure
+let Enclosure =
+  { id : Oid
+  , ctrls : List Oid
+  , pvers : List Oid
+  }
+
+let Enclosure/toConfGen = \(x : Enclosure) ->
+    "(${oid x.id}"
+ ++ " ctrls=${join.Oids x.ctrls}"
+ ++ " pvers=${join.Oids x.pvers}"
+ ++ ")"
+
+-- m0_confx_controller
 let Controller =
   { id : Oid
   , node : Oid
@@ -197,69 +283,32 @@ let Controller/toConfGen = \(x : Controller) ->
  ++ " pvers=${join.Oids x.pvers}"
  ++ ")"
 
--- drive
+-- m0_confx_drive
 let Drive =
   { id : Oid
-  , dev : Oid
+  , sdev : Oid
   , pvers : List Oid
   }
 
 let Drive/toConfGen = \(x : Drive) ->
     "(${oid x.id}"
- ++ " dev=${oid x.dev}"
+ ++ " dev=${oid x.sdev}"
  ++ " pvers=${join.Oids x.pvers}"
  ++ ")"
 
--- enclosure
-let Enclosure =
-  { id : Oid
-  , ctrls : List Oid
-  , pvers : List Oid
-  }
-
-let Enclosure/toConfGen = \(x : Enclosure) ->
-    "(${oid x.id}"
- ++ " ctrls=${join.Oids x.ctrls}"
- ++ " pvers=${join.Oids x.pvers}"
- ++ ")"
-
--- Objv
-let Objv =
-  { id : Oid
-  , real : Oid  -- real
-  , children : List Oid
-  }
-
-let Objv/toConfGen = \(x : Objv) ->
-    "(${oid x.id}"
- ++ " real=${oid x.real}"
- ++ " children=${join.Oids x.children}"
- ++ ")"
-
--- Pool
+-- m0_confx_pool
 let Pool =
   { id : Oid
-  , pver_policy : Natural
   , pvers : List Oid
   }
 
 let Pool/toConfGen = \(x : Pool) ->
     "(${oid x.id}"
- ++ " pver_policy=${nat x.pver_policy}"
+ ++ " pver_policy=0"
  ++ " pvers=${join.Oids x.pvers}"
  ++ ")"
 
--- Profile
-let Profile =
-  { id : Oid
-  , pools : List Oid
-  }
-
-let Profile/toConfGen = \(x : Profile) ->
-    "(${oid x.id}"
- ++ " pools=${join.Oids x.pools})"
-
--- Pver
+-- m0_confx_pver_actual
 let Pver =
   { id : Oid
   , N : Natural
@@ -278,88 +327,43 @@ let Pver/toConfGen = \(x : Pver) ->
  ++ " sitevs=${join.Oids x.sitevs}"
  ++ ")"
 
-
--- PverF
+-- m0_confx_pver_formulaic
 let PverF =
-  { iD : Oid
-  , id : Natural
+  { id : Oid
+  , cuid : Natural  -- cluster-unique identifier of this formulaic pver
   , base : Oid
   , allowance : List Natural
   }
 
 let PverF/toConfGen = \(x : PverF) ->
-    "(${oid x.iD}"
- ++ " id=${nat x.id}"
+    "(${oid x.id}"
+ ++ " id=${nat x.cuid}"
  ++ " base=${oid x.base}"
  ++ " allowance=${join.Naturals x.allowance}"
  ++ ")"
 
--- Rack
-let Rack =
+-- m0_confx_objv
+let Objv =
   { id : Oid
-  , encls : List Oid
-  , pvers : List Oid
+  , real : Oid
+  , children : List Oid
   }
 
-let Rack/toConfGen = \(x : Rack) ->
+let Objv/toConfGen = \(x : Objv) ->
     "(${oid x.id}"
- ++ " encls=${join.Oids x.encls}"
- ++ " pvers=${join.Oids x.pvers}"
+ ++ " real=${oid x.real}"
+ ++ " children=${join.Oids x.children}"
  ++ ")"
 
--- Sdev
-let Sdev =
+-- m0_confx_profile
+let Profile =
   { id : Oid
-  , dev_idx : Natural
-  , iface : Natural
-  , media : Natural
-  , bsize : Natural
-  , size : Natural
-  , last_state : Natural
-  , flags : Natural
-  , filename : Text
+  , pools : List Oid
   }
 
-let Sdev/toConfGen = \(x : Sdev) ->
+let Profile/toConfGen = \(x : Profile) ->
     "(${oid x.id}"
- ++ " dev_idx=${nat x.dev_idx}"
- ++ " iface=${nat x.iface}"
- ++ " media=${nat x.media}"
- ++ " bsize=${nat x.bsize}"
- ++ " size=${nat x.size}"
- ++ " last_state=${nat x.last_state}"
- ++ " flags=${nat x.flags}"
- ++ " filename=${text x.filename}"
- ++ ")"
-
--- Service
-let Service =
-  { id : Oid
-  , type : Natural
-  , endpoints : List Text
-  , params : List Text
-  , sdevs : List Oid
-  }
-
-let Service/toConfGen = \(x : Service) ->
-    "(${oid x.id}"
- ++ " type=${nat x.type}"
- ++ " endpoints=${join.Texts x.endpoints}"
- ++ " params=${join.Texts x.params}"
- ++ " sdevs=${join.Oids x.sdevs}"
- ++ ")"
-
--- Site
-let Site =
-  { id : Oid
-  , racks : List Oid
-  , pvers : List Oid
-  }
-
-let Site/toConfGen = \(x : Site) ->
-    "(${oid x.id}"
- ++ " racks=${join.Oids x.racks}"
- ++ " pvers=${join.Oids x.pvers}"
+ ++ " pools=${join.Oids x.pools}"
  ++ ")"
 
 let Obj =
@@ -443,7 +447,7 @@ let ids =
   , pver_2     = zoid ObjT.Pver 2
   , pver_49    = zoid ObjT.Pver 49
   , pver_63    = zoid ObjT.Pver 63
-  , pver_f    = zoid ObjT.PverF 62
+  , pver_f     = zoid ObjT.PverF 62
   , profile    = zoid ObjT.Profile 77
   , sdev_8     = zoid ObjT.Sdev 8
   , sdev_10    = zoid ObjT.Sdev 10
@@ -511,9 +515,9 @@ let node = Obj.Node
   , nr_cpu = 3
   , last_state = 0
   , flags = 0
-  , processes = [ids.process_24, ids.process_44, ids.process_46
+  , processes = [ ids.process_24, ids.process_44, ids.process_46
                 , ids.process_30, ids.process_27, ids.process_38
-                , ids.process_42, ids.process_40]
+                , ids.process_42, ids.process_40 ]
   }
 
 let process_24 = Obj.Process
@@ -579,7 +583,9 @@ let process_30 = Obj.Process
   , mem_limit_stack = 2914304
   , mem_limit_memlock = 2914304
   , endpoint = "172.28.128.3@tcp:12345:41:401"
-  , services = [ids.service_31, ids.service_36, ids.service_35, ids.service_33, ids.service_37, ids.service_34, ids.service_32]
+  , services = [ ids.service_31, ids.service_36, ids.service_35
+               , ids.service_33, ids.service_37, ids.service_34
+               , ids.service_32 ]
   }
 
 let process_46 = Obj.Process
@@ -714,56 +720,56 @@ let sdev_70 = Obj.Sdev
 
 let drive_15 = Obj.Drive
   { id = ids.drive_15
-  , dev = ids.sdev_14
+  , sdev = ids.sdev_14
   , pvers = [ids.pver_49]
   }
 
 let drive_13 = Obj.Drive
   { id = ids.drive_13
-  , dev = ids.sdev_12
+  , sdev = ids.sdev_12
   , pvers = [ids.pver_49]
   }
 
 let drive_11 = Obj.Drive
   { id = ids.drive_11
-  , dev = ids.sdev_10
+  , sdev = ids.sdev_10
   , pvers = [ids.pver_49]
   }
 
 let drive_9 = Obj.Drive
   { id = ids.drive_9
-  , dev = ids.sdev_8
+  , sdev = ids.sdev_8
   , pvers = [ids.pver_49]
   }
 
 let drive_23 = Obj.Drive
   { id = ids.drive_23
-  , dev = ids.sdev_22
+  , sdev = ids.sdev_22
   , pvers = [ids.pver_49]
   }
 
 let drive_71 = Obj.Drive
   { id = ids.drive_71
-  , dev = ids.sdev_70
+  , sdev = ids.sdev_70
   , pvers = [ids.pver_2]
   }
 
 let drive_21 = Obj.Drive
   { id = ids.drive_21
-  , dev = ids.sdev_20
+  , sdev = ids.sdev_20
   , pvers = [ids.pver_49]
   }
 
 let drive_19 = Obj.Drive
   { id = ids.drive_19
-  , dev = ids.sdev_18
+  , sdev = ids.sdev_18
   , pvers = [ids.pver_49]
   }
 
 let drive_17 = Obj.Drive
   { id = ids.drive_17
-  , dev = ids.sdev_16
-  , pvers = [ids.pver_49 , ids.pver_63]
+  , sdev = ids.sdev_16
+  , pvers = [ids.pver_49, ids.pver_63]
   }
 
 let objv_64 = Obj.Objv
@@ -847,7 +853,8 @@ let objv_50 = Obj.Objv
 let objv_51 = Obj.Objv
   { id = ids.objv_51
   , real = ids.controller_7
-  , children = [ids.objv_50, ids.objv_55, ids.objv_56, ids.objv_57, ids.objv_58, ids.objv_59, ids.objv_60, ids.objv_61]
+  , children = [ ids.objv_50, ids.objv_55, ids.objv_56, ids.objv_57
+               , ids.objv_58, ids.objv_59, ids.objv_60, ids.objv_61 ]
   }
 
 let objv_52 = Obj.Objv
@@ -927,19 +934,16 @@ let pver_2 = Obj.Pver
 
 let pool_48 = Obj.Pool
   { id = ids.pool_48
-  , pver_policy = 0
   , pvers = [ids.pver_f, ids.pver_49]
   }
 
 let pool_69 = Obj.Pool
   { id = ids.pool_69
-  , pver_policy = 0
   , pvers = [ids.pver_2]
   }
 
 let pool_1 = Obj.Pool
   { id = ids.pool_1
-  , pver_policy = 0
   , pvers = [ids.pver_63]
   }
 
@@ -988,7 +992,8 @@ let service_32 = Obj.Service
   , type = 2
   , endpoints = ["\"172.28.128.3@tcp:12345:41:401\""]
   , params = [] : List Text
-  , sdevs = [ids.sdev_10, ids.sdev_22, ids.sdev_16, ids.sdev_8, ids.sdev_14, ids.sdev_18, ids.sdev_12, ids.sdev_20]
+  , sdevs = [ ids.sdev_10, ids.sdev_22, ids.sdev_16, ids.sdev_8, ids.sdev_14
+            , ids.sdev_18, ids.sdev_12, ids.sdev_20 ]
   }
 
 let service_34 = Obj.Service
@@ -1074,7 +1079,9 @@ let service_26 = Obj.Service
 let controller_7 = Obj.Controller
   { id = ids.controller_7
   , node = ids.node
-  , drives = [ids.drive_17, ids.drive_19, ids.drive_21, ids.drive_71, ids.drive_23, ids.drive_9, ids.drive_11, ids.drive_13, ids.drive_15]
+  , drives = [ ids.drive_17, ids.drive_19, ids.drive_21, ids.drive_71
+             , ids.drive_23, ids.drive_9, ids.drive_11, ids.drive_13
+             , ids.drive_15 ]
   , pvers = [ids.pver_2, ids.pver_49, ids.pver_63]
   }
 
@@ -1097,8 +1104,8 @@ let site = Obj.Site
   }
 
 let pver_f = Obj.PverF
-  { iD = ids.pver_f
-  , id = 0
+  { id = ids.pver_f
+  , cuid = 0
   , base = ids.pver_49
   , allowance = [0, 0, 0, 0, 1]
   }
@@ -1108,81 +1115,83 @@ let profile_77 = Obj.Profile
   , pools = [ids.pool_69, ids.pool_48, ids.pool_1]
   }
 
-let objs = [controller_7,
-	     enclosure_5,
-             rack_4,
-             root,
-             node,
-             process_24,
-             process_27,
-             process_30,
-             process_38,
-             process_40,
-             process_42,
-             process_44,
-             process_46,
-             service_25,
-             service_26,
-             service_28,
-             service_29,
-             service_31,
-             service_32,
-             service_33,
-             service_34,
-             service_35,
-             service_36,
-             service_37,
-             service_39,
-             service_41,
-             service_43,
-             service_45,
-             service_47,
-             pool_1,
-             pool_48,
-             pool_69,
-             pver_2,
-             pver_49,
-             pver_63,
-             sdev_8,
-             sdev_10,
-             sdev_12,
-             sdev_14,
-             sdev_16,
-             sdev_18,
-             sdev_20,
-             sdev_22,
-             sdev_70,
-             drive_11,
-             drive_13,
-             drive_15,
-             drive_17,
-             drive_19,
-             drive_21,
-             drive_23,
-             drive_71,
-             objv_50,
-             objv_51,
-             objv_52,
-             objv_53,
-             objv_54,
-             objv_55,
-             objv_56,
-             objv_57,
-             objv_58,
-             objv_59,
-             objv_60,
-             objv_61,
-             objv_65,
-             objv_66,
-             objv_67,
-             objv_68,
-             objv_72,
-             objv_73,
-             objv_74,
-             objv_75,
-             objv_76,
-	     pver_f,
-             profile_77,
-             site]
+let objs =
+  [ root
+  , node
+  , process_24
+  , process_27
+  , process_30
+  , process_38
+  , process_40
+  , process_42
+  , process_44
+  , process_46
+  , service_25
+  , service_26
+  , service_28
+  , service_29
+  , service_31
+  , service_32
+  , service_33
+  , service_34
+  , service_35
+  , service_36
+  , service_37
+  , service_39
+  , service_41
+  , service_43
+  , service_45
+  , service_47
+  , sdev_8
+  , sdev_10
+  , sdev_12
+  , sdev_14
+  , sdev_16
+  , sdev_18
+  , sdev_20
+  , sdev_22
+  , sdev_70
+  , site
+  , rack_4
+  , enclosure_5
+  , controller_7
+  , drive_11
+  , drive_13
+  , drive_15
+  , drive_17
+  , drive_19
+  , drive_21
+  , drive_23
+  , drive_71
+  , pool_1
+  , pool_48
+  , pool_69
+  , pver_2
+  , pver_49
+  , pver_63
+  , pver_f
+  , objv_50
+  , objv_51
+  , objv_52
+  , objv_53
+  , objv_54
+  , objv_55
+  , objv_56
+  , objv_57
+  , objv_58
+  , objv_59
+  , objv_60
+  , objv_61
+  , objv_65
+  , objv_66
+  , objv_67
+  , objv_68
+  , objv_72
+  , objv_73
+  , objv_74
+  , objv_75
+  , objv_76
+  , profile_77
+  ]
 
 in Objs/toConfGen objs
