@@ -129,12 +129,18 @@ hax_context* init_halink(PyObject *obj, const char* node_uuid)
 
   // [KN] Debug stuff. In real life we don't need this assignment (this happens inside m0_halon_interface_init)
   /*hi = calloc(1, sizeof(struct m0_halon_interface));*/
-  int rc = m0_halon_interface_init(
+
+  int rc; // Note that Py_BEGIN_ALLOW_THREADS contains an open { and defines a block.
+  //
+  // TODO investigate why it doesn't work
+  /*Py_BEGIN_ALLOW_THREADS*/
+  rc = m0_halon_interface_init(
       &hi,
       M0_VERSION_GIT_REV_ID,
       M0_VERSION_BUILD_CONFIGURE_OPTS,
       NULL,
       node_uuid);
+  /*Py_END_ALLOW_THREADS*/
 
   if (rc != 0)
   {
@@ -172,6 +178,7 @@ int start( unsigned long long ctx
          , const struct m0_fid *ha_service_fid
          , const struct m0_fid *rm_service_fid)
 {
+  /*printf("Received fid: {%llu, %llu}\n", process_fid->f_container, process_fid->f_key);*/
   struct m0_halon_interface* hi = (struct m0_halon_interface*) ctx;
   return m0_halon_interface_start( hi
                                  , local_rpc_endpoint
