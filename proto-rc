@@ -3,7 +3,7 @@ set -eu -o pipefail
 
 # Recovery Coordinator (RC) prototype.
 #
-# Implemented as a Consul watcher handler over the Events Queue (EQ)
+# Implemented as a Consul watch handler over the Events Queue (EQ)
 # in the persistent KV store.
 #
 # Takes JSON array of events from stdin and processes them one after another.

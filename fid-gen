@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+set -eu -o pipefail
+
+usage() {
+    echo "$0 <type>"
+    echo
+    echo "Generate next fid of the given cluster entity type."
+    exit 1
+}
+
+[[ $# == 1 ]] || usage
+
+TYPE=$1
+
+export SRC_DIR="$(dirname $(readlink -f $0))"
+
+printf "0x%02x00000000000001:0x%04x\n" $TYPE $($SRC_DIR/next-gen fid)
