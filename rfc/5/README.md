@@ -15,5 +15,5 @@ Mero process and Consul agent cannot communicate directly.  They communicate ove
 The code of `hax` consists of C and Python parts.
 
 * C part maintains HA link (`m0_ha_link`) connections with one or more `m0d` processes.  The code uses `m0_halon_interface` API.
-* Python part runs HTTP server.  This server receives HTTP POST request from Consul KV watch handler, which is triggered whenever any key matching "bq/" prefix changes.
-* The callback functions passed to `m0_halon_interface_start()` are defined in the Python code.
+* The callback functions passed to `m0_halon_interface_start()` are defined in the Python code.  Callback handlers (e.g., `entrypoint_request_cb`, `msg_received_cb`) send HTTP requests to Consul.
+* Python part also runs HTTP server.  This server receives HTTP POST request from Consul KV watch handler, which is triggered whenever any key matching "bq/" prefix changes.
