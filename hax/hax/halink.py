@@ -1,5 +1,6 @@
 import ctypes as c
 import logging
+import threading
 from hax.types import Fid, FidStruct
 
 lib = c.cdll.LoadLibrary('/home/720599/projects/hare/hax/hax.so')
@@ -39,7 +40,9 @@ class HaLink(object):
         return c.c_char_p(byte_str)
 
     def test(self):
-        _test(self._ha_ctx)
+        tname = threading.currentThread().getName()
+        logging.info('Test method is invoked from thread {}'.format(tname))
+        # TODO call m0d from here
 
     def test_cb(self):
         import pudb; pudb.set_trace()
