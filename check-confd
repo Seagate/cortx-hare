@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -eu -o pipefail
+
+#
+# This is the Health Check for the Mero confd service.
+#
+
+test -f /tmp/confd || exit 2

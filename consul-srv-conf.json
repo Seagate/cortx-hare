@@ -11,11 +11,11 @@
   "service": {
     "id": "confd",
     "name": "confd",
-    "address": "192.168.180.162@tcp:12345:44",
+    "address": "@tcp:12345:44",
     "port": 101,
     "checks": [
       {
-        "args": ["sh", "-c", "test -f /tmp/confd || exit 2"],
+        "args": ["/opt/seagate/consul/check-confd"],
         "interval": "10s"
       }
     ]
