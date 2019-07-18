@@ -33,6 +33,10 @@ set_timeout() {
     local after=$1 # seconds
     local event=$2
     local tmo=$(date -d @$(($(date '+%s') + $after)) '+%Y%m%d%H%M.%S')
+    local event_s=$(consul kv get timeout/$tmo 2>/dev/null || true)
+    if [[ $event_s ]]; then
+        event="$event_s,$event"
+    fi
     consul kv put timeout/$tmo $event
 }
 
@@ -94,7 +98,11 @@ consul kv get -recurse timeout | {
             schedule_timeout $tmo
             exit 0
         fi
-        consul kv put eq/$($SRC_DIR/epoch-gen) $EVENT
+        IFS=','
+        for ev in $EVENT; do
+            consul kv put eq/$($SRC_DIR/epoch-gen) $ev
+        done
+        IFS=':'
         consul kv delete $TMO
         [[ $STOP -eq 1 ]] && exit 1 || true
     done
