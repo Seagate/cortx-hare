@@ -159,105 +159,6 @@ XXX [[https://learn.hashicorp.com/consul/developer-configuration/elections][Lead
   A: Short-lived process, triggered by Consul watch handler when the EQ is modified.
 - XXX How RC failures will be handled?
 
-** _sprint-4
-
-- [X] andriy
-- [X] kostya
-- [X] mandar
-- [X] prasanna
-- [ ] rajanikant
-- [X] vvv
-
-*** hax
-
-**** Python + C
-
-***** [@kostya] test the threading model
-
-Do we need to call ~m0_thread_adopt()~ from Python thread?
-
-***** [@mandar]
-
-**** HOLD C (libcurl, libjson)                                      :HOLD:
-
-**** HOLD Go (Consul Go bindings)                                   :HOLD:
-
-- Learning curve, however short, is still to be accounted for.
-- Also we may have hard time selling the idea of non-mainstream language implementation to management.
-
-**** CANCELLED c++/c (Consul C++ bindings)                     :CANCELLED:
-
-- HTTP API is as stable (if not more stable) as language bindings are.
-
-*** [@andriy] [[[https://jts.seagate.com/browse/EOS-871][EOS-871]]] health checking
-
-*** [@vvv]
-
-**** [1d] scoping
-
-**** write an RFC for "initial-rg.json"
-
-**** [9d] confd.xc
-
-*** [@prasanna] [[[https://jts.seagate.com/browse/EOS-880][EOS-880]]] consul-kv-import.json (aka "Initial RG")
-
-*** [@rajanikant] ?
-
-** scoping
-
-- XXX Add DoDs (definitions of done).
-
-*** [2w] health checking
-
-**** write the RFC
-
-**** HA state updates via health checking
-
-- Consul [health] [[https://www.consul.io/docs/agent/checks.html][check]] on each node (e.g., ~pgrep m0d~)
-- Consul check watch on each node. Sends HA states (of *all* services) to the local ~hax~.
-
-*** [4w] cluster configuration
-
-**** [4w] initial
-
-***** [2w] confd.xc
-
-***** [2w] consul-kv-import.json (aka "initial RG")
-
-[[https://www.consul.io/docs/commands/kv/import.html][Consul KV import]] files (JSON).
-
-- write the RFC ([[file:rfc/4/README.md][4/KV]])
-- generate the JSONs
-
-**** RG: disks, pools
-
-*** [8w] hax
-
-Support entrypoint fops and ha-msgs.
-
-*** [4w] bootstrap
-
-**** write the RFC
-
-**** systemd scripts (with [[https://docs.google.com/document/d/1cR-BbxtMjGuZPj8NOc95RyFjqmeFsYf4JJ5Hw_tL1zA/edit#bookmark=id.7c6yyeenu47i][dependencies between Consul/confd/ios]])
-
-**** /etc config
-
-**** bootstrap script (pdsh)
-
-*** [? 2w] RC infrastructure R&D
-
-XXX Needed only if we want Hare to handle events that cannot be handled with Consul health checks (e.g., rpc timeouts or IO errors reported by Mero processes).
-
-- EQ
-- timeouts
-- rules
-- BQ
-
-*** rabbix (RabbitMQ exchanger)
-
-XXX Do we have to process SSPL sensor messages for EES?
-
 ** hare API
 
 *** enqueue_event
@@ -286,6 +187,88 @@ Increment the epoch counter in Consul KV by [[https://www.consul.io/docs/command
 The function blocks until the epoch is returned or an error occurs.
 
 See the [[https://docs.google.com/document/d/1cR-BbxtMjGuZPj8NOc95RyFjqmeFsYf4JJ5Hw_tL1zA/edit#bookmark=id.whq5d31z34][prototype]].
+
+** _sprint-4
+
+- [X] andriy
+- [X] kostya
+- [X] mandar
+- [X] prasanna
+- [ ] rajanikant
+- [X] vvv
+
+*** [@kostya] hax, Python part
+
+- Test the threading model. Should we call ~m0_thread_adopt()~ for Python thread?
+
+*** [@mandar] hax, C part
+
+*** [@andriy] [[[https://jts.seagate.com/browse/EOS-871][EOS-871]]] health checking
+
+*** [@vvv]
+
+**** write an RFC for consul-kv-import.json
+
+**** [9d] confd.xc
+
+*** [@prasanna] [[[https://jts.seagate.com/browse/EOS-880][EOS-880]]] consul-kv-import.json (aka "Initial RG")
+
+** scoping
+
+[[Https://app.smartsheet.com/sheets/5gR2F28rvjVxRJfvp7QfRCwjxgVRp79wGfGJg2G1?view=grid][The Smartsheet]]
+
+*** [2w] health checking
+
+**** write the RFC
+
+**** HA state updates via health checking
+
+- Consul [health] [[https://www.consul.io/docs/agent/checks.html][check]] on each node (e.g., ~pgrep m0d~)
+- Consul check watch on each node. Sends HA states (of *all* services) to the local ~hax~.
+
+*** [5w] cluster configuration
+
+**** [5w] initial
+
+***** [3w] confd.xc
+
+***** [2w] consul-kv-import.json (aka "initial RG")
+
+[[https://www.consul.io/docs/commands/kv/import.html][Consul KV import]] files (JSON).
+
+- write the RFC ([[file:rfc/4/README.md][4/KV]])
+- generate the JSONs
+
+**** HOLD RG: disks, pools                                          :HOLD:
+
+- EES uses static configuration.  EES doesn't support disk failures.
+
+*** [8w] hax
+
+Support entrypoint fops and ha-msgs.
+
+*** [4w] bootstrap
+
+**** write the RFC
+
+**** systemd scripts (with [[https://docs.google.com/document/d/1cR-BbxtMjGuZPj8NOc95RyFjqmeFsYf4JJ5Hw_tL1zA/edit#bookmark=id.7c6yyeenu47i][dependencies between Consul/confd/ios]])
+
+**** /etc config
+
+**** bootstrap script (pdsh)
+
+*** [? 2w] RC infrastructure R&D
+
+XXX Needed only if we want Hare to handle events that cannot be handled with Consul health checks (e.g., rpc timeouts or IO errors reported by Mero processes).
+
+- EQ
+- timeouts
+- rules
+- BQ
+
+*** rabbix (RabbitMQ exchanger)
+
+XXX Do we have to process SSPL sensor messages for EES?
 
 ** [XXX-DELETEME] hare v0.1 scoping :ARCHIVE:
 
