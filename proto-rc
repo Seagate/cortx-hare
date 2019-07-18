@@ -28,6 +28,10 @@ sig_handler() {
     STOP=1
 }
 
+check4signal() {
+    if [[ $STOP -eq 1 ]]; then exit 1; fi
+}
+
 # Users can use this function to set timeouts.
 set_timeout() {
     local after=$1 # seconds
@@ -56,7 +60,7 @@ sed 's/null//' | jq -r '.[] | "\(.Key) \(.Value | @base64d)"' | {
             ;;
         esac
         consul kv delete $EPOCH
-        [[ $STOP -eq 1 ]] && exit 1 || true
+        check4signal
     done
 }
 
@@ -104,6 +108,6 @@ consul kv get -recurse timeout | {
         done
         IFS=':'
         consul kv delete $TMO
-        [[ $STOP -eq 1 ]] && exit 1 || true
+        check4signal
     done
 }
