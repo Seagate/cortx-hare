@@ -71,9 +71,11 @@ wake_me_after() {
 }
 
 schedule_timeout() {
-    local tmo=${1#*/} # [timeout/]YYYYMMDDhhmm.ss
+    local tmo=${1#*/} # [timeout/]YYYYmmddHHMM.SS
     unset IFS # otherwise tmo_f might be invalid
-    local tmo_f=$(echo $tmo | sed -r 's/(....)(..)(..)(..)(..)\.(..)/\1-\2-\3 \4:\5:\6/')
+    # Convert 'YYYYmmddHHMM.SS' to 'YYYY-mm-dd HH:MM:SS'.
+    local tmo_f=$(sed -r 's/(....)(..)(..)(..)(..)\.(..)/\1-\2-\3 \4:\5:\6/' \
+                      <<< $tmo)
     local tmo_s=$(date -d "$tmo_f" '+%s')
     local now_s=$(date -d 'now' '+%s')
     local after_s=$(($tmo_s - $now_s))
@@ -87,11 +89,11 @@ consul kv get -recurse timeout | {
     trap sig_handler TERM
     while read TMO EVENT; do
         tmo=${TMO#*/}
-        now=$(date '+%Y%m%d%H%M.%S')
-        [[ $tmo > $now ]] && {
+        now=$(date +%Y%m%d%H%M.%S)
+        if [[ $tmo > $now ]]; then
             schedule_timeout $tmo
             exit 0
-        } || true
+        fi
         consul kv put eq/$($SRC_DIR/epoch-gen) $EVENT
         consul kv delete $TMO
         [[ $STOP -eq 1 ]] && exit 1 || true
