@@ -21,17 +21,17 @@ The code of `hax` consists of C and Python parts.
 * The callback functions passed to `m0_halon_interface_start()` are defined in the Python code.  Callback handlers (e.g., `entrypoint_request_cb`, `msg_received_cb`) send HTTP requests to Consul.
 * Python part also runs HTTP server.  This server receives HTTP POST request from a Consul watch handler with payload of HA state updates.
 
-## Notes on Python threading model
+## Is `m0_thread_adopt` necessary?
 
-When being invoked, Mero calls have special assumptions on the threads they are currently on. The key point is that the Mero's local thread storage (LTS)  must be properly initialized beforehand. That's why it is pretty important to understand the connection between Pythonic threads and the OS-level threads Mero is aware of.
+Mero functions - including FFI callbacks triggered by Mero - _may_ require that the threads they run on have thread-local storage (TLS) initialised in a specific way.  The threads managed by Python runtime do not meet this assumption, unless `hax` code makes `m0_thread_adopt` calls in proper places (`m0_thread_adopt` performs TLS initialisation as required by Mero).  The question is, whether Mero code executed by `hax` will actually _depend_ on Mero-specific TLS?  The most likely answer is “yes”.
 
-### Some facts on Python threads
-1. The threads one creates with `threading` (and thus with `_thread` module) are not the green ones.
-2. Every time the Python program creates a thread, a new pthread is created (in case of Linux, of course).
-3. Although Python interpreter switches the thread activity by means of GIL (Global Interpreter Lock), the Python thread never changes its underlying pthread.
-4. The facts above don't apply to async/await mechanism and to libraries like `greenlet`.
+### Some facts about Python threads
 
-### Useful links and materials
-1. PyThread_start_new_thread function [source](https://github.com/python/cpython/blob/3.7/Python/thread_pthread.h#L179)
-2. [Coding patterns for Python extensions](https://pythonextensionpatterns.readthedocs.io/en/latest/)
+1. Threads created with [threading](https://docs.python.org/3/library/threading.html) API or with lower level [_thread](https://docs.python.org/3/library/_thread.html) API are not green threads.
+2. Every time Python interpreter creates a thread on Linux platform, a new pthread (POSIX thread) is created.  Python thread never changes the underlying pthread.
+3. The Python Global Interpreter Lock (GIL) is a mutex that allows only one thread to hold the control of the Python interpreter.  This means that only one thread can be in a state of execution at any point in time.
 
+### Useful links
+
+* `PyThread_start_new_thread` function ([source](https://github.com/python/cpython/blob/3.7/Python/thread_pthread.h#L179))
+* [Coding patterns for Python extensions](https://pythonextensionpatterns.readthedocs.io/en/latest/)
