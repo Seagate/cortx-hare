@@ -29,7 +29,7 @@ get_session_id | grep -q ^- || exit 0
 # Stop the EQ watch (if any):
 pkill -9 -f 'consul watch.*prefix eq' || true
 # Nicely stop currently running RC handler (if any):
-pkill -f 'proto-rc' || true
+pkill -f 'sh.*proto-rc' || true
 
 # Create session with the service:confd Health Checker:
 PAYLD='{"Name": "leader", "Checks": ["serfHealth", "service:confd"]}'

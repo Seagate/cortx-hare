@@ -20,18 +20,80 @@ set -eu -o pipefail
 exec &>> /tmp/consul-$(basename $0).log
 exec &> >(stdbuf -oL gawk '{ print strftime("%Y-%m-%d %H:%M:%S"), $0 }')
 
+SRC_DIR="$(dirname $(readlink -f $0))"
+
 STOP=0
 sig_handler() {
-    echo 'RC: signal caught! Exiting...'
+    echo 'Signal caught! Exiting...'
     STOP=1
 }
 
+# Users can use this function to set timeouts.
+set_timeout() {
+    local after=$1 # seconds
+    local event=$2
+    local tmo=$(date -d @$(($(date '+%s') + $after)) '+%Y%m%d%H%M.%S')
+    consul kv put timeout/$tmo $event
+}
+
+# Process events:
 sed 's/null//' | jq -r '.[] | "\(.Key) \(.Value | @base64d)"' | {
     trap sig_handler TERM
     while read EPOCH EVENT; do
-        echo "RC: $CONSUL_INDEX: Process $EPOCH $EVENT..."
-        sleep 10
+        echo "$CONSUL_INDEX: Process $EPOCH $EVENT..."
+        case $EVENT in
+          "wake_RC")
+            ;;
+          tmo*)
+            set_timeout 60 "tmo$CONSUL_INDEX"
+            ;;
+          *)
+            sleep 10
+            ;;
+        esac
         consul kv delete $EPOCH
+        [[ $STOP -eq 1 ]] && exit 1 || true
+    done
+}
+
+scheduled_wake_pid() {
+    grep 'TAG=wake_RC' /proc/*/environ 2>/dev/null | cut -d/ -f3
+}
+
+wake_rc() {
+    consul kv put eq/0 wake_RC &>/dev/null
+}
+
+wake_me_after() {
+    local after=$1 # secs
+    kill $(scheduled_wake_pid) &>/dev/null || true
+    ( TAG=wake_RC sleep $after_s && wake_rc ) &>/dev/null &
+}
+
+schedule_timeout() {
+    local tmo=${1#*/} # [timeout/]YYYYMMDDhhmm.ss
+    unset IFS # otherwise tmo_f might be invalid
+    local tmo_f=$(echo $tmo | sed -r 's/(....)(..)(..)(..)(..)\.(..)/\1-\2-\3 \4:\5:\6/')
+    local tmo_s=$(date -d "$tmo_f" '+%s')
+    local now_s=$(date -d 'now' '+%s')
+    local after_s=$(($tmo_s - $now_s))
+    [[ $after_s > 0 ]] || wake_rc
+    wake_me_after $after_s
+}
+
+# Process timeouts (if any):
+IFS=':'
+consul kv get -recurse timeout | {
+    trap sig_handler TERM
+    while read TMO EVENT; do
+        tmo=${TMO#*/}
+        now=$(date '+%Y%m%d%H%M.%S')
+        [[ $tmo > $now ]] && {
+            schedule_timeout $tmo
+            exit 0
+        } || true
+        consul kv put eq/$($SRC_DIR/epoch-gen) $EVENT
+        consul kv delete $TMO
         [[ $STOP -eq 1 ]] && exit 1 || true
     done
 }
