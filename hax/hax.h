@@ -5,8 +5,8 @@
 struct m0_halon_interface;
 
 typedef struct hax_context {
-  struct m0_halon_interface hi;
-  PyObject* handler;
+  struct m0_halon_interface *hc_hi;
+  PyObject                  *hc_handler;
 } hax_context;
 
 hax_context* init_halink(PyObject *obj, const char* node_uuid);

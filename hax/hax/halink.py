@@ -4,6 +4,7 @@ import threading
 from hax.types import Fid, FidStruct
 
 lib = c.cdll.LoadLibrary('/home/720599/projects/hare/hax/hax.so')
+#lib = c.cdll.LoadLibrary('/data/hare/hare/hax/hax.so')
 
 prototype = c.PYFUNCTYPE(c.c_ulonglong, c.py_object)
 prot2 = c.PYFUNCTYPE(None, c.c_void_p)
@@ -42,6 +43,7 @@ class HaLink(object):
     def test(self):
         tname = threading.currentThread().getName()
         logging.info('Test method is invoked from thread {}'.format(tname))
+	lib.test(self._ha_ctx)
         # TODO call m0d from here
 
     def test_cb(self):

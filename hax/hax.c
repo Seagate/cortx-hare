@@ -5,13 +5,16 @@
 #include <Python.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <errno.h>
 #include "hax.h"
+
+static hc_context *hc;
 
 PyObject* getModule(const char* module_name)
 {
   PyObject* sys_mod_dict = PyImport_GetModuleDict();
   PyObject* hax_mod = PyMapping_GetItemString(sys_mod_dict, module_name);
-  if (hax_mod == NULL)
+  if (hc_mod == NULL)
   {
     PyObject *sys = PyImport_ImportModule("sys");
     PyObject *path = PyObject_GetAttrString(sys, "path");
@@ -24,7 +27,7 @@ PyObject* getModule(const char* module_name)
     hax_mod = PyImport_Import(mod_name);
     Py_DECREF(mod_name);
   }
-  return hax_mod;
+  return hc_mod;
 }
 
 PyObject* toFid(const struct m0_fid* fid)
@@ -43,21 +46,23 @@ PyObject* toUid128(const struct m0_uint128* val)
   return instance;
 }
 
-void entrypoint_request_cb( struct m0_halon_interface         *hi
-                          , const struct m0_uint128           *req_id
-                          , const char             *remote_rpc_endpoint
-                          , const struct m0_fid               *process_fid
-                          , const char                        *git_rev_id
-                          , uint64_t                           pid
-                          , bool                               first_request
-                          ) {
+void entrypoint_request_cb( struct m0_halon_interface *hi
+                          , const struct m0_uint128   *req_id
+                          , const char                *remote_rpc_endpoint
+                          , const struct m0_fid       *process_fid
+                          , const char                *git_rev_id
+                          , uint64_t                   pid
+                          , bool                       first_request
+                          )
+{
   /*Py_BEGIN_ALLOW_THREADS*/
-  struct hax_context* hax = (struct hax_context*) hi;
+  printf("Context addr: %p\n", hc);
+  printf("handler addr: %p\n", hc->hc_handler);
   PyObject* py_fid = toFid(process_fid);
   PyObject* py_req = toUid128(req_id);
   
   PyObject_CallMethod(
-      hax->handler,
+      hc->hc_handler,
       "_entrypoint_request_cb",
       "(OsOskb)",
       py_req,
@@ -77,8 +82,10 @@ void msg_received_cb ( struct m0_halon_interface *hi
                      , struct m0_ha_link         *hl
                      , const struct m0_ha_msg    *msg
                      , uint64_t                   tag
-                     ) {
+                     )
+{
   // TODO Implement me
+  printf("\n msg received \n");
 }
 
 void msg_is_delivered_cb ( struct m0_halon_interface *hi
@@ -123,53 +130,38 @@ void link_disconnected_cb ( struct m0_halon_interface *hi
 
 hax_context* init_halink(PyObject *obj, const char* node_uuid)
 {
-  struct m0_halon_interface* hi;
   // Since we do depend on the Python object, we don't want to let it die before us.
   Py_INCREF(obj);
 
-  // [KN] Debug stuff. In real life we don't need this assignment (this happens inside m0_halon_interface_init)
-  /*hi = calloc(1, sizeof(struct m0_halon_interface));*/
-
   int rc; // Note that Py_BEGIN_ALLOW_THREADS contains an open { and defines a block.
-  //
-  // TODO investigate why it doesn't work
-  /*Py_BEGIN_ALLOW_THREADS*/
-  rc = m0_halon_interface_init(
-      &hi,
-      M0_VERSION_GIT_REV_ID,
-      M0_VERSION_BUILD_CONFIGURE_OPTS,
-      NULL,
-      node_uuid);
-  /*Py_END_ALLOW_THREADS*/
 
-  if (rc != 0)
-  {
-    free(hi);
+  hc = (hax_context*) malloc(sizeof(hax_context));
+  if (hc == NULL) {
+    printf("\n Error: %d\n", -ENOMEM);
+    return NULL;
+  }
+
+  rc = m0_halon_interface_init(&hc->hc_hi, "M0_VERSION_GIT_REV_ID",
+			       "M0_VERSION_BUILD_CONFIGURE_OPTS",
+			       "disable-compatibility-check", NULL);
+  if (rc != 0) {
+    free(hc);
     return 0;
   }
 
-
-  printf("I'm here\n");
-  hax_context* newp = (hax_context*) realloc(hi, sizeof(hax_context));
-  if (newp == 0)
-  {
-    m0_halon_interface_fini(hi);
-    return 0;
-  }
-
-  newp->handler = obj;
+  hc->hc_handler = obj;
 
   printf("Python object addr: %p\n", obj);
-  printf("Python object addr2: %p\n", newp->handler);
-  printf("Returning: %p\n", newp);
-  return  newp;
+  printf("Python object addr2: %p\n", hc->hc_handler);
+  printf("Returning: %p\n", hc);
+  return  hc;
 }
 
 void destroy_halink(unsigned long long ctx)
 {
-  struct hax_context* hax = (struct hax_context*) ctx;
-  Py_DECREF(hax->handler);
-  m0_halon_interface_fini(&(hax->hi));
+  struct hax_context* hc = (struct hax_context*) ctx;
+  Py_DECREF(hc->hc_handler);
+  m0_halon_interface_fini(hc->hc_hi);
 }
 
 int start( unsigned long long ctx
@@ -178,8 +170,9 @@ int start( unsigned long long ctx
          , const struct m0_fid *ha_service_fid
          , const struct m0_fid *rm_service_fid)
 {
-  /*printf("Received fid: {%llu, %llu}\n", process_fid->f_container, process_fid->f_key);*/
-  struct m0_halon_interface* hi = (struct m0_halon_interface*) ctx;
+  struct hax_context *hc = (struct hax_context*)ctx;
+  struct m0_halon_interface* hi = hc->hc_hi;
+
   return m0_halon_interface_start( hi
                                  , local_rpc_endpoint
                                  , process_fid
@@ -201,17 +194,15 @@ void test(unsigned long long ctx)
   printf("Got: %llu\n", ctx);
 
   // ----------
-  struct hax_context* hax = (struct hax_context*) ctx;
-  printf("Context addr: %p\n", hax);
-  printf("handler addr: %p\n", hax->handler);
+  struct hax_context* hc = (struct hax_context*) ctx;
+  printf("Context addr: %p\n", hc);
+  printf("handler addr: %p\n", hc->hc_handler);
 
   printf("GOT HERE\n");
 
-  struct m0_halon_interface* hi = &hax->hi;
-
   struct m0_uint128 t = M0_UINT128(100, 500);
   struct m0_fid fid = M0_FID_INIT(20, 50);
-  entrypoint_request_cb( hi
+  entrypoint_request_cb( hc->hc_hi
                        , &t
                        , "ENDP"
                        , &fid
@@ -227,14 +218,14 @@ int main(int argc, char **argv)
   struct m0_halon_interface *hi;
   int rc;
 
-  rc = m0_halon_interface_init(&hi, "", "", NULL, NULL);
+  rc = m0_halon_interface_init(&hi, "", "", "disable-compatibility-check", NULL);
   M0_ASSERT(rc == 0);
   rc = m0_halon_interface_start(hi, "0@lo:12345:42:100",
                                 &M0_FID_TINIT('r', 1, 1),
                                 &M0_FID_TINIT('s', 1, 1),
                                 &M0_FID_TINIT('s', 1, 2),
-                                NULL, NULL, NULL, NULL,
-                                NULL, NULL, NULL, NULL);
+                                entrypoint_request_cb, msg_received_cb, msg_is_delivered_cb, msg_is_not_delivered_cb,
+                                link_connected_cb, link_reused_cb, link_is_disconnecting_cb, link_disconnected_cb);
   M0_ASSERT(rc == 0);
   m0_halon_interface_stop(hi);
   m0_halon_interface_fini(hi);
