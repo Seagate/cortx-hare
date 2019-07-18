@@ -170,27 +170,36 @@ XXX [[https://learn.hashicorp.com/consul/developer-configuration/elections][Lead
 
 *** hax
 
-**** [@kostya] Python/C
+**** Python + C
 
-***** NEXT test the threading model (~m0_thread_adopt~)
+***** [@kostya] test the threading model
 
-**** C (libcurl, libjson)
+Do we need to call ~m0_thread_adopt()~ from Python thread?
 
-**** HOLD Go (Consul Go bindings)                              :HOLD:
+***** [@mandar]
 
-- State "HOLD"  from              [2019-07-16 Tue 12:46] \\
-  Learning curve, however short, is still to be accounted for.
+**** HOLD C (libcurl, libjson)                                      :HOLD:
+
+**** HOLD Go (Consul Go bindings)                                   :HOLD:
+
+- Learning curve, however short, is still to be accounted for.
+- Also we may have hard time selling the idea of non-mainstream language implementation to management.
 
 **** CANCELLED c++/c (Consul C++ bindings)                     :CANCELLED:
 
-- State "CANCELLED"  from              [2019-07-16 Tue 12:45] \\
-  HTTP API is as stable (if not more stable) as language bindings are.
+- HTTP API is as stable (if not more stable) as language bindings are.
 
-*** [@andriy] health checking
+*** [@andriy] [[[https://jts.seagate.com/browse/EOS-871][EOS-871]]] health checking
 
-*** [@vvv] confd.xc
+*** [@vvv]
 
-*** [@prasanna] initial-rg.json
+**** [1d] scoping
+
+**** write an RFC for "initial-rg.json"
+
+**** [9d] confd.xc
+
+*** [@prasanna] [[[https://jts.seagate.com/browse/EOS-880][EOS-880]]] consul-kv-import.json (aka "Initial RG")
 
 *** [@rajanikant] ?
 
@@ -198,7 +207,7 @@ XXX [[https://learn.hashicorp.com/consul/developer-configuration/elections][Lead
 
 - XXX Add DoDs (definitions of done).
 
-*** health checking
+*** [2w] health checking
 
 **** write the RFC
 
@@ -207,13 +216,13 @@ XXX [[https://learn.hashicorp.com/consul/developer-configuration/elections][Lead
 - Consul [health] [[https://www.consul.io/docs/agent/checks.html][check]] on each node (e.g., ~pgrep m0d~)
 - Consul check watch on each node. Sends HA states (of *all* services) to the local ~hax~.
 
-*** cluster configuration
+*** [4w] cluster configuration
 
-**** initial
+**** [4w] initial
 
-***** confd.xc
+***** [2w] confd.xc
 
-***** initial-rg.json
+***** [2w] consul-kv-import.json (aka "initial RG")
 
 [[https://www.consul.io/docs/commands/kv/import.html][Consul KV import]] files (JSON).
 
@@ -222,11 +231,11 @@ XXX [[https://learn.hashicorp.com/consul/developer-configuration/elections][Lead
 
 **** RG: disks, pools
 
-*** hax
+*** [8w] hax
 
 Support entrypoint fops and ha-msgs.
 
-*** bootstrap
+*** [4w] bootstrap
 
 **** write the RFC
 
@@ -236,11 +245,12 @@ Support entrypoint fops and ha-msgs.
 
 **** bootstrap script (pdsh)
 
-*** RC
+*** [? 2w] RC infrastructure R&D
 
 XXX Needed only if we want Hare to handle events that cannot be handled with Consul health checks (e.g., rpc timeouts or IO errors reported by Mero processes).
 
 - EQ
+- timeouts
 - rules
 - BQ
 
@@ -436,7 +446,7 @@ ctrl-1: { attrs, disks: [ disk-1 ] }
 
 *** fault tolerance
 
-Handle failures of m0d processes.  Consul watcher to trigger Pacemaker
+Handle failures of m0d processes.  Consul watch to trigger Pacemaker
 to do failover?
 
 *** ? fid generator
