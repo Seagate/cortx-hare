@@ -5,7 +5,6 @@ name: HA link eXtender
 status: raw
 editor: Valery V. Vorotyntsev <valery.vorotyntsev@seagate.com>
 contributors:
-<<<<<<< HEAD
   - Andriy Tkachuk <andriy.tkachuk@seagate.com>
   - Konstantin Nekrasov <konstantin.nekrasov@seagate.com>
 ---
