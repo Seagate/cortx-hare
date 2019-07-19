@@ -1,20 +1,22 @@
-#include "fid/fid.h"                    /* M0_FID_TINIT */
-#include "ha/halon/interface.h"         /* m0_halon_interface */
-#include "lib/assert.h"                 /* M0_ASSERT */
-#include "mero/version.h"        // M0_VERSION_GIT_REV_ID
 #include <Python.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
+#include "fid/fid.h"                    /* M0_FID_TINIT */
+#include "ha/halon/interface.h"         /* m0_halon_interface */
+#include "module/instance.h"
+#include "lib/assert.h"                 /* M0_ASSERT */
+#include "lib/thread.h"                 /* m0_thread_{adopt, shun} */
+#include "mero/version.h"        // M0_VERSION_GIT_REV_ID
 #include "hax.h"
 
-static hc_context *hc;
+static hax_context *hc;
 
-PyObject* getModule(const char* module_name)
+PyObject* getModule(char* module_name)
 {
   PyObject* sys_mod_dict = PyImport_GetModuleDict();
   PyObject* hax_mod = PyMapping_GetItemString(sys_mod_dict, module_name);
-  if (hc_mod == NULL)
+  if (hax_mod == NULL)
   {
     PyObject *sys = PyImport_ImportModule("sys");
     PyObject *path = PyObject_GetAttrString(sys, "path");
@@ -27,7 +29,7 @@ PyObject* getModule(const char* module_name)
     hax_mod = PyImport_Import(mod_name);
     Py_DECREF(mod_name);
   }
-  return hc_mod;
+  return hax_mod;
 }
 
 PyObject* toFid(const struct m0_fid* fid)
@@ -148,6 +150,8 @@ hax_context* init_halink(PyObject *obj, const char* node_uuid)
     free(hc);
     return 0;
   }
+  m0_mutex_init(&hc->hc_mutex);
+
 
   hc->hc_handler = obj;
 
@@ -161,6 +165,7 @@ void destroy_halink(unsigned long long ctx)
 {
   struct hax_context* hc = (struct hax_context*) ctx;
   Py_DECREF(hc->hc_handler);
+  m0_mutex_fini(&hc->hc_mutex);
   m0_halon_interface_fini(hc->hc_hi);
 }
 
@@ -191,6 +196,10 @@ int start( unsigned long long ctx
 
 void test(unsigned long long ctx)
 {
+  //struct m0_thread  mthread;
+  //struct m0        *m0;
+  //int               rc;
+
   printf("Got: %llu\n", ctx);
 
   // ----------
@@ -202,6 +211,17 @@ void test(unsigned long long ctx)
 
   struct m0_uint128 t = M0_UINT128(100, 500);
   struct m0_fid fid = M0_FID_INIT(20, 50);
+
+  /*M0_SET0(&mthread);
+  m0 = m0_halon_interface_m0_get(hc->hc_hi);
+  rc = m0_thread_adopt(&mthread, m0);
+  if (rc != 0) {
+     printf("Mero thread adoption failed: %d\n", rc);
+     return;
+  }
+  m0_mutex_lock(&hc->hc_mutex);
+  m0_mutex_unlock(&hc->hc_mutex);
+  m0_thread_shun();*/
   entrypoint_request_cb( hc->hc_hi
                        , &t
                        , "ENDP"
@@ -210,7 +230,6 @@ void test(unsigned long long ctx)
                        , 12345
                        , 0
       );
-
 }
 
 int main(int argc, char **argv)
