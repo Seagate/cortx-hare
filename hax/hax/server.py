@@ -1,5 +1,6 @@
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import logging
+import json
 
 
 class KVHandler(BaseHTTPRequestHandler):
@@ -10,14 +11,17 @@ class KVHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         self._set_headers()
-        self.wfile.write("<html><body><h1>Hallo!</h1></body></html>")
+        s = json.dumps({'message': 'I am alive'})
+        self.wfile.write(s.encode('utf-8'))
 
     def do_HEAD(self):
         self._set_headers()
 
     def do_POST(self):
         self._set_headers()
-        logging.info("A new request has been received")
+        content_length = int(self.headers['Content-Length'])
+        post_data = self.rfile.read(content_length)
+        logging.info("A new request has been received: {}".format(post_data))
 
 
 def run_server(server_class=HTTPServer, port=8080):
