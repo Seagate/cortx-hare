@@ -43,7 +43,7 @@ class HaLink(object):
     def test(self):
         tname = threading.currentThread().getName()
         logging.info('Test method is invoked from thread {}'.format(tname))
-        lib.test(self._ha_ctx)
+        _test(self._ha_ctx)
         # TODO call m0d from here
 
     def test_cb(self):
