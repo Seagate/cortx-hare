@@ -2,13 +2,33 @@
 set -eu -o pipefail
 
 usage() {
-    echo "$0 <type>"
-    echo
-    echo "Generate next fid of the given cluster entity type."
-    exit 1
+    cat <<EOF
+Usage: $0 <type>
+
+Generate new fid for the specified Mero conf object type.
+
+See the output of \`\$M0_SRC_DIR/utils/m0confgen --types' (2nd column)
+for the supported <type> values.
+
+Examples:
+
+    # Generate new fid of m0_conf_process object:
+    $0 0x72
+
+    # The same using helper function:
+    _typeid() {
+        local type_name=\$1
+        \$M0_SRC_DIR/utils/m0confgen --types |
+            awk -v t=\$type_name '\$3 == t {print \$2}'
+    }
+    $0 \$(_typeid process)
+EOF
 }
 
-[[ $# == 1 ]] || usage
+[[ $# == 1 ]] || {
+    usage >&2
+    exit 1
+}
 
 TYPE=$1
 
