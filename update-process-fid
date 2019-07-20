@@ -4,9 +4,9 @@ set -eu -o pipefail
 SRC_DIR="$(dirname $(readlink -f $0))"
 CONF_FILE=$SRC_DIR/consul-srv-conf.json
 
-RE="(.id.: .)fid"
+RE='("id": ")fid'
 while grep -Eq "$RE" $CONF_FILE; do
-    FID=$($SRC_DIR/fid-gen 0x72)
+    FID=$($SRC_DIR/fid-gen 0x72)  # process fid
     sed -r "0,/$RE/s//\1$FID/" -i $CONF_FILE
 done
 
