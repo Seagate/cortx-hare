@@ -8,6 +8,7 @@
 #   https://github.com/dhall-lang/dhall-haskell/pull/1083 bugfix.
 
 import argparse
+import ast
 import json
 import random
 import re
@@ -91,28 +92,46 @@ pools:
 
 def main(argv=None):
     opts = parse_opts(argv)
-    cluster_desc = yaml.safe_load(sys.stdin)
+    try:
+        cluster_desc = yaml.safe_load(sys.stdin)
+    except KeyboardInterrupt:
+        sys.exit(1)
+
     for host in cluster_desc['hosts']:
-        # These fact names correspond to version 2.4.1 of `facter`.
+        # The fact names used here correspond to version 2.4.1 of `facter`.
         # See https://puppet.com/docs/puppet/6.6/core_facts.html#legacy-facts
         host['facts'] = get_facts(host['name'], opts.mock,
                                   'hostname', 'processorcount',
                                   'memorysize_mb', 'ipaddress', 'macaddress')
-    print(f'XXX {cluster_desc}', file=sys.stderr)
+        host['disks'] = get_disks(host['name'], host['disks']['path_glob'])
+    # XXX DELETEME <<<<<<<
+    from pprint import pprint
+    pprint(cluster_desc)
+    # XXX >>>>>>>
 
 
-def get_facts(hostname: str, mock_p: bool, *args: str) -> Dict[str, Any]:
-    assert(hostname)
-
-    if mock_p:
-        return fabricate_facts(hostname, *args)
+def run_command(hostname: str, args: List[str]):
+    assert hostname
 
     cmd = []  # type: List[str]
     if hostname not in ('localhost', '127.0.0.1'):
         cmd = ['ssh', hostname]
-    cmd.extend(['facter', '--json'])
     cmd.extend(args)
-    return json.loads(subprocess.check_output(cmd, timeout=15).decode())
+    return subprocess.check_output(cmd, timeout=15).decode()
+
+
+def get_disks(hostname: str, path_glob: str) -> List[str]:
+    cmd = ['python', '-c', f'import glob; print(glob.glob({path_glob!r}))']
+    return ast.literal_eval(run_command(hostname, cmd))
+
+
+def get_facts(hostname: str, mock_p: bool, *args: str) -> Dict[str, Any]:
+    if mock_p:
+        return fabricate_facts(hostname, *args)
+
+    cmd = ['facter', '--json']
+    cmd.extend(args)
+    return json.loads(run_command(hostname, cmd))
 
 
 def fabricate_facts(hostname: str, *args: str) -> Dict[str, Any]:
