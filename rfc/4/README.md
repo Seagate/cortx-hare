@@ -5,18 +5,19 @@ name: Consul KV Schema
 status: raw
 editor: Valery V. Vorotyntsev <valery.vorotyntsev@seagate.com>
 contributors:
+  - Andriy Tkachuk <andriy.tkachuk@seagate.com>
   - Mandar Sawant <mandar.sawant@seagate.com>
 ---
 
 ## Consul KV Schema
-1. "leader/node" - used for RC Leader election
-1. "epoch/number" - used for unique epochs generation
-1. "fid/number" - used for unique FIDs generation
-1. "timeout/YYYYmmddHHMM.SS" - used for the timeouts by RC
-1. "eq/epoch/event" - Events Queue (EQ) monitored by RC
-1. "bq/epoch/HA_Status_updates" Broadcast Queue (BQ) used by RC to broadcast
-   HA Status Updates to all Mero processes. (On each node there is the watcher
-   on this queue.)
+
+Key | Value | Description
+--- | --- | ---
+`bq/<epoch>` | (conf object fid, HA state) | `bq/*` items are collectively referred to as the BQ (Broadcast Queue).  The items - HA state updates - are produced by the RC (Recovery Coordinator) script.
+`epoch` | current epoch (natural number) | Atomically incremented counter, which is used to generate unique ordered identifiers for EQ and BQ entries.
+`eq/<epoch>` | event | `eq/*` items are collectively referred to as the EQ (Event Queue).  Events are consumed and dequeued by the RC script.
+`leader` | node name | This key is used for RC leader election.  Created with [`consul lock`](https://www.consul.io/docs/commands/lock.html) command.
+`timeout` | YYYYmmddHHMM.SS | This value is used by the RC timeout mechanism.
 
 ### Entrypoint Reply Data
 
