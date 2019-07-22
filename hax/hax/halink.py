@@ -25,12 +25,14 @@ lib.start.restype = c.c_int
 class HaLink(object):
     def __init__(self, node_uuid=""):
         self._ha_ctx = lib.init_halink(self, self._c_str(node_uuid))
-        # if not self._ha_ctx:
-        # raise RuntimeError("Could not initialize ha_link")
+        if not self._ha_ctx:
+            raise RuntimeError("Could not initialize ha_link")
 
     def start(self, rpc_endpoint: str, process: Fid, ha_service: Fid,
               rm_service: Fid):
         # import pudb; pudb.set_trace()
+        tname = threading.currentThread().getName()
+        logging.info('Start method is invoked from thread {}'.format(tname))
         lib.start(self._ha_ctx, self._c_str(rpc_endpoint), process.to_c(),
                   ha_service.to_c(), rm_service.to_c())
 

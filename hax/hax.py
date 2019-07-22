@@ -9,7 +9,8 @@ def setup_logging():
 
 
 def thread_fn(ha: HaLink):
-    ha.test()
+    #ha.test()
+    ha.start("0@lo:12345:42:100", Fid(3,4), Fid(5,6), Fid(5,6))
 
 
 def main():
@@ -18,7 +19,7 @@ def main():
     # l.start("endpoint", Fid(3,4), Fid(5,6), Fid(0xDEADBEEF, 7))
     logging.info("Invoking threads")
 
-    threads = [None] * 20
+    threads = [None] * 1
     threads = list(map(lambda t: threading.Thread(target=thread_fn, args=(l,)), threads))
 
     for t in threads:

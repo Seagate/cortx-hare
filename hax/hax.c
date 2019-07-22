@@ -11,6 +11,8 @@
 #include "hax.h"
 
 static hax_context *hc;
+struct m0_thread    mthread;
+struct m0          *m0;
 
 PyObject* getModule(char* module_name)
 {
@@ -60,10 +62,10 @@ void entrypoint_request_cb( struct m0_halon_interface *hi
   /*Py_BEGIN_ALLOW_THREADS*/
   printf("Context addr: %p\n", hc);
   printf("handler addr: %p\n", hc->hc_handler);
-  PyObject* py_fid = toFid(process_fid);
-  PyObject* py_req = toUid128(req_id);
+  //PyObject* py_fid = toFid(process_fid);
+  //PyObject* py_req = toUid128(req_id);
 
-  PyObject_CallMethod(
+  /*PyObject_CallMethod(
       hc->hc_handler,
       "_entrypoint_request_cb",
       "(OsOskb)",
@@ -73,10 +75,10 @@ void entrypoint_request_cb( struct m0_halon_interface *hi
       git_rev_id,
       pid,
       first_request
-    );
-  //m0_halon_interface_entrypoint_reply(hi, req_id, 0, 0, NULL, NULL, 1, M0_FID_TINIT('s', 72, 1), NULL);
-  Py_DECREF(py_req);
-  Py_DECREF(py_fid);
+    );*/
+  m0_halon_interface_entrypoint_reply(hi, req_id, 0, 0, NULL, NULL, 1, &M0_FID_TINIT('s', 72, 1), NULL);
+  //Py_DECREF(py_req);
+  //Py_DECREF(py_fid);
 
   /*Py_END_ALLOW_THREADS*/
 }
@@ -89,6 +91,7 @@ void msg_received_cb ( struct m0_halon_interface *hi
 {
   // TODO Implement me
   printf("\n msg received \n");
+  m0_halon_interface_delivered(hi, hl, msg);
 }
 
 void msg_is_delivered_cb ( struct m0_halon_interface *hi
@@ -152,6 +155,8 @@ hax_context* init_halink(PyObject *obj, const char* node_uuid)
     return 0;
   }
   m0_mutex_init(&hc->hc_mutex);
+  M0_SET0(&mthread);
+  m0 = m0_halon_interface_m0_get(hc->hc_hi);
 
 
   hc->hc_handler = obj;
@@ -176,14 +181,22 @@ int start( unsigned long long ctx
          , const struct m0_fid *ha_service_fid
          , const struct m0_fid *rm_service_fid)
 {
-  struct hax_context *hc = (struct hax_context*)ctx;
-  struct m0_halon_interface* hi = hc->hc_hi;
+  struct hax_context        *hc = (struct hax_context*)ctx;
+  struct m0_halon_interface *hi = hc->hc_hi;
+  int                        rc;
 
-  return m0_halon_interface_start( hi
+  printf("Starting hax interface..\n");
+  rc = m0_thread_adopt(&mthread, m0);
+  if (rc != 0) {
+     printf("Mero thread adoption failed: %d\n", rc);
+     return rc;
+  }
+
+  rc = m0_halon_interface_start( hi
                                  , local_rpc_endpoint
-                                 , process_fid
-                                 , ha_service_fid
-                                 , rm_service_fid
+                                 , &M0_FID_TINIT('r', process_fid->f_container, process_fid->f_key)
+                                 , &M0_FID_TINIT('s', ha_service_fid->f_container, ha_service_fid->f_key)
+                                 , &M0_FID_TINIT('s', rm_service_fid->f_container, rm_service_fid->f_key)
                                  , entrypoint_request_cb
                                  , msg_received_cb
                                  , msg_is_delivered_cb
@@ -193,12 +206,14 @@ int start( unsigned long long ctx
                                  , link_is_disconnecting_cb
                                  , link_disconnected_cb
                                  );
+
+  m0_thread_shun();
+
+  return rc;
 }
 
 void test(unsigned long long ctx)
 {
-  struct m0_thread  mthread;
-  struct m0        *m0;
   int               rc;
 
   printf("Got: %llu\n", ctx);
@@ -213,14 +228,7 @@ void test(unsigned long long ctx)
   struct m0_uint128 t = M0_UINT128(100, 500);
   struct m0_fid fid = M0_FID_INIT(20, 50);
 
-  M0_SET0(&mthread);
-  m0 = m0_halon_interface_m0_get(hc->hc_hi);
-  rc = m0_thread_adopt(&mthread, m0);
-  if (rc != 0) {
-     printf("Mero thread adoption failed: %d\n", rc);
-     return;
-  }
-  m0_mutex_lock(&hc->hc_mutex);
+  //m0_mutex_lock(&hc->hc_mutex);
   entrypoint_request_cb( hc->hc_hi
                        , &t
                        , "ENDP"
@@ -229,8 +237,7 @@ void test(unsigned long long ctx)
                        , 12345
                        , 0
       );
-  m0_mutex_unlock(&hc->hc_mutex);
-  m0_thread_shun();
+  //m0_mutex_unlock(&hc->hc_mutex);
 }
 
 int main(int argc, char **argv)
