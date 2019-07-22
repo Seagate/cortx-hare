@@ -9,13 +9,13 @@
 
 import argparse
 import ast
-from collections import namedtuple
+from enum import Enum
 import json
 import random
 import re
 import subprocess
 import sys
-from typing import Any, Dict, List
+from typing import Any, Dict, NamedTuple, List
 import yaml
 
 
@@ -98,7 +98,6 @@ def main(argv=None):
     except KeyboardInterrupt:
         sys.exit(1)
 
-    m0conf = {}
     for host in cluster_desc['hosts']:
         # The fact names used here correspond to version 2.4.1 of `facter`.
         # See https://puppet.com/docs/puppet/6.6/core_facts.html#legacy-facts
@@ -107,7 +106,7 @@ def main(argv=None):
                                   'memorysize_mb', 'ipaddress', 'macaddress')
         host['disks']['items'] = get_disks(host['name'],
                                            host['disks']['path_glob'])
-        XXX_host(host, m0conf)
+    m0conf = build_m0conf(cluster_desc)
     # XXX DELETEME <<<<<<<
     from pprint import pprint
     print('----- cluster_desc -----')
@@ -115,52 +114,6 @@ def main(argv=None):
     print('----- m0conf -----')
     pprint(m0conf)
     # XXX >>>>>>>
-
-
-def _infinite_generator(start=0):
-    while True:
-        yield start
-        start += 1
-
-
-fidk_seq = _infinite_generator()  # fid key generator
-
-
-class Conf_Obj:
-    def to_dhall(self):
-        raise NotImplementedError('XXX IMPLEMENTME')
-
-
-class Conf_Node(Conf_Obj):
-    def __init__(self, memsize_MB: int, nr_cpu: int):
-        self.fidk = next(fidk_seq)
-        self.memsize_MB = memsize_MB
-        self.nr_cpu = nr_cpu
-        self.processes = []  # type: List[Any]
-
-    def __repr__(self):
-        return f'{self.__class__.__name__}(memsize_MB={self.memsize_MB},' \
-            f' nr_cpu={self.nr_cpu})'
-
-
-class Conf_Controller(Conf_Obj):
-    def __init__(self, node: int):
-        self.fidk = next(fidk_seq)
-        self.node = node
-        self.drives = []  # type: List[Any]
-        self.pvers = []  # type: List[Any]
-
-    def __repr__(self):
-        return f'{self.__class__.__name__}(node={self.node})'
-
-
-def XXX_host(host: Dict[str, Any], m0conf: Dict[str, Any]):
-    node = Conf_Node(memsize_MB=int(float(host['facts']['memorysize_mb'])),
-                     nr_cpu=host['facts']['processorcount'])
-    m0conf[f'node-{node.fidk}'] = node
-
-    ctrl = Conf_Controller(node=node.fidk)
-    m0conf[f'controller-{ctrl.fidk}'] = ctrl
 
 
 def run_command(hostname: str, *args: str) -> str:
@@ -173,7 +126,7 @@ def run_command(hostname: str, *args: str) -> str:
     return subprocess.check_output(cmd, timeout=15).decode()
 
 
-Disk = namedtuple('Disk', 'path size')
+Disk = NamedTuple('Disk', [('path', str), ('size', int)])
 Disk.size.__doc__ = 'Total space in bytes'
 
 
@@ -217,15 +170,69 @@ def fabricate_facts(hostname: str, *args: str) -> Dict[str, Any]:
     return dict((k, fabricated[k]) for k in args)
 
 
-# class ConfObj:
-#     XXX
+ObjT = Enum('ObjT', 'root fdmi_flt_grp fdmi_filter'
+            ' node process service sdev'  # software subtree
+            ' site rack enclosure controller drive'  # hardware subtree
+            ' pool pver pver_f objv'  # pool subtree
+            ' profile')
+ObjT.__doc__ = 'Mero conf object type'
 
 
-# def register_confobj_types():
-#     for t in ('dir', 'root', 'profile', 'filesystem', 'pool', 'pver', 'objv',
-#               'node', 'process', 'service', 'sdev', 'rack', 'enclosure',
-#               'controller', 'disk'):
-#         globals()['conf_' + t] = type('conf_' + t, (ConfObj,), {})
+Oid = NamedTuple('Oid', [('type', ObjT), ('fidk', int)])
+Oid.__doc__ = 'Mero conf object identifier'
+Oid.fidk.__doc__ = '.f_key part of the corresponding m0_fid'
+
+
+def _infinite_counter():
+    k = 0
+    while True:
+        yield k
+        k += 1
+
+
+_fidk = _infinite_counter()  # fid key generator
+
+
+def new_oid(objt: ObjT) -> Oid:
+    return Oid(objt, next(_fidk))
+
+
+class ConfObj:
+    def to_dhall(self):
+        raise NotImplementedError('XXX IMPLEMENTME')
+
+
+class ConfNode(ConfObj):
+    def __init__(self, memsize_MB: int, nr_cpu: int):
+        self.memsize_MB = memsize_MB
+        self.nr_cpu = nr_cpu
+        self.processes = []  # type: List[Any]
+
+    def __repr__(self):
+        return f'{self.__class__.__name__}(memsize_MB={self.memsize_MB},' \
+            f' nr_cpu={self.nr_cpu})'
+
+
+class ConfController(ConfObj):
+    def __init__(self, node: Oid):
+        assert node.type is ObjT.node
+        self.node = node.fidk
+        self.drives = []  # type: List[Any]
+        self.pvers = []  # type: List[Any]
+
+    def __repr__(self):
+        return f'{self.__class__.__name__}(node={self.node})'
+
+
+def build_m0conf(cluster_desc: Dict[str, Any]) -> Dict[Oid, ConfObj]:
+    conf = {}  # type: Dict[Oid, ConfObj]
+    for host in cluster_desc['hosts']:
+        oid = new_oid(ObjT.node)
+        conf[oid] = ConfNode(
+            memsize_MB=int(float(host['facts']['memorysize_mb'])),
+            nr_cpu=host['facts']['processorcount'])
+        conf[new_oid(ObjT.controller)] = ConfController(node=oid)
+    return conf
 
 
 if __name__ == '__main__':
