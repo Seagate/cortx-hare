@@ -1,9 +1,119 @@
 # Hare - Halon replacement
 
-The scripts in this repository form a middleware layer between [Consul](https://www.consul.io/) and [Mero](http://gitlab.mero.colo.seagate.com/mero/mero) services.  Their responsibilities:
+The scripts in this repository constitute a middleware layer between [Consul](https://www.consul.io/) and [Mero](http://gitlab.mero.colo.seagate.com/mero/mero) services.  Their responsibilities:
 
 - provide initial configuration for a Mero cluster;
 - mediate communications between Mero services and Consul agents.
+
+## Installation
+
+[Download Consul](https://www.consul.io/downloads.html).  Copy `consul` executable to a $PATH directory (e.g., `/usr/local/bin/`) on each node of the cluster.
+
+### Single node
+
+1. Prepare the node:
+   ```sh
+   cd
+   git clone ssh://git@gitlab.mero.colo.seagate.com:6022/mero/hare.git
+   sudo mkdir -p /opt/seagate
+   sudo ln -s ~/hare /opt/seagate/consul
+   touch /tmp/confd  # "Mero confd service is alive and well" indicator
+   ```
+
+2. Start Consul server agent:
+   ```sh
+   consul agent -bind='{{GetPrivateIP}}' -server -config-dir=~/hare \
+       -data-dir=/tmp/consul -bootstrap-expect=1 \
+       -client='127.0.0.1 {{GetPrivateIP}}' -ui &
+   ```
+
+3. Initialise Consul KV store:
+   ```sh
+   cd hare
+   ./kv-init
+   ```
+
+4. Generate and assign Mero process fids to the "services", mentioned in `consul-srv-conf.json`:
+   ```sh
+   ./gen-service-ids
+   ```
+
+### Multiple nodes
+
+1. Prepare each of the cluster nodes; see step 1 of the [Single node](#single-node) section.
+
+2. Start Consul agent (server or client) on each of the nodes.  Use [`-retry-join`](https://www.consul.io/docs/agent/options.html#_retry_join) option so that it joins already running Consul server(s).
+   ```sh
+   consul agent -bind='{{GetPrivateIP}}' -server -config-dir=~/hare \
+       -data-dir=/tmp/consul -retry-join=192.168.180.1
+   ```
+   **Note:** If you plan to test RC leader election, there should be at least 3 Consul servers in the cluster.
+
+3. Generate and assign Mero process fids:
+   ```sh
+   ./gen-service-ids
+   ```
+
+## Observe
+
+* RC leader election log:
+  ```sh
+  tail -f /tmp/consul-elect-rc-leader.log
+  ```
+
+* RC log:
+  ```sh
+  tail -f /tmp/consul-proto-rc.log
+  ```
+
+* Check if the RC leader has been elected:
+  ```sh
+  $ pgrep -a consul
+  9100 consul agent -bind={{GetPrivateIP}} -server -config-dir=/home/ant/hare -data-dir=/tmp/consul/ -bootstrap-expect=1 -client=127.0.0.1 {{GetPrivateIP}} -ui
+  9656 consul watch -type=keyprefix -prefix eq/ /home/ant/hare/proto-rc
+  ```
+
+  The `consul watch [...] -prefix eq/` line indicates that the leader has been elected.  If there is no such line, try `consul reload`.
+
+### Consul web UI
+
+To view the [Consul UI](https://learn.hashicorp.com/consul/getting-started/ui#set-up-access-to-the-ui), open `http://<vm-ip-address>:8500/ui` URL in your browser.
+
+## Miscellanea
+
+* Get an entrypoint:
+
+  ```sh
+  $ ./get-entrypoint
+  principal-RM: node0
+  confds:
+    - node: node0
+      fid: 0x7200000000000001:0x0002
+      address: 192.168.180.162@tcp:12345:44:101
+  ```
+
+* Add a timeout and monitor it via the log:
+
+  ```sh
+  $ tail -f /tmp/consul-proto-rc.log &
+  [2] 10457
+  $
+  $ consul kv put timeout/201907221208.00 tmo1
+  Success! Data written to: timeout/201907221208.00
+  $
+  $ consul kv put eq/0 wake_RC
+  Success! Data written to: eq/0
+  $ 2019-07-22 12:09:33 134: Process eq/0 wake_RC...
+  2019-07-22 12:09:33 Success! Deleted key: eq/0
+  2019-07-22 12:09:34 Success! Data written to: eq/000000002
+  2019-07-22 12:09:34 Success! Deleted key: timeout/201907221208.00
+  2019-07-22 12:09:34 137: Process eq/000000002 tmo1...
+  2019-07-22 12:09:34 Success! Data written to: timeout/201907221210.34
+  2019-07-22 12:09:34 Success! Deleted key: eq/000000002
+  [...]
+  ```
+
+  The timeout resets automatically (for demo purposes), so you will see it in the log file every other minute.
 
 ## Roadmap
 
@@ -12,102 +122,6 @@ The scripts in this repository form a middleware layer between [Consul](https://
 2. EOS release — Consul takes over Pacemaker's responsibilities.
 
 See also [plan.org](./plan.org).
-
-## Singlenode setup
-
-1. Prepare the node:
-   - Download Consul binary to your Linux VM and put it at some directory from the PATH (e.g., `/usr/local/bin/`).
-   - ```sh
-     cd
-     git clone ssh://git@gitlab.mero.colo.seagate.com:6022/mero/hare.git
-     sudo mkdir -p /opt/seagate
-     sudo ln -s ~/hare /opt/seagate/consul
-     touch /tmp/confd # simulate Mero confd service good health
-     ```
-1. Start Consul server agent:
-   ```sh
-   consul agent -bind='{{GetPrivateIP}}' -server -config-dir=~/hare \
-       -data-dir=/tmp/consul -bootstrap-expect=1 \
-       -client='127.0.0.1 {{GetPrivateIP}}' -ui &
-   ```
-1. Initialise Consul KV store:
-   ```sh
-   cd hare
-   ./kv-init
-   ```
-3. Generate and assign FIDs to the configured Mero services
-   (in consul-srv-conf.json file):
-   ```sh
-   ./gen-service-ids
-   ```
-
-Your singlenode setup is ready.
-
-To check the RC leader election log:
-```sh
-tail /tmp/consul-elect-rc-leader.log
-```
-
-To check the RC log:
-```sh
-tail /tmp/consul-proto-rc.log
-```
-
-To check if the RC leader has been elected:
-```sh
-$ pgrep -a consul
-9100 consul agent -bind={{GetPrivateIP}} -server -config-dir=/home/ant/hare -data-dir=/tmp/consul/ -bootstrap-expect=1 -client=127.0.0.1 {{GetPrivateIP}} -ui
-9656 consul watch -type=keyprefix -prefix eq/ /home/ant/hare/proto-rc
-```
-The presence of `consul watch ... -prefix eq/` process indicates that the leader has been elected.
-If not, try `consul reload` command.
-
-That's basically it. Your setup is ready for experiments and development.
-
-For example, you can get entry point:
-```sh
-$ ./get-entrypoint
-principal-RM: node0
-confds:
-  - node: node0
-    fid: 0x7200000000000001:0x0002
-    address: 192.168.180.162@tcp:12345:44:101
-```
-
-Or add some timeout and monitor it via the log file:
-```sh
-$ tail -f /tmp/consul-proto-rc.log &
-[2] 10457
-$
-$ consul kv put timeout/201907221208.00 tmo1
-Success! Data written to: timeout/201907221208.00
-$
-$ consul kv put eq/0 wake_RC
-Success! Data written to: eq/0
-$ 2019-07-22 12:09:33 134: Process eq/0 wake_RC...
-2019-07-22 12:09:33 Success! Deleted key: eq/0
-2019-07-22 12:09:34 Success! Data written to: eq/000000002
-2019-07-22 12:09:34 Success! Deleted key: timeout/201907221208.00
-2019-07-22 12:09:34 137: Process eq/000000002 tmo1...
-2019-07-22 12:09:34 Success! Data written to: timeout/201907221210.34
-2019-07-22 12:09:34 Success! Deleted key: eq/000000002
-...
-```
-
-The timeout is automatically reset (just for the demo purposes), so you will see it in the log file every other minute.
-
-You can check Consul setup in a browser at `http://<vm-ip-address>:8500`.
-
-## Multi-nodes setup
-
-On each node step 1 (Prepare the node) should be performed fist.  Then start Consul agent in server or client mode (there should be at least 3 server nodes if you want to test RC leader election) and join it to the already started agent with the `-retry-join` option like this:
-```sh
-consul agent -bind='{{GetPrivateIP}}' -server -config-dir=~/hare \
-    -data-dir=/tmp/consul -retry-join=192.168.180.1
-```
-Then perform step 4 (Update Mero services FIDs).
-
-That's it.
 
 ## Links
 
