@@ -35,9 +35,10 @@ See also [plan.org](./plan.org).
    cd hare
    ./kv-init
    ```
-1. Update Mero services FIDs:
+3. Generate and assign FIDs to the configured Mero services
+   (in consul-srv-conf.json file):
    ```sh
-   ./update-service-fid
+   ./gen-service-ids
    ```
 
 Your singlenode setup is ready.
