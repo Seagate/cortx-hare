@@ -9,6 +9,14 @@ contributors:
 ---
 
 ## Consul KV Schema
+1. "leader/node" - used for RC Leader election
+1. "epoch/number" - used for unique epochs generation
+1. "fid/number" - used for unique FIDs generation
+1. "timeout/YYYYmmddHHMM.SS" - used for the timeouts by RC
+1. "eq/epoch/event" - Events Queue (EQ) monitored by RC
+1. "bq/epoch/HA_Status_updates" Broadcast Queue (BQ) used by RC to broadcast
+   HA Status Updates to all Mero processes. (On each node there is the watcher
+   on this queue.)
 
 ### Entrypoint Reply Data
 
