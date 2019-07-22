@@ -15,28 +15,27 @@ See also [plan.org](./plan.org).
 
 ## Singlenode setup
 
-Download Consul binary to your Linux VM and put it at some directory from the PATH (e.g., `/usr/local/bin/`).
-
-0. Prepare the node:
-   ```sh
-   cd
-   git clone ssh://git@gitlab.mero.colo.seagate.com:6022/mero/hare.git
-   sudo mkdir -p /opt/seagate
-   sudo ln -s ~/hare /opt/seagate/consul
-   touch /tmp/confd # simulate Mero confd service good health
-   ```
+1. Prepare the node:
+   - Download Consul binary to your Linux VM and put it at some directory from the PATH (e.g., `/usr/local/bin/`).
+   - ```sh
+     cd
+     git clone ssh://git@gitlab.mero.colo.seagate.com:6022/mero/hare.git
+     sudo mkdir -p /opt/seagate
+     sudo ln -s ~/hare /opt/seagate/consul
+     touch /tmp/confd # simulate Mero confd service good health
+     ```
 1. Start Consul server agent:
    ```sh
    consul agent -bind='{{GetPrivateIP}}' -server -config-dir=~/hare \
        -data-dir=/tmp/consul -bootstrap-expect=1 \
        -client='127.0.0.1 {{GetPrivateIP}}' -ui &
    ```
-2. Initialise Consul KV store:
+1. Initialise Consul KV store:
    ```sh
    cd hare
    ./kv-init
    ```
-3. Update Mero services FIDs:
+1. Update Mero services FIDs:
    ```sh
    ./update-service-fid
    ```
@@ -60,6 +59,7 @@ $ pgrep -a consul
 9656 consul watch -type=keyprefix -prefix eq/ /home/ant/hare/proto-rc
 ```
 The presence of `consul watch ... -prefix eq/` process indicates that the leader has been elected.
+If not, try `consul reload` command.
 
 That's basically it. Your setup is ready for experiments and development.
 
