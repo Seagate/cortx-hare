@@ -104,7 +104,8 @@ def main(argv=None):
         host['facts'] = get_facts(host['name'], opts.mock,
                                   'hostname', 'processorcount',
                                   'memorysize_mb', 'ipaddress', 'macaddress')
-        host['disks'] = get_disks(host['name'], host['disks']['path_glob'])
+        host['disks']['items'] = get_disks(host['name'],
+                                           host['disks']['path_glob'])
     # XXX DELETEME <<<<<<<
     from pprint import pprint
     pprint(cluster_desc)
