@@ -216,7 +216,7 @@ class ConfNode(ConfObj):
 class ConfController(ConfObj):
     def __init__(self, node: Oid):
         assert node.type is ObjT.node
-        self.node = node.fidk
+        self.node = node
         self.drives = []  # type: List[Any]
         self.pvers = []  # type: List[Any]
 
