@@ -98,6 +98,7 @@ def main(argv=None):
     except KeyboardInterrupt:
         sys.exit(1)
 
+    m0conf = {}
     for host in cluster_desc['hosts']:
         # The fact names used here correspond to version 2.4.1 of `facter`.
         # See https://puppet.com/docs/puppet/6.6/core_facts.html#legacy-facts
@@ -106,10 +107,60 @@ def main(argv=None):
                                   'memorysize_mb', 'ipaddress', 'macaddress')
         host['disks']['items'] = get_disks(host['name'],
                                            host['disks']['path_glob'])
+        XXX_host(host, m0conf)
     # XXX DELETEME <<<<<<<
     from pprint import pprint
+    print('----- cluster_desc -----')
     pprint(cluster_desc)
+    print('----- m0conf -----')
+    pprint(m0conf)
     # XXX >>>>>>>
+
+
+def _infinite_generator(start=0):
+    while True:
+        yield start
+        start += 1
+
+
+fidk_seq = _infinite_generator()  # fid key generator
+
+
+class Conf_Obj:
+    def to_dhall(self):
+        raise NotImplementedError('XXX IMPLEMENTME')
+
+
+class Conf_Node(Conf_Obj):
+    def __init__(self, memsize_MB: int, nr_cpu: int):
+        self.fidk = next(fidk_seq)
+        self.memsize_MB = memsize_MB
+        self.nr_cpu = nr_cpu
+        self.processes = []  # type: List[Any]
+
+    def __repr__(self):
+        return f'{self.__class__.__name__}(memsize_MB={self.memsize_MB},' \
+            f' nr_cpu={self.nr_cpu})'
+
+
+class Conf_Controller(Conf_Obj):
+    def __init__(self, node: int):
+        self.fidk = next(fidk_seq)
+        self.node = node
+        self.drives = []  # type: List[Any]
+        self.pvers = []  # type: List[Any]
+
+    def __repr__(self):
+        return f'{self.__class__.__name__}(node={self.node})'
+
+
+def XXX_host(host: Dict[str, Any], m0conf: Dict[str, Any]):
+    node = Conf_Node(memsize_MB=int(float(host['facts']['memorysize_mb'])),
+                     nr_cpu=host['facts']['processorcount'])
+    m0conf[f'node-{node.fidk}'] = node
+
+    ctrl = Conf_Controller(node=node.fidk)
+    m0conf[f'controller-{ctrl.fidk}'] = ctrl
 
 
 def run_command(hostname: str, *args: str) -> str:
@@ -166,127 +217,15 @@ def fabricate_facts(hostname: str, *args: str) -> Dict[str, Any]:
     return dict((k, fabricated[k]) for k in args)
 
 
-#XXX# def register_confobj_types():
-#XXX#     for t in ('dir', 'root', 'profile', 'filesystem', 'pool', 'pver', 'objv',
-#XXX#               'node', 'process', 'service', 'sdev', 'rack', 'enclosure',
-#XXX#               'controller', 'disk'):
-#XXX#         globals()['conf_' + t] = type('conf_' + t, (ConfObj,), {})
-#XXX#
-#XXX#
-#XXX# def build_conf_graph(cluster_desc: Dict[str, Any]):
-#XXX#     XXX
+# class ConfObj:
+#     XXX
 
 
-#XXX## XXX ----------------------------------------------------------------
-#XXX#
-#XXX#
-#XXX## _singlenode_desc = """\
-#XXX## hosts:
-#XXX##   - name: localhost
-#XXX##     disks: { path_glob: "/dev/loop[0-9]*" }
-#XXX##     m0_servers:
-#XXX##       - endpoint: { proto: lo, portal: 34, tmid: 101 }
-#XXX##         runs_confd: true
-#XXX##         io_disks: { path_regex: . }
-#XXX##     c0_clients: []
-#XXX##     m0t1fs_clients: []
-#XXX## pools:
-#XXX##   - name: the pool
-#XXX##     allowed_failures: { ctrl: 0, disk: 0 }
-#XXX##     data_units: 1
-#XXX##     parity_units: 0
-#XXX##     disks: all
-#XXX## """
-#XXX#
-#XXX#
-#XXX#class Endpoint:
-#XXX#    nid_suffix: str
-#XXX#
-#XXX#    def __init__(self, **kwargs):
-#XXX#        def raise_error(msg=None):
-#XXX#            raise ValueError(f'Invalid endpoint: {kwargs!r}' +
-#XXX#                             '' if msg is None else '\n' + msg))
-#XXX#
-#XXX#        if len(kwargs) != 3 or set(kwargs) != {'proto', 'portal', 'tmid'}:
-#XXX#            raise_error()
-#XXX#
-#XXX#        proto = kwargs['proto']
-#XXX#        if type(proto) is str:
-#XXX#            supported = ('lo', 'tcp', 'o2ib')
-#XXX#            if proto not in supported:
-#XXX#                raise_error('`proto` must be one of: ' + ', '.join(supported))
-#XXX#            self.nid_suffix = '@' + proto
-#XXX#        elif type(proto) is dict and len(proto) == 1:
-#XXX#            proto, optional_digit = list(proto.items())[0]
-#XXX#            if proto not in ('tcp', 'o2ib'):
-#XXX#                raise_error()
-#XXX#            self.nid_suffix = '@' + proto
-#XXX#            if optional_digit is not None:
-#XXX#                if not (type(optional_digit) is int and \
-#XXX#                        (0 < optional_digit < 9)):
-#XXX#                    raise_error(f'Digit expected, e.g. `{proto}: 1`')
-#XXX#                self.nid_suffix += str(optional_digit)
-#XXX#        else:
-#XXX#            raise_error('Invalid `proto` specification')
-#XXX#
-#XXX#        portal, tmid = kwargs['portal'], kwargs['tmid']
-#XXX#        if not ({type(portal), type(tmid)} == {int} and \
-#XXX#                portal > 0 and tmid > 0):
-#XXX#            raise_error('`portal` and `tmid` must be natural numbers')
-#XXX#
-#XXX#        self.nid_suffix += f':12345:{portal}:{tmid}'
-#XXX#
-#XXX#
-#XXX#class Host:
-#XXX#    name: str
-#XXX#    disks_path_glob: str
-#XXX#    # m0_servers: List[M0_Server]
-#XXX#    # c0_clients: List[Endpoint]
-#XXX#    # m0t1fs_clients: List[Endpoint]
-#XXX#
-#XXX#    def __init__(self, **kwargs):
-#XXX#        self.name = kwargs['name']
-#XXX#        self.disks_path_glob = kwargs['disks']['path_glob']
-#XXX#        # self.m0_servers = [M0Server(x) for x in kwargs['m0_servers']]
-#XXX#        # self.c0_clients = [Endpoint(x) for x in kwargs['c0_clients']]
-#XXX#        # self.m0t1fs_clients = [Endpoint(x) for x in kwargs['m0t1fs_clients']]
-#XXX#
-#XXX#
-#XXX#class Cluster:
-#XXX#    hosts: List[Host]
-#XXX#    # pools: List[Pool]
-#XXX#
-#XXX#    def __init__(self, **kwargs):
-#XXX#        self.hosts = [Host(x) for x in kwargs['hosts']]
-#XXX#        # self.pools = [Pool(x) for x in kwargs['pools']]
-#XXX#
-#XXX#
-#XXX#def collect_facts(cluster: Cluster) -> Dict[str, Any]:
-#XXX#    for host in cluster.hosts:
-#XXX#        # Sanitize user input, preventing malicious host names like
-#XXX#        # "127.0.0.1; rm -rf ~; sudo rm -rf /;".
-#XXX#        if re.match('[a-z][-@_.a-z0-9]*', host.name) is None:
-#XXX#            raise ValueError('Invalid host reference: ' + host.name)
-#XXX#
-#XXX#        # These facts were obtained using version 2.4.1 of `facter`.
-#XXX#        # See https://puppet.com/docs/puppet/6.6/core_facts.html#legacy-facts
-#XXX#        mock_facts = {'hostname': 'cmu',
-#XXX#                      'processorcount': 3,
-#XXX#                      'memorysize_mb': '2846.40',
-#XXX#                      'ipaddress': '10.0.1.23',
-#XXX#                      'macaddress': '12:34:56:78:9a:bc'}
-#XXX#
-#XXX#        if mode != OpMode.MOCK:
-#XXX#            args = ['ssh', host.name] if mode == OpMode.SSH else []
-#XXX#            args.extend(['facter', '--json'])
-#XXX#            args.extend(mock_facts.keys())
-#XXX#            facts = json.loads(subprocess.check_output(args, timeout=15)
-#XXX#                               .decode())
-#XXX#
-#XXX#
-#XXX## def store_facts(facts: Facts, output_dir: str = None):
-#XXX##     pass
-#XXX## XXX ----------------------------------------------------------------
+# def register_confobj_types():
+#     for t in ('dir', 'root', 'profile', 'filesystem', 'pool', 'pver', 'objv',
+#               'node', 'process', 'service', 'sdev', 'rack', 'enclosure',
+#               'controller', 'disk'):
+#         globals()['conf_' + t] = type('conf_' + t, (ConfObj,), {})
 
 
 if __name__ == '__main__':
