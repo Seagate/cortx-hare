@@ -2,7 +2,7 @@ from hax.halink import HaLink
 from hax.types import Fid
 import logging
 import threading
-
+import signal
 
 def setup_logging():
     logging.basicConfig(level=logging.DEBUG)
@@ -29,6 +29,15 @@ def main():
 
     logging.info("Threads finished")
 
+def handleSignal(signalNumber, frame):
+    print('Received:', signalNumber)
+    raise SystemExit('Exiting')
+    return
 
 if __name__ == "__main__":
     main()
+    signal.signal(signal.SIGTERM, handleSignal)
+    signal.signal(signal.SIGINT, handleSignal)
+    signal.signal(signal.SIGQUIT, handleSignal)
+
+    signal.pause()

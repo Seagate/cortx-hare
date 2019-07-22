@@ -62,7 +62,7 @@ void entrypoint_request_cb( struct m0_halon_interface *hi
   printf("handler addr: %p\n", hc->hc_handler);
   PyObject* py_fid = toFid(process_fid);
   PyObject* py_req = toUid128(req_id);
-  
+
   PyObject_CallMethod(
       hc->hc_handler,
       "_entrypoint_request_cb",
@@ -74,6 +74,7 @@ void entrypoint_request_cb( struct m0_halon_interface *hi
       pid,
       first_request
     );
+  //m0_halon_interface_entrypoint_reply(hi, req_id, 0, 0, NULL, NULL, 1, M0_FID_TINIT('s', 72, 1), NULL);
   Py_DECREF(py_req);
   Py_DECREF(py_fid);
 
@@ -196,9 +197,9 @@ int start( unsigned long long ctx
 
 void test(unsigned long long ctx)
 {
-  //struct m0_thread  mthread;
-  //struct m0        *m0;
-  //int               rc;
+  struct m0_thread  mthread;
+  struct m0        *m0;
+  int               rc;
 
   printf("Got: %llu\n", ctx);
 
@@ -212,7 +213,7 @@ void test(unsigned long long ctx)
   struct m0_uint128 t = M0_UINT128(100, 500);
   struct m0_fid fid = M0_FID_INIT(20, 50);
 
-  /*M0_SET0(&mthread);
+  M0_SET0(&mthread);
   m0 = m0_halon_interface_m0_get(hc->hc_hi);
   rc = m0_thread_adopt(&mthread, m0);
   if (rc != 0) {
@@ -220,8 +221,6 @@ void test(unsigned long long ctx)
      return;
   }
   m0_mutex_lock(&hc->hc_mutex);
-  m0_mutex_unlock(&hc->hc_mutex);
-  m0_thread_shun();*/
   entrypoint_request_cb( hc->hc_hi
                        , &t
                        , "ENDP"
@@ -230,6 +229,8 @@ void test(unsigned long long ctx)
                        , 12345
                        , 0
       );
+  m0_mutex_unlock(&hc->hc_mutex);
+  m0_thread_shun();
 }
 
 int main(int argc, char **argv)

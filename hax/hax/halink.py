@@ -3,8 +3,8 @@ import logging
 import threading
 from hax.types import Fid, FidStruct
 
-lib = c.cdll.LoadLibrary('/home/720599/projects/hare/hax/hax.so')
-#lib = c.cdll.LoadLibrary('/data/hare/hare/hax/hax.so')
+#lib = c.cdll.LoadLibrary('/home/720599/projects/hare/hax/hax.so')
+lib = c.cdll.LoadLibrary('/data/hare/hare/hax/hax.so')
 
 prototype = c.PYFUNCTYPE(c.c_ulonglong, c.py_object)
 prot2 = c.PYFUNCTYPE(None, c.c_void_p)
@@ -47,7 +47,9 @@ class HaLink(object):
         # TODO call m0d from here
 
     def test_cb(self):
-        import pudb; pudb.set_trace()
+        tname = threading.currentThread().getName()
+        logging.info('Test cb method is invoked from thread {}'.format(tname))
+        #import pudb; pudb.set_trace()
 
     def _entrypoint_request_cb(self,
                                req_id,
@@ -56,5 +58,7 @@ class HaLink(object):
                                git_rev,
                                pid,
                                is_first_request):
-        import pudb; pudb.set_trace()
-        raise NotImplementedError("TODO")
+        #import pudb; pudb.set_trace()
+        tname = threading.currentThread().getName()
+        logging.info('_entrypoint_request_cb method is invoked from thread {}'.format(tname))
+        #raise NotImplementedError("TODO")
