@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -eu -o pipefail
+
+# Initialise Consul's KV store for Hare.
+
+consul kv put leader ''
+consul kv put epoch 1
+consul kv put fid 1
