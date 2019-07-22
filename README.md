@@ -99,7 +99,7 @@ You can check Consul setup in a browser at `http://<vm-ip-address>:8500`.
 
 ## Multi-nodes setup
 
-On each node step 0 (Prepare the node) should be performed fist.  Then start Consul agent in server or client mode (there should be at least 3 server nodes if you want to test RC leader election) and join it to the already started agent with the `-retry-join` option like this:
+On each node step 1 (Prepare the node) should be performed fist.  Then start Consul agent in server or client mode (there should be at least 3 server nodes if you want to test RC leader election) and join it to the already started agent with the `-retry-join` option like this:
 ```sh
 consul agent -bind='{{GetPrivateIP}}' -server -config-dir=~/hare \
     -data-dir=/tmp/consul -retry-join=192.168.180.1
