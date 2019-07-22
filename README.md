@@ -15,7 +15,7 @@ See also [plan.org](./plan.org).
 
 ## Singlenode setup
 
-Download Consul binary to your Linux VM and put it some directory from the PATH (e.g., `/usr/local/bin/`).
+Download Consul binary to your Linux VM and put it at some directory from the PATH (e.g., `/usr/local/bin/`).
 
 0. Prepare the node:
    ```sh
