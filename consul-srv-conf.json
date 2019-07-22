@@ -10,7 +10,7 @@
   "enable_local_script_checks" : true,
   "services": [
    {
-    "id": "0x7200000000000001:0x002e",
+    "id": "fid",
     "name": "confd",
     "address": "@tcp:12345:44",
     "port": 101,
@@ -22,7 +22,7 @@
     ]
    },
    {
-    "id": "0x7200000000000001:0x002f",
+    "id": "fid",
     "name": "ios",
     "address": "@tcp:12345:41",
     "port": 401
