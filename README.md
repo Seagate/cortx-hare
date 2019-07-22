@@ -43,14 +43,14 @@ Download Consul binary to your Linux VM and put it at some directory from the PA
 
 Your singlenode setup is ready.
 
-To watch the RC leader election log in real time:
+To check the RC leader election log:
 ```sh
-tail -f /tmp/consul-elect-rc-leader.log &
+tail /tmp/consul-elect-rc-leader.log
 ```
 
-To watch the RC log:
+To check the RC log:
 ```sh
-tail -f /tmp/consul-proto-rc.log &
+tail /tmp/consul-proto-rc.log
 ```
 
 To check if the RC leader has been elected:
@@ -59,7 +59,7 @@ $ pgrep -a consul
 9100 consul agent -bind={{GetPrivateIP}} -server -config-dir=/home/ant/hare -data-dir=/tmp/consul/ -bootstrap-expect=1 -client=127.0.0.1 {{GetPrivateIP}} -ui
 9656 consul watch -type=keyprefix -prefix eq/ /home/ant/hare/proto-rc
 ```
-The presence of `consul watch [...]proto-rc` process indicates that the leader has been elected.
+The presence of `consul watch ... -prefix eq/` process indicates that the leader has been elected.
 
 That's basically it. Your setup is ready for experiments and development.
 
