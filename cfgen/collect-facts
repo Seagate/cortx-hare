@@ -197,41 +197,60 @@ def new_oid(objt: ObjT) -> Oid:
     return Oid(objt, next(_fidk))
 
 
-class ConfObj:
+# XXX Convert to an abstract base class (ABC).
+# See https://mypy.readthedocs.io/en/stable/class_basics.html#abstract-base-classes-and-multiple-inheritance
+class ToDhall:
     def to_dhall(self):
         raise NotImplementedError('XXX IMPLEMENTME')
 
 
-class ConfNode(ConfObj):
-    def __init__(self, memsize_MB: int, nr_cpu: int):
+class ConfRoot(ToDhall):
+    def __init__(self, nodes: List[Oid] = []):
+        self.nodes = nodes
+
+    def __repr__(self):
+        return f'{self.__class__.__name__}(nodes={self.nodes})'
+
+
+class ConfNode(ToDhall):
+    def __init__(self, memsize_MB: int, nr_cpu: int,
+                 processes: List[Oid] = []):
         self.memsize_MB = memsize_MB
         self.nr_cpu = nr_cpu
-        self.processes = []  # type: List[Any]
+        self.processes = processes
 
     def __repr__(self):
         return f'{self.__class__.__name__}(memsize_MB={self.memsize_MB},' \
-            f' nr_cpu={self.nr_cpu})'
+            f' nr_cpu={self.nr_cpu}, processes={self.processes})'
 
 
-class ConfController(ConfObj):
-    def __init__(self, node: Oid):
+class ConfController(ToDhall):
+    def __init__(self, node: Oid, drives: List[Oid] = []):
         assert node.type is ObjT.node
         self.node = node
-        self.drives = []  # type: List[Any]
-        self.pvers = []  # type: List[Any]
+        assert all(x.type is ObjT.drive for x in drives)
+        self.drives = drives
+        self.pvers = []  # type: List[Oid]
 
     def __repr__(self):
-        return f'{self.__class__.__name__}(node={self.node})'
+        return f'{self.__class__.__name__}(node={self.node},' \
+            f' drives={self.drives})'
 
 
-def build_m0conf(cluster_desc: Dict[str, Any]) -> Dict[Oid, ConfObj]:
-    conf = {}  # type: Dict[Oid, ConfObj]
+def build_m0conf(cluster_desc: Dict[str, Any]) -> Dict[Oid, ToDhall]:
+    conf = {}  # type: Dict[Oid, Any]
+
+    root = new_oid(ObjT.root)
+    conf[root] = ConfRoot()
+
     for host in cluster_desc['hosts']:
-        oid = new_oid(ObjT.node)
-        conf[oid] = ConfNode(
+        node = new_oid(ObjT.node)
+        conf[root].nodes.append(node)
+        conf[node] = ConfNode(
             memsize_MB=int(float(host['facts']['memorysize_mb'])),
             nr_cpu=host['facts']['processorcount'])
-        conf[new_oid(ObjT.controller)] = ConfController(node=oid)
+        conf[new_oid(ObjT.controller)] = ConfController(node)
+
     return conf
 
 
