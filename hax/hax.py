@@ -25,9 +25,9 @@ def main():
     setup_logging()
     q = Queue(maxsize=1000)
     t = run_publisher_thread(q)
-    run_server(q, thread_to_wait=t)
+    l = HaLink(node_uuid="This is a test", queue=q)
+    run_server(q, thread_to_wait=t, halink=l)
 
-    l = HaLink(node_uuid="This is a test")
     # l.start("endpoint", Fid(3,4), Fid(5,6), Fid(0xDEADBEEF, 7))
 
 

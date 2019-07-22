@@ -37,21 +37,25 @@ class KVHandler(BaseHTTPRequestHandler):
         self._set_headers()
 
     def do_POST(self):
-        queue = self.server.reply_queue
         self._set_headers()
         content_length = int(self.headers['Content-Length'])
         post_data = self.rfile.read(content_length)
         logging.info("A new request has been received: {}".format(post_data))
-        queue.put(StrMessage(post_data))
-        logging.debug(
-            "The message is put to the queue, the server thread is free again")
+
+        # TODO instead of this call something to m0d must be done
+        self.server.halink.test_cb(post_data)
 
 
-def run_server(queue, thread_to_wait=None, server_class=HTTPServer, port=8080):
+def run_server(queue,
+               thread_to_wait=None,
+               server_class=HTTPServer,
+               port=8080,
+               halink=None):
     port = 8080
     server_address = ('', port)
     httpd = server_class(server_address, KVHandler)
     httpd.reply_queue = queue
+    httpd.halink = halink
 
     logging.info('Starting http server...')
     try:
@@ -68,12 +72,12 @@ def kv_publisher_thread(q: Queue):
     try:
         # client = consul.Consul()
         while True:
-            logging.info('Waiting')
+            logging.debug('Waiting')
             item = q.get()
             # import pudb; pudb.set_trace()
-            logging.info('Got something from the queue')
+            logging.debug('Got something from the queue')
             if isinstance(item, Die):
-                logging.info('Got posioned pill, exiting')
+                logging.debug('Got posioned pill, exiting')
                 break
 
             logging.debug('Sending message to Consul: {}'.format(item.s))

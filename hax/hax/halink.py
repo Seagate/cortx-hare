@@ -1,6 +1,7 @@
 import ctypes as c
 import logging
 import threading
+from hax.server import StrMessage
 from hax.types import Fid, FidStruct
 
 lib = c.cdll.LoadLibrary('/home/720599/projects/hare/hax/hax.so')
@@ -22,8 +23,9 @@ lib.start.restype = c.c_int
 
 
 class HaLink(object):
-    def __init__(self, node_uuid=""):
+    def __init__(self, node_uuid="", queue=None):
         self._ha_ctx = lib.init_halink(self, self._c_str(node_uuid))
+        self.queue = queue
         # if not self._ha_ctx:
         # raise RuntimeError("Could not initialize ha_link")
 
@@ -44,8 +46,11 @@ class HaLink(object):
         logging.info('Test method is invoked from thread {}'.format(tname))
         # TODO call m0d from here
 
-    def test_cb(self):
-        import pudb; pudb.set_trace()
+    def test_cb(self, data):
+        logging.debug("Sending the test message to the queue")
+        # TODO the actual data must be put here
+        self.queue.put(StrMessage(data))
+        logging.debug("The locality thread is free now")
 
     def _entrypoint_request_cb(self,
                                req_id,
