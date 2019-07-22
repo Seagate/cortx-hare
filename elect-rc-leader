@@ -32,7 +32,8 @@ pkill -9 -f 'consul watch.*prefix eq' || true
 pkill -f 'sh.*proto-rc' || true
 
 # Create session with the service:confd Health Checker:
-PAYLD='{"Name": "leader", "Checks": ["serfHealth", "service:confd"]}'
+CHECKS=$(curl -s http://127.0.0.1:8500/v1/health/node/`hostname` | jq '[.[].CheckID]')
+PAYLD="{\"Name\": \"leader\", \"Checks\": $CHECKS}"
 RES=$(curl -sX PUT -d "$PAYLD" http://localhost:8500/v1/session/create)
 SID=$(echo "$RES" | jq -r '.ID' 2>/dev/null || true)
 
