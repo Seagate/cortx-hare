@@ -7,7 +7,6 @@ from hax.types import Fid, FidStruct
 
 dirname = os.path.dirname(os.path.abspath(__file__))
 lib_path = '{}/../hax.so'.format(dirname)
-logging.debug('Loading hax library from path: {}'.format(lib_path))
 lib = c.cdll.LoadLibrary(lib_path)
 
 prototype = c.PYFUNCTYPE(c.c_ulonglong, c.py_object)
