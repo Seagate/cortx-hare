@@ -5,6 +5,16 @@
       "type": "key",
       "key": "leader",
       "args": ["/opt/seagate/consul/elect-rc-leader"]
+    },
+    {
+      "type": "service",
+      "service": "confd",
+      "handler_type": "http",
+      "http_handler_config": {
+         "path":"http://localhost:8080",
+         "method": "POST",
+         "timeout": "10s"
+      }
     }
   ],
   "enable_local_script_checks" : true,
