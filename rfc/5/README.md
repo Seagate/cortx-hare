@@ -1,7 +1,7 @@
 ---
 domain: gitlab.mero.colo.seagate.com
 shortname: 5/HAX
-name: HA link eXtender
+name: HA link eXtender (hax)
 status: raw
 editor: Valery V. Vorotyntsev <valery.vorotyntsev@seagate.com>
 contributors:
@@ -19,14 +19,13 @@ The code of `hax` consists of C and Python parts.
 
 * C part maintains HA link (`m0_ha_link`) connections with one or more `m0d` processes.  The code uses `m0_halon_interface` API.
 * The callback functions passed to `m0_halon_interface_start()` are defined in the Python code.  Callback handlers (e.g., `entrypoint_request_cb`, `msg_received_cb`) send HTTP requests to Consul.
-* Python part also runs HTTP server.  This server receives HTTP POST request from a Consul watch handler with payload of HA state updates.
+* Python part also runs HTTP server.  This server receives HTTP POST request from a Consul's watch handler with payload of HA state updates.
 
-## Input data format
+## Incoming HTTP requests
 
-1. hax receives the `POST` requests at `/`
-2. The incoming message body must have the structure as follows:
+`hax` receives HTTP POST requests from Consul's [watch handler](https://www.consul.io/docs/agent/watches.html#http-endpoint).  The payload is JSON formatted data with the following structure:
 
-```
+```json
 [{
     "Node": {
         "ID": "1e980571-4a55-bb9d-5eca-e37c06eead07",
@@ -111,9 +110,9 @@ The code of `hax` consists of C and Python parts.
 }]
 ```
 
-Note: hax can be registered as Consul HTTP watcher
+## Threading model
 
-## Is `m0_thread_adopt` necessary?
+### Is `m0_thread_adopt` necessary?
 
 Mero functions - including FFI callbacks triggered by Mero - _may_ require that the threads they run on have thread-local storage (TLS) initialised in a specific way.  The threads managed by Python runtime do not meet this assumption, unless `hax` code makes `m0_thread_adopt` calls in proper places (`m0_thread_adopt` performs TLS initialisation as required by Mero).  The question is, whether Mero code executed by `hax` will actually _depend_ on Mero-specific TLS?  The most likely answer is “yes”.
 
