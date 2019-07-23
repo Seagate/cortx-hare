@@ -7,6 +7,7 @@
 #   `yaml-to-dhall` executable that includes
 #   https://github.com/dhall-lang/dhall-haskell/pull/1083 bugfix.
 
+import abc
 import argparse
 import ast
 from enum import Enum
@@ -197,19 +198,56 @@ def new_oid(objt: ObjT) -> Oid:
     return Oid(objt, next(_fidk))
 
 
-# XXX Convert to an abstract base class (ABC).
-# See https://mypy.readthedocs.io/en/stable/class_basics.html#abstract-base-classes-and-multiple-inheritance
-class ToDhall:
+class ToDhall(metaclass=abc.ABCMeta):
+    @abc.abstractmethod
+    def to_dhall(self):
+        pass
+
+
+class ConfRoot(ToDhall):
+    def __init__(self, nodes: List[Oid] = [], sites: List[Oid] = []):
+        self.nodes = nodes
+        self.sites = sites
+
+    def __repr__(self):
+        return f'{self.__class__.__name__}(nodes={self.nodes},' \
+            f' sites={self.sites})'
+
     def to_dhall(self):
         raise NotImplementedError('XXX IMPLEMENTME')
 
 
-class ConfRoot(ToDhall):
-    def __init__(self, nodes: List[Oid] = []):
-        self.nodes = nodes
+class ConfSite(ToDhall):
+    def __init__(self, racks: List[Oid] = []):
+        self.racks = racks
 
     def __repr__(self):
-        return f'{self.__class__.__name__}(nodes={self.nodes})'
+        return f'{self.__class__.__name__}(racks={self.racks})'
+
+    def to_dhall(self):
+        raise NotImplementedError('XXX IMPLEMENTME')
+
+
+class ConfRack(ToDhall):
+    def __init__(self, encls: List[Oid] = []):
+        self.encls = encls
+
+    def __repr__(self):
+        return f'{self.__class__.__name__}(encls={self.encls})'
+
+    def to_dhall(self):
+        raise NotImplementedError('XXX IMPLEMENTME')
+
+
+class ConfEnclosure(ToDhall):
+    def __init__(self, ctrls: List[Oid] = []):
+        self.ctrls = ctrls
+
+    def __repr__(self):
+        return f'{self.__class__.__name__}(ctrls={self.ctrls})'
+
+    def to_dhall(self):
+        raise NotImplementedError('XXX IMPLEMENTME')
 
 
 class ConfNode(ToDhall):
@@ -223,6 +261,9 @@ class ConfNode(ToDhall):
         return f'{self.__class__.__name__}(memsize_MB={self.memsize_MB},' \
             f' nr_cpu={self.nr_cpu}, processes={self.processes})'
 
+    def to_dhall(self):
+        raise NotImplementedError('XXX IMPLEMENTME')
+
 
 class ConfController(ToDhall):
     def __init__(self, node: Oid, drives: List[Oid] = []):
@@ -230,26 +271,43 @@ class ConfController(ToDhall):
         self.node = node
         assert all(x.type is ObjT.drive for x in drives)
         self.drives = drives
-        self.pvers = []  # type: List[Oid]
 
     def __repr__(self):
         return f'{self.__class__.__name__}(node={self.node},' \
             f' drives={self.drives})'
 
+    def to_dhall(self):
+        raise NotImplementedError('XXX IMPLEMENTME')
+
 
 def build_m0conf(cluster_desc: Dict[str, Any]) -> Dict[Oid, ToDhall]:
     conf = {}  # type: Dict[Oid, Any]
 
-    root = new_oid(ObjT.root)
-    conf[root] = ConfRoot()
+    root_id = new_oid(ObjT.root)
+    conf[root_id] = ConfRoot()
+
+    site_id = new_oid(ObjT.site)
+    conf[site_id] = ConfSite()
+    conf[root_id].sites = [site_id]
+
+    rack_id = new_oid(ObjT.rack)
+    conf[rack_id] = ConfRack()
+    conf[site_id].racks = [rack_id]
+
+    encl_id = new_oid(ObjT.enclosure)
+    conf[encl_id] = ConfEnclosure()
+    conf[rack_id].encls = [encl_id]
 
     for host in cluster_desc['hosts']:
-        node = new_oid(ObjT.node)
-        conf[root].nodes.append(node)
-        conf[node] = ConfNode(
+        node_id = new_oid(ObjT.node)
+        conf[node_id] = ConfNode(
             memsize_MB=int(float(host['facts']['memorysize_mb'])),
             nr_cpu=host['facts']['processorcount'])
-        conf[new_oid(ObjT.controller)] = ConfController(node)
+        conf[root_id].nodes.append(node_id)
+
+        ctrl_id = new_oid(ObjT.controller)
+        conf[ctrl_id] = ConfController(node_id)
+        conf[encl_id].ctrls.append(ctrl_id)
 
     return conf
 
