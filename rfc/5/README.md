@@ -21,6 +21,98 @@ The code of `hax` consists of C and Python parts.
 * The callback functions passed to `m0_halon_interface_start()` are defined in the Python code.  Callback handlers (e.g., `entrypoint_request_cb`, `msg_received_cb`) send HTTP requests to Consul.
 * Python part also runs HTTP server.  This server receives HTTP POST request from a Consul watch handler with payload of HA state updates.
 
+## Input data format
+
+1. hax receives the `POST` requests at `/`
+2. The incoming message body must have the structure as follows:
+
+```
+[{
+    "Node": {
+        "ID": "1e980571-4a55-bb9d-5eca-e37c06eead07",
+        "Node": "sage75",
+        "Address": "192.168.180.162",
+        "Datacenter": "dc1",
+        "TaggedAddresses": {
+            "lan": "192.168.180.162",
+            "wan": "192.168.180.162"
+        },
+        "Meta": {
+            "consul-network-segment": ""
+        },
+        "CreateIndex": 5,
+        "ModifyIndex": 6
+    },
+    "Service": {
+        "ID": "0x7200000000000001:0x0004",
+        "Service": "confd",
+        "Tags": [],
+        "Meta": null,
+        "Port": 101,
+        "Address": "@tcp:12345:44",
+        "Weights": {
+            "Passing": 1,
+            "Warning": 1
+        },
+        "EnableTagOverride": false,
+        "CreateIndex": 6,
+        "ModifyIndex": 6,
+        "Proxy": {
+            "DestinationServiceName": "",
+            "Upstreams": null
+        },
+        "Connect": {}
+    },
+    "Checks": [{
+        "Node": "sage75",
+        "CheckID": "serfHealth",
+        "Name": "Serf Health Status",
+        "Status": "passing",
+        "Notes": "",
+        "Output": "Agent alive and reachable",
+        "ServiceID": "",
+        "ServiceName": "",
+        "ServiceTags": [],
+        "Definition": {
+            "Interval": "0s",
+            "Timeout": "0s",
+            "DeregisterCriticalServiceAfter": "0s",
+            "HTTP": "",
+            "Header": null,
+            "Method": "",
+            "TLSSkipVerify": false,
+            "TCP": ""
+        },
+        "CreateIndex": 5,
+        "ModifyIndex": 5
+    }, {
+        "Node": "sage75",
+        "CheckID": "service:0x7200000000000001:0x0004",
+        "Name": "Service 'confd' check",
+        "Status": "passing",
+        "Notes": "",
+        "Output": "",
+        "ServiceID": "0x7200000000000001:0x0004",
+        "ServiceName": "confd",
+        "ServiceTags": [],
+        "Definition": {
+            "Interval": "0s",
+            "Timeout": "0s",
+            "DeregisterCriticalServiceAfter": "0s",
+            "HTTP": "",
+            "Header": null,
+            "Method": "",
+            "TLSSkipVerify": false,
+            "TCP": ""
+        },
+        "CreateIndex": 6,
+        "ModifyIndex": 72
+    }]
+}]
+```
+
+Note: hax can be registered as Consul HTTP watcher
+
 ## Is `m0_thread_adopt` necessary?
 
 Mero functions - including FFI callbacks triggered by Mero - _may_ require that the threads they run on have thread-local storage (TLS) initialised in a specific way.  The threads managed by Python runtime do not meet this assumption, unless `hax` code makes `m0_thread_adopt` calls in proper places (`m0_thread_adopt` performs TLS initialisation as required by Mero).  The question is, whether Mero code executed by `hax` will actually _depend_ on Mero-specific TLS?  The most likely answer is “yes”.
