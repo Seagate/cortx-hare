@@ -2,7 +2,7 @@ import ctypes as c
 import logging
 import threading
 import os
-from hax.server import StrMessage
+from hax.server import Message
 from hax.types import Fid, FidStruct
 
 dirname = os.path.dirname(os.path.abspath(__file__))
@@ -56,7 +56,7 @@ class HaLink(object):
     def test_cb(self, data):
         logging.debug("Sending the test message to the queue")
         # TODO the actual data must be put here
-        self.queue.put(StrMessage(data))
+        self.queue.put(Message(data))
         logging.debug("The locality thread is free now")
 
     def _entrypoint_request_cb(self, req_id, remote_rpc_endpoint, process_fid,

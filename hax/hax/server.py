@@ -1,20 +1,20 @@
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import logging
-import json
+import json as j
 import consul
 from queue import Queue
 
 
-class Message(object):
+class BaseMessage(object):
     pass
 
 
-class StrMessage(Message):
+class Message(BaseMessage):
     def __init__(self, s):
         self.s = s
 
 
-class Die(Message):
+class Die(BaseMessage):
     pass
 
 
@@ -30,7 +30,7 @@ class KVHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         self._set_headers()
-        s = json.dumps({'message': 'I am alive'})
+        s = j.dumps({'message': 'I am alive'})
         self.wfile.write(s.encode('utf-8'))
 
     def do_HEAD(self):
@@ -40,10 +40,39 @@ class KVHandler(BaseHTTPRequestHandler):
         self._set_headers()
         content_length = int(self.headers['Content-Length'])
         post_data = self.rfile.read(content_length)
-        logging.info("A new request has been received: {}".format(post_data))
+        logging.debug('A new request has been received: {}'.format(post_data))
 
+        struct = self.parse_req(post_data)
+        struct = self.sanitize_service_info(struct)
+
+        logging.info('Effective structure is as follows: {}'.format(struct))
         # TODO instead of this call something to m0d must be done
-        self.server.halink.test_cb(post_data)
+        self.server.halink.test_cb(struct)
+
+    def sanitize_service_info(self, data):
+        if not data:
+            return []
+        result = []
+        for t in data:
+            service = t.get('Service')
+            checks = t.get('Checks')
+            result.append({
+                'fid': service.get('ID'),
+                'status': self.get_status(checks)
+            })
+        return result
+
+    def get_status(self, checks):
+        ok = all(map(lambda x: x.get('Status', None) == 'passing', checks))
+        return 'online' if ok else 'offline'
+
+    def parse_req(self, raw_data):
+        try:
+            struct = j.loads(raw_data)
+            return struct
+        except j.JSONDecodeError:
+            logging.warn('Not a valid JSON object received')
+            return None
 
 
 def run_server(queue,
