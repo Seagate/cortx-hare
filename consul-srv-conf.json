@@ -15,6 +15,11 @@
          "method": "POST",
          "timeout": "10s"
       }
+    },
+    {
+      "type": "service",
+      "service": "confd",
+      "args": ["/opt/seagate/consul/watch-service"]
     }
   ],
   "enable_local_script_checks" : true,

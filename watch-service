@@ -1,23 +1,20 @@
 #!/usr/bin/env bash
 set -eu -o pipefail
 
-usage() {
-    echo "$0 <service>"
-    echo
-    echo "Consul watch to monitor the specified service."
-    exit 1
-}
+# Service status watch handler (just for debug purposes).
+#
+# Can be run like this:
+#
+# $ consul watch -type=service -service=confd <$0>
+#
 
-[[ $# == 1 ]] || usage
+# Redirect all printouts to the log file with the timestamp prefix:
+exec &>> /tmp/consul-$(basename $0).log
+exec &> >(stdbuf -oL gawk '{ print strftime("%Y-%m-%d %H:%M:%S"), $0 }')
 
-SERVICE=$1
-
-export SRC_DIR="$(dirname $(readlink -f $0))"
-
-HANDLER="jq '[.[] | { (.Service.ID) :
-                      (if ([.Checks|.[].Status==\"passing\"]|all)
-                         then \"online\"
-                         else \"offline\"
-                       end)
-                    } ]'"
-exec consul watch -type=service -service=$SERVICE $HANDLER
+jq '[.[] | { "fid": (.Service.ID),
+             "status": (if ([.Checks|.[].Status=="passing"]|all)
+                          then "online"
+                          else "offline"
+                        end)
+           } ]'
