@@ -14,5 +14,10 @@ SERVICE=$1
 
 export SRC_DIR="$(dirname $(readlink -f $0))"
 
-HANDLER="jq '.[]|\"\(.Service.ID) \([.Checks|.[].Status==\"passing\"]|all)\"'"
+HANDLER="jq '[.[] | { (.Service.ID) :
+                      (if ([.Checks|.[].Status==\"passing\"]|all)
+                         then \"online\"
+                         else \"offline\"
+                       end)
+                    } ]'"
 exec consul watch -type=service -service=$SERVICE $HANDLER
