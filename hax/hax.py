@@ -1,44 +1,32 @@
 from hax.halink import HaLink
+from hax.server import run_server, kv_publisher_thread
 from hax.types import Fid
+from queue import Queue
+from threading import Thread
 import logging
-import threading
-import signal
+
 
 def setup_logging():
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format='%(asctime)s [%(levelname)s] {%(threadName)s} %(message)s')
 
 
-def thread_fn(ha: HaLink):
-    #ha.test()
-    ha.start("0@lo:12345:42:100", Fid(3,4), Fid(5,6), Fid(5,6))
+def run_publisher_thread(q: Queue):
+    t = Thread(target=kv_publisher_thread, args=(q, ))
+    t.start()
+    return t
 
 
 def main():
     setup_logging()
-    l = HaLink(node_uuid="This is a test")
+    q = Queue(maxsize=1000)
+    t = run_publisher_thread(q)
+    l = HaLink(node_uuid="This is a test", queue=q)
+    run_server(q, thread_to_wait=t, halink=l)
+
     # l.start("endpoint", Fid(3,4), Fid(5,6), Fid(0xDEADBEEF, 7))
-    logging.info("Invoking threads")
 
-    threads = [None] * 1
-    threads = list(map(lambda t: threading.Thread(target=thread_fn, args=(l,)), threads))
-
-    for t in threads:
-        t.start()
-
-    for t in threads:
-        t.join()
-
-    logging.info("Threads finished")
-
-def handleSignal(signalNumber, frame):
-    print('Received:', signalNumber)
-    raise SystemExit('Exiting')
-    return
 
 if __name__ == "__main__":
     main()
-    signal.signal(signal.SIGTERM, handleSignal)
-    signal.signal(signal.SIGINT, handleSignal)
-    signal.signal(signal.SIGQUIT, handleSignal)
-
-    signal.pause()

@@ -148,7 +148,7 @@ let FdmiFilter/toConfGen = \(x : FdmiFilter) ->
 -- m0_confx_node
 let Node =
   { id : Oid
-  , memsize : Natural
+  , memsize_MB : Natural
   , nr_cpu : Natural
   , last_state : Natural
   , flags : Natural
@@ -157,7 +157,7 @@ let Node =
 
 let Node/toConfGen = \(x : Node) ->
     "(${oid x.id}"
- ++ " memsize=${nat x.memsize}"
+ ++ " memsize=${nat x.memsize_MB}"
  ++ " nr_cpu=${nat x.nr_cpu}"
  ++ " last_state=${nat x.last_state}"
  ++ " flags=${nat x.flags}"
@@ -489,9 +489,9 @@ let ids =
   , drive_21   = zoid ObjT.Drive 21
   , drive_23   = zoid ObjT.Drive 23
   , drive_71   = zoid ObjT.Drive 71
-  , controller_7 = zoid ObjT.Controller 7
-  , enclosure_5  = zoid ObjT.Enclosure 5
-  , rack_4       = zoid ObjT.Rack 4
+  , controller = zoid ObjT.Controller 7
+  , enclosure  = zoid ObjT.Enclosure 5
+  , rack       = zoid ObjT.Rack 4
   }
 
 let root = Obj.Root
@@ -511,7 +511,7 @@ let root = Obj.Root
 
 let node = Obj.Node
   { id = ids.node
-  , memsize = 2846
+  , memsize_MB = 2846
   , nr_cpu = 3
   , last_state = 0
   , flags = 0
@@ -780,19 +780,19 @@ let objv_64 = Obj.Objv
 
 let objv_65 = Obj.Objv
   { id = ids.objv_65
-  , real = ids.controller_7
+  , real = ids.controller
   , children = [ids.objv_64]
   }
 
 let objv_66 = Obj.Objv
   { id = ids.objv_66
-  , real = ids.enclosure_5
+  , real = ids.enclosure
   , children = [ids.objv_65]
   }
 
 let objv_67 = Obj.Objv
   { id = ids.objv_67
-  , real = ids.rack_4
+  , real = ids.rack
   , children = [ids.objv_66]
   }
 
@@ -852,20 +852,20 @@ let objv_50 = Obj.Objv
 
 let objv_51 = Obj.Objv
   { id = ids.objv_51
-  , real = ids.controller_7
+  , real = ids.controller
   , children = [ ids.objv_50, ids.objv_55, ids.objv_56, ids.objv_57
                , ids.objv_58, ids.objv_59, ids.objv_60, ids.objv_61 ]
   }
 
 let objv_52 = Obj.Objv
   { id = ids.objv_52
-  , real = ids.enclosure_5
+  , real = ids.enclosure
   , children = [ids.objv_51]
   }
 
 let objv_53 = Obj.Objv
   { id = ids.objv_53
-  , real = ids.rack_4
+  , real = ids.rack
   , children = [ids.objv_52]
   }
 
@@ -883,19 +883,19 @@ let objv_72 = Obj.Objv
 
 let objv_73 = Obj.Objv
   { id = ids.objv_73
-  , real = ids.controller_7
+  , real = ids.controller
   , children = [ids.objv_72]
   }
 
 let objv_74 = Obj.Objv
   { id = ids.objv_74
-  , real = ids.enclosure_5
+  , real = ids.enclosure
   , children = [ids.objv_73]
   }
 
 let objv_75 = Obj.Objv
   { id = ids.objv_75
-  , real = ids.rack_4
+  , real = ids.rack
   , children = [ids.objv_74]
   }
 
@@ -1076,8 +1076,8 @@ let service_26 = Obj.Service
   , sdevs = [] : List Oid
   }
 
-let controller_7 = Obj.Controller
-  { id = ids.controller_7
+let controller = Obj.Controller
+  { id = ids.controller
   , node = ids.node
   , drives = [ ids.drive_17, ids.drive_19, ids.drive_21, ids.drive_71
              , ids.drive_23, ids.drive_9, ids.drive_11, ids.drive_13
@@ -1085,21 +1085,21 @@ let controller_7 = Obj.Controller
   , pvers = [ids.pver_2, ids.pver_49, ids.pver_63]
   }
 
-let enclosure_5 = Obj.Enclosure
-  { id = ids.enclosure_5
-  , ctrls = [ids.controller_7]
+let enclosure = Obj.Enclosure
+  { id = ids.enclosure
+  , ctrls = [ids.controller]
   , pvers = [ids.pver_2, ids.pver_49, ids.pver_63]
   }
 
-let rack_4 = Obj.Rack
-  { id = ids.rack_4
-  , encls = [ids.enclosure_5]
+let rack = Obj.Rack
+  { id = ids.rack
+  , encls = [ids.enclosure]
   , pvers = [ids.pver_2, ids.pver_49, ids.pver_63]
   }
 
 let site = Obj.Site
   { id = ids.site
-  , racks = [ids.rack_4]
+  , racks = [ids.rack]
   , pvers = [ids.pver_2, ids.pver_49, ids.pver_63]
   }
 
@@ -1152,9 +1152,9 @@ let objs =
   , sdev_22
   , sdev_70
   , site
-  , rack_4
-  , enclosure_5
-  , controller_7
+  , rack
+  , enclosure
+  , controller
   , drive_11
   , drive_13
   , drive_15

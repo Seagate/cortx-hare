@@ -8,8 +8,9 @@
     }
   ],
   "enable_local_script_checks" : true,
-  "service": {
-    "id": "confd",
+  "services": [
+   {
+    "id": "fid",
     "name": "confd",
     "address": "@tcp:12345:44",
     "port": 101,
@@ -19,5 +20,12 @@
         "interval": "10s"
       }
     ]
-  }
+   },
+   {
+    "id": "fid",
+    "name": "ios",
+    "address": "@tcp:12345:41",
+    "port": 401
+   }
+  ]
 }

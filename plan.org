@@ -159,95 +159,6 @@ XXX [[https://learn.hashicorp.com/consul/developer-configuration/elections][Lead
   A: Short-lived process, triggered by Consul watch handler when the EQ is modified.
 - XXX How RC failures will be handled?
 
-** _sprint-4
-
-- [X] andriy
-- [X] kostya
-- [X] mandar
-- [X] prasanna
-- [ ] rajanikant
-- [X] vvv
-
-*** hax
-
-**** [@kostya] Python/C
-
-***** NEXT test the threading model (~m0_thread_adopt~)
-
-**** C (libcurl, libjson)
-
-**** HOLD Go (Consul Go bindings)                              :HOLD:
-
-- State "HOLD"  from              [2019-07-16 Tue 12:46] \\
-  Learning curve, however short, is still to be accounted for.
-
-**** CANCELLED c++/c (Consul C++ bindings)                     :CANCELLED:
-
-- State "CANCELLED"  from              [2019-07-16 Tue 12:45] \\
-  HTTP API is as stable (if not more stable) as language bindings are.
-
-*** [@andriy] health checking
-
-*** [@vvv] confd.xc
-
-*** [@prasanna] initial-rg.json
-
-*** [@rajanikant] ?
-
-** scoping
-
-- XXX Add DoDs (definitions of done).
-
-*** health checking
-
-**** write the RFC
-
-**** HA state updates via health checking
-
-- Consul [health] [[https://www.consul.io/docs/agent/checks.html][check]] on each node (e.g., ~pgrep m0d~)
-- Consul check watch on each node. Sends HA states (of *all* services) to the local ~hax~.
-
-*** cluster configuration
-
-**** initial
-
-***** confd.xc
-
-***** initial-rg.json
-
-[[https://www.consul.io/docs/commands/kv/import.html][Consul KV import]] files (JSON).
-
-- write the RFC ([[file:rfc/4/README.md][4/KV]])
-- generate the JSONs
-
-**** RG: disks, pools
-
-*** hax
-
-Support entrypoint fops and ha-msgs.
-
-*** bootstrap
-
-**** write the RFC
-
-**** systemd scripts (with [[https://docs.google.com/document/d/1cR-BbxtMjGuZPj8NOc95RyFjqmeFsYf4JJ5Hw_tL1zA/edit#bookmark=id.7c6yyeenu47i][dependencies between Consul/confd/ios]])
-
-**** /etc config
-
-**** bootstrap script (pdsh)
-
-*** RC
-
-XXX Needed only if we want Hare to handle events that cannot be handled with Consul health checks (e.g., rpc timeouts or IO errors reported by Mero processes).
-
-- EQ
-- rules
-- BQ
-
-*** rabbix (RabbitMQ exchanger)
-
-XXX Do we have to process SSPL sensor messages for EES?
-
 ** hare API
 
 *** enqueue_event
@@ -277,178 +188,85 @@ The function blocks until the epoch is returned or an error occurs.
 
 See the [[https://docs.google.com/document/d/1cR-BbxtMjGuZPj8NOc95RyFjqmeFsYf4JJ5Hw_tL1zA/edit#bookmark=id.whq5d31z34][prototype]].
 
-** [XXX-DELETEME] hare v0.1 scoping :ARCHIVE:
+** _sprint-4
 
-*** DONE [2w] study Consul, describe high-level design, write PoC scripts
+- [X] andriy
+- [X] kostya
+- [X] mandar
+- [X] prasanna
+- [ ] rajanikant
+- [X] vvv
 
-*** [2w] integration with Mero -- nearest demo
+*** [@kostya] hax, Python part
 
-*** RG representation ([[file:rfc/4/README.md][4/KV]])
+- Test the threading model. Should we call ~m0_thread_adopt()~ for Python thread?
 
-*** [2w] initial configuration
-- the same sdev MUST have the same fid
-- the same disk MUST have the same fid
+*** [@mandar] hax, C part
 
-*** [2-4w] bootstrap
+*** [@andriy] [[[https://jts.seagate.com/browse/EOS-871][EOS-871]]] health checking
 
-*** HOLD [2w] health checking                                        :HOLD:
-- State "HOLD"       from              [2019-07-12 Fri 12:38] \\
-  Not required for EES, because m0d-s will be monitored by Corosync/Pacemaker.
-m0d-s, s3servers
+*** [@vvv]
 
-Every N seconds:
-- check health of process
-- check health of each locale ("ping fop")
-- [bonus] check health of services (send fop)
+**** write an RFC for consul-kv-import.json
 
-**** setup Consul health checkers
+**** [9d] confd.xc
 
-*** HOLD RC business logic                                           :HOLD:
+*** [@prasanna] [[[https://jts.seagate.com/browse/EOS-880][EOS-880]]] consul-kv-import.json (aka "Initial RG")
 
-- State "HOLD"       from              [2019-07-12 Fri 12:39] \\
-  Corosync/Pacemaker will do HA for EES.
-**** [2w] RC rule: unhealthy smth appears ==> RC puts new item into BQ
+** scoping
 
-**** HOLD [2w] m0d failure, node failure ==> Mero continues operation (in degraded read mode) :HOLD:
-- State "HOLD"       from              [2019-07-12 Fri 12:21] \\
-  Not needed for EES.
+[[https://app.smartsheet.com/sheets/5gR2F28rvjVxRJfvp7QfRCwjxgVRp79wGfGJg2G1?view=grid][The Smartsheet]]
 
-This can be /any/ node, including the one running Consul leader.
+*** [2w] health checking
 
-***** ST
+**** write the RFC
 
-**** HOLD [2w] disk failure ==> SNS repair/rebalance                :HOLD:
-- State "HOLD"       from              [2019-07-12 Fri 12:22] \\
-  Not needed for EES.
+**** HA state updates via health checking
 
-***** ST
+- Consul [health] [[https://www.consul.io/docs/agent/checks.html][check]] on each node (e.g., ~pgrep m0d~)
+- Consul check watch on each node. Sends HA states (of *all* services) to the local ~hax~.
 
-*** __components :ARCHIVE:
+*** [5w] cluster configuration
 
-**** cfgen
+**** [5w] initial
 
-**** RC scripts
+***** [3w] confd.xc
 
-**** hax: Consul<-->m0d HA bridge
+***** [2w] consul-kv-import.json (aka "initial RG")
 
-** [XXX-DELETEME] The "Fortnight" Prototype (due 2019-Jul-15) :ARCHIVE:
+[[https://www.consul.io/docs/commands/kv/import.html][Consul KV import]] files (JSON).
 
-We are able to start and stop m0d services in EOS configuration (aka
-"1+0" configuration): 1 data unit, no parity units, 2 hosts or 1 host.
-Halon is not used.
+- write the RFC ([[file:rfc/4/README.md][4/KV]])
+- generate the JSONs
 
-Some amount of fault tolerance is required. (If we decided to go quick
-and fragile way of not supporting failures in the prototype, we
-wouldn't need Consul to achieve this.  But the whole point of this
-prototyping exercise is prove that Mero cluster can work without
-Halon.)
+**** HOLD RG: disks, pools                                          :HOLD:
 
-*** [@andriy] RC
+- EES uses static configuration.  EES doesn't support disk failures.
 
-- RC - Recovery Coordinator
-- EQ - Event Queue
-- BQ - Broadcast Queue (HA notifications)
+*** [8w] hax
 
-*** [@vvv] initial cluster configuration
+Support entrypoint fops and ha-msgs.
 
-See [[file:rfc/3/README.md][3/CFGEN]].
+*** [4w] bootstrap
 
-**** XXX
-#+BEGIN_SRC dhall
-let mkNode = \(a : XXX) -> \(b : YYY) ->
-  { id = ids.node
-  , memsize = a
-  , nr_cpu = b
-  , last_state = 0
-  , flags = 0
-  , processes = c
-  }
-let node_13 = ./mkNode.dhall memsize nr_cpu [ proc_100, proc_500 ]
-in [ ..., node_13, ... ]
-#+END_SRC
+**** write the RFC
 
-**** Q: Can [[https://www.consul.io/docs/commands/catalog.html][consul catalog]] command be of use to us?
-*** [@dima.c] bootstrapping
-Ansible?
+**** systemd scripts (with [[https://docs.google.com/document/d/1cR-BbxtMjGuZPj8NOc95RyFjqmeFsYf4JJ5Hw_tL1zA/edit#bookmark=id.7c6yyeenu47i][dependencies between Consul/confd/ios]])
 
-**** start/stop m0d services
+**** /etc config
 
-Prepare configuration files in ~/etc/~, those will be used by systemd.
+**** bootstrap script (pdsh)
 
-*** [@mandar] entrypoint server
+*** [? 2w] RC infrastructure R&D
 
-See [[file:rfc/1/README.md][1/EPS]].
+XXX Needed only if we want Hare to handle events that cannot be handled with Consul health checks (e.g., rpc timeouts or IO errors reported by Mero processes).
 
-**** ~get-entrypoint~ script: How to fill [[file:~/src/mero/ha/entrypoint_fops.h::struct%20m0_ha_entrypoint_rep%20{][m0_ha_entrypoint_rep]]?
-#+BEGIN_SRC c
-struct m0_ha_entrypoint_rep {
-	uint32_t                        hae_quorum;        // XXX
-	struct m0_fid_arr               hae_confd_fids;    // XXX ? @andriy
-	const char                    **hae_confd_eps;
-	struct m0_fid                   hae_active_rm_fid; // XXX
-	char                           *hae_active_rm_ep;  // XXX
-	/** Data passed back to client to control query flow */
-	enum m0_ha_entrypoint_control   hae_control;
-	/* link parameters */
-	struct m0_ha_link_params        hae_link_params;   // XXX ? @max
-	bool                            hae_link_do_reconnect; // XXX @max
-};
-#+END_SRC
+- EQ
+- timeouts
+- rules
+- BQ
 
-***** check how ~halond~ fills those
+*** rabbix (RabbitMQ exchanger)
 
-***** discuss the rest with @andriy and @max
-*NB:* Please do document the takeaways of those discussions in the respective RFCs ([[file:rfc/4/README.md][4/KV]], [[file:rfc/1/README.md][1/EPS]]).
+XXX Do we have to process SSPL sensor messages for EES?
 
-**** How will ~m0ham~ consume ~get-entrypoint~ output?
-#+BEGIN_SRC c
-ep_rep = xcode_read_as(m0_ha_entrypoint_rep_xc, buf, &rc);
-#+END_SRC
-
-***** 1) make ~m0_ha_entrypoint_rep~ XCODE-able
-***** 2) two options:
-****** output xcode of ~m0_ha_entrypoint_rep~ from ~get-entrypoint~
-****** add support ~m0_ha_entrypoint_rep~ objects to ~m0hagen~
-
-*** [@kostya] HA notifications
-
-See [[file:rfc/2/README.md][2/HATX]].
-
-*** rg2kv
-
-See [[file:rfc/4/README.md][4/KV]].
-
-We might want to store subset of Halon's resource graph in Consul KV.
-
-#+BEGIN_SRC yaml
-/path/to/disks:
-  - disk-1: { attrs }
-
-/path/to/controllers:
-  - ctrl-1: { disks: [ disk-1 ], attrs }
-  - ctrl-2: { disks: [ disk-2 ], attrs }
-
----
-
-disk-1: { attrs }
-ctrl-1: { attrs, disks: [ disk-1 ] }
-#+END_SRC
-
-*** fault tolerance
-
-Handle failures of m0d processes.  Consul watcher to trigger Pacemaker
-to do failover?
-
-*** ? fid generator
-
-**** ? option 1: use the [[https://docs.google.com/document/d/1-td9_sO-bqErDtJYx40J9UEp2zJh4JJUp_yPmm9Knuc/edit][UFID generator]] (the one used by the s3server team)
-
-It generates only 20 bits of a ~m0_fid~.
-
-**** option 2: the RC increments some counter field in the KV
-
-***** Consul has some atomic increments ([[https://en.wikipedia.org/wiki/Compare-and-swap][CAS]])
-
-*** m0d heartbeats
-
-Do we want to utilize ~ha_link~ or come with a simpler mechanism?

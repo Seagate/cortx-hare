@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+set -eu -o pipefail
+
+usage() {
+    echo "Usage: $0 <key>"
+    echo
+    echo "Safely generates the next integer value of the given key"
+    echo "in the Consul's KV store using CAS-put operation."
+    exit 1
+}
+
+[[ $# == 1 ]] || usage
+
+KEY=$1
+
+get_current_value() {
+    consul kv get $KEY
+}
+
+get_current_index() {
+    consul kv get -detailed $KEY | awk '/ModifyIndex/ {print $2}'
+}
+
+commit_new_value() {
+    consul kv put -cas -modify-index=$1 $KEY $2 > /dev/null
+}
+
+NEW_VALUE=$(($(get_current_value) + 1))
+
+while ! commit_new_value $(get_current_index) $NEW_VALUE; do
+    NEW_VALUE=$(($(get_current_value) + 1))
+done
+
+echo $NEW_VALUE
