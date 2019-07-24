@@ -68,7 +68,7 @@ class KVHandler(BaseHTTPRequestHandler):
 
     def parse_req(self, raw_data):
         try:
-            struct = j.loads(raw_data)
+            struct = j.loads(raw_data.decode('utf-8'))
             return struct
         except j.JSONDecodeError:
             logging.warn('Not a valid JSON object received')
