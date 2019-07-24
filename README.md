@@ -7,7 +7,8 @@ The scripts in this repository constitute a middleware layer between [Consul](ht
 
 ## Installation
 
-[Download Consul](https://www.consul.io/downloads.html).  Copy `consul` executable to a $PATH directory (e.g., `/usr/local/bin/`) on each node of the cluster.
+- [Download Consul](https://www.consul.io/downloads.html).  Copy `consul` executable to a $PATH directory (e.g., `/usr/local/bin/`) on each node of the cluster.
+- Make sure Python-3 version (3.4 or 3.6) is installed.
 
 ### Single node
 
@@ -36,6 +37,11 @@ The scripts in this repository constitute a middleware layer between [Consul](ht
 4. Generate and assign Mero process fids to the "services", mentioned in `consul-srv-conf.json`:
    ```sh
    ./gen-service-ids
+   ```
+
+5. Start `hax`:
+   ```sh
+   python3 hax/hax.py &
    ```
 
 ### Multiple nodes
