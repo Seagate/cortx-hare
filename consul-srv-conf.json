@@ -41,6 +41,12 @@
     "name": "ios",
     "address": "@tcp:12345:41",
     "port": 401
+   },
+   {
+    "id": "fid",
+    "name": "hax",
+    "address": "@tcp:12345:47",
+    "port": 701
    }
   ]
 }
