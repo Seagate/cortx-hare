@@ -7,8 +7,13 @@ The scripts in this repository constitute a middleware layer between [Consul](ht
 
 ## Installation
 
-- [Download Consul](https://www.consul.io/downloads.html).  Copy `consul` executable to a $PATH directory (e.g., `/usr/local/bin/`) on each node of the cluster.
+- [Download Consul](https://www.consul.io/downloads.html).  Copy `consul` executable to a `$PATH` directory (e.g., `/usr/local/bin/`) on each node of the cluster.
 - Make sure Python-3 version (3.4 or 3.6) is installed.
+- Install python dependencies:
+
+```
+pip3 install -r hax/requirements.txt
+```
 
 ### Single node
 
