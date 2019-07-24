@@ -2,16 +2,17 @@
 set -eu -o pipefail
 
 usage() {
-    echo "Usage: $0 <key>"
+    echo "Usage: $0 <key> [inc]"
     echo
     echo "Safely generates the next integer value of the given key"
     echo "in the Consul's KV store using CAS-put operation."
     exit 1
 }
 
-[[ $# == 1 ]] || usage
+[[ $# < 1 ]] && usage
 
 KEY=$1
+INC=${2:-1}
 
 get_current_value() {
     consul kv get $KEY
@@ -25,7 +26,7 @@ commit_new_value() {
     consul kv put -cas -modify-index=$1 $KEY $2 > /dev/null
 }
 
-NEW_VALUE=$(($(get_current_value) + 1))
+NEW_VALUE=$(($(get_current_value) + $INC))
 
 while ! commit_new_value $(get_current_index) $NEW_VALUE; do
     NEW_VALUE=$(($(get_current_value) + 1))
