@@ -18,8 +18,19 @@ class Fid(object):
         self.container = container
         self.key = key
 
+    @staticmethod
+    def parse(val: str):
+        a, b = tuple(map(lambda x: int(x, 16), val.split(':')))
+        return Fid(a, b)
+
     def to_c(self):
         return FidStruct(self.container, self.key)
+
+    def get_copy(self):
+        return Fid(self.container, self.key)
+
+    def __repr__(self):
+        return '{}:{}'.format(hex(self.container), hex(self.key))
 
 
 class Uint128(object):
