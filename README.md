@@ -14,6 +14,10 @@ The scripts in this repository constitute a middleware layer between [Consul](ht
 ```
 pip3 install -r hax/requirements.txt
 ```
+- Make sure that the mero source code is patched:
+```
+cd $M0_SRC/ && git apply $HARE_SRC/hax/mero-patch.patch
+```
 
 ### Single node
 
