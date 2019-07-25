@@ -138,8 +138,13 @@ hax_context* init_halink(PyObject *obj, const char* node_uuid)
 {
   // Since we do depend on the Python object, we don't want to let it die before us.
   Py_INCREF(obj);
+  int rc;
 
-  int rc; // Note that Py_BEGIN_ALLOW_THREADS contains an open { and defines a block.
+  /*rc = m0_thread_adopt(&mthread, m0);*/
+  /*if (rc != 0) {*/
+     /*printf("Mero thread adoption failed: %d\n", rc);*/
+     /*return NULL;*/
+  /*}*/
 
   hc = (hax_context*) malloc(sizeof(hax_context));
   if (hc == NULL) {
@@ -173,6 +178,8 @@ void destroy_halink(unsigned long long ctx)
   Py_DECREF(hc->hc_handler);
   m0_mutex_fini(&hc->hc_mutex);
   m0_halon_interface_fini(hc->hc_hi);
+
+  /*m0_thread_shun();*/
 }
 
 int start( unsigned long long ctx
@@ -186,12 +193,6 @@ int start( unsigned long long ctx
   int                        rc;
 
   printf("Starting hax interface..\n");
-  rc = m0_thread_adopt(&mthread, m0);
-  if (rc != 0) {
-     printf("Mero thread adoption failed: %d\n", rc);
-     return rc;
-  }
-
   rc = m0_halon_interface_start( hi
                                  , local_rpc_endpoint
                                  , &M0_FID_TINIT('r', process_fid->f_container, process_fid->f_key)
@@ -206,9 +207,6 @@ int start( unsigned long long ctx
                                  , link_is_disconnecting_cb
                                  , link_disconnected_cb
                                  );
-
-  m0_thread_shun();
-
   return rc;
 }
 
