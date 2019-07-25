@@ -1,6 +1,5 @@
 from hax.halink import HaLink
 from hax.server import run_server, kv_publisher_thread
-from hax.types import Fid
 from queue import Queue
 from threading import Thread
 from hax.fid_provider import FidProvider, SERVICE_CONTAINER
@@ -46,7 +45,8 @@ def main():
     rm_fid = ha_fid.get_copy()
     rm_fid.key = rm_fid.key + 1
 
-    l.start("lnet:10.230.164.213@tcp:12345:999:1",
+    # l.start("lnet:10.230.164.213@tcp:12345:47:701",
+    l.start("10.230.164.213@tcp:12345:47:701",
             process=hax_fid,
             ha_service=ha_fid,
             rm_service=rm_fid)
