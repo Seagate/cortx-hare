@@ -43,7 +43,7 @@ cd $M0_SRC/ && git apply $HARE_SRC/hax/mero-patch.patch
    ./kv-init
    ```
 
-4. Generate and assign Mero process fids to the "services", mentioned in `consul-srv-conf.json`:
+4. Generate and assign Mero processes fids to the "services", mentioned in `consul-srv-conf.json`:
    ```sh
    ./gen-service-ids
    ```
@@ -64,7 +64,7 @@ cd $M0_SRC/ && git apply $HARE_SRC/hax/mero-patch.patch
    ```
    **Note:** If you plan to test RC leader election, there should be at least 3 Consul servers in the cluster.
 
-3. Generate and assign Mero process fids:
+3. Generate and assign Mero processes fids (on each node):
    ```sh
    ./gen-service-ids
    ```
