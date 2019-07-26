@@ -45,12 +45,14 @@ def main():
     rm_fid = ha_fid.get_copy()
     rm_fid.key = rm_fid.key + 1
 
-    # l.start("lnet:10.230.164.213@tcp:12345:47:701",
+    # [KN] FIXME the endpoint must be constructed dynamically by the data taken
+    # from Consul
     l.start("10.230.164.213@tcp:12345:47:701",
             process=hax_fid,
             ha_service=ha_fid,
             rm_service=rm_fid)
-    # [KN] This is a blocking call. It will work until the program is terminated by signal
+    # [KN] This is a blocking call. It will work until the program is
+    # terminated by signal
     run_server(q, thread_to_wait=t, halink=l)
 
 
