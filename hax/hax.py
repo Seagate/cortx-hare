@@ -37,6 +37,7 @@ def main():
     # The node UUID is simply random
     l = HaLink(node_uuid="d63141b1-a7f7-4258-b22a-59fda4ad86d1", queue=q)
     # [KN] The fid of the hax service is taken from Consul
+    hax_ep = FidProvider().get_hax_endpoint()
     hax_fid = FidProvider().get_hax_fid()
 
     # [KN] ..while two other ones are auto-generated
@@ -48,7 +49,7 @@ def main():
     # [KN] FIXME the endpoint must be constructed dynamically by the data taken
     # from Consul
 
-    l.start("10.230.164.213@tcp:12345:47:701",
+    l.start(hax_ep,
             process=hax_fid,
             ha_service=ha_fid,
             rm_service=rm_fid)
