@@ -156,8 +156,10 @@ BQ changes ==> Consul [[https://www.consul.io/docs/agent/watches.html][watch han
 XXX [[https://learn.hashicorp.com/consul/developer-configuration/elections][Leader Election Guide]]
 
 - Q: Is RC a daemon or a short-lived process?
-  A: Short-lived process, triggered by Consul watch handler when the EQ is modified.
-- XXX How RC failures will be handled?
+  A: RC is a short-lived process, triggered by Consul watch handler when the EQ is modified.
+
+- Q: How to handle RC failures?
+  A: RC leader election is based on sessions and locking mechanisms [[https://learn.hashicorp.com/consul/developer-configuration/elections][provided by Consul]].  We use ~consul kv put -acquire -session=<session-id>~ command to acquire a lock on ~leader~ key in Consul KV store.  The session with two health checks - ~serfHealth~ (default Consul's check for the node) and ~service:<fid>~ (confd's check on the node) - is created beforehand.  Whenever any of those checks fails or whenever currently running RC fails, the session will be destroyed and the lock of ~leader~ key will be released.  This will trigger the watch handler associated with ~leader~ key (~elect-rc-leader~ script), which will elect new RC leader.
 
 ** hare API
 
