@@ -59,13 +59,16 @@ void entrypoint_request_cb( struct m0_halon_interface *hi
                           , bool                       first_request
                           )
 {
-  /*Py_BEGIN_ALLOW_THREADS*/
-  printf("Context addr: %p\n", hc);
-  printf("handler addr: %p\n", hc->hc_handler);
-  //PyObject* py_fid = toFid(process_fid);
-  //PyObject* py_req = toUid128(req_id);
+  // [KN] This is obligatory since we want to work with Python object and we obviously work from an external thread.
+  // FYI: https://docs.python.org/2/c-api/init.html#releasing-the-gil-from-extension-code
+  PyGILState_STATE gstate;
+  gstate = PyGILState_Ensure();
 
-  /*PyObject_CallMethod(
+  printf("In entrypoint_request_cb\n");
+  PyObject* py_fid = toFid(process_fid);
+  PyObject* py_req = toUid128(req_id);
+
+  PyObject_CallMethod(
       hc->hc_handler,
       "_entrypoint_request_cb",
       "(OsOskb)",
@@ -75,12 +78,13 @@ void entrypoint_request_cb( struct m0_halon_interface *hi
       git_rev_id,
       pid,
       first_request
-    );*/
-  m0_halon_interface_entrypoint_reply(hi, req_id, 0, 0, NULL, NULL, 1, &M0_FID_TINIT('s', 72, 1), NULL);
-  //Py_DECREF(py_req);
-  //Py_DECREF(py_fid);
-
-  /*Py_END_ALLOW_THREADS*/
+    );
+  /*m0_halon_interface_entrypoint_reply(hi, req_id, 0, 0, NULL, NULL, 1, &M0_FID_TINIT('s', 72, 1), NULL);*/
+  Py_DECREF(py_req);
+  Py_DECREF(py_fid);
+  //
+  // [KN] Note that the Python threads will get unblocked only after this call
+  PyGILState_Release(gstate);
 }
 
 void msg_received_cb ( struct m0_halon_interface *hi
