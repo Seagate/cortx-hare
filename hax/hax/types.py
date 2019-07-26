@@ -2,13 +2,11 @@ import ctypes as c
 
 
 class FidStruct(c.Structure):
-    _fields_ = [("f_container", c.c_uint64),
-                ("f_key", c.c_uint64)]
+    _fields_ = [("f_container", c.c_uint64), ("f_key", c.c_uint64)]
 
 
 class Uint128Struct(c.Structure):
-    _fields_ = [("hi", c.c_uint64),
-                ("lo", c.c_uint64)]
+    _fields_ = [("hi", c.c_uint64), ("lo", c.c_uint64)]
 
 
 # Duplicates mero/fid/fid.h
@@ -31,6 +29,11 @@ class Fid(object):
 
     def __repr__(self):
         return '{}:{}'.format(hex(self.container), hex(self.key))
+
+    def __eq__(self, other):
+        if not isinstance(other, Fid):
+            return False
+        return other.container == self.container and other.key == self.key
 
 
 class Uint128(object):
