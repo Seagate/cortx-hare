@@ -25,5 +25,8 @@ int start( unsigned long long ctx
 
 void test( unsigned long long ctx );
 
+void m0_ha_failvec_reply_send(struct m0_ha_link *hl, struct m0_ha_msg *msg, struct m0_fid *pool_fid, uint32_t nr_notes);
+void m0_ha_nvec_reply_send(struct m0_ha_link *hl, struct m0_ha_msg *msg, struct m0_ha_nvec *nvec);
+
 #endif  // __HAX_H__
 

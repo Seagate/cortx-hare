@@ -1,0 +1,68 @@
+diff --git a/ha/halon/interface.c b/ha/halon/interface.c
+index 918b68801..c342fced8 100644
+--- a/ha/halon/interface.c
++++ b/ha/halon/interface.c
+@@ -98,7 +98,7 @@ struct m0_halon_interface_cfg {
+ 	void           (*hic_msg_received_cb)
+ 		(struct m0_halon_interface *hi,
+ 		 struct m0_ha_link         *hl,
+-		 const struct m0_ha_msg    *msg,
++		 struct m0_ha_msg    *msg,
+ 		 uint64_t                   tag);
+ 	void           (*hic_msg_is_delivered_cb)
+ 		(struct m0_halon_interface *hi,
+@@ -865,7 +865,7 @@ int m0_halon_interface_start(struct m0_halon_interface *hi,
+ 			     void                     (*msg_received_cb)
+ 				(struct m0_halon_interface *hi,
+ 				 struct m0_ha_link         *hl,
+-				 const struct m0_ha_msg    *msg,
++				 struct m0_ha_msg    *msg,
+ 				 uint64_t                   tag),
+ 			     void                     (*msg_is_delivered_cb)
+ 				(struct m0_halon_interface *hi,
+@@ -1133,6 +1133,21 @@ struct m0_spiel *m0_halon_interface_spiel(struct m0_halon_interface *hi)
+ 	return working ? spiel : NULL;
+ }
+ 
++M0_INTERNAL struct m0 *m0_halon_interface_m0_get(struct m0_halon_interface *hi)
++{
++	return &hi->hif_internal->hii_instance;
++}
++
++M0_INTERNAL struct m0_ha *m0_halon_interface_ha(struct m0_halon_interface *hi)
++{
++	return &hi->hif_internal->hii_ha;
++}
++
++M0_INTERNAL struct m0_ha_dispatcher *m0_halon_interface_ha_dispatcher(struct m0_halon_interface *hi)
++{
++	return &hi->hif_internal->hii_dispatcher;
++}
++
+ #undef M0_TRACE_SUBSYSTEM
+ 
+ /** @} end of ha group */
+diff --git a/ha/halon/interface.h b/ha/halon/interface.h
+index b98f43f1f..1d2c9d864 100644
+--- a/ha/halon/interface.h
++++ b/ha/halon/interface.h
+@@ -361,7 +361,7 @@ int m0_halon_interface_start(struct m0_halon_interface *hi,
+ 			     void                     (*msg_received_cb)
+ 				(struct m0_halon_interface *hi,
+ 				 struct m0_ha_link         *hl,
+-				 const struct m0_ha_msg    *msg,
++				 struct m0_ha_msg    *msg,
+ 				 uint64_t                   tag),
+ 			     void                     (*msg_is_delivered_cb)
+ 				(struct m0_halon_interface *hi,
+@@ -485,6 +485,10 @@ struct m0_reqh *m0_halon_interface_reqh(struct m0_halon_interface *hi);
+  */
+ struct m0_spiel *m0_halon_interface_spiel(struct m0_halon_interface *hi);
+ 
++M0_INTERNAL struct m0 *m0_halon_interface_m0_get(struct m0_halon_interface *hi);
++M0_INTERNAL struct m0_ha *m0_halon_interface_ha(struct m0_halon_interface *hi);
++M0_INTERNAL struct m0_ha_dispatcher *m0_halon_interface_ha_dispatcher(struct m0_halon_interface *hi);
++
+ /** @} end of ha group */
+ #endif /* __MERO_HA_HALON_INTERFACE_H__ */
+ 

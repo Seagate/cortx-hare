@@ -11,12 +11,10 @@ def setup_logging():
         level=logging.DEBUG,
         format='%(asctime)s [%(levelname)s] {%(threadName)s} %(message)s')
 
-
 def run_publisher_thread(q: Queue):
     t = Thread(target=kv_publisher_thread, args=(q, ))
     t.start()
     return t
-
 
 def main():
     # Note: no logging must happen before this call.
