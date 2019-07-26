@@ -47,6 +47,7 @@ def main():
 
     # [KN] FIXME the endpoint must be constructed dynamically by the data taken
     # from Consul
+
     l.start("10.230.164.213@tcp:12345:47:701",
             process=hax_fid,
             ha_service=ha_fid,

@@ -4,6 +4,7 @@ import threading
 import os
 from hax.server import Message
 from hax.types import Fid, FidStruct
+from hax.fid_provider import FidProvider
 
 prototype = c.PYFUNCTYPE(c.c_ulonglong, c.py_object)
 prot2 = c.PYFUNCTYPE(None, c.c_void_p)
@@ -48,12 +49,14 @@ class HaLink(object):
         byte_str = str_val.encode('utf-8')
         return c.c_char_p(byte_str)
 
+    # TODO remove me
     def test(self):
         tname = threading.currentThread().getName()
         logging.info('Test method is invoked from thread {}'.format(tname))
         self.__test(self._ha_ctx)
         # TODO call m0d from here
 
+    # TODO remove me
     def test_cb(self, data):
         logging.debug("Sending the test message to the queue")
         # TODO the actual data must be put here
@@ -62,4 +65,11 @@ class HaLink(object):
 
     def _entrypoint_request_cb(self, req_id, remote_rpc_endpoint, process_fid,
                                git_rev, pid, is_first_request):
-        raise NotImplementedError("TODO")
+        import pudb
+        pudb.set_trace()
+        prov = FidProvider()
+        sess = prov.get_leader_session()
+        principal_rm = prov.get_session_node(sess)
+        confds = prov.get_confd_list()
+        # FIXME send the reply using the data above
+        raise NotImplementedError()
