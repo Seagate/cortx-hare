@@ -1,0 +1,14 @@
+[Unit]
+Description=Consul agent for Hare
+Requires=network-online.target
+After=network-online.target
+ConditionFileNotEmpty=/opt/seagate/consul/consul-srv-conf.json
+
+[Service]
+ExecStart=/usr/local/bin/consul agent -config-dir=/opt/seagate/consul -data-dir=/tmp/consul -bootstrap-expect=1 -ui
+ExecReload=/usr/local/bin/consul reload
+KillMode=process
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
