@@ -217,6 +217,39 @@ class ConfRoot(ToDhall):
         raise NotImplementedError('XXX IMPLEMENTME')
 
 
+class ConfNode(ToDhall):
+    def __init__(self, nr_cpu: int, memsize_MB: int,
+                 processes: List[Oid] = []):
+        self.nr_cpu = nr_cpu
+        self.memsize_MB = memsize_MB
+        self.processes = processes
+
+    def __repr__(self):
+        args = ', '.join([f'nr_cpu={self.nr_cpu}',
+                          f'memsize_MB={self.memsize_MB}',
+                          f'processes={self.processes}'])
+        return f'{self.__class__.__name__}({args})'
+
+    def to_dhall(self):
+        raise NotImplementedError('XXX IMPLEMENTME')
+
+
+class ConfProcess(ToDhall):
+    def __init__(self, nr_cpu: int, memsize_MB: int, services: List[Oid] = []):
+        self.nr_cpu = nr_cpu
+        self.memsize_MB = memsize_MB
+        self.services = services
+
+    def __repr__(self):
+        args = ', '.join([f'nr_cpu={self.nr_cpu}',
+                          f'memsize_MB={self.memsize_MB}',
+                          f'services={self.services}'])
+        return f'{self.__class__.__name__}({args})'
+
+    def to_dhall(self):
+        raise NotImplementedError('XXX IMPLEMENTME')
+
+
 class ConfSite(ToDhall):
     def __init__(self, racks: List[Oid] = []):
         self.racks = racks
@@ -245,21 +278,6 @@ class ConfEnclosure(ToDhall):
 
     def __repr__(self):
         return f'{self.__class__.__name__}(ctrls={self.ctrls})'
-
-    def to_dhall(self):
-        raise NotImplementedError('XXX IMPLEMENTME')
-
-
-class ConfNode(ToDhall):
-    def __init__(self, memsize_MB: int, nr_cpu: int,
-                 processes: List[Oid] = []):
-        self.memsize_MB = memsize_MB
-        self.nr_cpu = nr_cpu
-        self.processes = processes
-
-    def __repr__(self):
-        return f'{self.__class__.__name__}(memsize_MB={self.memsize_MB},' \
-            f' nr_cpu={self.nr_cpu}, processes={self.processes})'
 
     def to_dhall(self):
         raise NotImplementedError('XXX IMPLEMENTME')
@@ -299,15 +317,21 @@ def build_m0conf(cluster_desc: Dict[str, Any]) -> Dict[Oid, ToDhall]:
     conf[rack_id].encls = [encl_id]
 
     for host in cluster_desc['hosts']:
+        nr_cpu = host['facts']['processorcount']
+        memsize_MB = int(float(host['facts']['memorysize_mb']))
+
         node_id = new_oid(ObjT.node)
-        conf[node_id] = ConfNode(
-            memsize_MB=int(float(host['facts']['memorysize_mb'])),
-            nr_cpu=host['facts']['processorcount'])
+        conf[node_id] = ConfNode(nr_cpu=nr_cpu, memsize_MB=memsize_MB)
         conf[root_id].nodes.append(node_id)
 
         ctrl_id = new_oid(ObjT.controller)
         conf[ctrl_id] = ConfController(node_id)
         conf[encl_id].ctrls.append(ctrl_id)
+
+        for proc in host['m0_servers']:
+            proc_id = new_oid(ObjT.process)
+            conf[proc_id] = ConfProcess(nr_cpu=nr_cpu, memsize_MB=memsize_MB)
+            conf[node_id].processes.append(proc_id)
 
     return conf
 
