@@ -1,4 +1,5 @@
 let List/map = https://prelude.dhall-lang.org/List/map
+let List/replicate = https://prelude.dhall-lang.org/List/replicate
 let Text/concatMapSep = https://prelude.dhall-lang.org/Text/concatMapSep
 let Text/concatSep = https://prelude.dhall-lang.org/Text/concatSep
 
@@ -148,10 +149,8 @@ let FdmiFilter/toConfGen = \(x : FdmiFilter) ->
 -- m0_confx_node
 let Node =
   { id : Oid
-  , memsize_MB : Natural
   , nr_cpu : Natural
-  , last_state : Natural
-  , flags : Natural
+  , memsize_MB : Natural
   , processes : List Oid
   }
 
@@ -159,30 +158,29 @@ let Node/toConfGen = \(x : Node) ->
     "(${oid x.id}"
  ++ " memsize=${nat x.memsize_MB}"
  ++ " nr_cpu=${nat x.nr_cpu}"
- ++ " last_state=${nat x.last_state}"
- ++ " flags=${nat x.flags}"
+ ++ " last_state=0"
+ ++ " flags=0"
  ++ " processes=${join.Oids x.processes}"
  ++ ")"
 
 -- m0_confx_process
 let Process =
   { id : Oid
-  , cores : List Natural
-  , mem_limit_as : Natural
-  , mem_limit_rss : Natural
-  , mem_limit_stack : Natural
-  , mem_limit_memlock : Natural
+  , nr_cpu : Natural
+  , memsize_MB : Natural
   , endpoint : Text
   , services : List Oid
   }
 
 let Process/toConfGen = \(x : Process) ->
+    let memsize_KiB = nat (x.memsize_MB * 1024)
+    in
     "(${oid x.id}"
- ++ " cores=${join.Naturals x.cores}"
- ++ " mem_limit_as=${nat x.mem_limit_as}"
- ++ " mem_limit_rss=${nat x.mem_limit_rss}"
- ++ " mem_limit_stack=${nat x.mem_limit_stack}"
- ++ " mem_limit_memlock=${nat x.mem_limit_memlock}"
+ ++ " cores=${join.Naturals (List/replicate x.nr_cpu Natural 1)}"
+ ++ " mem_limit_as=134217728"  -- = BE_SEGMENT_SIZE = 128MiB
+ ++ " mem_limit_rss=${memsize_KiB}"
+ ++ " mem_limit_stack=${memsize_KiB}"
+ ++ " mem_limit_memlock=${memsize_KiB}"
  ++ " endpoint=${Text/show x.endpoint}"
  ++ " services=${join.Oids x.services}"
  ++ ")"
@@ -212,8 +210,6 @@ let Sdev =
   , media : Natural  -- XXX make it a union
   , bsize : Natural
   , size : Natural
-  , last_state : Natural
-  , flags : Natural
   , filename : Text
   }
 
@@ -224,8 +220,8 @@ let Sdev/toConfGen = \(x : Sdev) ->
  ++ " media=${nat x.media}"
  ++ " bsize=${nat x.bsize}"
  ++ " size=${nat x.size}"
- ++ " last_state=${nat x.last_state}"
- ++ " flags=${nat x.flags}"
+ ++ " last_state=0"
+ ++ " flags=0"
  ++ " filename=${Text/show x.filename}"
  ++ ")"
 
@@ -511,10 +507,8 @@ let root = Obj.Root
 
 let node = Obj.Node
   { id = ids.node
-  , memsize_MB = 2846
   , nr_cpu = 3
-  , last_state = 0
-  , flags = 0
+  , memsize_MB = 2846
   , processes = [ ids.process_24, ids.process_44, ids.process_46
                 , ids.process_30, ids.process_27, ids.process_38
                 , ids.process_42, ids.process_40 ]
@@ -522,66 +516,48 @@ let node = Obj.Node
 
 let process_24 = Obj.Process
   { id = ids.process_24
-  , cores = [7]
-  , mem_limit_as = 134217728
-  , mem_limit_rss = 2914304
-  , mem_limit_stack = 2914304
-  , mem_limit_memlock = 2914304
+  , nr_cpu = 3
+  , memsize_MB = 2846
   , endpoint = "172.28.128.3@tcp:12345:34:101"
   , services = [ids.service_26, ids.service_25]
   }
 
 let process_40 = Obj.Process
   { id = ids.process_40
-  , cores = [7]
-  , mem_limit_as = 134217728
-  , mem_limit_rss = 2914304
-  , mem_limit_stack = 2914304
-  , mem_limit_memlock = 2914304
+  , nr_cpu = 3
+  , memsize_MB = 2846
   , endpoint = "172.28.128.3@tcp:12345:41:302"
   , services = [ids.service_41]
   }
 
 let process_42 = Obj.Process
   { id = ids.process_42
-  , cores = [7]
-  , mem_limit_as = 134217728
-  , mem_limit_rss = 2914304
-  , mem_limit_stack = 2914304
-  , mem_limit_memlock = 2914304
+  , nr_cpu = 3
+  , memsize_MB = 2846
   , endpoint = "172.28.128.3@tcp:12345:41:303"
   , services = [ids.service_43]
   }
 
 let process_38 = Obj.Process
   { id = ids.process_38
-  , cores = [7]
-  , mem_limit_as = 134217728
-  , mem_limit_rss = 2914304
-  , mem_limit_stack = 2914304
-  , mem_limit_memlock = 2914304
+  , nr_cpu = 3
+  , memsize_MB = 2846
   , endpoint = "172.28.128.3@tcp:12345:41:301"
   , services = [ids.service_39]
   }
 
 let process_27 = Obj.Process
   { id = ids.process_27
-  , cores = [7]
-  , mem_limit_as = 134217728
-  , mem_limit_rss = 2914304
-  , mem_limit_stack = 2914304
-  , mem_limit_memlock = 2914304
+  , nr_cpu = 3
+  , memsize_MB = 2846
   , endpoint = "172.28.128.3@tcp:12345:44:101"
   , services = [ids.service_28, ids.service_29]
   }
 
 let process_30 = Obj.Process
   { id = ids.process_30
-  , cores = [7]
-  , mem_limit_as = 134217728
-  , mem_limit_rss = 2914304
-  , mem_limit_stack = 2914304
-  , mem_limit_memlock = 2914304
+  , nr_cpu = 3
+  , memsize_MB = 2846
   , endpoint = "172.28.128.3@tcp:12345:41:401"
   , services = [ ids.service_31, ids.service_36, ids.service_35
                , ids.service_33, ids.service_37, ids.service_34
@@ -590,22 +566,16 @@ let process_30 = Obj.Process
 
 let process_46 = Obj.Process
   { id = ids.process_46
-  , cores = [7]
-  , mem_limit_as = 134217728
-  , mem_limit_rss = 2914304
-  , mem_limit_stack = 2914304
-  , mem_limit_memlock = 2914304
+  , nr_cpu = 3
+  , memsize_MB = 2846
   , endpoint = "172.28.128.3@tcp:12345:41:305"
   , services = [ids.service_47]
   }
 
 let process_44 = Obj.Process
   { id = ids.process_44
-  , cores = [7]
-  , mem_limit_as = 134217728
-  , mem_limit_rss = 2914304
-  , mem_limit_stack = 2914304
-  , mem_limit_memlock = 2914304
+  , nr_cpu = 3
+  , memsize_MB = 2846
   , endpoint = "172.28.128.3@tcp:12345:41:304"
   , services = [ids.service_45]
   }
@@ -617,8 +587,6 @@ let sdev_16 = Obj.Sdev
   , media = 1
   , bsize = 4096
   , size = 68719476736
-  , last_state = 0
-  , flags = 0
   , filename = "/dev/loop5"
   }
 
@@ -629,8 +597,6 @@ let sdev_20 = Obj.Sdev
   , media = 1
   , bsize = 4096
   , size = 68719476736
-  , last_state = 0
-  , flags = 0
   , filename = "/dev/loop7"
   }
 
@@ -641,8 +607,6 @@ let sdev_12 = Obj.Sdev
   , media = 1
   , bsize = 4096
   , size = 68719476736
-  , last_state = 0
-  , flags = 0
   , filename = "/dev/loop3"
   }
 
@@ -653,8 +617,6 @@ let sdev_18 = Obj.Sdev
   , media = 1
   , bsize = 4096
   , size = 68719476736
-  , last_state = 0
-  , flags = 0
   , filename = "/dev/loop6"
   }
 
@@ -665,8 +627,6 @@ let sdev_14 = Obj.Sdev
   , media = 1
   , bsize = 4096
   , size = 68719476736
-  , last_state = 0
-  , flags = 0
   , filename = "/dev/loop4"
   }
 
@@ -677,8 +637,6 @@ let sdev_22 = Obj.Sdev
   , media = 1
   , bsize = 4096
   , size = 68719476736
-  , last_state = 0
-  , flags = 0
   , filename = "/dev/loop8"
   }
 
@@ -689,8 +647,6 @@ let sdev_8 = Obj.Sdev
   , media = 1
   , bsize = 4096
   , size = 68719476736
-  , last_state = 0
-  , flags = 0
   , filename = "/dev/loop1"
   }
 
@@ -701,8 +657,6 @@ let sdev_10 = Obj.Sdev
   , media = 1
   , bsize = 4096
   , size = 68719476736
-  , last_state = 0
-  , flags = 0
   , filename = "/dev/loop2"
   }
 
@@ -713,8 +667,6 @@ let sdev_70 = Obj.Sdev
   , media = 1
   , bsize = 1
   , size = 1024
-  , last_state = 0
-  , flags = 0
   , filename = "/dev/null"
   }
 
