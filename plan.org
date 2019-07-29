@@ -217,7 +217,8 @@ See the [[https://docs.google.com/document/d/1cR-BbxtMjGuZPj8NOc95RyFjqmeFsYf4JJ
 
 ** scoping
 
-[[https://app.smartsheet.com/sheets/5gR2F28rvjVxRJfvp7QfRCwjxgVRp79wGfGJg2G1?view=grid][The Smartsheet]]
+- [[https://docs.google.com/spreadsheets/d/1zTmBfHFZXQJ7DS9hLzFVDwTU9ieQUKM09bS5IVATSpQ/edit#gid=0][Google spreadsheet]]
+- [[https://app.smartsheet.com/sheets/5gR2F28rvjVxRJfvp7QfRCwjxgVRp79wGfGJg2G1?view=grid][the "smart"sheet]]
 
 *** [2w] health checking
 
