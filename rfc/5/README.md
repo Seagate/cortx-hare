@@ -40,8 +40,8 @@ $ curl -s \
 0x7200000000000001:0x007d
 ```
 
-HA service fid is obtined by changing the most significant byte of `.f_container` field of the process fid to 0x73
-and by incrementing its `.f_key` field.
+HA service fid is obtined by changing the prefix of `.f_container` field of the process fid
+from 0x72 to 0x73 and by incrementing its `.f_key` field.
 
 RM service fid is obtained by incrementing `.f_key` field of the HA service fid.
 
