@@ -32,8 +32,6 @@ def main():
     q = Queue(maxsize=1000)
     t = run_publisher_thread(q)
 
-    # The node UUID is simply random
-    l = HaLink(node_uuid="d63141b1-a7f7-4258-b22a-59fda4ad86d1", queue=q)
     # [KN] The fid of the hax service is taken from Consul
     hax_ep = FidProvider().get_hax_endpoint()
     hax_fid = FidProvider().get_hax_fid()
@@ -44,17 +42,22 @@ def main():
     rm_fid = ha_fid.get_copy()
     rm_fid.key = rm_fid.key + 1
 
+    # The node UUID is simply random
+    l = HaLink(node_uuid="d63141b1-a7f7-4258-b22a-59fda4ad86d1", queue=q, rm_fid=rm_fid)
+
     # [KN] FIXME the endpoint must be constructed dynamically by the data taken
     # from Consul
 
-    l.start(hax_ep,
-            process=hax_fid,
-            ha_service=ha_fid,
-            rm_service=rm_fid)
-    # [KN] This is a blocking call. It will work until the program is
-    # terminated by signal
-    run_server(q, thread_to_wait=t, halink=l)
-
+    try:
+        l.start(hax_ep,
+                process=hax_fid,
+                ha_service=ha_fid,
+                rm_service=rm_fid)
+        # [KN] This is a blocking call. It will work until the program is
+        # terminated by signal
+        run_server(q, thread_to_wait=t, halink=l)
+    finally:
+        l.close()
 
 if __name__ == "__main__":
     main()

@@ -42,6 +42,7 @@ PyObject* getModule(char* module_name)
 PyObject* toFid(const struct m0_fid* fid)
 {
   PyObject* hax_mod = getModule("hax.types");
+  printf("Module loaded? %d\n", hax_mod == NULL ? 0 : 1);
   PyObject* instance = PyObject_CallMethod(hax_mod, "Fid", "(KK)", fid->f_container, fid->f_key);
   Py_DECREF(hax_mod);
   return instance;
@@ -80,8 +81,10 @@ static void entrypoint_request_cb( struct m0_halon_interface *hi
 
   printf("In entrypoint_request_cb\n");
   PyObject* py_fid = toFid(process_fid);
+  printf("Here - 1\n");
   PyObject* py_req = toUid128(req_id);
 
+  printf("Here - 2\n");
   PyObject_CallMethod(
       hc->hc_handler,
       "_entrypoint_request_cb",
@@ -104,20 +107,20 @@ static void entrypoint_request_cb( struct m0_halon_interface *hi
    * XXX TODO: Move test code to separate location.
    */
 
-  M0_ALLOC_ARR(confd_fids, 1);
-  if (confd_fids == NULL) {
-      M0_LOG(M0_ERROR, "fid array allocation failure");
-      return;
-  }
-  confd_fids[0] = M0_FID_TINIT('s', 3, 1);
-  M0_ALLOC_ARR(confd_eps, 1);
-  if (confd_eps == NULL)
-      M0_LOG(M0_ALWAYS, "confd ep array allocation failure");
-  confd_eps[0] = m0_strdup("172.28.128.4@tcp:12345:44:1");
-  rm_ep = m0_strdup("172.28.128.4@tcp:12345:44:1");
+  /*M0_ALLOC_ARR(confd_fids, 1);*/
+  /*if (confd_fids == NULL) {*/
+      /*M0_LOG(M0_ERROR, "fid array allocation failure");*/
+      /*return;*/
+  /*}*/
+  /*confd_fids[0] = M0_FID_TINIT('s', 3, 1);*/
+  /*M0_ALLOC_ARR(confd_eps, 1);*/
+  /*if (confd_eps == NULL)*/
+      /*M0_LOG(M0_ALWAYS, "confd ep array allocation failure");*/
+  /*confd_eps[0] = m0_strdup("172.28.128.4@tcp:12345:44:1");*/
+  /*rm_ep = m0_strdup("172.28.128.4@tcp:12345:44:1");*/
 
-  m0_halon_interface_entrypoint_reply(hi, req_id, 0, 1, confd_fids, confd_eps, 1, &M0_FID_TINIT('s', 4, 1), rm_ep);
-  M0_LOG(M0_ALWAYS, "Entry point replied");
+  /*m0_halon_interface_entrypoint_reply(hi, req_id, 0, 1, confd_fids, confd_eps, 1, &M0_FID_TINIT('s', 4, 1), rm_ep);*/
+  /*M0_LOG(M0_ALWAYS, "Entry point replied");*/
   /* Mock reply end */
 }
 
@@ -134,6 +137,7 @@ void m0_ha_entrypoint_reply_send(unsigned long long epr,
                                  const struct m0_fid        *rm_fid,
                                  const char                 *rm_eps)
 {
+  printf("In m0_ha_entrypoint_reply_send\n");
   struct hax_entrypoint_request *hep = (struct hax_entrypoint_request *)epr;
   hax_context                   *hc = hep->hep_hc;
   struct m0_halon_interface     *hi = hc->hc_hi;

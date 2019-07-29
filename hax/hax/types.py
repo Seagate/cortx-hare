@@ -1,4 +1,5 @@
 import ctypes as c
+import logging
 
 
 class FidStruct(c.Structure):
@@ -15,6 +16,7 @@ class Fid(object):
     def __init__(self, container, key):
         self.container = container
         self.key = key
+        logging.debug("Fid created: {}".format(str(self)))
 
     @staticmethod
     def parse(val: str):
@@ -40,6 +42,10 @@ class Uint128(object):
     def __init__(self, hi, lo):
         self.hi = hi
         self.lo = lo
+        logging.debug("Unit128 created: {}".format(str(self)))
+
+    def __repr__(self):
+        return '{}:{}'.format(hex(self.hi), hex(self.lo))
 
     def to_c(self):
         return Uint128Struct(self.hi, self.lo)
