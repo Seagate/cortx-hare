@@ -86,34 +86,29 @@ let oid = Oid/toConfGen
 -- m0_confx_root
 let Root =
   { id : Oid
-  , verno : Natural
-  , rootfid : Oid
   , mdpool : Oid
   , imeta_pver : Optional Oid
-  , mdredundancy : Natural
-  , params : List Text
   , nodes : List Oid
   , sites : List Oid
   , pools : List Oid
   , profiles : List Oid
-  , fdmi_flt_grps : List Oid
   }
 
 let Root/toConfGen = \(x : Root) ->
     let imeta = Optional/fold Oid x.imeta_pver Text oid "(0,0)"
     in
     "(${oid x.id}"
- ++ " verno=${nat x.verno}"
- ++ " rootfid=${oid x.rootfid}"
+ ++ " verno=1"
+ ++ " rootfid=${oid x.id}"
  ++ " mdpool=${oid x.mdpool}"
  ++ " imeta_pver=${imeta}"
- ++ " mdredundancy=${nat x.mdredundancy}"
- ++ " params=${join.Texts x.params}"
+ ++ " mdredundancy=1"  -- XXX Is this value OK for EES? Check with @madhav.
+ ++ " params=[]"
  ++ " nodes=${join.Oids x.nodes}"
  ++ " sites=${join.Oids x.sites}"
  ++ " pools=${join.Oids x.pools}"
  ++ " profiles=${join.Oids x.profiles}"
- ++ " fdmi_flt_grps=${join.Oids x.fdmi_flt_grps}"
+ ++ " fdmi_flt_grps=[]"
  ++ ")"
 
 -- m0_confx_fdmi_flt_grp
@@ -492,17 +487,12 @@ let ids =
 
 let root = Obj.Root
   { id = ids.root
-  , verno = 1
-  , rootfid = ids.root
   , mdpool = ids.pool_1
   , imeta_pver = Some ids.pver_2
-  , mdredundancy = 1
-  , params = [] : List Text
   , nodes = [ids.node]
   , sites = [ids.site]
   , pools = [ids.pool_69, ids.pool_48, ids.pool_1]
   , profiles = [ids.profile]
-  , fdmi_flt_grps = [] : List Oid
   }
 
 let node = Obj.Node
