@@ -226,7 +226,9 @@ class ToDhall(metaclass=abc.ABCMeta):
 
 class ConfRoot(ToDhall):
     def __init__(self, nodes: List[Oid] = [], sites: List[Oid] = []):
+        assert all(x.type is ObjT.node for x in nodes)
         self.nodes = nodes
+        assert all(x.type is ObjT.site for x in sites)
         self.sites = sites
 
     def __repr__(self):
@@ -250,6 +252,7 @@ class ConfNode(ToDhall):
                  processes: List[Oid] = []):
         self.nr_cpu = nr_cpu
         self.memsize_MB = memsize_MB
+        assert all(x.type is ObjT.process for x in processes)
         self.processes = processes
 
     def __repr__(self):
@@ -260,13 +263,19 @@ class ConfNode(ToDhall):
 
     def to_dhall(self, oid: Oid) -> str:
         assert oid.type is ObjT.node
-        raise NotImplementedError('XXX IMPLEMENTME')
+        args = ', '.join([f'id = {oid_to_dhall(oid)}',
+                          f'nr_cpu = {self.nr_cpu}',
+                          f'memsize_MB = {self.memsize_MB}',
+                          f'processes = {oids_to_dhall(self.processes)}'])
+        return '{ %s }' % args
 
 
 class ConfProcess(ToDhall):
     def __init__(self, nr_cpu: int, memsize_MB: int, services: List[Oid] = []):
         self.nr_cpu = nr_cpu
         self.memsize_MB = memsize_MB
+        # XXX endpoint
+        assert all(x.type is ObjT.service for x in services)
         self.services = services
 
     def __repr__(self):
@@ -277,11 +286,17 @@ class ConfProcess(ToDhall):
 
     def to_dhall(self, oid: Oid) -> str:
         assert oid.type is ObjT.process
-        raise NotImplementedError('XXX IMPLEMENTME')
+        args = ', '.join([f'id = {oid_to_dhall(oid)}',
+                          f'nr_cpu = {self.nr_cpu}',
+                          f'memsize_MB = {self.memsize_MB}',
+                          'endpoint = XXX',
+                          f'services = {oids_to_dhall(self.services)}'])
+        return '{ %s }' % args
 
 
 class ConfSite(ToDhall):
     def __init__(self, racks: List[Oid] = []):
+        assert all(x.type is ObjT.rack for x in racks)
         self.racks = racks
 
     def __repr__(self):
@@ -289,11 +304,15 @@ class ConfSite(ToDhall):
 
     def to_dhall(self, oid: Oid) -> str:
         assert oid.type is ObjT.site
-        raise NotImplementedError('XXX IMPLEMENTME')
+        args = ', '.join([f'id = {oid_to_dhall(oid)}',
+                          f'racks = {oids_to_dhall(self.racks)}',
+                          'pvers = [XXX]'])
+        return '{ %s }' % args
 
 
 class ConfRack(ToDhall):
     def __init__(self, encls: List[Oid] = []):
+        assert all(x.type is ObjT.enclosure for x in encls)
         self.encls = encls
 
     def __repr__(self):
@@ -301,11 +320,15 @@ class ConfRack(ToDhall):
 
     def to_dhall(self, oid: Oid) -> str:
         assert oid.type is ObjT.rack
-        raise NotImplementedError('XXX IMPLEMENTME')
+        args = ', '.join([f'id = {oid_to_dhall(oid)}',
+                          f'encls = {oids_to_dhall(self.encls)}',
+                          f'pvers = [XXX]'])
+        return '{ %s }' % args
 
 
 class ConfEnclosure(ToDhall):
     def __init__(self, ctrls: List[Oid] = []):
+        assert all(x.type is ObjT.controller for x in ctrls)
         self.ctrls = ctrls
 
     def __repr__(self):
@@ -313,7 +336,10 @@ class ConfEnclosure(ToDhall):
 
     def to_dhall(self, oid: Oid) -> str:
         assert oid.type is ObjT.enclosure
-        raise NotImplementedError('XXX IMPLEMENTME')
+        args = ', '.join([f'id = {oid_to_dhall(oid)}',
+                          f'ctrls = {oids_to_dhall(self.ctrls)}',
+                          f'pvers = [XXX]'])
+        return '{ %s }' % args
 
 
 class ConfController(ToDhall):
@@ -329,7 +355,11 @@ class ConfController(ToDhall):
 
     def to_dhall(self, oid: Oid) -> str:
         assert oid.type is ObjT.controller
-        raise NotImplementedError('XXX IMPLEMENTME')
+        args = ', '.join([f'id = {oid_to_dhall(oid)}',
+                          f'node = {oid_to_dhall(self.node)}',
+                          f'drives = {oids_to_dhall(self.drives)}',
+                          f'pvers = [XXX]'])
+        return '{ %s }' % args
 
 
 def build_m0conf(cluster_desc: Dict[str, Any]) -> Dict[Oid, ToDhall]:
@@ -366,6 +396,7 @@ def build_m0conf(cluster_desc: Dict[str, Any]) -> Dict[Oid, ToDhall]:
             proc_id = new_oid(ObjT.process)
             conf[proc_id] = ConfProcess(nr_cpu=nr_cpu, memsize_MB=memsize_MB)
             conf[node_id].processes.append(proc_id)
+        # XXX c0_clients, m0t1fs_clients
 
     return conf
 
