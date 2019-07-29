@@ -259,6 +259,7 @@ class ConfNode(ToDhall):
         return f'{self.__class__.__name__}({args})'
 
     def to_dhall(self, oid: Oid) -> str:
+        assert oid.type is ObjT.node
         raise NotImplementedError('XXX IMPLEMENTME')
 
 
@@ -275,6 +276,7 @@ class ConfProcess(ToDhall):
         return f'{self.__class__.__name__}({args})'
 
     def to_dhall(self, oid: Oid) -> str:
+        assert oid.type is ObjT.process
         raise NotImplementedError('XXX IMPLEMENTME')
 
 
@@ -286,6 +288,7 @@ class ConfSite(ToDhall):
         return f'{self.__class__.__name__}(racks={self.racks})'
 
     def to_dhall(self, oid: Oid) -> str:
+        assert oid.type is ObjT.site
         raise NotImplementedError('XXX IMPLEMENTME')
 
 
@@ -297,6 +300,7 @@ class ConfRack(ToDhall):
         return f'{self.__class__.__name__}(encls={self.encls})'
 
     def to_dhall(self, oid: Oid) -> str:
+        assert oid.type is ObjT.rack
         raise NotImplementedError('XXX IMPLEMENTME')
 
 
@@ -308,6 +312,7 @@ class ConfEnclosure(ToDhall):
         return f'{self.__class__.__name__}(ctrls={self.ctrls})'
 
     def to_dhall(self, oid: Oid) -> str:
+        assert oid.type is ObjT.enclosure
         raise NotImplementedError('XXX IMPLEMENTME')
 
 
@@ -323,6 +328,7 @@ class ConfController(ToDhall):
             f' drives={self.drives})'
 
     def to_dhall(self, oid: Oid) -> str:
+        assert oid.type is ObjT.controller
         raise NotImplementedError('XXX IMPLEMENTME')
 
 
