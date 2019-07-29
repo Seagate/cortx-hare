@@ -63,7 +63,7 @@ class HaLink(object):
         self.queue.put(Message(data))
         logging.debug("The locality thread is free now")
 
-    def _entrypoint_request_cb(self, req_id, remote_rpc_endpoint, process_fid,
+    def _entrypoint_request_cb(self, reply_context, req_id, remote_rpc_endpoint, process_fid,
                                git_rev, pid, is_first_request):
         import pudb
         pudb.set_trace()
@@ -71,5 +71,7 @@ class HaLink(object):
         sess = prov.get_leader_session()
         principal_rm = prov.get_session_node(sess)
         confds = prov.get_confd_list()
+
+
         # FIXME send the reply using the data above
         raise NotImplementedError()

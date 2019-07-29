@@ -72,6 +72,12 @@ static void entrypoint_request_cb( struct m0_halon_interface *hi
   PyGILState_STATE gstate;
   gstate = PyGILState_Ensure();
 
+  struct hax_entrypoint_request* ep;
+  M0_ALLOC_PTR(ep);
+
+  ep->hep_hc = hc;
+
+
   printf("In entrypoint_request_cb\n");
   PyObject* py_fid = toFid(process_fid);
   PyObject* py_req = toUid128(req_id);
@@ -79,7 +85,8 @@ static void entrypoint_request_cb( struct m0_halon_interface *hi
   PyObject_CallMethod(
       hc->hc_handler,
       "_entrypoint_request_cb",
-      "(OsOskb)",
+      "(kOsOskb)",
+      ep,
       py_req,
       remote_rpc_endpoint,
       py_fid,
@@ -133,6 +140,7 @@ void m0_ha_entrypoint_reply_send(unsigned long long epr,
 
   m0_halon_interface_entrypoint_reply(hi, req_id, rc, confd_nr, confd_fid_data,
                                       confd_eps_data, confd_quorum, rm_fid, rm_eps);
+  m0_free(hep);
 }
 
 static void _failvec_reply_send(struct hax_msg *hm)
