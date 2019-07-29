@@ -1,0 +1,10 @@
+{-*- dhall -*-}
+
+let Endpoint/show = \(x : ./Endpoint) ->
+    let nid = ../NetId/show x.nid
+    let portal = Natural/show x.portal
+    let tmid = Natural/show x.tmid
+    in
+    "${nid}:12345:${portal}:${tmid}"
+
+in Endpoint/show

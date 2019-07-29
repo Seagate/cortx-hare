@@ -3,6 +3,9 @@ let List/replicate = https://prelude.dhall-lang.org/List/replicate
 let Text/concatMapSep = https://prelude.dhall-lang.org/Text/concatMapSep
 let Text/concatSep = https://prelude.dhall-lang.org/Text/concatSep
 
+let Endpoint = ./Endpoint/Endpoint
+let Endpoint/show = ./Endpoint/show
+
 let ObjT =
   < Root
   | FdmiFltGrp
@@ -163,7 +166,7 @@ let Process =
   { id : Oid
   , nr_cpu : Natural
   , memsize_MB : Natural
-  , endpoint : Text
+  , endpoint : Endpoint
   , services : List Oid
   }
 
@@ -176,7 +179,7 @@ let Process/toConfGen = \(x : Process) ->
  ++ " mem_limit_rss=${memsize_KiB}"
  ++ " mem_limit_stack=${memsize_KiB}"
  ++ " mem_limit_memlock=${memsize_KiB}"
- ++ " endpoint=${Text/show x.endpoint}"
+ ++ " endpoint=${Text/show (Endpoint/show x.endpoint)}"
  ++ " services=${join.Oids x.services}"
  ++ ")"
 
@@ -504,11 +507,21 @@ let node = Obj.Node
                 , ids.process_42, ids.process_40 ]
   }
 
+let NetId = ./NetId/NetId
+
+let nid = NetId.tcp { tcp = { addr = "172.28.128.3", mdigit = None Natural } }
+
+let mkEndpoint : Natural -> Natural -> Endpoint
+  = \(portal : Natural)
+ -> \(tmid : Natural)
+ ->
+    { nid = nid, portal = portal, tmid = tmid }
+
 let process_24 = Obj.Process
   { id = ids.process_24
   , nr_cpu = 3
   , memsize_MB = 2846
-  , endpoint = "172.28.128.3@tcp:12345:34:101"
+  , endpoint = mkEndpoint 34 101
   , services = [ids.service_26, ids.service_25]
   }
 
@@ -516,7 +529,7 @@ let process_40 = Obj.Process
   { id = ids.process_40
   , nr_cpu = 3
   , memsize_MB = 2846
-  , endpoint = "172.28.128.3@tcp:12345:41:302"
+  , endpoint = mkEndpoint 41 302
   , services = [ids.service_41]
   }
 
@@ -524,7 +537,7 @@ let process_42 = Obj.Process
   { id = ids.process_42
   , nr_cpu = 3
   , memsize_MB = 2846
-  , endpoint = "172.28.128.3@tcp:12345:41:303"
+  , endpoint = mkEndpoint 41 303
   , services = [ids.service_43]
   }
 
@@ -532,7 +545,7 @@ let process_38 = Obj.Process
   { id = ids.process_38
   , nr_cpu = 3
   , memsize_MB = 2846
-  , endpoint = "172.28.128.3@tcp:12345:41:301"
+  , endpoint = mkEndpoint 41 301
   , services = [ids.service_39]
   }
 
@@ -540,7 +553,7 @@ let process_27 = Obj.Process
   { id = ids.process_27
   , nr_cpu = 3
   , memsize_MB = 2846
-  , endpoint = "172.28.128.3@tcp:12345:44:101"
+  , endpoint = mkEndpoint 44 101
   , services = [ids.service_28, ids.service_29]
   }
 
@@ -548,7 +561,7 @@ let process_30 = Obj.Process
   { id = ids.process_30
   , nr_cpu = 3
   , memsize_MB = 2846
-  , endpoint = "172.28.128.3@tcp:12345:41:401"
+  , endpoint = mkEndpoint 41 401
   , services = [ ids.service_31, ids.service_36, ids.service_35
                , ids.service_33, ids.service_37, ids.service_34
                , ids.service_32 ]
@@ -558,7 +571,7 @@ let process_46 = Obj.Process
   { id = ids.process_46
   , nr_cpu = 3
   , memsize_MB = 2846
-  , endpoint = "172.28.128.3@tcp:12345:41:305"
+  , endpoint = mkEndpoint 41 305
   , services = [ids.service_47]
   }
 
@@ -566,7 +579,7 @@ let process_44 = Obj.Process
   { id = ids.process_44
   , nr_cpu = 3
   , memsize_MB = 2846
-  , endpoint = "172.28.128.3@tcp:12345:41:304"
+  , endpoint = mkEndpoint 41 304
   , services = [ids.service_45]
   }
 
