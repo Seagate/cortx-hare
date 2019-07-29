@@ -114,6 +114,12 @@ def main(argv=None):
     pprint(cluster_desc)
     print('----- m0conf -----')
     pprint(m0conf)
+    print('----- dhall -----')
+    for k, v in m0conf.items():
+        try:
+            print(v.to_dhall(k))
+        except NotImplementedError:
+            print('XXX-IMPLEMENTME ' + oid_to_dhall(k))
     # XXX >>>>>>>
 
 
@@ -179,6 +185,10 @@ ObjT = Enum('ObjT', 'root fdmi_flt_grp fdmi_filter'
 ObjT.__doc__ = 'Mero conf object type'
 
 
+def objT_to_dhall(t: ObjT) -> str:
+    return 'ObjT.' + ''.join(s.capitalize() for s in t.name.split('_'))
+
+
 Oid = NamedTuple('Oid', [('type', ObjT), ('fidk', int)])
 Oid.__doc__ = 'Mero conf object identifier'
 Oid.fidk.__doc__ = '.f_key part of the corresponding m0_fid'
@@ -198,9 +208,19 @@ def new_oid(objt: ObjT) -> Oid:
     return Oid(objt, next(_fidk))
 
 
+def oid_to_dhall(oid: Oid) -> str:
+    return f'zoid {objT_to_dhall(oid.type)} {oid.fidk}'
+
+
+def oids_to_dhall(oids: List[Oid]) -> str:
+    if not oids:
+        return '[] : List Oid'
+    return '[ {} ]'.format(', '.join(oid_to_dhall(x) for x in oids))
+
+
 class ToDhall(metaclass=abc.ABCMeta):
     @abc.abstractmethod
-    def to_dhall(self):
+    def to_dhall(self, oid: Oid) -> str:
         pass
 
 
@@ -213,8 +233,16 @@ class ConfRoot(ToDhall):
         return f'{self.__class__.__name__}(nodes={self.nodes},' \
             f' sites={self.sites})'
 
-    def to_dhall(self):
-        raise NotImplementedError('XXX IMPLEMENTME')
+    def to_dhall(self, oid: Oid) -> str:
+        assert oid.type is ObjT.root
+        args = ', '.join([f'id = {oid_to_dhall(oid)}',
+                          'mdpool = XXX',
+                          'imeta_pver = XXX',
+                          f'nodes = {oids_to_dhall(self.nodes)}',
+                          f'sites = {oids_to_dhall(self.sites)}',
+                          'pools = [XXX]',
+                          'profiles = [XXX]'])
+        return '{ %s }' % args
 
 
 class ConfNode(ToDhall):
@@ -230,7 +258,7 @@ class ConfNode(ToDhall):
                           f'processes={self.processes}'])
         return f'{self.__class__.__name__}({args})'
 
-    def to_dhall(self):
+    def to_dhall(self, oid: Oid) -> str:
         raise NotImplementedError('XXX IMPLEMENTME')
 
 
@@ -246,7 +274,7 @@ class ConfProcess(ToDhall):
                           f'services={self.services}'])
         return f'{self.__class__.__name__}({args})'
 
-    def to_dhall(self):
+    def to_dhall(self, oid: Oid) -> str:
         raise NotImplementedError('XXX IMPLEMENTME')
 
 
@@ -257,7 +285,7 @@ class ConfSite(ToDhall):
     def __repr__(self):
         return f'{self.__class__.__name__}(racks={self.racks})'
 
-    def to_dhall(self):
+    def to_dhall(self, oid: Oid) -> str:
         raise NotImplementedError('XXX IMPLEMENTME')
 
 
@@ -268,7 +296,7 @@ class ConfRack(ToDhall):
     def __repr__(self):
         return f'{self.__class__.__name__}(encls={self.encls})'
 
-    def to_dhall(self):
+    def to_dhall(self, oid: Oid) -> str:
         raise NotImplementedError('XXX IMPLEMENTME')
 
 
@@ -279,7 +307,7 @@ class ConfEnclosure(ToDhall):
     def __repr__(self):
         return f'{self.__class__.__name__}(ctrls={self.ctrls})'
 
-    def to_dhall(self):
+    def to_dhall(self, oid: Oid) -> str:
         raise NotImplementedError('XXX IMPLEMENTME')
 
 
@@ -294,7 +322,7 @@ class ConfController(ToDhall):
         return f'{self.__class__.__name__}(node={self.node},' \
             f' drives={self.drives})'
 
-    def to_dhall(self):
+    def to_dhall(self, oid: Oid) -> str:
         raise NotImplementedError('XXX IMPLEMENTME')
 
 
