@@ -37,6 +37,8 @@ lib%.so.0: %.o
 
 hax.so: hax.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) $(LDLIBS) $^ -o $@
+libhax.so: hax.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) $(LDLIBS) $^ -o $@
 
 .PHONY: mostlyclean
 mostlyclean:

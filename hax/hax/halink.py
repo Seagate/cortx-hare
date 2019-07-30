@@ -12,7 +12,7 @@ prot2 = c.PYFUNCTYPE(None, c.c_void_p)
 class HaLink(object):
     def __init__(self, node_uuid="", queue=None, rm_fid=None):
         dirname = os.path.dirname(os.path.abspath(__file__))
-        lib_path = '{}/../hax.so'.format(dirname)
+        lib_path = '{}/../libhax.so'.format(dirname)
         logging.debug('Loading library from path: {}'.format(lib_path))
         lib = c.cdll.LoadLibrary(lib_path)
         lib.init_halink.argtypes = [c.py_object, c.c_char_p]
