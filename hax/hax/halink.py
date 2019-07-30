@@ -3,10 +3,19 @@ import logging
 import threading
 import os
 from hax.server import Message
-from hax.types import Fid, FidStruct
+from hax.types import Fid, FidStruct, Uint128Struct
 from hax.fid_provider import FidProvider
 
 prot2 = c.PYFUNCTYPE(None, c.c_void_p)
+
+
+def log_exception(fn):
+    def wrapper(*args, **kwargs):
+        try:
+            return fn(*args, **kwargs)
+        except Exception:
+            logging.exception("error")
+    return wrapper
 
 
 class HaLink(object):
@@ -33,7 +42,7 @@ class HaLink(object):
 
         lib.m0_halon_interface_entrypoint_reply.argtypes = [
             c.c_void_p,  # unsigned long long epr
-            c.c_void_p,  # const struct m0_uint128    *req_id
+            c.POINTER(Uint128Struct),  # const struct m0_uint128    *req_id
             c.c_int,  # int rc
             c.c_uint32,  # uint32_t confd_nr
             c.POINTER(FidStruct),  #
@@ -77,6 +86,7 @@ class HaLink(object):
         self.queue.put(Message(data))
         logging.debug("The locality thread is free now")
 
+    @log_exception
     def _entrypoint_request_cb(self, reply_context, req_id, remote_rpc_endpoint, process_fid,
                                git_rev, pid, is_first_request):
         logging.debug("Entrypoint request cb")
@@ -85,24 +95,30 @@ class HaLink(object):
         principal_rm = prov.get_session_node(sess)
         confds = prov.get_confd_list()
 
-        rc_quorum = len(confds) / 2 + 1
+        rc_quorum = int(len(confds) / 2 + 1)
 
         rm_eps = None
         for cnf in confds:
             if cnf.get('node') == principal_rm:
                 rm_eps = cnf.get('address')
                 break
+        confd_fids = list(map(lambda x: x.get('fid').to_c(), confds))
+        confd_eps = list(map(lambda x: self._c_str(x.get('address')), confds))
 
+        arr_t = (FidStruct * len(confd_fids))
+        confd_fid_array = arr_t(*confd_fids)
+
+        rm_eps_c = self._c_str(rm_eps)
         self.__entrypoint_reply(
             reply_context,
             req_id.to_c(),
             0,
             len(confds),
-            c.POINTER(list(map(lambda x: x.get('fid').to_c, confds))),
-            c.POINTER(list(map(lambda x: self._c_str(x.get('address')), confds))),
+            confd_fid_array,
+            (c.c_char_p * len(confd_eps))(*confd_eps),
             rc_quorum,
             self.rm_fid.to_c(),
-            self._c_str(rm_eps)
+            rm_eps_c
         )
         logging.debug("Entrypoint request replied")
 
