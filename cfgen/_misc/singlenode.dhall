@@ -4,7 +4,7 @@ in
     [ { name = "localhost"
       , disks = { path_glob = "/dev/loop[0-9]*" }
       , m0_servers =
-          [ { endpoint =
+          [ { endpoint_fmt =
                 { proto = CD.NetProtocol.lo
                 , portal = 34
                 , tmid = 101
@@ -13,8 +13,8 @@ in
             , io_disks = { path_regex = "." }
             }
           ]
-      , c0_clients = [] : List CD.Endpoint
-      , m0t1fs_clients = [] : List CD.Endpoint
+      , c0_clients = [] : List CD.EndpointFmt
+      , m0t1fs_clients = [] : List CD.EndpointFmt
       }
     ]
 , pools =

@@ -1,7 +1,7 @@
 { ClusterDesc =
     ./ClusterDesc
-, Endpoint =
-    ./Endpoint
+, EndpointFmt =
+    ./EndpointFmt
 , FailVec =
     ./FailVec
 , NetProtocol =
