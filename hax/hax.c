@@ -430,22 +430,3 @@ void test(unsigned long long ctx)
   //m0_mutex_unlock(&hc->hc_mutex);
 }
 
-int main(int argc, char **argv)
-{
-  struct m0_halon_interface *hi;
-  int rc;
-
-  rc = m0_halon_interface_init(&hi, "", "", "disable-compatibility-check", NULL);
-  M0_ASSERT(rc == 0);
-  rc = m0_halon_interface_start(hi, "0@lo:12345:42:100",
-                                &M0_FID_TINIT('r', 1, 1),
-                                &M0_FID_TINIT('s', 1, 1),
-                                &M0_FID_TINIT('s', 1, 2),
-                                entrypoint_request_cb, msg_received_cb, msg_is_delivered_cb, msg_is_not_delivered_cb,
-                                link_connected_cb, link_reused_cb, link_is_disconnecting_cb, link_disconnected_cb);
-  M0_ASSERT(rc == 0);
-  m0_halon_interface_stop(hi);
-  m0_halon_interface_fini(hi);
-  printf("Hello world");
-  return 0;
-}
