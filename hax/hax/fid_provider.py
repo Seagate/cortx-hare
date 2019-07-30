@@ -13,6 +13,14 @@ class FidProvider(object):
         serv = self.get_local_service_by_name('hax')
         return Fid.parse(serv.get('ID'))
 
+    def get_ha_fid(self):
+        serv = self.get_local_service_by_name('ha')
+        return Fid.parse(serv.get('ID'))
+
+    def get_rm_fid(self):
+        serv = self.get_local_service_by_name('rm')
+        return Fid.parse(serv.get('ID'))
+
     def get_local_service_by_name(self, name):
         services = self.cns.agent.services()
         for k, v in services.items():

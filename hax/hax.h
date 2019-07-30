@@ -45,7 +45,7 @@ void m0_ha_entrypoint_reply_send(unsigned long long epr,
                                  const char                 *rm_eps);
 void m0_ha_failvec_reply_send(unsigned long long hm, struct m0_fid *pool_fid,
                               uint32_t nr_notes);
-void m0_ha_nvec_reply_send(unsigned long long hm);
+void m0_ha_nvec_reply_send(unsigned long long hm, struct m0_ha_nvec *nvec);
 
 #endif  // __HAX_H__
 

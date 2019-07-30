@@ -5,6 +5,8 @@ from threading import Thread
 from hax.fid_provider import FidProvider, SERVICE_CONTAINER
 import logging
 
+from hax.types import Fid
+
 
 def setup_logging():
     logging.basicConfig(
@@ -35,15 +37,20 @@ def main():
     # [KN] The fid of the hax service is taken from Consul
     hax_ep = FidProvider().get_hax_endpoint()
     hax_fid = FidProvider().get_hax_fid()
+    ha_fid = FidProvider().get_ha_fid()
+    rm_fid = FidProvider().get_rm_fid()
 
     # [KN] ..while two other ones are auto-generated
-    ha_fid = hax_fid.get_copy()
-    ha_fid.container = SERVICE_CONTAINER
-    rm_fid = ha_fid.get_copy()
-    rm_fid.key = rm_fid.key + 1
+    #ha_fid = hax_fid.get_copy()
+    #ha_fid.container = SERVICE_CONTAINER
+    #rm_fid = ha_fid.get_copy()
+    #rm_fid.key = rm_fid.key + 1
 
     # The node UUID is simply random
     l = HaLink(node_uuid="d63141b1-a7f7-4258-b22a-59fda4ad86d1", queue=q, rm_fid=rm_fid)
+    #pfid = Fid.parse("1:0")
+    #hafid = Fid.parse("5:0")
+    #rmfid = Fid.parse("4:0")
 
     # [KN] FIXME the endpoint must be constructed dynamically by the data taken
     # from Consul

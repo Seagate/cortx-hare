@@ -96,6 +96,8 @@ class HaLink(object):
         sess = prov.get_leader_session()
         principal_rm = prov.get_session_node(sess)
         confds = prov.get_confd_list()
+        tname = threading.currentThread().getName()
+        logging.info('in _entrypoint_request_cb'.format(tname))
 
         rc_quorum = int(len(confds) / 2 + 1)
 

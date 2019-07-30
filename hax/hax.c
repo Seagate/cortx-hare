@@ -19,6 +19,18 @@ static hax_context *hc;
 struct m0_thread    mthread;
 struct m0          *m0;
 
+static void _ha_test_entrypoint_reply_send(struct m0_halon_interface *hi,
+                                           const struct m0_uint128   *req_id,
+                                           const char                *remote_rpc_endpoint,
+                                           const struct m0_fid       *process_fid,
+                                           const char                *git_rev_id,
+                                           uint64_t                   pid,
+                                           bool                       first_request);
+static void __ha_failvec_reply_send(struct hax_msg *hax_msg, struct m0_fid *pool_fid,
+                                    uint32_t nr_notes);
+static void nvec_test_reply_send(struct hax_msg *hm);
+static void __ha_nvec_reply_send(struct hax_msg *hax_msg, struct m0_ha_nvec *nvec);
+
 PyObject* getModule(char* module_name)
 {
   PyObject* sys_mod_dict = PyImport_GetModuleDict();
@@ -65,19 +77,15 @@ static void entrypoint_request_cb( struct m0_halon_interface *hi
                                   , bool                       first_request
                                   )
 {
-  struct m0_fid *confd_fids;
-  const char    **confd_eps;
-  const char    *rm_ep;
+  struct hax_entrypoint_request* ep;
   // [KN] This is obligatory since we want to work with Python object and we obviously work from an external thread.
   // FYI: https://docs.python.org/2/c-api/init.html#releasing-the-gil-from-extension-code
   PyGILState_STATE gstate;
   gstate = PyGILState_Ensure();
 
-  struct hax_entrypoint_request* ep;
   M0_ALLOC_PTR(ep);
 
   ep->hep_hc = hc;
-
 
   printf("In entrypoint_request_cb\n");
   PyObject* py_fid = toFid(process_fid);
@@ -103,25 +111,43 @@ static void entrypoint_request_cb( struct m0_halon_interface *hi
   // [KN] Note that the Python threads will get unblocked only after this call
   PyGILState_Release(gstate);
 
-  /* Mock reply start
-   * XXX TODO: Move test code to separate location.
-   */
+  //M0_LOG(M0_ALWAYS, "Entrypoint replying");
+  /* Mock reply */
+  //_ha_test_entrypoint_reply_send(hi, req_id, remote_rpc_endpoint, process_fid,
+  //                               git_rev_id, pid, first_request);
 
-  /*M0_ALLOC_ARR(confd_fids, 1);*/
-  /*if (confd_fids == NULL) {*/
-      /*M0_LOG(M0_ERROR, "fid array allocation failure");*/
-      /*return;*/
-  /*}*/
-  /*confd_fids[0] = M0_FID_TINIT('s', 3, 1);*/
-  /*M0_ALLOC_ARR(confd_eps, 1);*/
-  /*if (confd_eps == NULL)*/
-      /*M0_LOG(M0_ALWAYS, "confd ep array allocation failure");*/
-  /*confd_eps[0] = m0_strdup("172.28.128.4@tcp:12345:44:1");*/
-  /*rm_ep = m0_strdup("172.28.128.4@tcp:12345:44:1");*/
+  }
 
-  /*m0_halon_interface_entrypoint_reply(hi, req_id, 0, 1, confd_fids, confd_eps, 1, &M0_FID_TINIT('s', 4, 1), rm_ep);*/
-  /*M0_LOG(M0_ALWAYS, "Entry point replied");*/
-  /* Mock reply end */
+static void _ha_test_entrypoint_reply_send(struct m0_halon_interface *hi,
+                                           const struct m0_uint128   *req_id,
+                                           const char                *remote_rpc_endpoint,
+                                           const struct m0_fid       *process_fid,
+                                           const char                *git_rev_id,
+                                           uint64_t                   pid,
+                                           bool                       first_request)
+{
+  struct m0_fid *confd_fids;
+  const char    **confd_eps;
+  const char    *rm_ep;
+
+   /* XXX TODO: Move test code to separate location.*/
+
+  M0_ALLOC_ARR(confd_fids, 1);
+  if (confd_fids == NULL) {
+      M0_LOG(M0_ERROR, "fid array allocation failure");
+      return;
+  }
+  confd_fids[0] = M0_FID_TINIT('s', 3, 1);
+  M0_ALLOC_ARR(confd_eps, 1);
+  if (confd_eps == NULL)
+      M0_LOG(M0_ALWAYS, "confd ep array allocation failure");
+  confd_eps[0] = m0_strdup("172.28.128.4@tcp:12345:44:1");
+  rm_ep = m0_strdup("172.28.128.4@tcp:12345:44:1");
+
+  m0_halon_interface_entrypoint_reply(hi, req_id, 0, 1, confd_fids, confd_eps, 1, &M0_FID_TINIT('s', 4, 1), rm_ep);
+  M0_LOG(M0_ALWAYS, "Entry point replied");
+  m0_free(confd_fids);
+  m0_free(confd_eps);
 }
 
 /*
@@ -154,8 +180,7 @@ static void _failvec_reply_send(struct hax_msg *hm)
  /* Invoke python call from here, comment the mock reply send and pass hax_msg (hm).
   * XXX TODO: Move out test calls to separate location.
   */
-
-  //m0_ha_failvec_reply_send(hm, &M0_FID_TINIT('o', 2, 9), 0);
+  __ha_failvec_reply_send(hm, &M0_FID_TINIT('o', 2, 9), 0);
 }
 
 /*
@@ -165,7 +190,16 @@ static void _failvec_reply_send(struct hax_msg *hm)
 void m0_ha_failvec_reply_send(unsigned long long hm, struct m0_fid *pool_fid,
                               uint32_t nr_notes)
 {
-  struct hax_msg            *hax_msg = (struct hax_msg *)hm;
+  struct hax_msg *hax_msg = (struct hax_msg *)hm;
+
+  M0_PRE(hax_msg != NULL);
+
+  __ha_failvec_reply_send(hax_msg, pool_fid, nr_notes);
+}
+
+static void __ha_failvec_reply_send(struct hax_msg *hax_msg, struct m0_fid *pool_fid,
+                                    uint32_t nr_notes)
+{
   struct m0_ha_link         *hl = hax_msg->hm_hl;
   struct hax_context        *hc = hax_msg->hm_hc;
   struct m0_halon_interface *hi = hc->hc_hi;
@@ -198,65 +232,79 @@ static void _nvec_reply_send(struct hax_msg *hm)
   /* Call python function from here, comment below test function.
    * XXX TODO: Move out test calls to separate location.
    */
-  //m0_ha_nvec_reply_send(hl, msg, NULL);
+  nvec_test_reply_send(hm);
 }
 
-/*
- * Sends nvec reply.
- * To be invoked from python land.
- */
-void m0_ha_nvec_reply_send(unsigned long long hm)
+static void nvec_test_reply_send(struct hax_msg *hm)
 {
-  struct hax_msg              *hax_msg = (struct hax_msg *)hm;
-  struct m0_halon_interface   *hi = hax_msg->hm_hc->hc_hi;
-  struct m0_ha_link           *hl = hax_msg->hm_hl;
-  struct m0_ha_msg            *msg = hax_msg->hm_msg;
+  struct m0_halon_interface   *hi = hm->hm_hc->hc_hi;
+  struct m0_ha_link           *hl = hm->hm_hl;
+  struct m0_ha_msg            *msg = hm->hm_msg;
   const struct m0_ha_msg_nvec *nvec_req;
-  struct m0_ha_nvec            _nvec;
+  struct m0_ha_nvec            nvec;
   struct m0_fid                obj_fid;
-  bool                         mock_nvec = true; /* XXX TODO: Remove after getting actual information from consul. */
   int                          i;
 
   nvec_req = &msg->hm_data.u.hed_nvec;
 
   /* Temp fabricated code to just test hax - mero communication */
-  if (mock_nvec) {
-      M0_LOG(M0_DEBUG, "nvec nv_nr=%"PRIu32" hmvn_type=%s", _nvec.nv_nr,
-             msg->hm_data.u.hed_nvec.hmnv_type == M0_HA_NVEC_SET ?  "SET" :
-              msg->hm_data.u.hed_nvec.hmnv_type == M0_HA_NVEC_GET ?  "GET" :
-                                                                     "UNKNOWN!");
-      _nvec = (struct m0_ha_nvec){
-              .nv_nr   = msg->hm_data.u.hed_nvec.hmnv_nr,
-             };
-      M0_ALLOC_ARR(_nvec.nv_note, _nvec.nv_nr);
-      M0_ASSERT(_nvec.nv_note != NULL);
-      for (i = 0; i < _nvec.nv_nr; ++i) {
-           _nvec.nv_note[i] = msg->hm_data.u.hed_nvec.hmnv_arr.hmna_arr[i];
-           M0_LOG(M0_DEBUG, "nv_note[%d]=(no_id="FID_F" "
-                  "no_state=%"PRIu32")", i, FID_P(&_nvec.nv_note[i].no_id),
-                   _nvec.nv_note[i].no_state);
-      }
-      if (msg->hm_data.u.hed_nvec.hmnv_type == M0_HA_NVEC_SET) {
+  M0_LOG(M0_DEBUG, "nvec nv_nr=%"PRIu32" hmvn_type=%s", nvec.nv_nr,
+         msg->hm_data.u.hed_nvec.hmnv_type == M0_HA_NVEC_SET ?  "SET" :
+         msg->hm_data.u.hed_nvec.hmnv_type == M0_HA_NVEC_GET ?  "GET" :
+                                                                "UNKNOWN!");
+  nvec = (struct m0_ha_nvec){
+           .nv_nr   = msg->hm_data.u.hed_nvec.hmnv_nr,
+         };
+  M0_ALLOC_ARR(nvec.nv_note, nvec.nv_nr);
+  M0_ASSERT(nvec.nv_note != NULL);
+  for (i = 0; i < nvec.nv_nr; ++i) {
+       nvec.nv_note[i] = msg->hm_data.u.hed_nvec.hmnv_arr.hmna_arr[i];
+       M0_LOG(M0_DEBUG, "nv_note[%d]=(no_id="FID_F" "
+                        "no_state=%"PRIu32")", i, FID_P(&nvec.nv_note[i].no_id),
+                        nvec.nv_note[i].no_state);
+  }
+  if (msg->hm_data.u.hed_nvec.hmnv_type == M0_HA_NVEC_SET) {
 		/* Implement me */
-      } else {
+  } else {
            for (i = 0; i < nvec_req->hmnv_nr; ++i) {
                 obj_fid = nvec_req->hmnv_arr.hmna_arr[i].no_id;
                 /* Get state of the given obj from consul.
                  * Presently create a fabricated reply.
                  */
                  M0_LOG(M0_DEBUG, "obj == NULL");
-                 _nvec.nv_note[i] = (struct m0_ha_note){
+                 nvec.nv_note[i] = (struct m0_ha_note){
                                        .no_id    = obj_fid,
                                        .no_state = M0_NC_ONLINE,
 			           };
-                 }
-        }
-      //nvec = &_nvec;
+           }
   }
-  m0_ha_msg_nvec_send(&_nvec, msg->hm_data.u.hed_nvec.hmnv_id_of_get,
+
+  __ha_nvec_reply_send(hm, &nvec);
+  m0_free(nvec.nv_note);
+}
+
+/*
+ * Sends nvec reply.
+ * To be invoked from python land.
+ */
+void m0_ha_nvec_reply_send(unsigned long long hm, struct m0_ha_nvec *nvec)
+{
+  struct hax_msg *hax_msg = (struct hax_msg *)hm;
+
+  __ha_nvec_reply_send(hax_msg, nvec);
+}
+
+static void __ha_nvec_reply_send(struct hax_msg *hax_msg, struct m0_ha_nvec *nvec)
+{
+  struct m0_halon_interface   *hi = hax_msg->hm_hc->hc_hi;
+  struct m0_ha_link           *hl = hax_msg->hm_hl;
+  struct m0_ha_msg            *msg = hax_msg->hm_msg;
+
+  M0_PRE(hax_msg != NULL);
+  M0_PRE(nvec != NULL);
+
+  m0_ha_msg_nvec_send(nvec, msg->hm_data.u.hed_nvec.hmnv_id_of_get,
                       M0_HA_NVEC_SET, hl);
-  if (mock_nvec)
-      m0_free(_nvec.nv_note);
 
   m0_halon_interface_delivered(hi, hl, msg);
 }
@@ -316,9 +364,13 @@ static void link_reused_cb (struct m0_halon_interface *hi, const struct m0_uint1
   // TODO Implement me
 }
 
-static void link_is_disconnecting_cb (struct m0_halon_interface *hi, struct m0_ha_link *link)
+static void link_is_disconnecting_cb (struct m0_halon_interface *hi, struct m0_ha_link *hl)
 {
-  // TODO Implement me
+  struct m0_ha            *ha;
+
+  M0_LOG(M0_ALWAYS, "Disconnecting ha");
+  ha = m0_halon_interface_ha(hi);
+  m0_ha_disconnect_incoming(ha, hl);
 }
 
 void link_disconnected_cb (struct m0_halon_interface *hi, struct m0_ha_link *link)
@@ -369,6 +421,7 @@ void destroy_halink(unsigned long long ctx)
   struct hax_context* hc = (struct hax_context*) ctx;
   Py_DECREF(hc->hc_handler);
   m0_mutex_fini(&hc->hc_mutex);
+  m0_halon_interface_stop(hc->hc_hi);
   m0_halon_interface_fini(hc->hc_hi);
 
   /*m0_thread_shun();*/
