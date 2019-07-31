@@ -15,6 +15,7 @@ def log_exception(fn):
             return fn(*args, **kwargs)
         except Exception:
             logging.exception("error")
+
     return wrapper
 
 
@@ -87,8 +88,9 @@ class HaLink(object):
         logging.debug("The locality thread is free now")
 
     @log_exception
-    def _entrypoint_request_cb(self, reply_context, req_id, remote_rpc_endpoint, process_fid,
-                               git_rev, pid, is_first_request):
+    def _entrypoint_request_cb(self, reply_context, req_id,
+                               remote_rpc_endpoint, process_fid, git_rev, pid,
+                               is_first_request):
         logging.debug("Entrypoint request cb")
         prov = FidProvider()
         sess = prov.get_leader_session()
@@ -105,22 +107,21 @@ class HaLink(object):
         confd_fids = list(map(lambda x: x.get('fid').to_c(), confds))
         confd_eps = list(map(lambda x: self._c_str(x.get('address')), confds))
 
-        arr_t = (FidStruct * len(confd_fids))
-        confd_fid_array = arr_t(*confd_fids)
+        make_array = self._make_arr
 
-        rm_eps_c = self._c_str(rm_eps)
-        self.__entrypoint_reply(
-            reply_context,
-            req_id.to_c(),
-            0,
-            len(confds),
-            confd_fid_array,
-            (c.c_char_p * len(confd_eps))(*confd_eps),
-            rc_quorum,
-            self.rm_fid.to_c(),
-            rm_eps_c
-        )
+        self.__entrypoint_reply(reply_context, req_id.to_c(), 0, len(confds),
+                                make_array(FidStruct, confd_fids),
+                                make_array(c.c_char_p, confd_eps), rc_quorum,
+                                self.rm_fid.to_c(), self._c_str(rm_eps))
         logging.debug("Entrypoint request replied")
+
+    def _make_arr(self, ctr, some_list):
+        # [KN] This is just a awkward syntax to say ctypes
+        # that we're willing to pass a C array of type described by ctr
+        #
+        # Example: self._make_arr(c.c_char_p, ['12'])
+        arr_type = ctr * len(some_list)
+        return arr_type(*some_list)
 
     def close(self):
         logging.debug("Destructing ha_link")
