@@ -41,7 +41,7 @@ class HaLink(object):
         self.__start = lib.start
         self.__destroy = prot2(('destroy_halink', lib))
 
-        lib.m0_halon_interface_entrypoint_reply.argtypes = [
+        lib.m0_ha_entrypoint_reply_send.argtypes = [
             c.c_void_p,  # unsigned long long epr
             c.POINTER(Uint128Struct),  # const struct m0_uint128    *req_id
             c.c_int,  # int rc
@@ -52,7 +52,7 @@ class HaLink(object):
             c.POINTER(FidStruct),  # const struct m0_fid        *rm_fid
             c.c_char_p  # const char *rm_eps
         ]
-        self.__entrypoint_reply = lib.m0_halon_interface_entrypoint_reply
+        self.__entrypoint_reply = lib.m0_ha_entrypoint_reply_send
 
         self._ha_ctx = self.__init_halink(self, self._c_str(node_uuid))
         self.queue = queue
@@ -109,6 +109,7 @@ class HaLink(object):
 
         make_array = self._make_arr
 
+        logging.debug("Pasing the entrypoint reply to hax.c layer")
         self.__entrypoint_reply(reply_context, req_id.to_c(), 0, len(confds),
                                 make_array(FidStruct, confd_fids),
                                 make_array(c.c_char_p, confd_eps), rc_quorum,
