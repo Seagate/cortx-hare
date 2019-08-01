@@ -16,7 +16,7 @@ import random
 import re
 import subprocess
 import sys
-from typing import Any, Dict, NamedTuple, List
+from typing import Any, Dict, NamedTuple, Optional, List, Union
 import yaml
 
 
@@ -218,6 +218,27 @@ def oids_to_dhall(oids: List[Oid]) -> str:
     return '[ {} ]'.format(', '.join(oid_to_dhall(x) for x in oids))
 
 
+NetProtocol = Union[str, Dict[str, Optional[int]]]
+
+
+EndpointFmt = NamedTuple('EndpointFmt', [('proto', NetProtocol),
+                                         ('portal', int),
+                                         ('tmid', int)])
+
+
+def endpoint_to_dhall(fmt: EndpointFmt, ipaddr: str) -> str:
+    if type(fmt.proto) is str:
+        assert fmt.proto == 'lo'
+        nid = 'NetId.lo'
+    else:
+        assert len(fmt.proto) == 1
+        k, v = list(fmt.proto.items())[0]  # type: ignore
+        assert k in ('tcp', 'ib')
+        md = 'None Natural' if v is None else f'Some {v}'
+        nid = f'NetId.{k} {{ {k} = {{ ipaddr = "{ipaddr}", mdigit = {md} }} }}'
+    return f'{{ nid = {nid}, portal = {fmt.portal}, tmid = {fmt.tmid} }}'
+
+
 class ToDhall(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def to_dhall(self, oid: Oid) -> str:
@@ -271,25 +292,30 @@ class ConfNode(ToDhall):
 
 
 class ConfProcess(ToDhall):
-    def __init__(self, nr_cpu: int, memsize_MB: int, services: List[Oid] = []):
+    def __init__(self, nr_cpu: int, memsize_MB: int, endpoint_fmt: EndpointFmt,
+                 ipaddr: str, services: List[Oid] = []):
         self.nr_cpu = nr_cpu
         self.memsize_MB = memsize_MB
-        # XXX endpoint
+        self.endpoint_fmt = endpoint_fmt
+        self.ipaddr = ipaddr
         assert all(x.type is ObjT.service for x in services)
         self.services = services
 
     def __repr__(self):
         args = ', '.join([f'nr_cpu={self.nr_cpu}',
                           f'memsize_MB={self.memsize_MB}',
+                          f'endpoint_fmt={self.endpoint_fmt}',
+                          f'ipaddr={self.ipaddr!r}',
                           f'services={self.services}'])
         return f'{self.__class__.__name__}({args})'
 
     def to_dhall(self, oid: Oid) -> str:
         assert oid.type is ObjT.process
+        endpoint = endpoint_to_dhall(self.endpoint_fmt, self.ipaddr)
         args = ', '.join([f'id = {oid_to_dhall(oid)}',
                           f'nr_cpu = {self.nr_cpu}',
                           f'memsize_MB = {self.memsize_MB}',
-                          'endpoint = XXX',
+                          f'endpoint = {endpoint}',
                           f'services = {oids_to_dhall(self.services)}'])
         return '{ %s }' % args
 
@@ -393,8 +419,14 @@ def build_m0conf(cluster_desc: Dict[str, Any]) -> Dict[Oid, ToDhall]:
         conf[encl_id].ctrls.append(ctrl_id)
 
         for proc in host['m0_servers']:
+            # XXX How many processes should we create?
+            # XXX See "mero roles" file in `halon` repository:
+            # XXX mero-halon/scripts/mero_clovis_role_mappings.ede
             proc_id = new_oid(ObjT.process)
-            conf[proc_id] = ConfProcess(nr_cpu=nr_cpu, memsize_MB=memsize_MB)
+            conf[proc_id] = ConfProcess(
+                nr_cpu=nr_cpu, memsize_MB=memsize_MB,
+                endpoint_fmt=EndpointFmt(**proc['endpoint_fmt']),
+                ipaddr=host['facts']['ipaddress'])
             conf[node_id].processes.append(proc_id)
         # XXX c0_clients, m0t1fs_clients
 

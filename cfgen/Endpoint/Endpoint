@@ -2,7 +2,7 @@
 
 let NetId = ../NetId/NetId
 
--- Lnet endpoint.
+-- LNet endpoint address.
 --
 -- Endpoint address format (ABNF):
 --
