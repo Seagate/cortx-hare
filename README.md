@@ -2,7 +2,7 @@
 
 The scripts in this repository constitute a middleware layer between [Consul](https://www.consul.io/) and [Mero](http://gitlab.mero.colo.seagate.com/mero/mero) services.  Their responsibilities:
 
-- provide initial configuration for a Mero cluster;
+- generate initial configuration of Mero cluster;
 - mediate communications between Mero services and Consul agents.
 
 ## Installation
