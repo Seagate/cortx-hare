@@ -509,7 +509,7 @@ let node = Obj.Node
 
 let NetId = ./NetId/NetId
 
-let nid = NetId.tcp { tcp = { addr = "172.28.128.3", mdigit = None Natural } }
+let nid = NetId.tcp { tcp = { ipaddr = "172.28.128.3", mdigit = None Natural } }
 
 let mkEndpoint : Natural -> Natural -> Endpoint
   = \(portal : Natural)

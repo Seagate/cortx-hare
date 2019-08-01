@@ -1,7 +1,7 @@
 {-*- dhall -*-}
 
 let Addr =
-  { addr : Text  -- IPv4 address
+  { ipaddr : Text  -- IPv4 address
   , mdigit : Optional Natural  -- optional digit after "@tcp" or "@o2ib"
   }
 
