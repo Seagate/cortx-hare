@@ -4,7 +4,6 @@ let Text/concatMapSep = https://prelude.dhall-lang.org/Text/concatMapSep
 let Text/concatSep = https://prelude.dhall-lang.org/Text/concatSep
 
 let Endpoint = ./Endpoint/Endpoint
-let Endpoint/show = ./Endpoint/show
 
 let ObjT =
   < Root
@@ -179,7 +178,7 @@ let Process/toConfGen = \(x : Process) ->
  ++ " mem_limit_rss=${memsize_KiB}"
  ++ " mem_limit_stack=${memsize_KiB}"
  ++ " mem_limit_memlock=${memsize_KiB}"
- ++ " endpoint=${Text/show (Endpoint/show x.endpoint)}"
+ ++ " endpoint=${Text/show (./Endpoint/show x.endpoint)}"
  ++ " services=${join.Oids x.services}"
  ++ ")"
 
@@ -507,15 +506,7 @@ let node = Obj.Node
                 , ids.process_42, ids.process_40 ]
   }
 
-let NetId = ./NetId/NetId
-
-let nid = NetId.tcp { tcp = { ipaddr = "172.28.128.3", mdigit = None Natural } }
-
-let mkEndpoint : Natural -> Natural -> Endpoint
-  = \(portal : Natural)
- -> \(tmid : Natural)
- ->
-    { nid = nid, portal = portal, tmid = tmid }
+let mkEndpoint = ./Endpoint/tcp "172.28.128.3"
 
 let process_24 = Obj.Process
   { id = ids.process_24
