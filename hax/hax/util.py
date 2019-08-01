@@ -48,6 +48,7 @@ class ConsulUtil(object):
         session = leader.get('Session')
         if not session:
             raise RuntimeError('Could not get the leader from Consul')
+        return session
 
     def get_session_node(self, session_id):
         _, sess_details = self.cns.session.info(session_id)
