@@ -58,11 +58,11 @@ done
 # We've got the lock! Start the leader in background:
 export SID
 (
+    # Destroy the session when leader dies:
+    trap "curl -sX PUT http://localhost:8500/v1/session/destroy/$SID &>/dev/null" EXIT
+
     # XXX: notify Mero about new Principal RM here
 
     # Start EQ watch:
-    consul watch -type=keyprefix -prefix eq/ $SRC_DIR/proto-rc || true
-
-    # Cleanup after ourselves:
-    curl -sX PUT http://localhost:8500/v1/session/destroy/$SID &>/dev/null
+    consul watch -type=keyprefix -prefix eq/ $SRC_DIR/proto-rc
 ) &
