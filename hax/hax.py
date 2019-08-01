@@ -2,7 +2,7 @@ from hax.halink import HaLink
 from hax.server import run_server, kv_publisher_thread
 from queue import Queue
 from threading import Thread
-from hax.fid_provider import FidProvider, SERVICE_CONTAINER
+from hax.util import ConsulUtil, SERVICE_CONTAINER
 import logging
 
 from hax.types import Fid
@@ -13,10 +13,12 @@ def setup_logging():
         level=logging.DEBUG,
         format='%(asctime)s [%(levelname)s] {%(threadName)s} %(message)s')
 
+
 def run_publisher_thread(q: Queue):
     t = Thread(target=kv_publisher_thread, args=(q, ))
     t.start()
     return t
+
 
 def main():
     # Note: no logging must happen before this call.
@@ -35,10 +37,11 @@ def main():
     t = run_publisher_thread(q)
 
     # [KN] The fid of the hax service is taken from Consul
-    hax_ep = FidProvider().get_hax_endpoint()
-    hax_fid = FidProvider().get_hax_fid()
-    ha_fid = FidProvider().get_ha_fid()
-    rm_fid = FidProvider().get_rm_fid()
+    util = ConsulUtil()
+    hax_ep = util.get_hax_endpoint()
+    hax_fid = util.get_hax_fid()
+    ha_fid = util.get_ha_fid()
+    rm_fid = util.get_rm_fid()
 
     # [KN] ..while two other ones are auto-generated
     #ha_fid = hax_fid.get_copy()
@@ -47,7 +50,9 @@ def main():
     #rm_fid.key = rm_fid.key + 1
 
     # The node UUID is simply random
-    l = HaLink(node_uuid="d63141b1-a7f7-4258-b22a-59fda4ad86d1", queue=q, rm_fid=rm_fid)
+    l = HaLink(node_uuid="d63141b1-a7f7-4258-b22a-59fda4ad86d1",
+               queue=q,
+               rm_fid=rm_fid)
     #pfid = Fid.parse("1:0")
     #hafid = Fid.parse("5:0")
     #rmfid = Fid.parse("4:0")
@@ -56,15 +61,13 @@ def main():
     # from Consul
 
     try:
-        l.start(hax_ep,
-                process=hax_fid,
-                ha_service=ha_fid,
-                rm_service=rm_fid)
+        l.start(hax_ep, process=hax_fid, ha_service=ha_fid, rm_service=rm_fid)
         # [KN] This is a blocking call. It will work until the program is
         # terminated by signal
         run_server(q, thread_to_wait=t, halink=l)
     finally:
         l.close()
+
 
 if __name__ == "__main__":
     main()

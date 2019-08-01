@@ -4,8 +4,7 @@ from hax.types import Fid
 SERVICE_CONTAINER = 0x7300000000000001
 
 
-# FIXME [KN] Rename the class to something more meaningful (ConsulUtil?)
-class FidProvider(object):
+class ConsulUtil(object):
     def __init__(self):
         self.cns = c.Consul()
 

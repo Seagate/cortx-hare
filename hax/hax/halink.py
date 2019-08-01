@@ -4,7 +4,7 @@ import threading
 import os
 from hax.server import Message
 from hax.types import Fid, FidStruct, Uint128Struct
-from hax.fid_provider import FidProvider
+from hax.util import ConsulUtil
 
 prot2 = c.PYFUNCTYPE(None, c.c_void_p)
 
@@ -95,7 +95,7 @@ class HaLink(object):
             "Started processing entrypoint request from remote eps = '{}', process_fid = {}"
             .format(remote_rpc_endpoint, str(process_fid)))
 
-        prov = FidProvider()
+        prov = ConsulUtil()
         sess = prov.get_leader_session()
         principal_rm = prov.get_session_node(sess)
         confds = prov.get_confd_list()
