@@ -8,24 +8,30 @@ class ConsulUtil(object):
     def __init__(self):
         self.cns = c.Consul()
 
+    # Returns the fid of the current hax process (in other words, returns
+    # "my" fid)
     def get_hax_fid(self):
         serv = self.get_local_service_by_name('hax')
-        return Fid.parse(serv.get('ID'))
+        return Fid.parse(serv.get('ServiceID'))
 
     def get_ha_fid(self):
         serv = self.get_local_service_by_name('ha')
-        return Fid.parse(serv.get('ID'))
+        return Fid.parse(serv.get('ServiceID'))
 
     def get_rm_fid(self):
         serv = self.get_local_service_by_name('rm')
-        return Fid.parse(serv.get('ID'))
+        return Fid.parse(serv.get('ServiceID'))
 
     def get_local_service_by_name(self, name):
-        services = self.cns.agent.services()
-        for k, v in services.items():
-            if v.get('Service') == name:
-                return v
-        raise RuntimeError('No {} service found in Consul'.format(name))
+        hostname = self.cns.agent.self().get('Config').get('NodeName')
+
+        _, service = self.cns.catalog.service(service=name)
+        srv = list(filter(lambda x: x.get('Node') == hostname, service))
+        if not len(srv):
+            raise RuntimeError(
+                'No {} service found in Consul at Node={}'.format(
+                    name, hostname))
+        return srv[0]
 
     def get_hax_endpoint(self):
         my_fid = self.get_hax_fid()
@@ -39,7 +45,9 @@ class ConsulUtil(object):
 
     def get_leader_session(self):
         _, leader = self.cns.kv.get('leader')
-        return leader.get('Session')
+        session = leader.get('Session')
+        if not session:
+            raise RuntimeError('Could not get the leader from Consul')
 
     def get_session_node(self, session_id):
         _, sess_details = self.cns.session.info(session_id)
@@ -61,6 +69,5 @@ class ConsulUtil(object):
     def get_confd_list(self):
         _, services = self.cns.catalog.service(service='confd')
 
-        confd_list = list(
-            map(self._to_canonical_service_data, services))
+        confd_list = list(map(self._to_canonical_service_data, services))
         return confd_list
