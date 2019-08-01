@@ -91,7 +91,10 @@ class HaLink(object):
     def _entrypoint_request_cb(self, reply_context, req_id,
                                remote_rpc_endpoint, process_fid, git_rev, pid,
                                is_first_request):
-        logging.debug("Entrypoint request cb")
+        logging.debug(
+            "Started processing entrypoint request from remote eps = '{}', process_fid = {}"
+            .format(remote_rpc_endpoint, str(process_fid)))
+
         prov = FidProvider()
         sess = prov.get_leader_session()
         principal_rm = prov.get_session_node(sess)
@@ -116,10 +119,11 @@ class HaLink(object):
                                 make_array(FidStruct, confd_fids),
                                 make_array(c.c_char_p, confd_eps), rc_quorum,
                                 self.rm_fid.to_c(), self._c_str(rm_eps))
-        logging.debug("Entrypoint request replied")
+        logging.debug(
+            "Entrypoint request replied, mero's locality thread is free now")
 
     def _make_arr(self, ctr, some_list):
-        # [KN] This is just a awkward syntax to say ctypes
+        # [KN] This is just an awkward syntax to tell ctypes
         # that we're willing to pass a C array of type described by ctr
         #
         # Example: self._make_arr(c.c_char_p, ['12'])
@@ -130,4 +134,4 @@ class HaLink(object):
         logging.debug("Destructing ha_link")
         self.__destroy(self._ha_ctx)
         self._ha_ctx = 0
-        logging.debug("ha_link destroyed")
+        logging.debug("ha_link destroyed. Bye!")
