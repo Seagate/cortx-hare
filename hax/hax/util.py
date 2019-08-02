@@ -1,4 +1,5 @@
 import consul as c
+from hax.exception import HAConsistencyException
 from hax.types import Fid
 
 SERVICE_CONTAINER = 0x7300000000000001
@@ -28,7 +29,7 @@ class ConsulUtil(object):
         _, service = self.cns.catalog.service(service=name)
         srv = list(filter(lambda x: x.get('Node') == hostname, service))
         if not len(srv):
-            raise RuntimeError(
+            raise HAConsistencyException(
                 'No {} service found in Consul at Node={}'.format(
                     name, hostname))
         return srv[0]
@@ -47,7 +48,7 @@ class ConsulUtil(object):
         _, leader = self.cns.kv.get('leader')
         session = leader.get('Session')
         if not session:
-            raise RuntimeError('Could not get the leader from Consul')
+            raise HAConsistencyException('Could not get the leader from Consul')
         return session
 
     def get_session_node(self, session_id):

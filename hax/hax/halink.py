@@ -2,9 +2,10 @@ import ctypes as c
 import logging
 import threading
 import os
-from hax.server import Message
+from errno import EAGAIN
 from hax.types import Fid, FidStruct, Uint128Struct, HaNoteStruct
 from hax.util import ConsulUtil
+from hax.exception import HAConsistencyException
 
 prot2 = c.PYFUNCTYPE(None, c.c_void_p)
 
@@ -52,10 +53,7 @@ class HaLink(object):
             c.c_char_p  # const char *rm_eps
         ]
         self.__entrypoint_reply = lib.m0_ha_entrypoint_reply_send
-        lib.test_ha_note.argtypes = [
-                    c.POINTER(HaNoteStruct),
-                    c.c_uint32
-                ]
+        lib.test_ha_note.argtypes = [c.POINTER(HaNoteStruct), c.c_uint32]
         self.__test_ha_note = lib.test_ha_note
 
         self._ha_ctx = self.__init_halink(self, self._c_str(node_uuid))
@@ -77,20 +75,6 @@ class HaLink(object):
         byte_str = str_val.encode('utf-8')
         return c.c_char_p(byte_str)
 
-    # TODO remove me
-    def test(self):
-        tname = threading.currentThread().getName()
-        logging.info('Test method is invoked from thread {}'.format(tname))
-        self.__test(self._ha_ctx)
-        # TODO call m0d from here
-
-    # TODO remove me
-    def test_cb(self, data):
-        logging.debug("Sending the test message to the queue")
-        # TODO the actual data must be put here
-        self.queue.put(Message(data))
-        logging.debug("The locality thread is free now")
-
     @log_exception
     def _entrypoint_request_cb(self, reply_context, req_id,
                                remote_rpc_endpoint, process_fid, git_rev, pid,
@@ -99,12 +83,25 @@ class HaLink(object):
             "Started processing entrypoint request from remote eps = '{}', process_fid = {}"
             .format(remote_rpc_endpoint, str(process_fid)))
 
-        prov = ConsulUtil()
-        sess = prov.get_leader_session()
-        principal_rm = prov.get_session_node(sess)
-        confds = prov.get_confd_list()
-        tname = threading.currentThread().getName()
-        logging.info('in _entrypoint_request_cb'.format(tname))
+        make_array = self._make_arr
+        sess = None
+        principal_rm = None
+        confds = None
+
+        try:
+            prov = ConsulUtil()
+            sess = prov.get_leader_session()
+            principal_rm = prov.get_session_node(sess)
+            confds = prov.get_confd_list()
+        except Exception:
+            logging.exception("Failed to get the data from Consul. " +
+                              "Replying with EAGAIN error code.")
+            self.__entrypoint_reply(reply_context, req_id.to_c(), EAGAIN, 0,
+                                    make_array(FidStruct, []),
+                                    make_array(c.c_char_p, []), 0,
+                                    self.rm_fid.to_c(), None)
+            logging.debug("Reply sent")
+            return
 
         rc_quorum = int(len(confds) / 2 + 1)
 
@@ -116,8 +113,6 @@ class HaLink(object):
         confd_fids = list(map(lambda x: x.get('fid').to_c(), confds))
         confd_eps = list(map(lambda x: self._c_str(x.get('address')), confds))
 
-        make_array = self._make_arr
-
         logging.debug("Pasing the entrypoint reply to hax.c layer")
         self.__entrypoint_reply(reply_context, req_id.to_c(), 0, len(confds),
                                 make_array(FidStruct, confd_fids),
@@ -128,9 +123,12 @@ class HaLink(object):
 
     # XXX [KN] this is a stub for now
     def broadcast_service_states(self, service_states):
-        logging.debug("The following service states will be broadcasted via ha_link: {}".format(service_states))
+        logging.debug(
+            "The following service states will be broadcasted via ha_link: {}".
+            format(service_states))
         note_list = list(map(self._to_ha_note, service_states))
-        self.__test_ha_note(self._make_arr(HaNoteStruct, note_list), len(note_list))
+        self.__test_ha_note(self._make_arr(HaNoteStruct, note_list),
+                            len(note_list))
 
     def _to_ha_note(self, service_state):
         assert isinstance(service_state, dict)
