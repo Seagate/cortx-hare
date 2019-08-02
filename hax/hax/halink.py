@@ -3,7 +3,7 @@ import logging
 import threading
 import os
 from hax.server import Message
-from hax.types import Fid, FidStruct, Uint128Struct
+from hax.types import Fid, FidStruct, Uint128Struct, HaNoteStruct
 from hax.util import ConsulUtil
 
 prot2 = c.PYFUNCTYPE(None, c.c_void_p)
@@ -37,7 +37,6 @@ class HaLink(object):
         lib.start.restype = c.c_int
 
         self.__init_halink = lib.init_halink
-        self.__test = prot2(('test', lib))
         self.__start = lib.start
         self.__destroy = prot2(('destroy_halink', lib))
 
@@ -53,6 +52,11 @@ class HaLink(object):
             c.c_char_p  # const char *rm_eps
         ]
         self.__entrypoint_reply = lib.m0_ha_entrypoint_reply_send
+        lib.test_ha_note.argtypes = [
+                    c.POINTER(HaNoteStruct),
+                    c.c_uint32
+                ]
+        self.__test_ha_note = lib.test_ha_note
 
         self._ha_ctx = self.__init_halink(self, self._c_str(node_uuid))
         self.queue = queue
@@ -121,6 +125,25 @@ class HaLink(object):
                                 self.rm_fid.to_c(), self._c_str(rm_eps))
         logging.debug(
             "Entrypoint request replied, mero's locality thread is free now")
+
+    # XXX [KN] this is a stub for now
+    def broadcast_service_states(self, service_states):
+        logging.debug("The following service states will be broadcasted via ha_link: {}".format(service_states))
+        note_list = list(map(self._to_ha_note, service_states))
+        self.__test_ha_note(self._make_arr(HaNoteStruct, note_list), len(note_list))
+
+    def _to_ha_note(self, service_state):
+        assert isinstance(service_state, dict)
+        assert 'fid' in service_state
+        assert 'status' in service_state
+        fid = service_state.get('fid')
+        status = service_state.get('status')
+
+        int_status = HaNoteStruct.M0_NC_ONLINE
+        if status != 0:
+            int_status = HaNoteStruct.M0_NC_FAILED
+
+        return HaNoteStruct(fid.to_c(), int_status)
 
     def _make_arr(self, ctr, some_list):
         # [KN] This is just an awkward syntax to tell ctypes

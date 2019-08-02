@@ -1,7 +1,7 @@
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import logging
 import json as j
-import consul
+from hax.types import Fid
 from queue import Queue
 
 
@@ -47,8 +47,13 @@ class KVHandler(BaseHTTPRequestHandler):
 
         logging.info('Effective structure is as follows: {}'.format(struct))
         # TODO instead of this call something to m0d must be done
-        self.server.halink.test_cb(struct)
+        self.server.halink.broadcast_service_states(struct)
 
+    # Returns list of the following dicts:
+    # {
+    #   'fid' : <service fid>,
+    #   'status': <either 'offline' or 'online'>
+    #  }
     def sanitize_service_info(self, data):
         if not data:
             return []
@@ -57,7 +62,7 @@ class KVHandler(BaseHTTPRequestHandler):
             service = t.get('Service')
             checks = t.get('Checks')
             result.append({
-                'fid': service.get('ID'),
+                'fid': Fid.parse(service.get('ID')),
                 'status': self.get_status(checks)
             })
         return result
