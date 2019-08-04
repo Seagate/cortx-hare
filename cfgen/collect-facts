@@ -55,9 +55,9 @@ hosts:
   - name: <str>  # [user@]hostname; e.g., localhost, samir@10.22.33.44
     disks: { path_glob: <str> }  # e.g. "/dev/loop[0-9]*"
     m0_servers:
-      - endpoint:
-          proto: <str>  # supported values: lo, tcp, o2ib;
-                        # also supported: { tcp: <digit> }, { o2ib: <digit> }
+      - endpoint_fmt:
+          proto: <str>  # supported values: lo, tcp, ib;
+                        # also supported: { tcp: <digit> }, { ib: <digit> }
           portal: <int>
           tmid: <int>
         runs_confd: <bool>   # optional, defaults to false
@@ -95,6 +95,7 @@ pools:
 def main(argv=None):
     opts = parse_opts(argv)
     try:
+        # XXX yaml-to-dhall './ClusterDesc/ClusterDesc'
         cluster_desc = yaml.safe_load(sys.stdin)
     except KeyboardInterrupt:
         sys.exit(1)
@@ -107,6 +108,9 @@ def main(argv=None):
                                   'memorysize_mb', 'ipaddress', 'macaddress')
         host['disks']['items'] = get_disks(host['name'],
                                            host['disks']['path_glob'])
+
+    validate_cluster_desc(cluster_desc)
+
     m0conf = build_m0conf(cluster_desc)
     # XXX DELETEME <<<<<<<
     from pprint import pprint
@@ -121,6 +125,18 @@ def main(argv=None):
         except NotImplementedError:
             print('XXX-IMPLEMENTME ' + oid_to_dhall(k))
     # XXX >>>>>>>
+
+
+def all_unique(xs):
+    """Returns True iff all entries of the sequence are unique."""
+    return len(xs) == len(set(xs))
+
+
+def validate_cluster_desc(desc: Dict[str, Any]):
+    hosts = [(h['name'], h['facts']['ipaddress']) for h in desc['hosts']]
+    assert all_unique([ip for _name, ip in hosts]), \
+        'IP addresses are not unique:\n' + \
+        '\n'.join('    ' + name + ' ' + ip for name, ip in hosts)
 
 
 def run_command(hostname: str, *args: str) -> str:
