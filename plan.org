@@ -190,30 +190,48 @@ The function blocks until the epoch is returned or an error occurs.
 
 See the [[https://docs.google.com/document/d/1cR-BbxtMjGuZPj8NOc95RyFjqmeFsYf4JJ5Hw_tL1zA/edit#bookmark=id.whq5d31z34][prototype]].
 
-** _sprint-4
+** _sprint-5
 
-- [X] andriy
-- [X] kostya
-- [X] mandar
-- [X] prasanna
-- [ ] rajanikant
-- [X] vvv
+*** init conf
 
-*** [@kostya] hax, Python part
+**** confd.xc
 
-- Test the threading model. Should we call ~m0_thread_adopt()~ for Python thread?
+***** roles/processes
+#+BEGIN_SRC ruby
+Role_of = {
+    'clients'     => 'datamover',
+    'clovis-apps' => 'clovis-app',
+    's3servers'   => 's3server',
+    'confds'      => 'confd',
+    'ssus'        => 'storage',
+}.freeze
 
-*** [@mandar] hax, C part
+uniq_host[host]['roles'].push('station') \
+    if uniq_host[host]['roles'].include? 'confd'
+#+END_SRC
 
-*** [@andriy] [[[https://jts.seagate.com/browse/EOS-871][EOS-871]]] health checking
+**** consul-kv-import.json
 
-*** [@vvv]
+**** ? /etc/sysconfig/* files
 
-**** write an RFC for consul-kv-import.json
+**** ? systemd scripts
 
-**** [9d] confd.xc
+*** hax
 
-*** [@prasanna] [[[https://jts.seagate.com/browse/EOS-880][EOS-880]]] consul-kv-import.json (aka "Initial RG")
+**** [[[https://jts.seagate.com/browse/EOS-1244][EOS-1244]]] concurrency issues
+
+**** [[[https://jts.seagate.com/browse/EOS-1247][EOS-1247]]] m0_ha_msg types
+
+***** incoming/outgoing ha_links -- when to use which?
+
+**** refactoring
+
+- document coding style
+
+*** bootstrap
+
+- use a bash script for starting Consul + hax + m0d(s)
+- write an RFC
 
 ** scoping
 
