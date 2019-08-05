@@ -6,6 +6,7 @@ from errno import EAGAIN
 from hax.types import Fid, FidStruct, Uint128Struct, HaNoteStruct
 from hax.util import ConsulUtil
 from hax.exception import HAConsistencyException
+from hax.server import EntrypointRequest
 
 prot2 = c.PYFUNCTYPE(None, c.c_void_p)
 
@@ -83,6 +84,24 @@ class HaLink(object):
     def _entrypoint_request_cb(self, reply_context, req_id,
                                remote_rpc_endpoint, process_fid, git_rev, pid,
                                is_first_request):
+        self.queue.put(
+            EntrypointRequest(reply_context=reply_context,
+                              req_id=req_id,
+                              remote_rpc_endpoint=remote_rpc_endpoint,
+                              process_fid=process_fid,
+                              git_rev=git_rev,
+                              pid=pid,
+                              is_first_request=is_first_request,
+                              ha_link_instance=self))
+
+    @log_exception
+    def send_entrypoint_request_reply(self, message):
+        assert isinstance(message, EntrypointRequest)
+        reply_context = message.reply_context
+        req_id = message.req_id
+        remote_rpc_endpoint = message.remote_rpc_endpoint
+        process_fid = message.process_fid
+
         logging.debug(
             "Started processing entrypoint request from remote eps = '{}', process_fid = {}"
             .format(remote_rpc_endpoint, str(process_fid)))

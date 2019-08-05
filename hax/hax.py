@@ -57,9 +57,6 @@ def main():
     #hafid = Fid.parse("5:0")
     #rmfid = Fid.parse("4:0")
 
-    # [KN] FIXME the endpoint must be constructed dynamically by the data taken
-    # from Consul
-
     try:
         l.start(hax_ep, process=hax_fid, ha_service=ha_fid, rm_service=rm_fid)
         # [KN] This is a blocking call. It will work until the program is
