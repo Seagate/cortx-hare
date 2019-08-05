@@ -513,6 +513,16 @@ void m0_ha_notify(unsigned long long ctx, struct m0_ha_note *notes, uint32_t nr_
 	m0_halon_interface_nvec_broadcast(hi, &nvec);
 }
 
+int init_mero_thread()
+{
+	int rc;
+	rc = m0_thread_adopt(&mthread, m0);
+	if (rc != 0) {
+		M0_LOG(M0_ERROR, "Mero thread adoption failed: %d\n", rc);
+	}
+	return rc;
+}
+
 /*
  *  Local variables:
  *  c-indentation-style: "K&R"

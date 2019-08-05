@@ -5,8 +5,7 @@ import os
 from errno import EAGAIN
 from hax.types import Fid, FidStruct, Uint128Struct, HaNoteStruct
 from hax.util import ConsulUtil
-from hax.exception import HAConsistencyException
-from hax.server import EntrypointRequest
+from hax.message import EntrypointRequest
 
 prot2 = c.PYFUNCTYPE(None, c.c_void_p)
 
@@ -63,6 +62,12 @@ class HaLink(object):
         self._ha_ctx = self.__init_halink(self, self._c_str(node_uuid))
         self.queue = queue
         self.rm_fid = rm_fid
+
+        lib.init_mero_thread.argtypes = []
+        lib.init_mero_thread.restype = c.c_int
+        self.__init_mero_thread = lib.init_mero_thread
+        self.__shun_mero_thread = lib.m0_thread_shun
+
         # if not self._ha_ctx:
         # raise RuntimeError("Could not initialize ha_link")
 
@@ -84,6 +89,11 @@ class HaLink(object):
     def _entrypoint_request_cb(self, reply_context, req_id,
                                remote_rpc_endpoint, process_fid, git_rev, pid,
                                is_first_request):
+        logging.debug(
+            ("Received entrypoint request from remote eps = '{}', " +
+             "process_fid = {}." +
+             " The request will be processed in another thread.").format(
+                 remote_rpc_endpoint, str(process_fid)))
         self.queue.put(
             EntrypointRequest(reply_context=reply_context,
                               req_id=req_id,
@@ -183,3 +193,11 @@ class HaLink(object):
     def test_broadcast(self):
         logging.info("broadcasting rm service state")
         self.__ha_broadcast(self._ha_ctx)
+
+    # TODO refactor: Separate the C calls from HaLink class, so that hax.c functions can be invoked outside of HaLink instance.
+    def adopt_mero_thread(self):
+        logging.debug("Adopting mero thread")
+        self.__init_mero_thread()
+
+    def shun_mero_thread(self):
+        self.__shun_mero_thread()

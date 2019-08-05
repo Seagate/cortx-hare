@@ -1,5 +1,5 @@
 from hax.halink import HaLink
-from hax.server import run_server, kv_publisher_thread
+from hax.server import run_server, kv_handler_thread
 from queue import Queue
 from threading import Thread
 from hax.util import ConsulUtil, SERVICE_CONTAINER
@@ -14,8 +14,8 @@ def setup_logging():
         format='%(asctime)s [%(levelname)s] {%(threadName)s} %(message)s')
 
 
-def run_publisher_thread(q: Queue):
-    t = Thread(target=kv_publisher_thread, args=(q, ))
+def run_handler_thread(q: Queue, ha_link: HaLink):
+    t = Thread(target=kv_handler_thread, args=(q, ha_link))
     t.start()
     return t
 
@@ -30,11 +30,10 @@ def main():
     #    thread which must be free ASAP)
     # 2. The main thread is being interrupted (e.g. by SIGTERM) and "Die"
     #    must be sent to the processing thread
-    # [KN] The messages are consumed by Python thread created by run_publisher_thread function.
+    # [KN] The messages are consumed by Python thread created by run_handler_thread function.
     #
     # [KN] Note: The server is launched in the main thread.
     q = Queue(maxsize=1000)
-    t = run_publisher_thread(q)
 
     # [KN] The fid of the hax service is taken from Consul
     util = ConsulUtil()
@@ -56,6 +55,7 @@ def main():
     #pfid = Fid.parse("1:0")
     #hafid = Fid.parse("5:0")
     #rmfid = Fid.parse("4:0")
+    t = run_handler_thread(q, l)
 
     try:
         l.start(hax_ep, process=hax_fid, ha_service=ha_fid, rm_service=rm_fid)
