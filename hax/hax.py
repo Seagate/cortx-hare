@@ -1,7 +1,7 @@
 from hax.halink import HaLink
-from hax.server import run_server, kv_handler_thread
+from hax.server import run_server
+from hax.handler import ConsumerThread
 from queue import Queue
-from threading import Thread
 from hax.util import ConsulUtil, SERVICE_CONTAINER
 import logging
 
@@ -15,7 +15,7 @@ def setup_logging():
 
 
 def run_handler_thread(q: Queue, ha_link: HaLink):
-    t = Thread(target=kv_handler_thread, name='qconsumer', args=(q, ha_link))
+    t = ConsumerThread(q, ha_link)
     t.start()
     return t
 
@@ -28,8 +28,7 @@ def main():
     # [KN] The elements in the queue will appear if
     # 1. A callback is invoked from ha_link (this will happen in a mero
     #    thread which must be free ASAP)
-    # 2. The main thread is being interrupted (e.g. by SIGTERM) and "Die"
-    #    must be sent to the processing thread
+    # 2. TBD: a new HA notification has come form Consul via HTTP
     # [KN] The messages are consumed by Python thread created by run_handler_thread function.
     #
     # [KN] Note: The server is launched in the main thread.
@@ -62,7 +61,7 @@ def main():
         # [KN] This is a blocking call. It will work until the program is
         # terminated by signal
         l.test_broadcast()
-        run_server(q, thread_to_wait=t, halink=l)
+        run_server(thread_to_wait=t, halink=l)
     finally:
         l.close()
 
