@@ -196,7 +196,14 @@ See the [[https://docs.google.com/document/d/1cR-BbxtMjGuZPj8NOc95RyFjqmeFsYf4JJ
 
 **** confd.xc
 
-***** roles/processes
+***** LNet protocol (lo/tcp/o2ib) selection
+
+~m0genfacts --lnet-transport {tcp|o2ib}~, defaults to ~tcp~.
+
+***** from roles to services
+
+****** m0genfacts
+
 #+BEGIN_SRC ruby
 Role_of = {
     'clients'     => 'datamover',
@@ -208,6 +215,79 @@ Role_of = {
 
 uniq_host[host]['roles'].push('station') \
     if uniq_host[host]['roles'].include? 'confd'
+#+END_SRC
+
+#+BEGIN_SRC python
+uniq_host = {
+    'hostA1': {
+        'roles': ['datamover', 's3server'],
+        'pos': 0,
+        'address': 'hostA1'
+    },
+    'hostB1': {
+        'roles': ['clovis-app'],
+        'pos': 1,
+        'address': 'hostB1'
+    },
+    'hostC1': {
+        'roles': ['confd', 'station'],
+        'pos': 2,
+        'address': 'hostC1'
+    },
+    'hostD1': {
+        'roles': ['storage'],
+        'pos': 3,
+        'address': 'hostD1',
+        'disks': 'sh-glob-pattern'
+    },
+}
+
+q_dbfacts = {
+    'hostA1': {
+        'role': ['datamover', 's3server'],
+        'hostname': 'hostA1'
+    },
+    'hostC1': {
+        'role': ['confd', 'station'],
+        'hostname': 'hostC1'
+    },
+}
+#+END_SRC
+
+****** halon_facts.yaml
+
+******* mero roles
+#+BEGIN_SRC erb
+    m0h_roles:
+      - name: ha
+  <%- if dbfact['role'].include? 'confd' -%>
+      - name: confd
+  <%- end -%>
+  <%- if dbfact['role'].include? 'storage' -%>
+      - name: storage
+  <%- end -%>
+  <%- if dbfact['role'].include? 'datamover' -%>
+      - name: m0t1fs
+  <%- end -%>
+  <%- if dbfact['role'].include? 'clovis-app' -%>
+      - name: clovis-app
+  <%- end -%>
+  <%- if dbfact['role'].include? 's3server' -%>
+      - name: s3server
+  <%- end -%>
+#+END_SRC
+
+******* halon roles
+#+BEGIN_SRC erb
+<%- if dbfact['role'].include? 'station' -%>
+               - name: station
+<%- end -%>
+<%- if dbfact['role'].include? 'storage' -%>
+               - name: ssu
+<%- end -%>
+<%- if !(dbfact['role'] & ['datamover', 's3server', 'clovis-app']).empty? -%>
+               - name: dm
+<%- end -%>
 #+END_SRC
 
 **** consul-kv-import.json
