@@ -15,7 +15,7 @@ def setup_logging():
 
 
 def run_handler_thread(q: Queue, ha_link: HaLink):
-    t = Thread(target=kv_handler_thread, args=(q, ha_link))
+    t = Thread(target=kv_handler_thread, name='qconsumer', args=(q, ha_link))
     t.start()
     return t
 
