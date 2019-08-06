@@ -63,9 +63,9 @@ class HaLink(object):
         self.queue = queue
         self.rm_fid = rm_fid
 
-        lib.init_mero_thread.argtypes = []
-        lib.init_mero_thread.restype = c.c_int
-        self.__init_mero_thread = lib.init_mero_thread
+        lib.adopt_mero_thread.argtypes = []
+        lib.adopt_mero_thread.restype = c.c_int
+        self.__adopt_mero_thread = lib.adopt_mero_thread
         self.__shun_mero_thread = lib.m0_thread_shun
 
         # if not self._ha_ctx:
@@ -77,7 +77,6 @@ class HaLink(object):
         logging.info('Start method is invoked from thread {}'.format(tname))
         self.__start(self._ha_ctx, self._c_str(rpc_endpoint), process.to_c(),
                      ha_service.to_c(), rm_service.to_c())
-        logging.info("broadcating rm service state")
 
     def _c_str(self, str_val: str) -> c.c_char_p:
         if not str_val:
@@ -197,7 +196,7 @@ class HaLink(object):
     # TODO refactor: Separate the C calls from HaLink class, so that hax.c functions can be invoked outside of HaLink instance.
     def adopt_mero_thread(self):
         logging.debug("Adopting mero thread")
-        self.__init_mero_thread()
+        self.__adopt_mero_thread()
 
     def shun_mero_thread(self):
         self.__shun_mero_thread()

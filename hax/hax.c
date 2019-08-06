@@ -37,7 +37,7 @@
 #include "hax.h"
 
 static hax_context *hc;
-struct m0_thread    mthread;
+struct m0_thread    m0thread;
 struct m0          *m0;
 
 static void _ha_test_entrypoint_reply_send(struct m0_halon_interface *hi,
@@ -396,7 +396,7 @@ hax_context* init_halink(PyObject *obj, const char* node_uuid)
 	Py_INCREF(obj);
 	int rc;
 
-	/*rc = m0_thread_adopt(&mthread, m0);*/
+	/*rc = m0_thread_adopt(&m0thread, m0);*/
 	/*if (rc != 0) {*/
 	/*printf("Mero thread adoption failed: %d\n", rc);*/
 	/*return NULL;*/
@@ -416,7 +416,7 @@ hax_context* init_halink(PyObject *obj, const char* node_uuid)
 		return 0;
 	}
 	m0_mutex_init(&hc->hc_mutex);
-	M0_SET0(&mthread);
+	M0_SET0(&m0thread);
 	m0 = m0_halon_interface_m0_get(hc->hc_hi);
 
 
@@ -513,10 +513,10 @@ void m0_ha_notify(unsigned long long ctx, struct m0_ha_note *notes, uint32_t nr_
 	m0_halon_interface_nvec_broadcast(hi, &nvec);
 }
 
-int init_mero_thread()
+int adopt_mero_thread()
 {
 	int rc;
-	rc = m0_thread_adopt(&mthread, m0);
+	rc = m0_thread_adopt(&m0thread, m0);
 	if (rc != 0) {
 		M0_LOG(M0_ERROR, "Mero thread adoption failed: %d\n", rc);
 	}
