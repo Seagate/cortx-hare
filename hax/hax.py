@@ -64,6 +64,7 @@ def main():
         l.start(hax_ep, process=hax_fid, ha_service=ha_fid, rm_service=rm_fid)
         # [KN] This is a blocking call. It will work until the program is
         # terminated by signal
+        l.test_broadcast()
         run_server(q, thread_to_wait=t, halink=l)
     finally:
         l.close()

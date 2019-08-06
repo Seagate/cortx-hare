@@ -56,6 +56,9 @@ class HaLink(object):
         lib.test_ha_note.argtypes = [c.POINTER(HaNoteStruct), c.c_uint32]
         self.__test_ha_note = lib.test_ha_note
 
+        lib.m0_ha_broadcast_test.argtypes = [c.c_void_p]
+        self.__ha_broadcast = lib.m0_ha_broadcast_test
+
         self._ha_ctx = self.__init_halink(self, self._c_str(node_uuid))
         self.queue = queue
         self.rm_fid = rm_fid
@@ -68,6 +71,7 @@ class HaLink(object):
         logging.info('Start method is invoked from thread {}'.format(tname))
         self.__start(self._ha_ctx, self._c_str(rpc_endpoint), process.to_c(),
                      ha_service.to_c(), rm_service.to_c())
+        logging.info("broadcating rm service state")
 
     def _c_str(self, str_val: str) -> c.c_char_p:
         if not str_val:
@@ -156,3 +160,7 @@ class HaLink(object):
         self.__destroy(self._ha_ctx)
         self._ha_ctx = 0
         logging.debug("ha_link destroyed. Bye!")
+
+    def test_broadcast(self):
+        logging.info("broadcasting rm service state")
+        self.__ha_broadcast(self._ha_ctx)
