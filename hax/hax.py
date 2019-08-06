@@ -14,7 +14,7 @@ def setup_logging():
         format='%(asctime)s [%(levelname)s] {%(threadName)s} %(message)s')
 
 
-def run_handler_thread(q: Queue, ha_link: HaLink):
+def run_qconsumer_thread(q: Queue, ha_link: HaLink):
     t = ConsumerThread(q, ha_link)
     t.start()
     return t
@@ -29,10 +29,10 @@ def main():
     # 1. A callback is invoked from ha_link (this will happen in a mero
     #    thread which must be free ASAP)
     # 2. TBD: a new HA notification has come form Consul via HTTP
-    # [KN] The messages are consumed by Python thread created by run_handler_thread function.
+    # [KN] The messages are consumed by Python thread created by run_qconsumer_thread function.
     #
     # [KN] Note: The server is launched in the main thread.
-    q = Queue(maxsize=1000)
+    q = Queue(maxsize=8)
 
     # [KN] The fid of the hax service is taken from Consul
     util = ConsulUtil()
@@ -54,7 +54,7 @@ def main():
     #pfid = Fid.parse("1:0")
     #hafid = Fid.parse("5:0")
     #rmfid = Fid.parse("4:0")
-    t = run_handler_thread(q, l)
+    t = run_qconsumer_thread(q, l)
 
     try:
         l.start(hax_ep, process=hax_fid, ha_service=ha_fid, rm_service=rm_fid)
