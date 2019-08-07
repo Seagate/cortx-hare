@@ -1,11 +1,10 @@
 from hax.halink import HaLink
+from hax.ffi import HaxFFI
 from hax.server import run_server
 from hax.handler import ConsumerThread
 from queue import Queue
-from hax.util import ConsulUtil, SERVICE_CONTAINER
+from hax.util import ConsulUtil
 import logging
-
-from hax.types import Fid
 
 
 def setup_logging():
@@ -14,8 +13,8 @@ def setup_logging():
         format='%(asctime)s [%(levelname)s] {%(threadName)s} %(message)s')
 
 
-def run_qconsumer_thread(q: Queue, ha_link: HaLink):
-    t = ConsumerThread(q, ha_link)
+def run_qconsumer_thread(q: Queue, ffi: HaxFFI):
+    t = ConsumerThread(q, ffi)
     t.start()
     return t
 
@@ -42,10 +41,12 @@ def main():
     rm_fid = util.get_rm_fid()
 
     # The node UUID is simply random
+    ffi = HaxFFI()
     l = HaLink(node_uuid="d63141b1-a7f7-4258-b22a-59fda4ad86d1",
                queue=q,
-               rm_fid=rm_fid)
-    t = run_qconsumer_thread(q, l)
+               rm_fid=rm_fid,
+               ffi=ffi)
+    t = run_qconsumer_thread(q, ffi)
 
     try:
         l.start(hax_ep, process=hax_fid, ha_service=ha_fid, rm_service=rm_fid)
