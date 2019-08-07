@@ -16,7 +16,7 @@ import random
 import re
 import subprocess
 import sys
-from typing import Any, Dict, NamedTuple, Optional, List, Union
+from typing import Any, Dict, NamedTuple, List
 import yaml
 
 
@@ -55,18 +55,11 @@ hosts:
   - name: <str>  # [user@]hostname; e.g., localhost, samir@10.22.33.44
     disks: { path_glob: <str> }  # e.g. "/dev/loop[0-9]*"
     m0_servers:
-      - endpoint_fmt:
-          proto: <str>  # supported values: lo, tcp, ib;
-                        # also supported: { tcp: <digit> }, { ib: <digit> }
-          portal: <int>
-          tmid: <int>
-        runs_confd: <bool>   # optional, defaults to false
-        io_disks:  # optional section; if present, IO service will be executed
-          path_regex: <str>  # e.g. "."
-    c0_clients:      # list of endpoints
-      - { proto: <str>, portal: <int>, tmid: <int> }
-    m0t1fs_clients:  # list of endpoints
-      - { proto: <str>, portal: <int>, tmid: <int> }
+      - runs_confd: <bool>   # optional, defaults to false
+        io_disks:
+          path_regex: <str>  # e.g. "."; empty string means no IO service
+    c0_clients: <int>        # max quantity of Clovis apps this host may have
+    m0t1fs_clients: <int>    # max quantity of m0t1fs clients
 pools:
   - name: <str>
     allowed_failures:  # optional section; no failures will be allowed
@@ -120,8 +113,11 @@ def main(argv=None):
     pprint(m0conf)
     print('----- dhall -----')
     for k, v in m0conf.items():
+        objt = v.__class__.__name__
+        assert objt.startswith('Conf')
+        objt = objt[len('Conf'):]
         try:
-            print(v.to_dhall(k))
+            print('Obj.{} {}'.format(objt, v.to_dhall(k)))
         except NotImplementedError:
             print('XXX-IMPLEMENTME ' + oid_to_dhall(k))
     # XXX >>>>>>>
@@ -234,27 +230,6 @@ def oids_to_dhall(oids: List[Oid]) -> str:
     return '[ {} ]'.format(', '.join(oid_to_dhall(x) for x in oids))
 
 
-NetProtocol = Union[str, Dict[str, Optional[int]]]
-
-
-EndpointFmt = NamedTuple('EndpointFmt', [('proto', NetProtocol),
-                                         ('portal', int),
-                                         ('tmid', int)])
-
-
-def endpoint_to_dhall(fmt: EndpointFmt, ipaddr: str) -> str:
-    if type(fmt.proto) is str:
-        assert fmt.proto == 'lo'
-        nid = 'NetId.lo'
-    else:
-        assert len(fmt.proto) == 1
-        k, v = list(fmt.proto.items())[0]  # type: ignore
-        assert k in ('tcp', 'ib')
-        md = 'None Natural' if v is None else f'Some {v}'
-        nid = f'NetId.{k} {{ {k} = {{ ipaddr = "{ipaddr}", mdigit = {md} }} }}'
-    return f'{{ nid = {nid}, portal = {fmt.portal}, tmid = {fmt.tmid} }}'
-
-
 class ToDhall(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def to_dhall(self, oid: Oid) -> str:
@@ -308,26 +283,31 @@ class ConfNode(ToDhall):
 
 
 class ConfProcess(ToDhall):
-    def __init__(self, nr_cpu: int, memsize_MB: int, endpoint_fmt: EndpointFmt,
-                 ipaddr: str, services: List[Oid] = []):
+    _endpoint_tmids = {}  # type: Dict[str, int]
+
+    def __init__(self, nr_cpu: int, memsize_MB: int, ipaddr: str,
+                 services: List[Oid] = []):
+        assert nr_cpu > 0
         self.nr_cpu = nr_cpu
+        assert memsize_MB > 0
         self.memsize_MB = memsize_MB
-        self.endpoint_fmt = endpoint_fmt
+        assert ipaddr
         self.ipaddr = ipaddr
+        self.tmid = ConfProcess._endpoint_tmids.setdefault(ipaddr, 1)
+        ConfProcess._endpoint_tmids[ipaddr] += 1
         assert all(x.type is ObjT.service for x in services)
         self.services = services
 
     def __repr__(self):
         args = ', '.join([f'nr_cpu={self.nr_cpu}',
                           f'memsize_MB={self.memsize_MB}',
-                          f'endpoint_fmt={self.endpoint_fmt}',
                           f'ipaddr={self.ipaddr!r}',
                           f'services={self.services}'])
         return f'{self.__class__.__name__}({args})'
 
     def to_dhall(self, oid: Oid) -> str:
         assert oid.type is ObjT.process
-        endpoint = endpoint_to_dhall(self.endpoint_fmt, self.ipaddr)
+        endpoint = f'./Endpoint/tcp "{self.ipaddr}" 1975 {self.tmid}'
         args = ', '.join([f'id = {oid_to_dhall(oid)}',
                           f'nr_cpu = {self.nr_cpu}',
                           f'memsize_MB = {self.memsize_MB}',
@@ -434,16 +414,20 @@ def build_m0conf(cluster_desc: Dict[str, Any]) -> Dict[Oid, ToDhall]:
         conf[ctrl_id] = ConfController(node_id)
         conf[encl_id].ctrls.append(ctrl_id)
 
+        # `hax` process
+        proc_id = new_oid(ObjT.process)
+        conf[proc_id] = ConfProcess(
+            nr_cpu=nr_cpu, memsize_MB=memsize_MB,
+            ipaddr=host['facts']['ipaddress'])
+        conf[node_id].processes.append(proc_id)
+
         for proc in host['m0_servers']:
-            # XXX How many processes should we create?
-            # XXX See "mero roles" file in `halon` repository:
-            # XXX mero-halon/scripts/mero_clovis_role_mappings.ede
             proc_id = new_oid(ObjT.process)
             conf[proc_id] = ConfProcess(
                 nr_cpu=nr_cpu, memsize_MB=memsize_MB,
-                endpoint_fmt=EndpointFmt(**proc['endpoint_fmt']),
                 ipaddr=host['facts']['ipaddress'])
             conf[node_id].processes.append(proc_id)
+
         # XXX c0_clients, m0t1fs_clients
 
     return conf

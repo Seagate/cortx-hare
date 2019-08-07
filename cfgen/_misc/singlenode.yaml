@@ -2,12 +2,10 @@ hosts:
   - name: localhost
     disks: { path_glob: "/dev/loop[0-9]*" }
     m0_servers:
-      # - endpoint_fmt: { proto: lo, portal: 34, tmid: 101 }
-      - endpoint_fmt: { proto: { tcp: null }, portal: 34, tmid: 101 }
-        runs_confd: true
+      - runs_confd: true
         io_disks: { path_regex: . }
-    c0_clients: []
-    m0t1fs_clients: []
+    c0_clients: 2
+    m0t1fs_clients: 0
 pools:
   - name: the pool
     # allowed_failures: { site: 0, rack: 0, encl: 0, ctrl: 0, disk: 0 }
