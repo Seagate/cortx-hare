@@ -172,7 +172,7 @@ class HaLink(object):
         status = service_state.get('status')
 
         int_status = HaNoteStruct.M0_NC_ONLINE
-        if status != 0:
+        if status != 'online':
             int_status = HaNoteStruct.M0_NC_FAILED
 
         return HaNoteStruct(fid.to_c(), int_status)
