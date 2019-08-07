@@ -147,7 +147,7 @@ class HaLink(object):
         confd_fids = list(map(lambda x: x.get('fid').to_c(), confds))
         confd_eps = list(map(lambda x: self._c_str(x.get('address')), confds))
 
-        logging.debug("Pasing the entrypoint reply to hax.c layer")
+        logging.debug("Passing the entrypoint reply to hax.c layer")
         self.__entrypoint_reply(reply_context, req_id.to_c(), 0, len(confds),
                                 make_array(FidStruct, confd_fids),
                                 make_array(c.c_char_p, confd_eps), rc_quorum,
