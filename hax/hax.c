@@ -461,17 +461,6 @@ int start(unsigned long long ctx, const char *local_rpc_endpoint,
 	return rc;
 }
 
-void test_ha_note(struct m0_ha_note* notes, uint32_t count)
-{
-  char s[128];
-  int i;
-  for (i = 0; i < count; ++i) 
-  {
-    m0_fid_print(s, 128, &notes[i].no_id);
-    printf("%d: %s\n", i, s);
-  }
-}
-
 void test(unsigned long long ctx)
 {
 	struct hax_context* hc = (struct hax_context*) ctx;

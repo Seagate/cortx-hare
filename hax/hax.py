@@ -41,19 +41,10 @@ def main():
     ha_fid = util.get_ha_fid()
     rm_fid = util.get_rm_fid()
 
-    # [KN] ..while two other ones are auto-generated
-    #ha_fid = hax_fid.get_copy()
-    #ha_fid.container = SERVICE_CONTAINER
-    #rm_fid = ha_fid.get_copy()
-    #rm_fid.key = rm_fid.key + 1
-
     # The node UUID is simply random
     l = HaLink(node_uuid="d63141b1-a7f7-4258-b22a-59fda4ad86d1",
                queue=q,
                rm_fid=rm_fid)
-    #pfid = Fid.parse("1:0")
-    #hafid = Fid.parse("5:0")
-    #rmfid = Fid.parse("4:0")
     t = run_qconsumer_thread(q, l)
 
     try:

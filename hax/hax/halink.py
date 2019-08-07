@@ -53,11 +53,13 @@ class HaLink(object):
             c.c_char_p  # const char *rm_eps
         ]
         self.__entrypoint_reply = lib.m0_ha_entrypoint_reply_send
-        lib.test_ha_note.argtypes = [c.POINTER(HaNoteStruct), c.c_uint32]
-        self.__test_ha_note = lib.test_ha_note
 
-        lib.m0_ha_broadcast_test.argtypes = [c.c_void_p]
-        self.__ha_broadcast = lib.m0_ha_broadcast_test
+        lib.m0_ha_notify.argtypes = [
+            c.c_void_p,  # unsigned long long ctx
+            c.POINTER(HaNoteStruct),  # struct m0_ha_note *notes
+            c.c_uint32  # uint32_t nr_notes
+        ]
+        self.__ha_broadcast = lib.m0_ha_notify
 
         self._ha_ctx = self.__init_halink(self, self._c_str(node_uuid))
         self.queue = queue
@@ -153,13 +155,13 @@ class HaLink(object):
         logging.debug(
             "Entrypoint request replied, mero's locality thread is free now")
 
-    # XXX [KN] this is a stub for now
     def broadcast_service_states(self, service_states):
         logging.debug(
             "The following service states will be broadcasted via ha_link: {}".
             format(service_states))
         note_list = list(map(self._to_ha_note, service_states))
-        self.__test_ha_note(self._make_arr(HaNoteStruct, note_list),
+        self.__ha_broadcast(self._ha_ctx,
+                            self._make_arr(HaNoteStruct, note_list),
                             len(note_list))
 
     def _to_ha_note(self, service_state):
@@ -188,10 +190,6 @@ class HaLink(object):
         self.__destroy(self._ha_ctx)
         self._ha_ctx = 0
         logging.debug("ha_link destroyed. Bye!")
-
-    def test_broadcast(self):
-        logging.info("broadcasting rm service state")
-        self.__ha_broadcast(self._ha_ctx)
 
     # TODO refactor: Separate the C calls from HaLink class, so that hax.c functions can be invoked outside of HaLink instance.
     def adopt_mero_thread(self):
