@@ -239,7 +239,6 @@ let Service =
   { id : Oid
   , type : SvcT
   , endpoints : List Text
-  , params : List Text
   , sdevs : List Oid
   }
 
@@ -247,7 +246,7 @@ let Service/toConfGen = \(x : Service) ->
     "(${oid x.id}"
  ++ " type=@${SvcT/show x.type}"
  ++ " endpoints=${join.Texts x.endpoints}"
- ++ " params=${join.Texts x.params}"
+ ++ " params=[]"
  ++ " sdevs=${join.Oids x.sdevs}"
  ++ ")"
 
@@ -949,7 +948,6 @@ let service_41 = Obj.Service
   { id = ids.service_41
   , type = SvcT.M0_CST_RMS
   , endpoints = ["\"172.28.128.3@tcp:12345:41:302\""]
-  , params = [] : List Text
   , sdevs = [] : List Oid
   }
 
@@ -957,7 +955,6 @@ let service_43 = Obj.Service
   { id = ids.service_43
   , type = SvcT.M0_CST_RMS
   , endpoints = ["\"172.28.128.3@tcp:12345:41:303\""]
-  , params = [] : List Text
   , sdevs = [] : List Oid
   }
 
@@ -965,7 +962,6 @@ let service_39 = Obj.Service
   { id = ids.service_39
   , type = SvcT.M0_CST_RMS
   , endpoints = ["\"172.28.128.3@tcp:12345:41:301\""]
-  , params = [] : List Text
   , sdevs = [] : List Oid
   }
 
@@ -973,7 +969,6 @@ let service_29 = Obj.Service
   { id = ids.service_29
   , type = SvcT.M0_CST_RMS
   , endpoints = ["\"172.28.128.3@tcp:12345:44:101\""]
-  , params = [] : List Text
   , sdevs = [] : List Oid
   }
 
@@ -981,7 +976,6 @@ let service_28 = Obj.Service
   { id = ids.service_28
   , type = SvcT.M0_CST_CONFD
   , endpoints = ["\"172.28.128.3@tcp:12345:44:101\""]
-  , params = [] : List Text
   , sdevs = [] : List Oid
   }
 
@@ -989,7 +983,6 @@ let service_32 = Obj.Service
   { id = ids.service_32
   , type = SvcT.M0_CST_IOS
   , endpoints = ["\"172.28.128.3@tcp:12345:41:401\""]
-  , params = [] : List Text
   , sdevs = [ ids.sdev_10, ids.sdev_22, ids.sdev_16, ids.sdev_8, ids.sdev_14
             , ids.sdev_18, ids.sdev_12, ids.sdev_20 ]
   }
@@ -998,7 +991,6 @@ let service_34 = Obj.Service
   { id = ids.service_34
   , type = SvcT.M0_CST_SNS_REB
   , endpoints = ["\"172.28.128.3@tcp:12345:41:401\""]
-  , params = [] : List Text
   , sdevs = [] : List Oid
   }
 
@@ -1006,7 +998,6 @@ let service_37 = Obj.Service
   { id = ids.service_37
   , type = SvcT.M0_CST_ISCS
   , endpoints = ["\"172.28.128.3@tcp:12345:41:401\""]
-  , params = [] : List Text
   , sdevs = [] : List Oid
   }
 
@@ -1014,7 +1005,6 @@ let service_33 = Obj.Service
   { id = ids.service_33
   , type = SvcT.M0_CST_SNS_REP
   , endpoints = ["\"172.28.128.3@tcp:12345:41:401\""]
-  , params = [] : List Text
   , sdevs = [] : List Oid
   }
 
@@ -1022,7 +1012,6 @@ let service_35 = Obj.Service
   { id = ids.service_35
   , type = SvcT.M0_CST_ADDB2
   , endpoints = ["\"172.28.128.3@tcp:12345:41:401\""]
-  , params = [] : List Text
   , sdevs = [] : List Oid
   }
 
@@ -1030,7 +1019,6 @@ let service_36 = Obj.Service
   { id = ids.service_36
   , type = SvcT.M0_CST_CAS
   , endpoints = ["\"172.28.128.3@tcp:12345:41:401\""]
-  , params = [] : List Text
   , sdevs = [ids.sdev_70]
   }
 
@@ -1038,7 +1026,6 @@ let service_31 = Obj.Service
   { id = ids.service_31
   , type = SvcT.M0_CST_RMS
   , endpoints = ["\"172.28.128.3@tcp:12345:41:401\""]
-  , params = [] : List Text
   , sdevs = [] : List Oid
   }
 
@@ -1046,7 +1033,6 @@ let service_45 = Obj.Service
   { id = ids.service_45
   , type = SvcT.M0_CST_RMS
   , endpoints = ["\"172.28.128.3@tcp:12345:41:304\""]
-  , params = [] : List Text
   , sdevs = [] : List Oid
   }
 
@@ -1054,7 +1040,6 @@ let service_47 = Obj.Service
   { id = ids.service_47
   , type = SvcT.M0_CST_RMS
   , endpoints = ["\"172.28.128.3@tcp:12345:41:305\""]
-  , params = [] : List Text
   , sdevs = [] : List Oid
   }
 
@@ -1062,7 +1047,6 @@ let service_25 = Obj.Service
   { id = ids.service_25
   , type = SvcT.M0_CST_HA
   , endpoints = ["\"172.28.128.3@tcp:12345:34:101\""]
-  , params = [] : List Text
   , sdevs = [] : List Oid
   }
 
@@ -1070,7 +1054,6 @@ let service_26 = Obj.Service
   { id = ids.service_26
   , type = SvcT.M0_CST_RMS
   , endpoints = ["\"172.28.128.3@tcp:12345:34:101\""]
-  , params = [] : List Text
   , sdevs = [] : List Oid
   }
 
