@@ -14,7 +14,7 @@ flake8: $(PYTHON_SCRIPTS)
 
 .PHONY: typecheck
 typecheck: $(PYTHON_SCRIPTS)
-	set -e -o pipefail; for f in $^; do mypy $$f; done
+	set -eu -o pipefail; for f in $^; do mypy $$f; done
 
 .PHONY: check-dhall
 check-dhall: confd.dhall
