@@ -230,6 +230,27 @@ def oids_to_dhall(oids: List[Oid]) -> str:
     return '[ {} ]'.format(', '.join(oid_to_dhall(x) for x in oids))
 
 
+class Endpoint:
+    _tmids = {}  # type: Dict[str, int]
+
+    def __init__(self, ipaddr: str, tmid: int = None):
+        assert ipaddr
+        self.ipaddr = ipaddr
+        if tmid is None:
+            self.tmid = Endpoint._tmids.setdefault(ipaddr, 1)
+            Endpoint._tmids[ipaddr] += 1
+        else:
+            assert tmid > 0
+            self.tmid = tmid
+
+    def __repr__(self):
+        args = ', '.join([f'ipaddr={self.ipaddr!r}', f'tmid={self.tmid}'])
+        return f'{self.__class__.__name__}({args})'
+
+    def to_dhall(self):
+        return f'./Endpoint/tcp "{self.ipaddr}" 1975 {self.tmid}'
+
+
 class ToDhall(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def to_dhall(self, oid: Oid) -> str:
@@ -283,35 +304,29 @@ class ConfNode(ToDhall):
 
 
 class ConfProcess(ToDhall):
-    _endpoint_tmids = {}  # type: Dict[str, int]
-
-    def __init__(self, nr_cpu: int, memsize_MB: int, ipaddr: str,
+    def __init__(self, nr_cpu: int, memsize_MB: int, endpoint: Endpoint,
                  services: List[Oid] = []):
         assert nr_cpu > 0
         self.nr_cpu = nr_cpu
         assert memsize_MB > 0
         self.memsize_MB = memsize_MB
-        assert ipaddr
-        self.ipaddr = ipaddr
-        self.tmid = ConfProcess._endpoint_tmids.setdefault(ipaddr, 1)
-        ConfProcess._endpoint_tmids[ipaddr] += 1
+        self.endpoint = endpoint
         assert all(x.type is ObjT.service for x in services)
         self.services = services
 
     def __repr__(self):
         args = ', '.join([f'nr_cpu={self.nr_cpu}',
                           f'memsize_MB={self.memsize_MB}',
-                          f'ipaddr={self.ipaddr!r}',
+                          f'endpoint={self.endpoint}',
                           f'services={self.services}'])
         return f'{self.__class__.__name__}({args})'
 
     def to_dhall(self, oid: Oid) -> str:
         assert oid.type is ObjT.process
-        endpoint = f'./Endpoint/tcp "{self.ipaddr}" 1975 {self.tmid}'
         args = ', '.join([f'id = {oid_to_dhall(oid)}',
                           f'nr_cpu = {self.nr_cpu}',
                           f'memsize_MB = {self.memsize_MB}',
-                          f'endpoint = {endpoint}',
+                          f'endpoint = {self.endpoint.to_dhall()}',
                           f'services = {oids_to_dhall(self.services)}'])
         return '{ %s }' % args
 
@@ -344,7 +359,7 @@ class SvcT(Enum):
 
 
 class ConfService(ToDhall):
-    def __init__(self, stype: SvcT, endpoint: str, sdevs: List[Oid] = []):
+    def __init__(self, stype: SvcT, endpoint: Endpoint, sdevs: List[Oid] = []):
         self.type = stype
         self.endpoint = endpoint
         assert all(x.type is ObjT.sdev for x in sdevs)
@@ -360,7 +375,7 @@ class ConfService(ToDhall):
         assert oid.type is ObjT.service
         args = ', '.join([f'id = {oid_to_dhall(oid)}',
                           f'type = SvcT.{self.type.name}',
-                          f'endpoints = [ "\\"{self.endpoint}\\"" ]',
+                          f'endpoint = {self.endpoint.to_dhall()}',
                           f'sdevs = {oids_to_dhall(self.sdevs)}'])
         return '{ %s }' % args
 
@@ -485,19 +500,19 @@ def build_m0conf(cluster_desc: Dict[str, Any]) -> Dict[Oid, ToDhall]:
         proc_id = new_oid(ObjT.process)
         conf[proc_id] = ConfProcess(
             nr_cpu=nr_cpu, memsize_MB=memsize_MB,
-            ipaddr=host['facts']['ipaddress'])
+            endpoint=Endpoint(host['facts']['ipaddress']))
         conf[node_id].processes.append(proc_id)
 
         for proc in host['m0_servers']:
+            ep = Endpoint(ipaddr=host['facts']['ipaddress'])
             proc_id = new_oid(ObjT.process)
-            conf[proc_id] = ConfProcess(
-                nr_cpu=nr_cpu, memsize_MB=memsize_MB,
-                ipaddr=host['facts']['ipaddress'])
+            conf[proc_id] = ConfProcess(nr_cpu=nr_cpu, memsize_MB=memsize_MB,
+                                        endpoint=ep)
             conf[node_id].processes.append(proc_id)
 
             for stype in service_types(proc):
                 svc_id = new_oid(ObjT.service)
-                conf[svc_id] = ConfService(stype=stype, endpoint='XXX')
+                conf[svc_id] = ConfService(stype=stype, endpoint=ep)
                 conf[proc_id].services.append(svc_id)
 
         # XXX c0_clients, m0t1fs_clients
