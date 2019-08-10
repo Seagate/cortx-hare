@@ -10,7 +10,7 @@
 import abc
 import argparse
 import ast
-from enum import Enum
+from enum import Enum, auto
 import json
 import random
 import re
@@ -316,6 +316,55 @@ class ConfProcess(ToDhall):
         return '{ %s }' % args
 
 
+# m0_conf_service_type
+class SvcT(Enum):
+    """Mero service type
+    """
+    M0_CST_MDS = auto()
+    M0_CST_IOS = auto()
+    M0_CST_CONFD = auto()
+    M0_CST_RMS = auto()
+    M0_CST_STATS = auto()
+    M0_CST_HA = auto()
+    M0_CST_SSS = auto()
+    M0_CST_SNS_REP = auto()
+    M0_CST_SNS_REB = auto()
+    M0_CST_ADDB2 = auto()
+    M0_CST_CAS = auto()
+    M0_CST_DIX_REP = auto()
+    M0_CST_DIX_REB = auto()
+    M0_CST_DS1 = auto()
+    M0_CST_DS2 = auto()
+    M0_CST_FIS = auto()
+    M0_CST_FDMI = auto()
+    M0_CST_BE = auto()
+    M0_CST_M0T1FS = auto()
+    M0_CST_CLOVIS = auto()
+    M0_CST_ISCS = auto()
+
+
+class ConfService(ToDhall):
+    def __init__(self, stype: SvcT, endpoint: str, sdevs: List[Oid] = []):
+        self.type = stype
+        self.endpoint = endpoint
+        assert all(x.type is ObjT.sdev for x in sdevs)
+        self.sdevs = sdevs
+
+    def __repr__(self):
+        args = ', '.join([f'stype={self.type}',
+                          f'endpoint={self.endpoint}',
+                          f'sdevs={self.sdevs}'])
+        return f'{self.__class__.__name__}({args})'
+
+    def to_dhall(self, oid: Oid) -> str:
+        assert oid.type is ObjT.service
+        args = ', '.join([f'id = {oid_to_dhall(oid)}',
+                          f'type = SvcT.{self.type.name}',
+                          f'endpoints = [ "\\"{self.endpoint}\\"" ]',
+                          f'sdevs = {oids_to_dhall(self.sdevs)}'])
+        return '{ %s }' % args
+
+
 class ConfSite(ToDhall):
     def __init__(self, racks: List[Oid] = []):
         assert all(x.type is ObjT.rack for x in racks)
@@ -384,6 +433,24 @@ class ConfController(ToDhall):
         return '{ %s }' % args
 
 
+def service_types(process: Dict[str, Any] = None) -> List[SvcT]:
+    # Every Mero process runs a resource manager service (RMS).
+    ts = [SvcT.M0_CST_RMS]
+
+    if process is not None:
+        if process.get('runs_confd'):
+            ts.append(SvcT.M0_CST_CONFD)
+
+        if process['io_disks']['path_regex']:
+            ts.extend([SvcT.M0_CST_IOS,
+                       SvcT.M0_CST_SNS_REP,
+                       SvcT.M0_CST_SNS_REB,
+                       SvcT.M0_CST_ADDB2,
+                       SvcT.M0_CST_CAS,
+                       SvcT.M0_CST_ISCS])
+    return ts
+
+
 def build_m0conf(cluster_desc: Dict[str, Any]) -> Dict[Oid, ToDhall]:
     conf = {}  # type: Dict[Oid, Any]
 
@@ -427,6 +494,11 @@ def build_m0conf(cluster_desc: Dict[str, Any]) -> Dict[Oid, ToDhall]:
                 nr_cpu=nr_cpu, memsize_MB=memsize_MB,
                 ipaddr=host['facts']['ipaddress'])
             conf[node_id].processes.append(proc_id)
+
+            for stype in service_types(proc):
+                svc_id = new_oid(ObjT.service)
+                conf[svc_id] = ConfService(stype=stype, endpoint='XXX')
+                conf[proc_id].services.append(svc_id)
 
         # XXX c0_clients, m0t1fs_clients
 
