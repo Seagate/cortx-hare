@@ -99,6 +99,8 @@ def main(argv=None):
         host['facts'] = get_facts(host['name'], opts.mock,
                                   'hostname', 'processorcount',
                                   'memorysize_mb', 'ipaddress', 'macaddress')
+        host['facts']['_memsize_MB'] = int(float(
+            host['facts']['memorysize_mb']))
         host['disks']['items'] = get_disks(host['name'],
                                            host['disks']['path_glob'])
 
@@ -116,10 +118,7 @@ def main(argv=None):
         objt = v.__class__.__name__
         assert objt.startswith('Conf')
         objt = objt[len('Conf'):]
-        try:
-            print('Obj.{} {}'.format(objt, v.to_dhall(k)))
-        except NotImplementedError:
-            print('XXX-IMPLEMENTME ' + oid_to_dhall(k))
+        print('Obj.{} {}'.format(objt, v.to_dhall(k)))
     # XXX >>>>>>>
 
 
@@ -330,6 +329,23 @@ class ConfProcess(ToDhall):
                           f'services = {oids_to_dhall(self.services)}'])
         return '{ %s }' % args
 
+    @staticmethod
+    def build(m0conf: Dict[Oid, Any], parent: Oid, host_facts: Dict[str, Any],
+              process_desc: Dict[str, Any] = None) -> None:
+        assert parent.type is ObjT.node
+
+        ep = Endpoint(ipaddr=host_facts['ipaddress'])
+        proc_id = new_oid(ObjT.process)
+        m0conf[proc_id] = ConfProcess(nr_cpu=host_facts['processorcount'],
+                                      memsize_MB=host_facts['_memsize_MB'],
+                                      endpoint=ep)
+        m0conf[parent].processes.append(proc_id)
+
+        for stype in service_types(process_desc):
+            svc_id = new_oid(ObjT.service)
+            m0conf[svc_id] = ConfService(stype=stype, endpoint=ep)
+            m0conf[proc_id].services.append(svc_id)
+
 
 # m0_conf_service_type
 class SvcT(Enum):
@@ -448,15 +464,20 @@ class ConfController(ToDhall):
         return '{ %s }' % args
 
 
-def service_types(process: Dict[str, Any] = None) -> List[SvcT]:
-    # Every Mero process runs a resource manager service (RMS).
-    ts = [SvcT.M0_CST_RMS]
+def service_types(process_desc: Dict[str, Any] = None) -> List[SvcT]:
+    # Every program that uses m0_halon_interface API (ha/halon/interface.h
+    # in `mero` repository) must be represented by at least 3 conf objects
+    # in the Mero conf cache: a process object and two service objects
+    # (HA and RMS).
+    #
+    # See http://gitlab.mero.colo.seagate.com/mero/hare/issues/8
+    ts = [SvcT.M0_CST_HA, SvcT.M0_CST_RMS]
 
-    if process is not None:
-        if process.get('runs_confd'):
+    if process_desc is not None:
+        if process_desc.get('runs_confd'):
             ts.append(SvcT.M0_CST_CONFD)
 
-        if process['io_disks']['path_regex']:
+        if process_desc['io_disks']['path_regex']:
             ts.extend([SvcT.M0_CST_IOS,
                        SvcT.M0_CST_SNS_REP,
                        SvcT.M0_CST_SNS_REB,
@@ -485,37 +506,24 @@ def build_m0conf(cluster_desc: Dict[str, Any]) -> Dict[Oid, ToDhall]:
     conf[rack_id].encls = [encl_id]
 
     for host in cluster_desc['hosts']:
-        nr_cpu = host['facts']['processorcount']
-        memsize_MB = int(float(host['facts']['memorysize_mb']))
+        facts = host['facts']
 
         node_id = new_oid(ObjT.node)
-        conf[node_id] = ConfNode(nr_cpu=nr_cpu, memsize_MB=memsize_MB)
+        conf[node_id] = ConfNode(nr_cpu=facts['processorcount'],
+                                 memsize_MB=facts['_memsize_MB'])
         conf[root_id].nodes.append(node_id)
 
         ctrl_id = new_oid(ObjT.controller)
         conf[ctrl_id] = ConfController(node_id)
         conf[encl_id].ctrls.append(ctrl_id)
 
-        # `hax` process
-        proc_id = new_oid(ObjT.process)
-        conf[proc_id] = ConfProcess(
-            nr_cpu=nr_cpu, memsize_MB=memsize_MB,
-            endpoint=Endpoint(host['facts']['ipaddress']))
-        conf[node_id].processes.append(proc_id)
+        ConfProcess.build(conf, node_id, facts)  # `hax`
 
         for proc in host['m0_servers']:
-            ep = Endpoint(ipaddr=host['facts']['ipaddress'])
-            proc_id = new_oid(ObjT.process)
-            conf[proc_id] = ConfProcess(nr_cpu=nr_cpu, memsize_MB=memsize_MB,
-                                        endpoint=ep)
-            conf[node_id].processes.append(proc_id)
+            ConfProcess.build(conf, node_id, facts, proc)
 
-            for stype in service_types(proc):
-                svc_id = new_oid(ObjT.service)
-                conf[svc_id] = ConfService(stype=stype, endpoint=ep)
-                conf[proc_id].services.append(svc_id)
-
-        # XXX c0_clients, m0t1fs_clients
+        for _ in range(host['c0_clients'] + host['m0t1fs_clients']):
+            ConfProcess.build(conf, node_id, facts)
 
     return conf
 
