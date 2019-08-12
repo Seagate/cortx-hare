@@ -547,15 +547,13 @@ def build_m0conf(cluster_desc: Dict[str, Any]) -> Dict[Oid, ToDhall]:
     root_id = new_oid(ObjT.root)
     conf = {root_id: ConfRoot()}  # type: Dict[Oid, Any]
 
-    site_id = ConfSite.build(conf, root_id)
-    rack_id = ConfRack.build(conf, site_id)
+    rack_id = ConfRack.build(conf, ConfSite.build(conf, root_id))
 
     for host in cluster_desc['hosts']:
         facts = host['facts']
 
-        encl_id = ConfEnclosure.build(conf, rack_id)
         node_id = ConfNode.build(conf, root_id, facts)
-        ConfController.build(conf, encl_id, node_id)
+        ConfController.build(conf, ConfEnclosure.build(conf, rack_id), node_id)
 
         ConfProcess.build(conf, node_id, facts)  # `hax`
 
