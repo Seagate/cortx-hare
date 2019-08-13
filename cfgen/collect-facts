@@ -109,11 +109,11 @@ def main(argv=None):
 
     m0conf = build_m0conf(cluster_desc)
     # XXX DELETEME <<<<<<<
-    from pprint import pprint
-    print('----- cluster_desc -----')
-    pprint(cluster_desc)
-    print('----- m0conf -----')
-    pprint(m0conf)
+    # from pprint import pprint
+    # print('----- cluster_desc -----')
+    # pprint(cluster_desc)
+    # print('----- m0conf -----')
+    # pprint(m0conf)
     # XXX >>>>>>>
 
     if not os.path.isdir(opts.output_dir):
@@ -126,13 +126,13 @@ def main(argv=None):
             return objt[len('Conf'):]
 
         print("""\
-let Endpoint/tcp = ./cfgen/dhall/Endpoint/tcp
-let Obj          = ./cfgen/dhall/Conf/Obj/Obj
-let ObjT         = ./cfgen/dhall/Conf/ObjT/ObjT
-let Oid          = ./cfgen/dhall/Conf/Oid/Oid
-let SvcT         = ./cfgen/dhall/Conf/SvcT/SvcT
-let confgen      = ./cfgen/dhall/Conf/confgen
-let zoid         = ./cfgen/dhall/Conf/Oid/zoid
+let Endpoint/tcp = ./dhall/Endpoint/tcp
+let Obj          = ./dhall/Conf/Obj/Obj
+let ObjT         = ./dhall/Conf/ObjT/ObjT
+let Oid          = ./dhall/Conf/Oid/Oid
+let SvcT         = ./dhall/Conf/SvcT/SvcT
+let confgen      = ./dhall/Conf/confgen
+let zoid         = ./dhall/Conf/Oid/zoid
 
 let objs =
   [ {}
