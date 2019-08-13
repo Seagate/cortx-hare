@@ -157,7 +157,7 @@ Hax processes the following callbacks from `ha_link` (via `m0_ha_halon_interface
 1. Entrypoint requests
 2. Process status change (namely, `M0_HA_MSG_EVENT_PROCESS` message with event type `M0_CONF_HA_PROCESS_STARTED` or `M0_CONF_HA_PROCESS_STOPPED`). Upon these events receival, hax must update the corresponding KV pair.
 
-#### Notes
+**Notes:**
 
 1. Hax MUST NOT make any assumption whether the service is registered in Consul. Service registering and watching the KV with the service status is out of  hax' responsibilty.
 2. In the future we might want to support Mero service update events (namely, `M0_HA_MSG_EVENT_SERVICE` message with event type `M0_CONF_HA_SERVICE_FAILED`, `M0_CONF_HA_SERVICE_STOPPED` or `M0_CONF_HA_SERVICE_FAILED` - see `m0_conf_ha_service_event` enum in `mero/conf/ha.h`). For the current version this functionality more like an overkill.
@@ -206,7 +206,7 @@ The general idea of storing the mero process status in Consul KV can be seen bel
 
 ```
 
-#### Notes
+**Notes:**
 
 1. `N` in the proposed Consul KV key `m0d-service-status/N/P` corresponds to the node FID. `P` stands for a logical name of the process.
    - This means that the checker script (check.sh) must know the FID of the node it runs at.
@@ -223,6 +223,7 @@ Mero functions - including FFI callbacks triggered by Mero - _may_ require that 
 1. Threads created with [threading](https://docs.python.org/3/library/threading.html) API or with lower level [_thread](https://docs.python.org/3/library/_thread.html) API are not green threads.
 2. Every time Python interpreter creates a thread on Linux platform, a new pthread (POSIX thread) is created.  Python thread never changes the underlying pthread.
 3. The Python Global Interpreter Lock (GIL) is a mutex that allows only one thread to hold the control of the Python interpreter.  This means that only one thread can be in a state of execution at any point in time.
+4. When calling a Python land from a non-python thread (e.g. from a callback from a foreign library), the GIL must be properly acquired first, see [details](https://docs.python.org/3.6/c-api/init.html#non-python-created-threads). As a result the, the corresponding execution of the Python code will become effectively single-threaded unless the C extension will release GIL. That's one of the reasons why hax replies to an entrypoint request from a different thread.
 
 ### Useful links
 
