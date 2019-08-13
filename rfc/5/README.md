@@ -151,14 +151,15 @@ The incoming HTTP requests bring the changes in the service states that Consul i
 ## Mero service notifications
 
 ### HA Link callbacks support
+
 Hax processes the following callbacks from `ha_link` (via `m0_ha_halon_interface`):
 
 1. Entrypoint requests
 2. Process status change (namely, `M0_HA_MSG_EVENT_PROCESS` message with event type `M0_CONF_HA_PROCESS_STARTED` or `M0_CONF_HA_PROCESS_STOPPED`). Upon these events receival, hax must update the corresponding KV pair.
 
 #### Notes
-1. Hax must not make any assumption whether the service is registered in Consul. Service registering and watching the KV with the service status is out of  hax' responsibilty.
-2. In the future we might want to support Mero service update events (namely, `M0_HA_MSG_EVENT_SERVICE` message with event type `M0_CONF_HA_SERVICE_FAILED`, `M0_CONF_HA_SERVICE_STOPPED` or `M0_CONF_HA_SERVICE_FAILED` - see `m0_conf_ha_service_event` enum in `mero/conf/ha.h`). For the current version this functionality more like an overkill (concluded in the discussion with @vvv as of 8/12/19).
+1. Hax MUST NOT make any assumption whether the service is registered in Consul. Service registering and watching the KV with the service status is out of  hax' responsibilty.
+2. In the future we might want to support Mero service update events (namely, `M0_HA_MSG_EVENT_SERVICE` message with event type `M0_CONF_HA_SERVICE_FAILED`, `M0_CONF_HA_SERVICE_STOPPED` or `M0_CONF_HA_SERVICE_FAILED` - see `m0_conf_ha_service_event` enum in `mero/conf/ha.h`). For the current version this functionality more like an overkill.
 3. In the future versions process update events must be forwarded through Consul-based Event Queue.
 
 ### Storing process status in Consul KV
@@ -166,47 +167,47 @@ Hax processes the following callbacks from `ha_link` (via `m0_ha_halon_interface
 The general idea of storing the mero process status in Consul KV can be seen below.
 
 ```
-     ┌────┐                             ┌───┐                                 ┌──┐                    ┌──────────┐                 ┌──────┐
-     │Mero│                             │Hax│                                 │KV│                    │X check.sh│                 │Consul│
-     └─┬──┘                             └─┬─┘                                 └┬─┘                    └────┬─────┘                 └──┬───┘
-       │ Process X is now online at node Y│                                    │                           │                          │
-       │ ─────────────────────────────────>                                    │                           │                          │
-       │                                  │                                    │                           │                          │
-       │                                  │ put m0d-service-status/Y/X = online│                           │                          │
-       │                                  │ ───────────────────────────────────>                           │                          │
-       │                                  │                                    │                           │                          │
-       │                                  │                 Ok                 │                           │                          │
-       │                                  │ <─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─                           │                          │
-       │                                  │                                    │                           │                          │
-       │                                  │                                    │                           │                          │
-       │                                  │                         ╔═══════╤══╪═══════════════════════════╪══════════════════════════╪═════════════╗
-       │                                  │                         ║ LOOP  │  every n sec                 │                          │             ║
-       │                                  │                         ╟───────┘  │                           │                          │             ║
-       │                                  │                         ║          │                           │        Is X alive?       │             ║
-       │                                  │                         ║          │                           │ <─────────────────────────             ║
-       │                                  │                         ║          │                           │                          │             ║
-       │                                  │                         ║          │ get m0d-service-status/Y/X│                          │             ║
-       │                                  │                         ║          │ <──────────────────────────                          │             ║
-       │                                  │                         ║          │                           │                          │             ║
-       │                                  │                         ║          │           online          │                          │             ║
-       │                                  │                         ║          │  ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─>                          │             ║
-       │                                  │                         ║          │                           │                          │             ║
-       │                                  │                         ║          │                           │────┐                                   ║
-       │                                  │                         ║          │                           │    │ pgrep for the process             ║
-       │                                  │                         ║          │                           │<───┘                                   ║
-       │                                  │                         ║          │                           │                          │             ║
-       │                                  │                         ║          │                           │            Yes           │             ║
-       │                                  │                         ║          │                           │  ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ >             ║
-       │                                  │                         ╚══════════╪═══════════════════════════╪══════════════════════════╪═════════════╝
-     ┌─┴──┐                             ┌─┴─┐                                 ┌┴─┐                    ┌────┴─────┐                 ┌──┴───┐
-     │Mero│                             │Hax│                                 │KV│                    │X check.sh│                 │Consul│
-     └────┘                             └───┘                                 └──┘                    └──────────┘                 └──────┘
+     ┌────┐                             ┌───┐                                 ┌──┐                    ┌──────────┐          ┌──────┐
+     │Mero│                             │Hax│                                 │KV│                    │X check.sh│          │Consul│
+     └─┬──┘                             └─┬─┘                                 └┬─┘                    └────┬─────┘          └──┬───┘
+       │ Process P is now online at node N│                                    │                           │                   │
+       │ ─────────────────────────────────>                                    │                           │                   │
+       │                                  │                                    │                           │                   │
+       │                                  │ put m0d-service-status/N/P = online│                           │                   │
+       │                                  │ ───────────────────────────────────>                           │                   │
+       │                                  │                                    │                           │                   │
+       │                                  │                 Ok                 │                           │                   │
+       │                                  │ <─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─                           │                   │
+       │                                  │                                    │                           │                   │
+       │                                  │                                    │                           │                   │
+       │                                  │                         ╔═══════╤══╪═══════════════════════════╪═══════════════════╪═════════════╗
+       │                                  │                         ║ LOOP  │  every n sec                 │                   │             ║
+       │                                  │                         ╟───────┘  │                           │                   │             ║
+       │                                  │                         ║          │                           │    Is P alive?    │             ║
+       │                                  │                         ║          │                           │ <──────────────────             ║
+       │                                  │                         ║          │                           │                   │             ║
+       │                                  │                         ║          │ get m0d-service-status/N/P│                   │             ║
+       │                                  │                         ║          │ <──────────────────────────                   │             ║
+       │                                  │                         ║          │                           │                   │             ║
+       │                                  │                         ║          │           online          │                   │             ║
+       │                                  │                         ║          │  ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─>                   │             ║
+       │                                  │                         ║          │                           │                   │             ║
+       │                                  │                         ║          │                           │────┐              │             ║
+       │                                  │                         ║          │                           │    │ pgrep for P  │             ║
+       │                                  │                         ║          │                           │<───┘              │             ║
+       │                                  │                         ║          │                           │                   │             ║
+       │                                  │                         ║          │                           │        Yes        │             ║
+       │                                  │                         ║          │                           │  ─ ─ ─ ─ ─ ─ ─ ─ ─>             ║
+       │                                  │                         ╚══════════╪═══════════════════════════╪═══════════════════╪═════════════╝
+     ┌─┴──┐                             ┌─┴─┐                                 ┌┴─┐                    ┌────┴─────┐          ┌──┴───┐
+     │Mero│                             │Hax│                                 │KV│                    │X check.sh│          │Consul│
+     └────┘                             └───┘                                 └──┘                    └──────────┘          └──────┘
 
 ```
 
 #### Notes
 
-1. `Y` in the proposed Consul KV key `m0d-service-status/Y/X` corresponds to the node FID.
+1. `N` in the proposed Consul KV key `m0d-service-status/N/P` corresponds to the node FID. `P` stands for a logical name of the process.
    - This means that the checker script (check.sh) must know the FID of the node it runs at.
 2. Checker script must check both value in Consul KV and `pgrep` the process. This is required to make sure that the value in KV is not obsolete.
 
