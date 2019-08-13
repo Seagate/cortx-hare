@@ -12,6 +12,7 @@ import argparse
 import ast
 from enum import Enum, auto
 import json
+import os
 import random
 import re
 import subprocess
@@ -113,13 +114,34 @@ def main(argv=None):
     pprint(cluster_desc)
     print('----- m0conf -----')
     pprint(m0conf)
-    print('----- dhall -----')
-    for k, v in m0conf.items():
-        objt = v.__class__.__name__
-        assert objt.startswith('Conf')
-        objt = objt[len('Conf'):]
-        print('Obj.{} {}'.format(objt, v.to_dhall(k)))
     # XXX >>>>>>>
+
+    if not os.path.isdir(opts.output_dir):
+        os.mkdir(opts.output_dir)
+
+    with open(os.path.join(opts.output_dir, 'confd.dhall'), 'w') as f:
+        def objt(obj: ToDhall) -> str:
+            objt = obj.__class__.__name__
+            assert objt.startswith('Conf')
+            return objt[len('Conf'):]
+
+        print("""\
+let Endpoint/tcp = ./cfgen/dhall/Endpoint/tcp
+let Obj          = ./cfgen/dhall/Conf/Obj/Obj
+let ObjT         = ./cfgen/dhall/Conf/ObjT/ObjT
+let Oid          = ./cfgen/dhall/Conf/Oid/Oid
+let SvcT         = ./cfgen/dhall/Conf/SvcT/SvcT
+let confgen      = ./cfgen/dhall/Conf/confgen
+let zoid         = ./cfgen/dhall/Conf/Oid/zoid
+
+let objs =
+  [ {}
+  ]
+
+in confgen objs
+""".format('\n  , '.join('Obj.{} {}'.format(objt(v), v.to_dhall(k))
+                         for k, v in m0conf.items())),
+              file=f)
 
 
 def all_unique(xs):
@@ -247,7 +269,7 @@ class Endpoint:
         return f'{self.__class__.__name__}({args})'
 
     def to_dhall(self):
-        return f'./Endpoint/tcp "{self.ipaddr}" 1975 {self.tmid}'
+        return f'Endpoint/tcp "{self.ipaddr}" 1975 {self.tmid}'
 
 
 class ToDhall(metaclass=abc.ABCMeta):
