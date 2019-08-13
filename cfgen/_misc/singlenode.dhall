@@ -1,4 +1,4 @@
-let CD = ./ClusterDesc/package.dhall
+let CD = ./cfgen/dhall/ClusterDesc/package.dhall
 in
 { hosts =
     [ { name = "localhost"

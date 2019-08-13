@@ -1,0 +1,14 @@
+{-*- dhall -*-}
+
+let ObjT/show = ../ObjT/show
+let Oid = ./Oid
+
+let Oid/confgen = \(x : Oid) ->
+    let cont : Text =
+        if Natural/isZero x.cont7
+        then ""
+        else "${Natural/show x.cont7}:"
+    in
+    "${ObjT/show x.type}-${cont}${Natural/show x.key}"
+
+in Oid/confgen

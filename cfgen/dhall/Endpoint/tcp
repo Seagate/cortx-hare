@@ -2,7 +2,9 @@
 
 let NetId = ../NetId/NetId
 
-let Endpoint/tcp : Text -> Natural -> Natural -> ./Endpoint
+let Endpoint = ./Endpoint
+
+let Endpoint/tcp : Text -> Natural -> Natural -> Endpoint
   = \(ipaddr : Text)
  -> \(portal : Natural)
  -> \(tmid : Natural)

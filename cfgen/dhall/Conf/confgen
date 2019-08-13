@@ -1,0 +1,13 @@
+{-*- dhall -*-}
+
+let List/map       = https://prelude.dhall-lang.org/List/map
+let Text/concatSep = https://prelude.dhall-lang.org/Text/concatSep
+
+let Obj         = ./Obj/Obj
+let Obj/confgen = ./Obj/confgen
+
+let confgen : List Obj -> Text =
+    \(objs : List Obj) ->
+    Text/concatSep "\n" (List/map Obj Text Obj/confgen objs) ++ "\n"
+
+in confgen

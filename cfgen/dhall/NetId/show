@@ -1,0 +1,19 @@
+{-*- dhall -*-}
+
+let Addr  = ./Addr
+let NetId = ./NetId
+
+let NetId/show : NetId -> Text =
+    \(nid : NetId) ->
+    let mshow = \(m : Optional Natural) ->
+            Optional/fold Natural m Text Natural/show ""
+    let Addr/show = \(infix : Text) -> \(addr : Addr) ->
+            addr.ipaddr ++ infix ++ mshow addr.mdigit
+    let conv =
+      { lo = "0@lo"
+      , tcp = \(x : { tcp : Addr }) -> Addr/show "@tcp" x.tcp
+      , ib = \(x : { ib : Addr }) -> Addr/show "@o2ib" x.ib
+      }
+    in merge conv nid
+
+in NetId/show

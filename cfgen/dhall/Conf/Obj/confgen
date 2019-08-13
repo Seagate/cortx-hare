@@ -1,0 +1,192 @@
+{-*- dhall -*-}
+
+let List/replicate    = https://prelude.dhall-lang.org/List/replicate
+let Text/concatMapSep = https://prelude.dhall-lang.org/Text/concatMapSep
+
+let Endpoint/show = ../../Endpoint/show
+let Oid           = ../Oid/Oid
+let Oid/confgen   = ../Oid/confgen
+let SvcT/show     = ../SvcT/show
+
+let Obj = ./Obj
+let T   = ./types.dhall
+
+let List/confgen : forall (a : Type) -> (a -> Text) -> List a -> Text
+  = \(a : Type)
+ -> \(f : a -> Text)
+ -> \(xs : List a)
+ ->
+    "[" ++ Text/concatMapSep ", " a f xs ++ "]"
+
+let join =
+  { Naturals = List/confgen Natural Natural/show
+  , Oids = List/confgen Oid Oid/confgen
+  , Texts =
+        let id = \(a : Type) -> \(x : a) -> x
+        in List/confgen Text (id Text)
+  }
+
+let nat = Natural/show
+let oid = Oid/confgen
+
+let Root/confgen = \(x : T.Root) ->
+    let imeta = Optional/fold Oid x.imeta_pver Text oid "(0,0)"
+    in
+    "(${oid x.id}"
+ ++ " verno=1"
+ ++ " rootfid=${oid x.id}"
+ ++ " mdpool=${oid x.mdpool}"
+ ++ " imeta_pver=${imeta}"
+ ++ " mdredundancy=1"  -- XXX Is this value OK for EES? Check with @madhav.
+ ++ " params=[]"
+ ++ " nodes=${join.Oids x.nodes}"
+ ++ " sites=${join.Oids x.sites}"
+ ++ " pools=${join.Oids x.pools}"
+ ++ " profiles=${join.Oids x.profiles}"
+ ++ " fdmi_flt_grps=[]"
+ ++ ")"
+
+let FdmiFltGrp/confgen = \(x : T.FdmiFltGrp) ->
+    "(${oid x.id}"
+ ++ " rec_type=${nat x.rec_type}"
+ ++ " filters=${join.Oids x.filters}"
+ ++ ")"
+
+let FdmiFilter/confgen = \(x : T.FdmiFilter) ->
+    "(${oid x.id}"
+ ++ " id=${oid x.filter_id}"
+ ++ " root=${Text/show x.filter_root}"
+ ++ " node=${oid x.node}"
+ ++ " endpoints=${join.Texts x.endpoints}"
+ ++ ")"
+
+let Node/confgen = \(x : T.Node) ->
+    "(${oid x.id}"
+ ++ " memsize=${nat x.memsize_MB}"
+ ++ " nr_cpu=${nat x.nr_cpu}"
+ ++ " last_state=0"
+ ++ " flags=0"
+ ++ " processes=${join.Oids x.processes}"
+ ++ ")"
+
+let Process/confgen = \(x : T.Process) ->
+    let memsize_KiB = nat (x.memsize_MB * 1024)
+    in
+    "(${oid x.id}"
+ ++ " cores=${join.Naturals (List/replicate x.nr_cpu Natural 1)}"
+ ++ " mem_limit_as=134217728"  -- = BE_SEGMENT_SIZE = 128MiB
+ ++ " mem_limit_rss=${memsize_KiB}"
+ ++ " mem_limit_stack=${memsize_KiB}"
+ ++ " mem_limit_memlock=${memsize_KiB}"
+ ++ " endpoint=${Text/show (Endpoint/show x.endpoint)}"
+ ++ " services=${join.Oids x.services}"
+ ++ ")"
+
+let Service/confgen = \(x : T.Service) ->
+    "(${oid x.id}"
+ ++ " type=@${SvcT/show x.type}"
+ ++ " endpoints=[${Text/show (Endpoint/show x.endpoint)}]"
+ ++ " params=[]"
+ ++ " sdevs=${join.Oids x.sdevs}"
+ ++ ")"
+
+let Sdev/confgen = \(x : T.Sdev) ->
+    "(${oid x.id}"
+ ++ " dev_idx=${nat x.dev_idx}"
+ ++ " iface=${nat x.iface}"
+ ++ " media=${nat x.media}"
+ ++ " bsize=${nat x.bsize}"
+ ++ " size=${nat x.size}"
+ ++ " last_state=0"
+ ++ " flags=0"
+ ++ " filename=${Text/show x.filename}"
+ ++ ")"
+
+let Site/confgen = \(x : T.Site) ->
+    "(${oid x.id}"
+ ++ " racks=${join.Oids x.racks}"
+ ++ " pvers=${join.Oids x.pvers}"
+ ++ ")"
+
+let Rack/confgen = \(x : T.Rack) ->
+    "(${oid x.id}"
+ ++ " encls=${join.Oids x.encls}"
+ ++ " pvers=${join.Oids x.pvers}"
+ ++ ")"
+
+let Enclosure/confgen = \(x : T.Enclosure) ->
+    "(${oid x.id}"
+ ++ " ctrls=${join.Oids x.ctrls}"
+ ++ " pvers=${join.Oids x.pvers}"
+ ++ ")"
+
+let Controller/confgen = \(x : T.Controller) ->
+    "(${oid x.id}"
+ ++ " node=${oid x.node}"
+ ++ " drives=${join.Oids x.drives}"
+ ++ " pvers=${join.Oids x.pvers}"
+ ++ ")"
+
+let Drive/confgen = \(x : T.Drive) ->
+    "(${oid x.id}"
+ ++ " dev=${oid x.sdev}"
+ ++ " pvers=${join.Oids x.pvers}"
+ ++ ")"
+
+let Pool/confgen = \(x : T.Pool) ->
+    "(${oid x.id}"
+ ++ " pver_policy=0"
+ ++ " pvers=${join.Oids x.pvers}"
+ ++ ")"
+
+let Pver/confgen = \(x : T.Pver) ->
+    "(${oid x.id}"
+ ++ " N=${nat x.N}"
+ ++ " K=${nat x.K}"
+ ++ " P=${nat x.P}"
+ ++ " tolerance=${join.Naturals x.tolerance}"
+ ++ " sitevs=${join.Oids x.sitevs}"
+ ++ ")"
+
+let PverF/confgen = \(x : T.PverF) ->
+    "(${oid x.id}"
+ ++ " id=${nat x.cuid}"
+ ++ " base=${oid x.base}"
+ ++ " allowance=${join.Naturals x.allowance}"
+ ++ ")"
+
+let Objv/confgen = \(x : T.Objv) ->
+    "(${oid x.id}"
+ ++ " real=${oid x.real}"
+ ++ " children=${join.Oids x.children}"
+ ++ ")"
+
+let Profile/confgen = \(x : T.Profile) ->
+    "(${oid x.id}"
+ ++ " pools=${join.Oids x.pools}"
+ ++ ")"
+
+let Obj/confgen : Obj -> Text =
+    \(x : Obj) ->
+    let conv =
+      { Root = Root/confgen
+      , FdmiFltGrp = FdmiFltGrp/confgen
+      , FdmiFilter = FdmiFilter/confgen
+      , Node = Node/confgen
+      , Process = Process/confgen
+      , Service = Service/confgen
+      , Sdev = Sdev/confgen
+      , Site = Site/confgen
+      , Rack = Rack/confgen
+      , Enclosure = Enclosure/confgen
+      , Controller = Controller/confgen
+      , Drive = Drive/confgen
+      , Pool = Pool/confgen
+      , Pver = Pver/confgen
+      , PverF = PverF/confgen
+      , Objv = Objv/confgen
+      , Profile = Profile/confgen
+      }
+    in merge conv x
+
+in Obj/confgen

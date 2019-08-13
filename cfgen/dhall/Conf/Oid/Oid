@@ -1,0 +1,12 @@
+{-*- dhall -*-}
+
+let ObjT = ../ObjT/ObjT
+
+-- Object identifier.
+let Oid =
+  { type : ObjT
+  , cont7 : Natural -- fid.f_container & M0_FID_TYPE_MASK
+  , key : Natural
+  }
+
+in Oid

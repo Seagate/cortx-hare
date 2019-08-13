@@ -1,0 +1,28 @@
+{-*- dhall -*-}
+
+let ObjT = ./ObjT
+
+let ObjT/show : ObjT -> Text =
+    \(x : ObjT) ->
+    let conv =
+      { Root = "root"
+      , FdmiFltGrp = "fdmi_flt_grp"
+      , FdmiFilter = "fdmi_filter"
+      , Node = "node"
+      , Process = "process"
+      , Service = "service"
+      , Sdev = "sdev"
+      , Site = "site"
+      , Rack = "rack"
+      , Enclosure = "enclosure"
+      , Controller = "controller"
+      , Drive = "drive"
+      , Pool = "pool"
+      , Pver = "pver"
+      , PverF = "pver_f"
+      , Objv = "objv"
+      , Profile = "profile"
+      }
+    in merge conv x
+
+in ObjT/show
