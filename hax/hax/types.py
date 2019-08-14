@@ -51,6 +51,14 @@ class HaNoteStruct(c.Structure):
     _fields_ = [("no_id", FidStruct), ("no_state", c.c_uint32)]
 
 
+# Duplicates mero/conf/ha.h:m0_conf_ha_process
+class ConfHaProcess(object):
+    def __init__(self, chp_event=0, chp_type=0, chp_pid=0):
+        self.chp_event = chp_event
+        self.chp_type = chp_type
+        self.chp_pid = chp_pid
+
+
 # Duplicates mero/fid/fid.h
 class Fid(object):
     def __init__(self, container, key):

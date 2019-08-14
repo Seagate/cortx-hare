@@ -1,9 +1,10 @@
 from threading import Thread
 from queue import Queue, Empty
-from hax.message import EntrypointRequest
+from hax.message import EntrypointRequest, ProcessEvent
 from hax.ffi import HaxFFI
 import time
 import logging
+from hax.util import ConsulUtil
 
 
 class ConsumerThread(Thread):
@@ -12,6 +13,7 @@ class ConsumerThread(Thread):
                          name='qconsumer',
                          args=(q, hax_ffi))
         self.is_stopped = False
+        self.consul = ConsulUtil()
 
     def _do_work(self, q: Queue, ffi: HaxFFI):
         logging.info('Handler thread has started')
@@ -38,9 +40,11 @@ class ConsumerThread(Thread):
                 if isinstance(item, EntrypointRequest):
                     ha_link = item.ha_link_instance
                     ha_link.send_entrypoint_request_reply(item)
+                elif isinstance(item, ProcessEvent):
+                    self.consul.update_process_status(item.evt)
                 else:
-                    logging.debug('Sending message to Consul: {}'.format(
-                        item.s))
+                    logging.warning(
+                        'Unsupported event type received: {}'.format(item))
         except StopIteration:
             ffi.shun_mero_thread()
             logging.info('Handler thread has exited')

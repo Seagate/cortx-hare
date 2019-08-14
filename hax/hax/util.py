@@ -1,4 +1,5 @@
 import consul as c
+import psutil
 from hax.exception import HAConsistencyException
 from hax.types import Fid
 
@@ -8,6 +9,12 @@ SERVICE_CONTAINER = 0x7300000000000001
 class ConsulUtil(object):
     def __init__(self):
         self.cns = c.Consul()
+        self.event_map = {
+            0: "M0_CONF_HA_PROCESS_STARTING",
+            1: "M0_CONF_HA_PROCESS_STARTED",
+            2: "M0_CONF_HA_PROCESS_STOPPING",
+            3: "M0_CONF_HA_PROCESS_STOPPED"
+        }
 
     # Returns the fid of the current hax process (in other words, returns
     # "my" fid)
@@ -23,8 +30,12 @@ class ConsulUtil(object):
         serv = self.get_local_service_by_name('rm')
         return Fid.parse(serv.get('ServiceID'))
 
-    def get_local_service_by_name(self, name):
+    def get_my_nodename(self):
         hostname = self.cns.agent.self().get('Config').get('NodeName')
+        return hostname
+
+    def get_local_service_by_name(self, name):
+        hostname = self.get_my_nodename()
 
         _, service = self.cns.catalog.service(service=name)
         srv = list(filter(lambda x: x.get('Node') == hostname, service))
@@ -48,7 +59,8 @@ class ConsulUtil(object):
         _, leader = self.cns.kv.get('leader')
         session = leader.get('Session')
         if not session:
-            raise HAConsistencyException('Could not get the leader from Consul')
+            raise HAConsistencyException(
+                'Could not get the leader from Consul')
         return session
 
     def get_session_node(self, session_id):
@@ -73,3 +85,18 @@ class ConsulUtil(object):
 
         confd_list = list(map(self._to_canonical_service_data, services))
         return confd_list
+
+    def update_process_status(self, event):
+        pid = event.chp_pid
+        process_name = "unknown"
+        if pid != 0:
+            process = psutil.Process(pid)
+            process_name = process.name()
+        node = self.get_my_nodename()
+
+        key = 'm0d-process/{}/{}'.format(node, process_name)
+        status_value = self.get_status_line(event.chp_event)
+        self.cns.kv.put(key, status_value)
+
+    def get_status_line(self, event_type):
+        return self.event_map[event_type]

@@ -27,5 +27,10 @@ class EntrypointRequest(BaseMessage):
         self.ha_link_instance = ha_link_instance
 
 
+class ProcessEvent(BaseMessage):
+    def __init__(self, evt):
+        self.evt = evt
+
+
 class Die(BaseMessage):
     pass
