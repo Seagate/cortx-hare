@@ -166,15 +166,15 @@ static void _ha_test_entrypoint_reply_send(struct m0_halon_interface *hi,
 /*
  * To be invoked from python land.
  */
-void m0_ha_entrypoint_reply_send(unsigned long long epr,
-				 const struct m0_uint128    *req_id,
-				 int                         rc,
-				 uint32_t                    confd_nr,
-				 const struct m0_fid        *confd_fid_data,
-				 const char                **confd_eps_data,
-				 uint32_t                    confd_quorum,
-				 const struct m0_fid        *rm_fid,
-				 const char                 *rm_eps)
+M0_INTERNAL void m0_ha_entrypoint_reply_send(unsigned long long epr,
+					     const struct m0_uint128    *req_id,
+					     int                         rc,
+					     uint32_t                    confd_nr,
+					     const struct m0_fid        *confd_fid_data,
+					     const char                **confd_eps_data,
+					     uint32_t                    confd_quorum,
+					     const struct m0_fid        *rm_fid,
+					     const char                 *rm_eps)
 {
 	struct hax_entrypoint_request *hep = (struct hax_entrypoint_request *)epr;
 	hax_context                   *hc = hep->hep_hc;
@@ -185,7 +185,13 @@ void m0_ha_entrypoint_reply_send(unsigned long long epr,
 	m0_free(hep);
 }
 
-static void _failvec_reply_send(struct hax_msg *hm)
+
+static void _stob_io_err_handle(struct hax_msg *hm)
+{
+	/* XXX Implement me. */
+}
+
+static void _failvec_handle(struct hax_msg *hm)
 {
 	M0_PRE(hm != NULL);
 
@@ -199,8 +205,8 @@ static void _failvec_reply_send(struct hax_msg *hm)
  * Sends failvec reply.
  * To be invoked from Python land.
  */
-void m0_ha_failvec_reply_send(unsigned long long hm, struct m0_fid *pool_fid,
-			      uint32_t nr_notes)
+M0_INTERNAL void m0_ha_failvec_reply_send(unsigned long long hm, struct m0_fid *pool_fid,
+					  uint32_t nr_notes)
 {
 	struct hax_msg *hax_msg = (struct hax_msg *)hm;
 
@@ -233,12 +239,11 @@ static void __ha_failvec_reply_send(struct hax_msg *hax_msg, struct m0_fid *pool
 
 	repmsg->hm_data.u.hed_fvec_rep.mfp_nr = nr_notes;
 	m0_ha_link_send(hl, repmsg, &tag);
-	m0_halon_interface_delivered(hi, hl, msg);
 	m0_free(repmsg);
 }
 
 /* Tests hax - mero nvec reply send. */
-static void _nvec_reply_send(struct hax_msg *hm)
+static void _nvec_handle(struct hax_msg *hm)
 {
 
 	/* Call python function from here, comment below test function.
@@ -299,7 +304,7 @@ static void nvec_test_reply_send(struct hax_msg *hm)
  * Sends nvec reply.
  * To be invoked from python land.
  */
-void m0_ha_nvec_reply_send(unsigned long long hm, struct m0_ha_nvec *nvec)
+M0_INTERNAL void m0_ha_nvec_reply_send(unsigned long long hm, struct m0_ha_nvec *nvec)
 {
 	struct hax_msg *hax_msg = (struct hax_msg *)hm;
 
@@ -317,16 +322,66 @@ static void __ha_nvec_reply_send(struct hax_msg *hax_msg, struct m0_ha_nvec *nve
 
 	m0_ha_msg_nvec_send(nvec, msg->hm_data.u.hed_nvec.hmnv_id_of_get,
 			M0_HA_NVEC_SET, hl);
-
-	m0_halon_interface_delivered(hi, hl, msg);
 }
 
-static void msg_received_cb (struct m0_halon_interface *hi, struct m0_ha_link *hl,
-			     struct m0_ha_msg *msg, uint64_t tag)
+static void _keepalive_handle(struct hax_msg *hm)
 {
-	struct m0_ha            *ha;
-	struct m0_ha_dispatcher *hd;
+	/* XXX Implement me. */
+}
+
+static void _process_event_handle(struct hax_msg *hm)
+{
+	struct hax_context *hc = hm->hm_hc;
+	struct m0_ha_msg   *hmsg = hm->hm_msg;
+
+	/* XXX Call python function to update consul here. */
+	/*PyObject_CallMethod(hc->hc_handler, "_update_process_state", "(kOsOskb)",
+			    &hmsg->hm_fid, hmsg->hm_data.u.chp_event);*/
+}
+
+static void _service_event_handle(struct hax_msg *hm)
+{
+	/* XXX Call python function to update consul here. */
+}
+
+static void _rpc_event_handle(struct hax_msg *hm)
+{
+	/* XXX Implement me. */
+}
+
+static void _be_io_err_handle(struct hax_msg *hm)
+{
+	/* XXX Implement me. */
+}
+
+static void _sns_err_handle(struct hax_msg *hm)
+{
+	/* XXX Implement me. */
+}
+
+static void (*hax_action[])(struct hax_msg *hm) = {
+	[M0_HA_MSG_STOB_IOQ]        = _stob_io_err_handle,
+	[M0_HA_MSG_NVEC]            = _nvec_handle,
+	[M0_HA_MSG_FAILURE_VEC_REQ] = _failvec_handle,
+	[M0_HA_MSG_FAILURE_VEC_REP] = _failvec_handle,
+	[M0_HA_MSG_KEEPALIVE_REQ]   = _keepalive_handle,
+	[M0_HA_MSG_KEEPALIVE_REP]   = _keepalive_handle,
+	[M0_HA_MSG_EVENT_PROCESS]   = _process_event_handle,
+	[M0_HA_MSG_EVENT_SERVICE]   = _service_event_handle,
+	[M0_HA_MSG_EVENT_RPC]       = _rpc_event_handle,
+	[M0_HA_MSG_BE_IO_ERR]       = _be_io_err_handle,
+	[M0_HA_MSG_SNS_ERR]         = _sns_err_handle
+};
+
+static void msg_received_cb(struct m0_halon_interface *hi, struct m0_ha_link *hl,
+			    struct m0_ha_msg *msg, uint64_t tag)
+{
 	struct hax_msg          *hm;
+
+
+	M0_PRE(msg->hm_data.hed_type > M0_HA_MSG_INVALID && msg->hm_data.hed_type < M0_HA_MSG_SNS_ERR);
+
+	M0_LOG(M0_ALWAYS, "msg received of type: %d", msg->hm_data.hed_type);
 
 	M0_ALLOC_PTR(hm);
 	if (hm == NULL) {
@@ -336,20 +391,8 @@ static void msg_received_cb (struct m0_halon_interface *hi, struct m0_ha_link *h
 	hm->hm_hc = hc;
 	hm->hm_hl = hl;
 	hm->hm_msg = msg;
-	ha = m0_halon_interface_ha(hi);
-	hd = m0_halon_interface_ha_dispatcher(hi);
-	if (msg->hm_data.hed_type == M0_HA_MSG_FAILURE_VEC_REQ)
-		_failvec_reply_send(hm);
-	else if (msg->hm_data.hed_type == M0_HA_MSG_NVEC)
-		_nvec_reply_send(hm);
-	else {
-		/* Using generic handlers for rest of the messages,
-		 * implement if required.
-		 */
-		m0_ha_dispatcher_handle(hd, ha, hl, msg, tag);
-		m0_halon_interface_delivered(hi, hl, msg);
-	}
-	M0_LOG(M0_ALWAYS, "msg received of type: %d", msg->hm_data.hed_type);
+	hax_action[msg->hm_data.hed_type](hm);
+	m0_halon_interface_delivered(hi, hl, msg);
 }
 
 static void msg_is_delivered_cb (struct m0_halon_interface *hi, struct m0_ha_link *hl,
@@ -378,19 +421,16 @@ static void link_reused_cb (struct m0_halon_interface *hi, const struct m0_uint1
 
 static void link_is_disconnecting_cb (struct m0_halon_interface *hi, struct m0_ha_link *hl)
 {
-	struct m0_ha *ha;
-
 	M0_LOG(M0_ALWAYS, "Disconnecting ha");
-	ha = m0_halon_interface_ha(hi);
-	m0_ha_disconnect_incoming(ha, hl);
+	m0_halon_interface_disconnect(hi, hl);
 }
 
-void link_disconnected_cb (struct m0_halon_interface *hi, struct m0_ha_link *link)
+static void link_disconnected_cb (struct m0_halon_interface *hi, struct m0_ha_link *link)
 {
   /* TODO Implement me */
 }
 
-hax_context* init_halink(PyObject *obj, const char* node_uuid)
+M0_INTERNAL hax_context* init_halink(PyObject *obj, const char* node_uuid)
 {
 	// Since we do depend on the Python object, we don't want to let it die before us.
 	Py_INCREF(obj);
