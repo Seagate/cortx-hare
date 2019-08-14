@@ -85,13 +85,26 @@ and saves that data locally as [Dhall](https://dhall-lang.org/) expressions
 
 ### `cfgen`
 
-**cfgen** will perform Dhall processing and generate the following files:
+**cfgen** performs Dhall processing and generates the following files:
 
-  * `bootstrap.json` -- input parameters for the
-    [`bootstrap`](rfc/6/README.md) script (e.g., the sets of `consul`
-    server and client nodes).
+  * `consul-nodes` -- tells [`bootstrap`](rfc/6/README.md) script
+    where Consul server and client agents should be started.
 
-  * `consul-defs.json` -- Consul services and
+    Format:
+    ```
+    [servers]
+    hostname
+    hostname
+    hostname
+
+    [clients]
+    hostname
+    hostname
+
+    # Comments start with a hash symbol and run to the end of the line.
+    ```
+
+  * `consul-services.json` -- Consul services and
     [watches](https://www.consul.io/docs/agent/watches.html)
     definitions.
 
