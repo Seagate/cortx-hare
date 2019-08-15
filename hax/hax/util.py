@@ -94,7 +94,7 @@ class ConsulUtil(object):
             process_name = process.name()
         node = self.get_my_nodename()
 
-        key = 'm0d-process/{}/{}'.format(node, process_name)
+        key = 'm0d-process/{}/{}_{}'.format(node, event.fid, process_name)
         status_value = self.get_status_line(event.chp_event)
         self.cns.kv.put(key, status_value)
 
