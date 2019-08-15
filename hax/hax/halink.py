@@ -2,7 +2,7 @@ import ctypes as c
 import logging
 import threading
 from errno import EAGAIN
-from hax.types import Fid, FidStruct, HaNoteStruct
+from hax.types import Fid, FidStruct, HaNoteStruct, ConfHaProcess
 from hax.util import ConsulUtil
 from hax.message import EntrypointRequest, ProcessEvent
 from hax.ffi import HaxFFI, make_array, make_c_str
@@ -115,9 +115,14 @@ class HaLink(object):
                                make_array(HaNoteStruct, note_list),
                                len(note_list))
 
-    def _process_event_cb(self, chp_event, chp_type, chp_pid):
-        logging.info('chp_event={}, chp_type={}, chp_pid={}'.format(chp_event, chp_type, chp_pid))
-        self.queue.put(ProcessEvent(ConfHaProcess(chp_event=chp_event, chp_type=chp_type, chp_pid=chp_pid)))
+    def _process_event_cb(self, fid, chp_event, chp_type, chp_pid):
+        logging.info('fid={}, chp_event={}'.format(fid, chp_event))
+        self.queue.put(
+            ProcessEvent(
+                ConfHaProcess(chp_event=chp_event,
+                              chp_type=chp_type,
+                              chp_pid=chp_pid,
+                              fid=fid)))
 
     def _to_ha_note(self, service_state):
         assert isinstance(service_state, dict)
