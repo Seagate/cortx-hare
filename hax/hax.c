@@ -75,7 +75,6 @@ PyObject* getModule(char* module_name)
 PyObject* toFid(const struct m0_fid* fid)
 {
 	PyObject* hax_mod = getModule("hax.types");
-	printf("Module loaded? %d\n", hax_mod == NULL ? 0 : 1);
 	PyObject* instance = PyObject_CallMethod(hax_mod, "Fid", "(KK)",
 						 fid->f_container, fid->f_key);
 	Py_DECREF(hax_mod);
@@ -108,7 +107,7 @@ static void entrypoint_request_cb(struct m0_halon_interface *hi, const struct m0
 
 	ep->hep_hc = hc;
 
-	printf("In entrypoint_request_cb\n");
+	M0_LOG(M0_INFO, "In entrypoint_request_cb\n");
 	PyObject* py_fid = toFid(process_fid);
 	PyObject* py_req = toUid128(req_id);
 
@@ -328,6 +327,12 @@ static void _keepalive_handle(struct hax_msg *hm)
 
 static void _process_event_handle(struct hax_msg *hm)
 {
+	if (!hm->hm_hc->alive)
+	{
+		M0_LOG(M0_DEBUG,
+		       "Skipping the event processing since Python object is already destructed\n");
+		return;
+	}
 	PyGILState_STATE gstate;
 	gstate = PyGILState_Ensure();
 
@@ -441,18 +446,13 @@ M0_INTERNAL hax_context* init_halink(PyObject *obj, const char* node_uuid)
 	Py_INCREF(obj);
 	int rc;
 
-	/*rc = m0_thread_adopt(&m0thread, m0);*/
-	/*if (rc != 0) {*/
-	/*printf("Mero thread adoption failed: %d\n", rc);*/
-	/*return NULL;*/
-	/*}*/
-
 	hc = (hax_context*) malloc(sizeof(hax_context));
 	if (hc == NULL) {
-		printf("\n Error: %d\n", -ENOMEM);
+		M0_LOG(M0_ERROR, "\n Error: %d\n", -ENOMEM);
 		return NULL;
 	}
 
+	hc->alive = true;
 	rc = m0_halon_interface_init(&hc->hc_hi, "M0_VERSION_GIT_REV_ID",
 			"M0_VERSION_BUILD_CONFIGURE_OPTS",
 			"disable-compatibility-check", NULL);
@@ -464,24 +464,18 @@ M0_INTERNAL hax_context* init_halink(PyObject *obj, const char* node_uuid)
 	M0_SET0(&m0thread);
 	m0 = m0_halon_interface_m0_get(hc->hc_hi);
 
-
 	hc->hc_handler = obj;
-
-	printf("Python object addr: %p\n", obj);
-	printf("Python object addr2: %p\n", hc->hc_handler);
-	printf("Returning: %p\n", hc);
 	return  hc;
 }
 
 void destroy_halink(unsigned long long ctx)
 {
 	struct hax_context* hc = (struct hax_context*) ctx;
+	hc->alive = false;
 	Py_DECREF(hc->hc_handler);
 	m0_mutex_fini(&hc->hc_mutex);
 	m0_halon_interface_stop(hc->hc_hi);
 	m0_halon_interface_fini(hc->hc_hi);
-
-	/*m0_thread_shun();*/
 }
 
 int start(unsigned long long ctx, const char *local_rpc_endpoint,
@@ -492,7 +486,7 @@ int start(unsigned long long ctx, const char *local_rpc_endpoint,
 	struct m0_halon_interface *hi = hc->hc_hi;
 	int                        rc;
 
-	printf("Starting hax interface..\n");
+	M0_LOG(M0_INFO, "Starting hax interface..\n");
 	rc = m0_halon_interface_start(hi, local_rpc_endpoint,
 				      &M0_FID_TINIT('r', process_fid->f_container, process_fid->f_key),
 				      &M0_FID_TINIT('s', ha_service_fid->f_container,

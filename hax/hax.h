@@ -31,6 +31,7 @@ struct m0_halon_interface;
 typedef struct hax_context {
 	struct m0_halon_interface *hc_hi;
 	struct m0_mutex            hc_mutex;
+	bool			   alive;
 	PyObject                  *hc_handler;
 } hax_context;
 
