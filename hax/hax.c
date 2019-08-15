@@ -110,25 +110,22 @@ static void entrypoint_request_cb(struct m0_halon_interface *hi, const struct m0
 
 	printf("In entrypoint_request_cb\n");
 	PyObject* py_fid = toFid(process_fid);
-	printf("Here - 1\n");
 	PyObject* py_req = toUid128(req_id);
 
-	printf("Here - 2\n");
-	PyObject_CallMethod(hc->hc_handler, "_entrypoint_request_cb", "(kOsOskb)",
+	/*
+	 * XXX The magic syntax of (KOsOsKb) is explained here:
+	 * https://docs.python.org/3.7/c-api/arg.html#numbers
+	 *
+	 * Note that `K` stands for `unsigned long long` while `k` is simply
+	 * `unsigned long` (be aware of overflow).
+	 */
+	PyObject_CallMethod(hc->hc_handler, "_entrypoint_request_cb", "(KOsOsKb)",
 			    ep, py_req, remote_rpc_endpoint, py_fid, git_rev_id, pid,
 			    first_request);
 	Py_DECREF(py_req);
 	Py_DECREF(py_fid);
 	/* XXX Note that the Python threads will get unblocked only after this call. */
 	PyGILState_Release(gstate);
-
-
-	/* XXX MOVE ME: Mock reply
-	M0_LOG(M0_ALWAYS, "Entrypoint replying");
-	_ha_test_entrypoint_reply_send(hi, req_id, remote_rpc_endpoint, process_fid,
-					  git_rev_id, pid, first_request);
-	*/
-
   }
 
 static void _ha_test_entrypoint_reply_send(struct m0_halon_interface *hi,
@@ -331,12 +328,20 @@ static void _keepalive_handle(struct hax_msg *hm)
 
 static void _process_event_handle(struct hax_msg *hm)
 {
+	PyGILState_STATE gstate;
+	gstate = PyGILState_Ensure();
+
 	struct hax_context *hc = hm->hm_hc;
 	struct m0_ha_msg   *hmsg = hm->hm_msg;
 
-	/* XXX Call python function to update consul here. */
-	/*PyObject_CallMethod(hc->hc_handler, "_update_process_state", "(kOsOskb)",
-			    &hmsg->hm_fid, hmsg->hm_data.u.chp_event);*/
+	PyObject* py_fid = toFid(&hmsg->hm_fid);
+	PyObject_CallMethod(hc->hc_handler, "_process_event_cb", "(OKKK)",
+			    py_fid,
+			    hmsg->hm_data.u.hed_event_process.chp_event,
+			    hmsg->hm_data.u.hed_event_process.chp_type,
+			    hmsg->hm_data.u.hed_event_process.chp_pid);
+	Py_DECREF(py_fid);
+	PyGILState_Release(gstate);
 }
 
 static void _service_event_handle(struct hax_msg *hm)
