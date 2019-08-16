@@ -193,9 +193,9 @@ end
 
 1. `fid` in the proposed Consul KV key `processes/<fid>` corresponds to the process fid (this guarantees that the key is unique within `processes/` prefix).
    - This means that the checker script (health-check.sh) must know the fid of the processes it monitors.
-   - This is quite OK that the keys in the KV are not reader-friendly and don't expose the logical name of the mero process. The end user will need to look into [Consul services](https://www.consul.io/api/agent/service.html) to learn the state of the particular mero process.
+   - This is OK that the keys in the KV are not reader-friendly and don't expose the logical name of the mero process. The end user will need to look into [Consul services](https://www.consul.io/api/agent/service.html) to learn the state of the particular mero process.
 2. Checker script must check both value in Consul KV and `pgrep` the process. This is required to make sure that the value in KV is not obsolete.
-3. "online" status shown at the diagram is chosen for the sake of simplicity. The exhaustive list of the values to store can be seen in [RFC 4](../4/README.md).
+3. "online" status shown at the diagram is chosen for the sake of simplicity. The exhaustive list of the values to store can be seen in [4/KV](../4/README.md).
 
 ## Threading model
 
