@@ -1,6 +1,6 @@
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import logging
-import json as j
+import json
 from hax.types import Fid
 
 
@@ -16,7 +16,7 @@ class KVHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         self._set_headers()
-        s = j.dumps({'message': 'I am alive'})
+        s = json.dumps({'message': 'I am alive'})
         self.wfile.write(s.encode('utf-8'))
 
     def do_HEAD(self):
@@ -26,44 +26,42 @@ class KVHandler(BaseHTTPRequestHandler):
         self._set_headers()
         content_length = int(self.headers['Content-Length'])
         post_data = self.rfile.read(content_length)
-        logging.debug('A new request has been received: {}'.format(post_data))
+        logging.debug('POST request received: {}'.format(post_data))
 
-        struct = self.parse_req(post_data)
-        struct = self.sanitize_service_info(struct)
-
-        logging.info('Effective structure is as follows: {}'.format(struct))
+        ha_states = self.to_ha_states(self.parse_request(post_data))
+        logging.info('HA states: {}'.format(ha_states))
         # TODO instead of this call something to m0d must be done
-        self.server.halink.broadcast_service_states(struct)
+        self.server.halink.broadcast_ha_states(ha_states)
 
-    # Returns list of the following dicts:
-    # {
-    #   'fid' : <service fid>,
-    #   'status': <either 'offline' or 'online'>
-    #  }
-    def sanitize_service_info(self, data):
+    @staticmethod
+    def parse_request(raw_data):
+        try:
+            return json.loads(raw_data.decode('utf-8'))
+        except json.JSONDecodeError:
+            logging.warn('Invalid JSON object received')
+
+    @staticmethod
+    def to_ha_states(data):
+        """Converts a dictionary, obtained from JSON data, into a list of
+        HA states.
+
+        Format of an HA state: {'fid': <service fid>, 'status': <state>},
+        where <state> is either 'online' or 'offline'.
+        """
         if not data:
             return []
+
+        def get_status(checks):
+            ok = all(x.get('Status') == 'passing' for x in checks)
+            return 'online' if ok else 'offline'
+
         result = []
         for t in data:
-            service = t.get('Service')
-            checks = t.get('Checks')
             result.append({
-                'fid': Fid.parse(service.get('ID')),
-                'status': self.get_status(checks)
+                'fid': Fid.parse(t['Service']['ID']),
+                'status': get_status(t['Checks'])
             })
         return result
-
-    def get_status(self, checks):
-        ok = all(map(lambda x: x.get('Status', None) == 'passing', checks))
-        return 'online' if ok else 'offline'
-
-    def parse_req(self, raw_data):
-        try:
-            struct = j.loads(raw_data.decode('utf-8'))
-            return struct
-        except j.JSONDecodeError:
-            logging.warn('Not a valid JSON object received')
-            return None
 
 
 def run_server(thread_to_wait=None,
@@ -75,7 +73,7 @@ def run_server(thread_to_wait=None,
     httpd = server_class(server_address, KVHandler)
     httpd.halink = halink
 
-    logging.info('Starting http server...')
+    logging.info('Starting HTTP server...')
     try:
         httpd.serve_forever()
     finally:

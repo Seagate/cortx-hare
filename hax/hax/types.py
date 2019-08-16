@@ -68,8 +68,8 @@ class Fid(object):
 
     @staticmethod
     def parse(val: str):
-        a, b = tuple(map(lambda x: int(x, 16), val.split(':')))
-        return Fid(a, b)
+        cont, key = tuple(int(s, 16) for s in val.split(':', 1))
+        return Fid(cont, key)
 
     def to_c(self):
         return FidStruct(self.container, self.key)
@@ -80,9 +80,7 @@ class Fid(object):
     def __repr__(self):
         return '{}:{}'.format(hex(self.container), hex(self.key))
 
-    def __eq__(self, other):
-        if not isinstance(other, Fid):
-            return False
+    def __eq__(self, other: Fid):
         return other.container == self.container and other.key == self.key
 
 
