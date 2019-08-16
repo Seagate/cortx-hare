@@ -17,6 +17,6 @@ Key | Value | Description
 `epoch` | current epoch (natural number) | Atomically incremented counter, which is used to generate unique ordered identifiers for EQ and BQ entries.
 `eq/<epoch>` | event | `eq/*` items are collectively referred to as the EQ (Event Queue).  Events are consumed and dequeued by the RC script.
 `leader` | node name | This key is used for RC leader election.  Created with [`consul lock`](https://www.consul.io/docs/commands/lock.html) command.
-`processes/<fid>` | `<HA state>` | HA state as reported by the callback via `ha link`. Possible string values are as follows: `M0_CONF_HA_PROCESS_STARTING`, `M0_CONF_HA_PROCESS_STARTED`, `M0_CONF_HA_PROCESS_STOPPING`, `M0_CONF_HA_PROCESS_STOPPED` (i.e. just repeating `enum m0_conf_ha_process_event` from `mero/conf/ha.h`)
+`processes/<fid>` | `{ "state" : "<HA state>" }` | HA state as reported by the callback via `ha link`. Possible string values are as follows: `M0_CONF_HA_PROCESS_STARTING`, `M0_CONF_HA_PROCESS_STARTED`, `M0_CONF_HA_PROCESS_STOPPING`, `M0_CONF_HA_PROCESS_STOPPED`.
 `timeout` | YYYYmmddHHMM.SS | This value is used by the RC timeout mechanism.
 
