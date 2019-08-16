@@ -169,17 +169,17 @@ The general idea of storing the mero process status in Consul KV can be seen bel
 
 ```plantuml
 @startuml
-participant Mero
+participant "m0mkfs/m0d" as Mero
 participant Hax
 participant KV
 participant "P health-check.sh" as Checker
 
 Mero -> Hax: Process P is now online
-Hax -> KV: put processes/<FID> = online
+Hax -> KV: put processes/<fid> = online
 KV --> Hax: Ok
 loop every n sec
   Consul -> Checker: Is P alive?
-  Checker -> KV: get processes/<FID>
+  Checker -> KV: get processes/<fid>
   KV --> Checker: online
   Checker -> Checker: pgrep for P
   Checker --> Consul: Yes
@@ -191,8 +191,8 @@ end
 
 **Notes:**
 
-1. `FID` in the proposed Consul KV key `processes/<FID>` corresponds to the process FID (this guarantees that the key is unique within `processes/` prefix).
-   - This means that the checker script (health-check.sh) must know the FID of the processes it monitors.
+1. `fid` in the proposed Consul KV key `processes/<fid>` corresponds to the process fid (this guarantees that the key is unique within `processes/` prefix).
+   - This means that the checker script (health-check.sh) must know the fid of the processes it monitors.
    - This is quite OK that the keys in the KV are not reader-friendly and don't expose the logical name of the mero process. The end user will need to look into [Consul services](https://www.consul.io/api/agent/service.html) to learn the state of the particular mero process.
 2. Checker script must check both value in Consul KV and `pgrep` the process. This is required to make sure that the value in KV is not obsolete.
 3. "online" status shown at the diagram is chosen for the sake of simplicity. The exhaustive list of the values to store can be seen in [RFC 4](../4/README.md).
