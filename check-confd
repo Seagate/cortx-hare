@@ -4,7 +4,4 @@ set -eu -o pipefail
 #
 # This is the Health Check for the Mero confd service.
 #
-
-#consul kv get m0d-process/qb21n1-m05-vm1/0x7200000000000001:0x0_python
-#test -f /tmp/confd || exit 2
-test `consul kv get service/0x7200000000000001:0x1` = "M0_CONF_HA_PROCESS_STARTED"
+test $(consul kv get processes/0x7200000000000001:0x1 | jq '.state' -r) = "M0_CONF_HA_PROCESS_STARTED"

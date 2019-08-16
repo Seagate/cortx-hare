@@ -1,5 +1,5 @@
 import consul as c
-import psutil
+import json
 from hax.exception import HAConsistencyException
 from hax.types import Fid
 
@@ -87,18 +87,11 @@ class ConsulUtil(object):
         return confd_list
 
     def update_process_status(self, event):
-	# Remove commented code if not required.
-        #pid = event.chp_pid
-        #process_name = "unknown"
-        #if pid != 0:
-            #process = psutil.Process(pid)
-            #process_name = process.name()
-        #node = self.get_my_nodename()
-
-        #key = 'm0d-process/{}/{}_{}'.format(node, event.fid, process_name)
-        key = 'service/{}'.format(event.fid)
+        key = 'processes/{}'.format(event.fid)
         status_value = self.get_status_line(event.chp_event)
         self.cns.kv.put(key, status_value)
 
     def get_status_line(self, event_type):
-        return self.event_map[event_type]
+        state_name = self.event_map[event_type]
+        ret = {'state': state_name}
+        return json.dumps(ret)
