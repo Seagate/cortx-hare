@@ -167,49 +167,33 @@ Hax processes the following callbacks from `ha_link` (via `m0_ha_halon_interface
 
 The general idea of storing the mero process status in Consul KV can be seen below.
 
-```
-     ┌────┐                             ┌───┐                                 ┌──┐                    ┌──────────┐          ┌──────┐
-     │Mero│                             │Hax│                                 │KV│                    │X check.sh│          │Consul│
-     └─┬──┘                             └─┬─┘                                 └┬─┘                    └────┬─────┘          └──┬───┘
-       │ Process P is now online at node N│                                    │                           │                   │
-       │ ─────────────────────────────────>                                    │                           │                   │
-       │                                  │                                    │                           │                   │
-       │                                  │ put m0d-service-status/N/P = online│                           │                   │
-       │                                  │ ───────────────────────────────────>                           │                   │
-       │                                  │                                    │                           │                   │
-       │                                  │                 Ok                 │                           │                   │
-       │                                  │ <─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─                           │                   │
-       │                                  │                                    │                           │                   │
-       │                                  │                                    │                           │                   │
-       │                                  │                         ╔═══════╤══╪═══════════════════════════╪═══════════════════╪═════════════╗
-       │                                  │                         ║ LOOP  │  every n sec                 │                   │             ║
-       │                                  │                         ╟───────┘  │                           │                   │             ║
-       │                                  │                         ║          │                           │    Is P alive?    │             ║
-       │                                  │                         ║          │                           │ <──────────────────             ║
-       │                                  │                         ║          │                           │                   │             ║
-       │                                  │                         ║          │ get m0d-service-status/N/P│                   │             ║
-       │                                  │                         ║          │ <──────────────────────────                   │             ║
-       │                                  │                         ║          │                           │                   │             ║
-       │                                  │                         ║          │           online          │                   │             ║
-       │                                  │                         ║          │  ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─>                   │             ║
-       │                                  │                         ║          │                           │                   │             ║
-       │                                  │                         ║          │                           │────┐              │             ║
-       │                                  │                         ║          │                           │    │ pgrep for P  │             ║
-       │                                  │                         ║          │                           │<───┘              │             ║
-       │                                  │                         ║          │                           │                   │             ║
-       │                                  │                         ║          │                           │        Yes        │             ║
-       │                                  │                         ║          │                           │  ─ ─ ─ ─ ─ ─ ─ ─ ─>             ║
-       │                                  │                         ╚══════════╪═══════════════════════════╪═══════════════════╪═════════════╝
-     ┌─┴──┐                             ┌─┴─┐                                 ┌┴─┐                    ┌────┴─────┐          ┌──┴───┐
-     │Mero│                             │Hax│                                 │KV│                    │X check.sh│          │Consul│
-     └────┘                             └───┘                                 └──┘                    └──────────┘          └──────┘
+```plantuml
+@startuml
+participant Mero
+participant Hax
+participant KV
+participant "P health-check.sh" as Checker
 
+Mero -> Hax: Process P is now online
+Hax -> KV: put processes/<FID> = online
+KV --> Hax: Ok
+loop every n sec
+  Consul -> Checker: Is P alive?
+  Checker -> KV: get processes/<FID>
+  KV --> Checker: online
+  Checker -> Checker: pgrep for P
+  Checker --> Consul: Yes
+  Consul -> Consul: Mark P as green
+end
+
+@enduml
 ```
 
 **Notes:**
 
-1. `N` in the proposed Consul KV key `m0d-service-status/N/P` corresponds to the node FID. `P` stands for a logical name of the process.
-   - This means that the checker script (check.sh) must know the FID of the node it runs at.
+1. `FID` in the proposed Consul KV key `processes/<FID>` corresponds to the process FID (this guarantees that the key is unique within `processes/` prefix.
+   - This means that the checker script (health-check.sh) must know the FID of the processes it monitors.
+   - This is quite OK that the keys in the KV are not reader-friendly and don't expose the logical name of the mero process. The end user will need to look into [Consul services](https://www.consul.io/api/agent/service.html) to learn the state of the particular mero process.
 2. Checker script must check both value in Consul KV and `pgrep` the process. This is required to make sure that the value in KV is not obsolete.
 
 ## Threading model
