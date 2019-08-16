@@ -87,14 +87,16 @@ class ConsulUtil(object):
         return confd_list
 
     def update_process_status(self, event):
-        pid = event.chp_pid
-        process_name = "unknown"
-        if pid != 0:
-            process = psutil.Process(pid)
-            process_name = process.name()
-        node = self.get_my_nodename()
+	# Remove commented code if not required.
+        #pid = event.chp_pid
+        #process_name = "unknown"
+        #if pid != 0:
+            #process = psutil.Process(pid)
+            #process_name = process.name()
+        #node = self.get_my_nodename()
 
-        key = 'm0d-process/{}/{}_{}'.format(node, event.fid, process_name)
+        #key = 'm0d-process/{}/{}_{}'.format(node, event.fid, process_name)
+        key = 'service/{}'.format(event.fid)
         status_value = self.get_status_line(event.chp_event)
         self.cns.kv.put(key, status_value)
 

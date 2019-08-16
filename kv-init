@@ -6,3 +6,4 @@ set -eu -o pipefail
 consul kv put leader ''
 consul kv put epoch 1
 consul kv put fid 1
+consul kv put service/"0x7200000000000001:0x1" "M0_CONF_HA_PROCESS_STOPPED"
