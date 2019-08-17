@@ -376,17 +376,13 @@ static void msg_received_cb(struct m0_halon_interface *hi,
 
 	M0_PRE(M0_HA_MSG_INVALID < msg_type && msg_type <= M0_HA_MSG_SNS_ERR);
 	M0_LOG(M0_ALWAYS, "Received msg of type %d", m0_ha_msg_type_get(msg));
-	{
-		struct hax_msg *hm;
 
-		M0_ALLOC_PTR(hm);
-		M0_ASSERT(hm != NULL);
-		hm->hm_hc = hc;
-		hm->hm_hl = hl;
-		hm->hm_msg = msg;
-		hax_action[msg_type](hm);
-		m0_free(hm); // XXX Can't we allocate `hm` on stack?
-	}
+	hax_action[msg_type](
+		&(struct hax_msg){
+			.hm_hc = hc,
+			.hm_hl = hl,
+			.hm_msg = msg
+		});
 	m0_halon_interface_delivered(hi, hl, msg);
 }
 
