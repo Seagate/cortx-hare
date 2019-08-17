@@ -36,7 +36,7 @@
 #include "ha/msg.h"
 #include "hax.h"
 
-static hax_context *hc;
+static struct hax_context *hc;
 
 // XXX Shouldn't these be `static`?
 struct m0_thread    m0thread;
@@ -454,7 +454,8 @@ static void link_disconnected_cb(struct m0_halon_interface *hi,
   /* TODO Implement me */
 }
 
-M0_INTERNAL hax_context *init_halink(PyObject *obj, const char* node_uuid)
+M0_INTERNAL struct hax_context *init_halink(PyObject *obj,
+					    const char* node_uuid)
 {
 	int rc;
 
@@ -462,7 +463,7 @@ M0_INTERNAL hax_context *init_halink(PyObject *obj, const char* node_uuid)
 	// before us.
 	Py_INCREF(obj);
 
-	hc = (hax_context *)malloc(sizeof(hax_context));
+	hc = malloc(sizeof(*hc));
 	assert(hc != NULL);
 
 	hc->alive = true;

@@ -28,12 +28,12 @@
 
 struct m0_halon_interface;
 
-typedef struct hax_context {
+struct hax_context {
 	struct m0_halon_interface *hc_hi;
 	struct m0_mutex            hc_mutex;
 	bool			   alive;
 	PyObject                  *hc_handler;
-} hax_context;
+};
 
 struct hax_entrypoint_request {
 	struct hax_context *hep_hc;
@@ -45,7 +45,7 @@ struct hax_msg {
 	struct m0_ha_msg   *hm_msg;
 };
 
-hax_context* init_halink(PyObject *obj, const char* node_uuid);
+struct hax_context *init_halink(PyObject *obj, const char *node_uuid);
 
 void destroy_halink(unsigned long long ctx);
 
