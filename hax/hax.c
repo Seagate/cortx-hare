@@ -192,11 +192,6 @@ M0_INTERNAL void m0_ha_entrypoint_reply_send(unsigned long long        epr,
 	m0_free(hep);
 }
 
-static void handle_stob_io_err(struct hax_msg *hm)
-{
-	/* XXX Implement me. */
-}
-
 static void handle_failvec(struct hax_msg *hm)
 {
 	M0_PRE(hm != NULL);
@@ -329,11 +324,6 @@ static void __ha_nvec_reply_send(struct hax_msg *hax_msg,
 			M0_HA_NVEC_SET, hl);
 }
 
-static void handle_keepalive(struct hax_msg *hm)
-{
-	/* XXX Implement me. */
-}
-
 static void handle_process_event(struct hax_msg *hm)
 {
 	if (!hm->hm_hc->alive) {
@@ -357,38 +347,24 @@ static void handle_process_event(struct hax_msg *hm)
 	PyGILState_Release(gstate);
 }
 
-static void handle_service_event(struct hax_msg *hm)
+static void _impossible(struct hax_msg *hm)
 {
-	/* XXX Call python function to update consul here. */
-}
-
-static void handle_rpc_event(struct hax_msg *hm)
-{
-	/* XXX Implement me. */
-}
-
-static void handle_be_io_err(struct hax_msg *hm)
-{
-	/* XXX Implement me. */
-}
-
-static void handle_sns_err_handle(struct hax_msg *hm)
-{
-	/* XXX Implement me. */
+	M0_IMPOSSIBLE("Unsupported ha_msg type: %d",
+		      m0_ha_msg_type_get(hm->hm_msg);
 }
 
 static void (*hax_action[])(struct hax_msg *hm) = {
-	[M0_HA_MSG_STOB_IOQ]        = handle_stob_io_err,
+	[M0_HA_MSG_STOB_IOQ]        = _impossible,
 	[M0_HA_MSG_NVEC]            = handle_nvec,
 	[M0_HA_MSG_FAILURE_VEC_REQ] = handle_failvec,
 	[M0_HA_MSG_FAILURE_VEC_REP] = handle_failvec,
-	[M0_HA_MSG_KEEPALIVE_REQ]   = handle_keepalive,
-	[M0_HA_MSG_KEEPALIVE_REP]   = handle_keepalive,
+	[M0_HA_MSG_KEEPALIVE_REQ]   = _impossible,
+	[M0_HA_MSG_KEEPALIVE_REP]   = _impossible,
 	[M0_HA_MSG_EVENT_PROCESS]   = handle_process_event,
-	[M0_HA_MSG_EVENT_SERVICE]   = handle_service_event,
-	[M0_HA_MSG_EVENT_RPC]       = handle_rpc_event,
-	[M0_HA_MSG_BE_IO_ERR]       = handle_be_io_err,
-	[M0_HA_MSG_SNS_ERR]         = handle_sns_err_handle
+	[M0_HA_MSG_EVENT_SERVICE]   = _impossible,
+	[M0_HA_MSG_EVENT_RPC]       = _impossible,
+	[M0_HA_MSG_BE_IO_ERR]       = _impossible,
+	[M0_HA_MSG_SNS_ERR]         = _impossible,
 };
 
 static void msg_received_cb(struct m0_halon_interface *hi,
