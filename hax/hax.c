@@ -192,12 +192,12 @@ M0_INTERNAL void m0_ha_entrypoint_reply_send(unsigned long long        epr,
 	m0_free(hep);
 }
 
-static void _stob_io_err_handle(struct hax_msg *hm)
+static void handle_stob_io_err(struct hax_msg *hm)
 {
 	/* XXX Implement me. */
 }
 
-static void _failvec_handle(struct hax_msg *hm)
+static void handle_failvec(struct hax_msg *hm)
 {
 	M0_PRE(hm != NULL);
 	/*
@@ -247,7 +247,7 @@ static void __ha_failvec_reply_send(struct hax_msg *hax_msg,
 }
 
 /* Tests hax - mero nvec reply send. */
-static void _nvec_handle(struct hax_msg *hm)
+static void handle_nvec(struct hax_msg *hm)
 {
 	/*
 	 * Call python function from here, comment below test function.
@@ -329,12 +329,12 @@ static void __ha_nvec_reply_send(struct hax_msg *hax_msg,
 			M0_HA_NVEC_SET, hl);
 }
 
-static void _keepalive_handle(struct hax_msg *hm)
+static void handle_keepalive(struct hax_msg *hm)
 {
 	/* XXX Implement me. */
 }
 
-static void _process_event_handle(struct hax_msg *hm)
+static void handle_process_event(struct hax_msg *hm)
 {
 	if (!hm->hm_hc->alive) {
 		M0_LOG(M0_DEBUG, "Skipping the event processing since"
@@ -357,38 +357,38 @@ static void _process_event_handle(struct hax_msg *hm)
 	PyGILState_Release(gstate);
 }
 
-static void _service_event_handle(struct hax_msg *hm)
+static void handle_service_event(struct hax_msg *hm)
 {
 	/* XXX Call python function to update consul here. */
 }
 
-static void _rpc_event_handle(struct hax_msg *hm)
+static void handle_rpc_event(struct hax_msg *hm)
 {
 	/* XXX Implement me. */
 }
 
-static void _be_io_err_handle(struct hax_msg *hm)
+static void handle_be_io_err(struct hax_msg *hm)
 {
 	/* XXX Implement me. */
 }
 
-static void _sns_err_handle(struct hax_msg *hm)
+static void handle_sns_err_handle(struct hax_msg *hm)
 {
 	/* XXX Implement me. */
 }
 
 static void (*hax_action[])(struct hax_msg *hm) = {
-	[M0_HA_MSG_STOB_IOQ]        = _stob_io_err_handle,
-	[M0_HA_MSG_NVEC]            = _nvec_handle,
-	[M0_HA_MSG_FAILURE_VEC_REQ] = _failvec_handle,
-	[M0_HA_MSG_FAILURE_VEC_REP] = _failvec_handle,
-	[M0_HA_MSG_KEEPALIVE_REQ]   = _keepalive_handle,
-	[M0_HA_MSG_KEEPALIVE_REP]   = _keepalive_handle,
-	[M0_HA_MSG_EVENT_PROCESS]   = _process_event_handle,
-	[M0_HA_MSG_EVENT_SERVICE]   = _service_event_handle,
-	[M0_HA_MSG_EVENT_RPC]       = _rpc_event_handle,
-	[M0_HA_MSG_BE_IO_ERR]       = _be_io_err_handle,
-	[M0_HA_MSG_SNS_ERR]         = _sns_err_handle
+	[M0_HA_MSG_STOB_IOQ]        = handle_stob_io_err,
+	[M0_HA_MSG_NVEC]            = handle_nvec,
+	[M0_HA_MSG_FAILURE_VEC_REQ] = handle_failvec,
+	[M0_HA_MSG_FAILURE_VEC_REP] = handle_failvec,
+	[M0_HA_MSG_KEEPALIVE_REQ]   = handle_keepalive,
+	[M0_HA_MSG_KEEPALIVE_REP]   = handle_keepalive,
+	[M0_HA_MSG_EVENT_PROCESS]   = handle_process_event,
+	[M0_HA_MSG_EVENT_SERVICE]   = handle_service_event,
+	[M0_HA_MSG_EVENT_RPC]       = handle_rpc_event,
+	[M0_HA_MSG_BE_IO_ERR]       = handle_be_io_err,
+	[M0_HA_MSG_SNS_ERR]         = handle_sns_err_handle
 };
 
 static void msg_received_cb(struct m0_halon_interface *hi,
