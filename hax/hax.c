@@ -49,11 +49,11 @@ static void _ha_test_entrypoint_reply_send(struct m0_halon_interface *hi,
                                            const char                *git_rev_id,
                                            uint64_t                   pid,
                                            bool                       first_request);
-static void __ha_failvec_reply_send(struct hax_msg *hax_msg,
+static void __ha_failvec_reply_send(const struct hax_msg *hm,
 				    struct m0_fid *pool_fid,
                                     uint32_t nr_notes);
-static void nvec_test_reply_send(struct hax_msg *hm);
-static void __ha_nvec_reply_send(struct hax_msg *hax_msg,
+static void nvec_test_reply_send(const struct hax_msg *hm);
+static void __ha_nvec_reply_send(const struct hax_msg *hm,
 				 struct m0_ha_nvec *nvec);
 
 PyObject* getModule(char *module_name)
@@ -192,7 +192,7 @@ M0_INTERNAL void m0_ha_entrypoint_reply_send(unsigned long long        epr,
 	m0_free(hep);
 }
 
-static void handle_failvec(struct hax_msg *hm)
+static void handle_failvec(const struct hax_msg *hm)
 {
 	M0_PRE(hm != NULL);
 	/*
@@ -216,16 +216,16 @@ M0_INTERNAL void m0_ha_failvec_reply_send(unsigned long long hm,
 	__ha_failvec_reply_send((struct hax_msg *)hm, pool_fid, nr_notes);
 }
 
-static void __ha_failvec_reply_send(struct hax_msg *hax_msg,
+static void __ha_failvec_reply_send(const struct hax_msg *hm,
 				    struct m0_fid *pool_fid,
 				    uint32_t nr_notes)
 {
-	struct m0_ha_link *hl = hax_msg->hm_hl;
-	struct m0_ha_msg  *msg = hax_msg->hm_msg;
+	struct m0_ha_link *hl = hm->hm_hl;
+	struct m0_ha_msg  *msg = hm->hm_msg;
 	struct m0_ha_msg  *repmsg;
 	uint64_t           tag;
 
-	M0_PRE(hax_msg != NULL);
+	M0_PRE(hm != NULL);
 	M0_PRE(hl != NULL);
 
 	M0_ALLOC_PTR(repmsg);
@@ -242,7 +242,7 @@ static void __ha_failvec_reply_send(struct hax_msg *hax_msg,
 }
 
 /* Tests hax - mero nvec reply send. */
-static void handle_nvec(struct hax_msg *hm)
+static void handle_nvec(const struct hax_msg *hm)
 {
 	/*
 	 * Call python function from here, comment below test function.
@@ -251,7 +251,7 @@ static void handle_nvec(struct hax_msg *hm)
 	nvec_test_reply_send(hm);
 }
 
-static void nvec_test_reply_send(struct hax_msg *hm)
+static void nvec_test_reply_send(const struct hax_msg *hm)
 {
 	struct m0_ha_msg            *msg = hm->hm_msg;
 	const struct m0_ha_msg_nvec *nvec_req = &msg->hm_data.u.hed_nvec;
@@ -311,20 +311,20 @@ M0_INTERNAL void m0_ha_nvec_reply_send(unsigned long long hm,
 	__ha_nvec_reply_send((struct hax_msg *)hm, nvec);
 }
 
-static void __ha_nvec_reply_send(struct hax_msg *hax_msg,
+static void __ha_nvec_reply_send(const struct hax_msg *hm,
 				 struct m0_ha_nvec *nvec)
 {
-	struct m0_ha_link *hl = hax_msg->hm_hl;
-	struct m0_ha_msg  *msg = hax_msg->hm_msg;
+	struct m0_ha_link *hl = hm->hm_hl;
+	struct m0_ha_msg  *msg = hm->hm_msg;
 
-	M0_PRE(hax_msg != NULL);
+	M0_PRE(hm != NULL);
 	M0_PRE(nvec != NULL);
 
 	m0_ha_msg_nvec_send(nvec, msg->hm_data.u.hed_nvec.hmnv_id_of_get,
 			M0_HA_NVEC_SET, hl);
 }
 
-static void handle_process_event(struct hax_msg *hm)
+static void handle_process_event(const struct hax_msg *hm)
 {
 	if (!hm->hm_hc->alive) {
 		M0_LOG(M0_DEBUG, "Skipping the event processing since"
@@ -347,13 +347,13 @@ static void handle_process_event(struct hax_msg *hm)
 	PyGILState_Release(gstate);
 }
 
-static void _impossible(struct hax_msg *hm)
+static void _impossible(const struct hax_msg *hm)
 {
 	M0_IMPOSSIBLE("Unsupported ha_msg type: %d",
 		      m0_ha_msg_type_get(hm->hm_msg);
 }
 
-static void (*hax_action[])(struct hax_msg *hm) = {
+static void (*hax_action[])(const struct hax_msg *hm) = {
 	[M0_HA_MSG_STOB_IOQ]        = _impossible,
 	[M0_HA_MSG_NVEC]            = handle_nvec,
 	[M0_HA_MSG_FAILURE_VEC_REQ] = handle_failvec,
