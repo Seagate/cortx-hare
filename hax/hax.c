@@ -104,6 +104,7 @@ static void entrypoint_request_cb(struct m0_halon_interface *hi, const struct m0
 	gstate = PyGILState_Ensure();
 
 	M0_ALLOC_PTR(ep);
+	M0_ASSERT(ep != NULL);
 
 	ep->hep_hc = hc;
 
@@ -142,16 +143,15 @@ static void _ha_test_entrypoint_reply_send(struct m0_halon_interface *hi,
 	/* XXX TODO: Move test code to separate location.*/
 
 	M0_ALLOC_ARR(confd_fids, 1);
-	if (confd_fids == NULL) {
-		M0_LOG(M0_ERROR, "fid array allocation failure");
-		return;
-	}
+	M0_ASSERT(confd_fids != NULL);
 	confd_fids[0] = M0_FID_TINIT('s', 3, 1);
+
 	M0_ALLOC_ARR(confd_eps, 1);
-	if (confd_eps == NULL)
-		M0_LOG(M0_ALWAYS, "confd ep array allocation failure");
+	M0_ASSERT(confd_eps != NULL);
 	confd_eps[0] = m0_strdup("172.28.128.4@tcp:12345:44:1");
+	M0_ASSERT(confd_eps[0] != NULL);
 	rm_ep = m0_strdup("172.28.128.4@tcp:12345:44:1");
+	M0_ASSERT(rm_ep != NULL);
 
 	m0_halon_interface_entrypoint_reply(hi, req_id, 0, 1, confd_fids, confd_eps, 1, &M0_FID_TINIT('s', 4, 1), rm_ep);
 	M0_LOG(M0_ALWAYS, "Entry point replied");
@@ -226,8 +226,7 @@ static void __ha_failvec_reply_send(struct hax_msg *hax_msg, struct m0_fid *pool
 	M0_PRE(hi != NULL);
 
 	M0_ALLOC_PTR(repmsg);
-	if (repmsg == NULL)
-		return;
+	M0_ASSERT(repmsg != NULL);
 	repmsg->hm_data.hed_type = M0_HA_MSG_FAILURE_VEC_REP;
 	/* Fabricated poolfid, fetch the information from consul */
 	repmsg->hm_data.u.hed_fvec_rep.mfp_pool = *pool_fid;
@@ -394,10 +393,7 @@ static void msg_received_cb(struct m0_halon_interface *hi, struct m0_ha_link *hl
 	M0_LOG(M0_ALWAYS, "msg received of type: %d", msg->hm_data.hed_type);
 
 	M0_ALLOC_PTR(hm);
-	if (hm == NULL) {
-		M0_LOG(M0_ERROR, "hax_msg allocation failure %d", -ENOMEM);
-		return;
-	}
+	M0_ASSERT(hm != NULL);
 	hm->hm_hc = hc;
 	hm->hm_hl = hl;
 	hm->hm_msg = msg;
@@ -446,11 +442,8 @@ M0_INTERNAL hax_context* init_halink(PyObject *obj, const char* node_uuid)
 	Py_INCREF(obj);
 	int rc;
 
-	hc = (hax_context*) malloc(sizeof(hax_context));
-	if (hc == NULL) {
-		M0_LOG(M0_ERROR, "\n Error: %d\n", -ENOMEM);
-		return NULL;
-	}
+	hc = (hax_context *)malloc(sizeof(hax_context));
+	assert(hc != NULL);
 
 	hc->alive = true;
 	rc = m0_halon_interface_init(&hc->hc_hi, "M0_VERSION_GIT_REV_ID",
@@ -541,14 +534,10 @@ void m0_ha_notify(unsigned long long ctx, struct m0_ha_note *notes, uint32_t nr_
 	m0_halon_interface_nvec_broadcast(hi, &nvec);
 }
 
-int adopt_mero_thread()
+void adopt_mero_thread(void)
 {
-	int rc;
-	rc = m0_thread_adopt(&m0thread, m0);
-	if (rc != 0) {
-		M0_LOG(M0_ERROR, "Mero thread adoption failed: %d\n", rc);
-	}
-	return rc;
+	int rc = m0_thread_adopt(&m0thread, m0);
+	assert(rc == 0);
 }
 
 /*
