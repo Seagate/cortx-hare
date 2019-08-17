@@ -6,6 +6,7 @@ CPPFLAGS := -I$(M0_SRC_DIR) $(shell python-config --includes)
 CPPFLAGS += -DM0_INTERNAL= -DM0_EXTERN=extern
 
 CFLAGS := -g -Werror -Wno-attributes
+#XXX Mandar, would you uncomment the next line and fix compilation errors please?  --vvv
 # CFLAGS += -Wall -Wextra
 CFLAGS += -fPIC
 
