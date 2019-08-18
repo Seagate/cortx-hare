@@ -1,12 +1,5 @@
 #!/usr/bin/env python3
 
-# TODO:
-#
-# - Validate input file.  One simple way to do this is to use
-#   `yaml-to-dhall ./ClusterDesc/ClusterDesc`, but this requires
-#   `yaml-to-dhall` executable that includes
-#   https://github.com/dhall-lang/dhall-haskell/pull/1083 bugfix.
-
 import abc
 import argparse
 import ast
@@ -17,7 +10,7 @@ import random
 import re
 import subprocess
 import sys
-from typing import Any, Dict, NamedTuple, List
+from typing import Any, Callable, Dict, NamedTuple, List, Tuple
 import yaml
 
 
@@ -27,24 +20,32 @@ __author__ = 'Valery V. Vorotyntsev <valery.vorotyntsev@seagate.com>'
 
 def parse_opts(argv):
     p = argparse.ArgumentParser(
-        # formatter_class=argparse.RawTextHelpFormatter,
+        description='Generate configuration data in Dhall format.',
         usage='%(prog)s [-o <output-dir>] [--mock]',
         epilog='The program reads cluster description in YAML format from the'
         " standard input; '--help-schema' option shows the schema.")
     p.add_argument('--help-schema', nargs=0, help='show cluster description'
                    ' file schema', action=ShowSchema)
-    default_output_dir = 'collected-facts'
     p.add_argument('-o', metavar='output-dir',
                    help='directory to store generated files in'
-                   f" (defaults to '{default_output_dir}')",
-                   dest='output_dir', default=default_output_dir)
+                   ' (defaults to the current working directory)',
+                   dest='output_dir', default='.')
     p.add_argument('--mock', help='Generate pseudo-random "facts". The hosts'
                    ' specified in the cluster description file will not be'
                    " visited and don't even have to exist.",
                    action='store_true')
     p.add_argument('-V', '--version', action='version',
                    version='%(prog)s ' + __version__)
-    return p.parse_args(argv)
+    opts = p.parse_args(argv)
+
+    # Sanity checking
+    d = opts.output_dir
+    if not (d and os.path.isdir(d) and os.access(d, os.X_OK | os.W_OK)):
+        print("`-o' argument must be a path to writable directory",
+              file=sys.stderr)
+        sys.exit(1)
+
+    return opts
 
 
 class ShowSchema(argparse.Action):
@@ -89,7 +90,8 @@ pools:
 def main(argv=None):
     opts = parse_opts(argv)
     try:
-        # XXX yaml-to-dhall './ClusterDesc/ClusterDesc'
+        # XXX TODO: Validate the input with
+        # `yaml-to-dhall ./dhall/ClusterDesc/ClusterDesc` command.
         cluster_desc = yaml.safe_load(sys.stdin)
     except KeyboardInterrupt:
         sys.exit(1)
@@ -107,53 +109,46 @@ def main(argv=None):
 
     validate_cluster_desc(cluster_desc)
 
-    m0conf = build_m0conf(cluster_desc)
-    # XXX DELETEME <<<<<<<
-    # from pprint import pprint
-    # print('----- cluster_desc -----')
-    # pprint(cluster_desc)
-    # print('----- m0conf -----')
-    # pprint(m0conf)
-    # XXX >>>>>>>
-
-    if not os.path.isdir(opts.output_dir):
-        os.mkdir(opts.output_dir)
-
-    with open(os.path.join(opts.output_dir, 'confd.dhall'), 'w') as f:
-        def objt(obj: ToDhall) -> str:
-            objt = obj.__class__.__name__
-            assert objt.startswith('Conf')
-            return objt[len('Conf'):]
-
-        print("""\
-let Endpoint/tcp = ./dhall/Endpoint/tcp
-let Obj          = ./dhall/Conf/Obj/Obj
-let ObjT         = ./dhall/Conf/ObjT/ObjT
-let Oid          = ./dhall/Conf/Oid/Oid
-let SvcT         = ./dhall/Conf/SvcT/SvcT
-let confgen      = ./dhall/Conf/confgen
-let zoid         = ./dhall/Conf/Oid/zoid
-
-let objs =
-  [ {}
-  ]
-
-in confgen objs
-""".format('\n  , '.join('Obj.{} {}'.format(objt(v), v.to_dhall(k))
-                         for k, v in m0conf.items())),
-              file=f)
+    nodes = cluster_nodes(cluster_desc)
+    outs: List[Tuple[
+        str, Callable[..., str], List[Any], Dict[str, Any]]] = [
+            ('bootstrap-env', generate_bootstrap_env, nodes, {}),
+            ('confd.dhall', generate_confd, [cluster_desc], {}),
+    ]
+    for path, generate, args, kwargs in outs:
+        assert '\n' not in path
+        with open(os.path.join(opts.output_dir, path), 'w') as f:
+            f.write(generate(*args, **kwargs))
 
 
 def all_unique(xs):
-    """Returns True iff all entries of the sequence are unique."""
+    """Returns True iff all entries of the sequence are unique.
+    """
+    if hasattr(xs, '__iter__') and hasattr(xs, '__next__'):
+        # `xs` is a generator.  We should not consume it twice.
+        xs = list(xs)
     return len(xs) == len(set(xs))
 
 
 def validate_cluster_desc(desc: Dict[str, Any]):
+    assert all_unique(host['name'] for host in desc['hosts'])
+
     hosts = [(h['name'], h['facts']['ipaddress']) for h in desc['hosts']]
-    assert all_unique([ip for _name, ip in hosts]), \
+    assert all_unique(ip for _name, ip in hosts), \
         'IP addresses are not unique:\n' + \
         '\n'.join('    ' + name + ' ' + ip for name, ip in hosts)
+
+    total_nr_confds = 0
+
+    for host in desc['hosts']:
+        nr_confds = sum(1 for m0d in host['m0_servers'] if m0d['runs_confd'])
+        assert nr_confds < 2, host['name'] + ': Too many confd services'
+        total_nr_confds += nr_confds
+
+        assert nr_confds + host['c0_clients'] + host['m0t1fs_clients'] > 0, \
+            host['name'] + ': At least one Mero server or client is required'
+
+    assert total_nr_confds > 0, 'At least one confd is required'
 
 
 def run_command(hostname: str, *args: str) -> str:
@@ -208,6 +203,27 @@ def fabricate_facts(hostname: str, *args: str) -> Dict[str, Any]:
             rng(256), rng(256), rng(256), rng(256), rng(256), rng(256)]),
     }
     return dict((k, fabricated[k]) for k in args)
+
+
+def cluster_nodes(cluster_desc: Dict[str, Any]) -> Tuple[List[str], List[str]]:
+    hosts = list((host['facts']['hostname'],
+                  any(m0d['runs_confd'] for m0d in host['m0_servers']))
+                 for host in cluster_desc['hosts'])
+    servers = list(hostname for hostname, confd_p in hosts if confd_p)
+    clients = list(hostname for hostname, confd_p in hosts if not confd_p)
+
+    names = servers + clients
+    assert all_unique(names)
+    assert all(re.search('[",= @]', name) is None for name in names)
+
+    return servers, clients
+
+
+def generate_bootstrap_env(servers: List[str], clients: List[str]) -> str:
+    return """\
+consul_server_nodes={}
+consul_client_nodes={}
+""".format(','.join(servers), ','.join(clients))
 
 
 ObjT = Enum('ObjT', 'root fdmi_flt_grp fdmi_filter'
@@ -588,6 +604,35 @@ def build_m0conf(cluster_desc: Dict[str, Any]) -> Dict[Oid, ToDhall]:
     assert all(k.type.name == v.__class__.__name__[len('Conf'):].lower()
                for k, v in conf.items())
     return conf
+
+
+def generate_confd(cluster_desc: Dict[str, Any]) -> str:
+    m0conf = build_m0conf(cluster_desc)
+
+    def objt(obj: ToDhall) -> str:
+        objt = obj.__class__.__name__
+        assert objt.startswith('Conf')
+        return objt[len('Conf'):]
+
+    return """\
+let Endpoint/tcp = ./dhall/Endpoint/tcp
+let Obj          = ./dhall/Conf/Obj/Obj
+let ObjT         = ./dhall/Conf/ObjT/ObjT
+let Oid          = ./dhall/Conf/Oid/Oid
+let SvcT         = ./dhall/Conf/SvcT/SvcT
+let confgen      = ./dhall/Conf/confgen
+let zoid         = ./dhall/Conf/Oid/zoid
+
+let objs =
+  [ {}
+  ]
+
+in confgen objs
+""".format('\n  , '.join('Obj.{} {}'.format(objt(v), v.to_dhall(k))
+                         for k, v in m0conf.items()
+                         # XXX DELETEME
+                         if k.type not in (ObjT.root, ObjT.site, ObjT.rack,
+                                           ObjT.enclosure, ObjT.controller)))
 
 
 if __name__ == '__main__':
