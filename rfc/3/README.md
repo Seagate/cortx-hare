@@ -15,6 +15,9 @@ document are to be interpreted as described in
 
 ## Configuration Generation
 
+Configuration generation script &mdash; `cfgen` &mdash; generates
+various configuration files required to start Mero cluster.
+
 ![cfgen](cfgen.png)
 
 ### Cluster Description File
@@ -63,7 +66,7 @@ pools:
 ```
 usage: cfgen [-o <output-dir>] [--mock]
 
-Generate configuration data for Mero cluster.
+Generate configuration files required to start Mero cluster.
 
 optional arguments:
   -h, --help     show this help message and exit

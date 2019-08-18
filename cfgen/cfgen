@@ -20,7 +20,8 @@ __author__ = 'Valery V. Vorotyntsev <valery.vorotyntsev@seagate.com>'
 
 def parse_opts(argv):
     p = argparse.ArgumentParser(
-        description='Generate configuration data for Mero cluster.',
+        description='Generate configuration files required to start'
+        ' Mero cluster.',
         usage='%(prog)s [-o <output-dir>] [--mock]',
         epilog='The program reads cluster description in YAML format from the'
         " standard input; '--help-schema' option shows the schema.")
