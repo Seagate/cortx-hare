@@ -58,16 +58,17 @@ pools:
     #disks: all
 ```
 
-### `collect-facts`
+### `cfgen` script
 
 ```
-usage: collect-facts [-o <output-dir>] [--mock]
+usage: cfgen [-o <output-dir>] [--mock]
+
+Generate configuration data for Mero cluster.
 
 optional arguments:
   -h, --help     show this help message and exit
   --help-schema  show cluster description file schema
-  -o output-dir  directory to store generated files in (defaults to
-                 'collected-facts')
+  -o output-dir  output directory (defaults to '.')
   --mock         Generate pseudo-random "facts". The hosts specified in the
                  cluster description file will not be visited and don't even
                  have to exist.
@@ -77,36 +78,28 @@ The program reads cluster description in YAML format from the standard input;
 '--help-schema' option shows the schema.
 ```
 
-**collect-facts** ssh-es to the hosts mentioned in the cluster
-description file, collects "facts" about them (e.g.,
-`facter --json processors | jq .processors.count`, `facter memorysize_mb`)
-and saves that data locally as [Dhall](https://dhall-lang.org/) expressions
-(`collected-facts/*.dhall`).
+**cfgen** reads cluster description file from stdin, ssh-es to the
+hosts mentioned in it, collects their "facts" (e.g., number of CPUs,
+RAM size), and uses that information to generate configuration data.
 
-### `cfgen`
+### Output files
 
-**cfgen** performs Dhall processing and generates the following files:
-
-  * `consul-nodes` -- tells [`bootstrap`](rfc/6/README.md) script
+  * `bootstrap-env` -- tells [`bootstrap`](rfc/6/README.md) script
     where Consul server and client agents should be started.
 
     Format:
     ```
-    [servers]
-    hostname
-    hostname
-    hostname
-
-    [clients]
-    hostname
-    hostname
+    consul_server_nodes=host1,host2,host3
+    consul_client_nodes=host4,host5
 
     # Comments start with a hash symbol and run to the end of the line.
     ```
 
-  * `consul-services.json` -- Consul services and
-    [watches](https://www.consul.io/docs/agent/watches.html)
-    definitions.
+  * `consul-config_<hostname>.json` -- Consul
+    [configuration files](https://www.consul.io/docs/agent/options.html#configuration-files),
+    one for each node.  These files contain definitions of
+    [services](https://www.consul.io/docs/agent/services.html) and
+    [checks](https://www.consul.io/docs/agent/checks.html).
 
   * `consul-kv.json` -- key/value pairs in JSON format, ready to be
     consumed by
