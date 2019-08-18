@@ -1,12 +1,12 @@
 SHELL = bash
 
-PYTHON_SCRIPTS = cfgen-dhall
+PYTHON_SCRIPTS = cfgen
 
 # XXX YMMV
 M0_SRC_DIR = ~/src/mero
 
 .PHONY: check
-check: flake8 typecheck test-cfgen-dhall
+check: flake8 typecheck test-cfgen check-dhall
 
 .PHONY: flake8
 flake8: $(PYTHON_SCRIPTS)
@@ -16,11 +16,11 @@ flake8: $(PYTHON_SCRIPTS)
 typecheck: $(PYTHON_SCRIPTS)
 	set -eu -o pipefail; for f in $^; do mypy $$f; done
 
-.PHONY: test-cfgen-dhall
-test-cfgen-dhall:
+.PHONY: test-cfgen
+test-cfgen:
 	set -eu -o pipefail;\
  out=$$(mktemp -d);\
- ./cfgen-dhall --mock -o $$out <_misc/singlenode.yaml;\
+ ./cfgen --mock -o $$out <_misc/singlenode.yaml;\
  dhall text <$$out/confd.dhall | $(M0_SRC_DIR)/utils/m0confgen >/dev/null;\
  rm -r $$out
 

@@ -26,9 +26,13 @@ def parse_opts(argv):
         " standard input; '--help-schema' option shows the schema.")
     p.add_argument('--help-schema', nargs=0, help='show cluster description'
                    ' file schema', action=ShowSchema)
+    # default_dhall_dir = '/opt/cfgen/dhall'
+    # p.add_argument('--dhall', metavar='dir',
+    #                help='directory with auxiliary Dhall expressions'
+    #                f' (defaults to {default_dhall_dir!r})',
+    #                dest='dhall_dir', default=default_dhall_dir)
     p.add_argument('-o', metavar='output-dir',
-                   help='directory to store generated files in'
-                   ' (defaults to the current working directory)',
+                   help="output directory (defaults to '.')",
                    dest='output_dir', default='.')
     p.add_argument('--mock', help='Generate pseudo-random "facts". The hosts'
                    ' specified in the cluster description file will not be'
@@ -110,15 +114,13 @@ def main(argv=None):
     validate_cluster_desc(cluster_desc)
 
     nodes = cluster_nodes(cluster_desc)
-    outs: List[Tuple[
-        str, Callable[..., str], List[Any], Dict[str, Any]]] = [
-            ('bootstrap-env', generate_bootstrap_env, nodes, {}),
-            ('confd.dhall', generate_confd, [cluster_desc], {}),
+    outs: List[Tuple[str, Callable[..., str], List[Any]]] = [
+            ('bootstrap-env', generate_bootstrap_env, nodes),
+            ('confd.dhall', generate_confd, [cluster_desc]),
     ]
-    for path, generate, args, kwargs in outs:
-        assert '\n' not in path
+    for path, generate, args in outs:
         with open(os.path.join(opts.output_dir, path), 'w') as f:
-            f.write(generate(*args, **kwargs))
+            f.write(generate(*args))
 
 
 def all_unique(xs):
