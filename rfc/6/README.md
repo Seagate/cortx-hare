@@ -1,48 +1,70 @@
 ---
 domain: gitlab.mero.colo.seagate.com
 shortname: 6/BOOT
-name: Mero Cluster Bootstrapping
+name: Mero Cluster Bootstrap
 status: raw
 editor: Valery V. Vorotyntsev <valery.vorotyntsev@seagate.com>
 ---
 
-## Mero Cluster Bootstrapping
+## Language
+
+The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+"SHOULD", "SHOULD NOT", "RECOMMENDED", "MAY", and "OPTIONAL" in this
+document are to be interpreted as described in
+[RFC 2119](https://tools.ietf.org/html/rfc2119).
+
+## Mero cluster bootstrap
 
 Cluster administrator
 
 1. Prepares the
    [cluster description file](rfc/3/README.md#cluster-description-file).
 
-1. Runs `bootstrap` script (on any cluster node), passing the cluster
-   description file to it via standard input.
+1. Runs `bootstrap` script, passing it the cluster description file
+   via standard input.  The script MAY be started on any node of the
+   cluster.
 
 The `bootstrap` script
 
 1. Executes [‘cfgen’ script](rfc/3/README.md#cfgen), which generates
-   `consul-nodes`, `consul-services.json`, `consul-kv.json`, and
+   `bootstrap-env`, `consul-config.json`, `consul-kv.json`, and
    `confd.xc` files.
 
-1. Starts `consul` agents, knowing from `consul-nodes` file where
+1. Starts `consul` agents, knowing from `bootstrap-env` file where
    server and client agents should be running.
 
 1. Initialises [Consul KV](rfc/4/README.md) by executing
    `consul kv import @consul-kv.json` command.
 
-1. Starts `hax` on each of the nodes.  Each of the `hax` processes
-   gets its [three fids](#8) from the Consul KV.
+1. Starts `hax` on every node of the cluster.  Each `hax` process
+   obtains its [three fids](#8) from the Consul KV.
 
-1. Starts `m0mkfs` processes.
+1. Starts ‘confd’ Mero servers on the Consul server nodes.  For each
+   confd Mero server:
 
-   XXX TBD: We should be able to use Consul watch(es) to notify
-   ‘bootstrap’ the completion of `m0mkfs`.  E.g., ‘bootstrap’ may
-   wait for a file, which will be created by a Consul's watch
-   handler.  Once `m0mkfs` has completed on a node with Consul
-   server agent, ‘bootstrap’ may proceed with starting confd on that
-   node.
+   - obtains host name and process fid from the Consul KV;
+   - uploads `confd.xc` file;
+   - starts `m0mkfs` process;
+   - waits for `m0mkfs` to terminate;
+   - starts `m0d` process.
 
-1. Uploads `confd.xc` file to the Consul server nodes (those listed in
-   the `[servers]` section of `consul-nodes` file).  Starts “confd”
-   `m0d` on those nodes.
+1. Waits for ‘confd’ servers to start.
 
-1. Starts the rest of `m0d`s (I/O services), obtaining the names of
-   their hosts and CLI arguments (?) from the Consul KV.
+1. Starts other (non-confd) Mero servers.  For each non-confd Mero
+   server:
+
+   - obtains host name and process fid from the Consul KV;
+   - starts `m0mkfs` process;
+   - waits for `m0mkfs` to terminate;
+   - starts `m0d` process(es).
+
+**Note:** `bootstrap` waits for a Mero process by polling status of
+the corresponding Consul service; see
+[5/HAX](rfc/5/README.md#storing-process-status-in-consul-kv) for more
+details.
+
+## Design Highlights
+
+* Mero ‘confd’ services SHALL be collocated with Consul server agents.
+* Several ‘confd’ service SHALL NOT be running on the same node.
+* Several Mero servers MAY be running on the same node.
