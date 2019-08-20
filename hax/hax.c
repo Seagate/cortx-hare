@@ -212,7 +212,7 @@ M0_INTERNAL void m0_ha_failvec_reply_send(unsigned long long hm,
 					  struct m0_fid *pool_fid,
 					  uint32_t nr_notes)
 {
-	M0_PRE(hm != NULL);
+	M0_PRE(hm != 0);
 	__ha_failvec_reply_send((struct hax_msg *)hm, pool_fid, nr_notes);
 }
 
@@ -350,7 +350,7 @@ static void handle_process_event(const struct hax_msg *hm)
 static void _impossible(const struct hax_msg *hm)
 {
 	M0_IMPOSSIBLE("Unsupported ha_msg type: %d",
-		      m0_ha_msg_type_get(hm->hm_msg);
+		      m0_ha_msg_type_get(hm->hm_msg));
 }
 
 static void (*hax_action[])(const struct hax_msg *hm) = {
@@ -386,11 +386,32 @@ static void msg_received_cb(struct m0_halon_interface *hi,
 	m0_halon_interface_delivered(hi, hl, msg);
 }
 
-static void noop_cb(struct m0_halon_interface *hi,
-		    struct m0_ha_link *hl,
-		    uint64_t tag)
+static void msg_is_delivered_cb(struct m0_halon_interface *hi,
+				struct m0_ha_link *hl,
+				uint64_t tag)
 {
-	M0_LOG(M0_NOTICE, "XXX Callback handler is a noop");
+	M0_LOG(M0_DEBUG, "noop");
+}
+
+static void msg_is_not_delivered_cb(struct m0_halon_interface *hi,
+				    struct m0_ha_link *hl,
+				    uint64_t tag)
+{
+	M0_LOG(M0_DEBUG, "noop");
+}
+
+static void link_connected_cb(struct m0_halon_interface *hi,
+			      const struct m0_uint128 *req_id,
+			      struct m0_ha_link *link)
+{
+	M0_LOG(M0_DEBUG, "noop");
+}
+
+static void link_reused_cb(struct m0_halon_interface *hi,
+			   const struct m0_uint128 *req_id,
+			   struct m0_ha_link *link)
+{
+	M0_LOG(M0_DEBUG, "noop");
 }
 
 static void link_is_disconnecting_cb(struct m0_halon_interface *hi,
@@ -398,6 +419,12 @@ static void link_is_disconnecting_cb(struct m0_halon_interface *hi,
 {
 	M0_LOG(M0_ALWAYS, "Disconnecting ha");
 	m0_halon_interface_disconnect(hi, hl);
+}
+
+static void link_disconnected_cb(struct m0_halon_interface *hi,
+			         struct m0_ha_link *link)
+{
+	M0_LOG(M0_DEBUG, "noop");
 }
 
 M0_INTERNAL struct hax_context *init_halink(PyObject *obj,
@@ -459,9 +486,12 @@ int start(unsigned long long   ctx,
 			      rm_service_fid->f_key),
 		entrypoint_request_cb,
 		msg_received_cb,
-		noop_cb, noop_cb, noop_cb, noop_cb,
+		msg_is_delivered_cb,
+		msg_is_not_delivered_cb,
+		link_connected_cb,
+		link_reused_cb,
 		link_is_disconnecting_cb,
-		noop_cb);
+		link_disconnected_cb);
 }
 
 void test(unsigned long long ctx)
