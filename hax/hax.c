@@ -25,6 +25,7 @@
 #include <errno.h>
 #include "fid/fid.h"             /* M0_FID_TINIT */
 #include "ha/halon/interface.h"  /* m0_halon_interface */
+#include "ha/link.h"             /* m0_ha_link_send */
 #include "ha/note.h"
 #include "module/instance.h"
 #include "lib/assert.h"          /* M0_ASSERT */
@@ -42,13 +43,6 @@ static struct hax_context *hc;
 struct m0_thread    m0thread;
 struct m0          *m0;
 
-static void _ha_test_entrypoint_reply_send(struct m0_halon_interface *hi,
-                                           const struct m0_uint128   *req_id,
-                                           const char                *remote_rpc_endpoint,
-                                           const struct m0_fid       *process_fid,
-                                           const char                *git_rev_id,
-                                           uint64_t                   pid,
-                                           bool                       first_request);
 static void __ha_failvec_reply_send(const struct hax_msg *hm,
 				    struct m0_fid *pool_fid,
                                     uint32_t nr_notes);
@@ -135,41 +129,6 @@ static void entrypoint_request_cb(struct m0_halon_interface *hi,
 	PyGILState_Release(gstate);
   }
 
-static void _ha_test_entrypoint_reply_send(struct m0_halon_interface *hi,
-					   const struct m0_uint128   *req_id,
-					   const char                *remote_rpc_endpoint,
-					   const struct m0_fid       *process_fid,
-					   const char                *git_rev_id,
-					   uint64_t                   pid,
-					   bool                       first_request)
-{
-	struct m0_fid *confd_fids;
-	const char   **confd_eps;
-	const char    *rm_ep;
-
-	/* XXX TODO: Move test code to separate location.*/
-
-	M0_ALLOC_ARR(confd_fids, 1);
-	M0_ASSERT(confd_fids != NULL);
-	confd_fids[0] = M0_FID_TINIT('s', 3, 1);
-
-	M0_ALLOC_ARR(confd_eps, 1);
-	M0_ASSERT(confd_eps != NULL);
-	confd_eps[0] = m0_strdup("172.28.128.4@tcp:12345:44:1");
-	M0_ASSERT(confd_eps[0] != NULL);
-
-	rm_ep = m0_strdup("172.28.128.4@tcp:12345:44:1");
-	M0_ASSERT(rm_ep != NULL);
-
-	m0_halon_interface_entrypoint_reply(hi, req_id, 0, 1, confd_fids,
-					    confd_eps, 1,
-					    &M0_FID_TINIT('s', 4, 1), rm_ep);
-	M0_LOG(M0_ALWAYS, "Entry point replied");
-
-	m0_free(confd_fids);
-	m0_free(confd_eps);
-}
-
 /*
  * To be invoked from python land.
  */
@@ -255,9 +214,11 @@ static void nvec_test_reply_send(const struct hax_msg *hm)
 {
 	struct m0_ha_msg            *msg = hm->hm_msg;
 	const struct m0_ha_msg_nvec *nvec_req = &msg->hm_data.u.hed_nvec;
-	struct m0_ha_nvec            nvec = { .nv_nr = nvec_req->hmnv_nr };
+	struct m0_ha_nvec            nvec = {
+		.nv_nr = (int32_t)nvec_req->hmnv_nr
+	};
 	struct m0_fid                obj_fid;
-	int                          i;
+	int32_t                      i;
 
 	M0_LOG(M0_DEBUG, "nvec nv_nr=%"PRIu32" hmvn_type=%s", nvec.nv_nr,
 			nvec_req->hmnv_type == M0_HA_NVEC_SET ? "SET" :
@@ -277,7 +238,7 @@ static void nvec_test_reply_send(const struct hax_msg *hm)
 
 	switch (nvec_req->hmnv_type) {
 	case M0_HA_NVEC_GET:
-		for (i = 0; i < nvec_req->hmnv_nr; ++i) {
+		for (i = 0; i < (int32_t)nvec_req->hmnv_nr; ++i) {
 			obj_fid = nvec_req->hmnv_arr.hmna_arr[i].no_id;
 			/*
 			 * XXX Get the state of given object from Consul.
@@ -428,7 +389,7 @@ static void link_disconnected_cb(struct m0_halon_interface *hi,
 }
 
 M0_INTERNAL struct hax_context *init_halink(PyObject *obj,
-					    const char* node_uuid)
+					    const char *node_uuid)
 {
 	int rc;
 
@@ -510,25 +471,22 @@ void test(unsigned long long ctx)
 
 void m0_ha_broadcast_test(unsigned long long ctx)
 {
-	struct hax_context *hc = (struct hax_context *)ctx;
-	struct m0_ha_note   note;
-
-	note.no_id = M0_FID_TINIT('s', 4, 0);
-	note.no_state = M0_NC_ONLINE;
-
+	struct m0_ha_note note = {
+		.no_id = M0_FID_TINIT('s', 4, 0),
+		.no_state = M0_NC_ONLINE
+	};
 	m0_ha_notify(ctx, &note, 1);
 }
 
 void m0_ha_notify(unsigned long long ctx, struct m0_ha_note *notes,
 		  uint32_t nr_notes)
 {
-	struct hax_context        *hc = (struct hax_context *)ctx;
-	struct m0_halon_interface *hi = hc->hc_hi;
-	struct m0_ha_nvec          nvec = {
+	struct hax_context *hc = (struct hax_context *)ctx;
+	struct m0_ha_nvec nvec = {
 		.nv_nr = nr_notes,
 		.nv_note = notes
 	};
-	m0_halon_interface_nvec_broadcast(hi, &nvec);
+	m0_halon_interface_nvec_broadcast(hc->hc_hi, &nvec);
 }
 
 void adopt_mero_thread(void)
