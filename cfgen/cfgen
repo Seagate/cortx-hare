@@ -92,12 +92,28 @@ pools:
         sys.exit()
 
 
+def ensure_compliant(input_str: str, path: str):
+    p = subprocess.Popen(['yaml-to-dhall', path],
+                         stdin=subprocess.PIPE,
+                         stdout=subprocess.PIPE,
+                         stderr=subprocess.PIPE)
+    output, err = p.communicate(input=input_str.encode())
+    rc = p.returncode
+    if rc != 0:
+        print('Wrong input string given')
+        print(output.decode())
+        print(err.decode())
+        sys.exit(rc)
+
+
 def main(argv=None):
     opts = parse_opts(argv)
     try:
-        # XXX TODO: Validate the input with
-        # `yaml-to-dhall ./dhall/ClusterDesc/ClusterDesc` command.
-        cluster_desc = yaml.safe_load(sys.stdin)
+        input_str = sys.stdin.read()
+        cluster_desc = yaml.safe_load(input_str)
+        dir_path = os.path.dirname(os.path.realpath(__file__))
+        ensure_compliant(input_str,
+                         '{}/dhall/ClusterDesc/ClusterDesc'.format(dir_path))
     except KeyboardInterrupt:
         sys.exit(1)
 
