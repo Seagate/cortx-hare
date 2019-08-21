@@ -1,10 +1,11 @@
-from hax.halink import HaLink
-from hax.ffi import HaxFFI
-from hax.server import run_server
-from hax.handler import ConsumerThread
-from queue import Queue
-from hax.util import ConsulUtil
 import logging
+from queue import Queue
+
+from hax.ffi import HaxFFI
+from hax.halink import HaLink
+from hax.handler import ConsumerThread
+from hax.server import run_server
+from hax.util import ConsulUtil
 
 
 def setup_logging():
@@ -13,10 +14,10 @@ def setup_logging():
         format='%(asctime)s [%(levelname)s] {%(threadName)s} %(message)s')
 
 
-def run_qconsumer_thread(q: Queue, ffi: HaxFFI):
-    t = ConsumerThread(q, ffi)
-    t.start()
-    return t
+def run_qconsumer_thread(queue: Queue, ffi: HaxFFI):
+    thread = ConsumerThread(queue, ffi)
+    thread.start()
+    return thread
 
 
 def main():
@@ -28,7 +29,8 @@ def main():
     # 1. A callback is invoked from ha_link (this will happen in a mero
     #    thread which must be free ASAP)
     # 2. TBD: a new HA notification has come form Consul via HTTP
-    # [KN] The messages are consumed by Python thread created by run_qconsumer_thread function.
+    # [KN] The messages are consumed by Python thread created by
+    # run_qconsumer_thread function.
     #
     # [KN] Note: The server is launched in the main thread.
     q = Queue(maxsize=8)
@@ -42,20 +44,23 @@ def main():
 
     # The node UUID is simply random
     ffi = HaxFFI()
-    l = HaLink(node_uuid="d63141b1-a7f7-4258-b22a-59fda4ad86d1",
-               queue=q,
-               rm_fid=rm_fid,
-               ffi=ffi)
-    t = run_qconsumer_thread(q, ffi)
+    halink = HaLink(node_uuid="d63141b1-a7f7-4258-b22a-59fda4ad86d1",
+                    queue=q,
+                    rm_fid=rm_fid,
+                    ffi=ffi)
+    thread = run_qconsumer_thread(q, ffi)
 
     try:
-        l.start(hax_ep, process=hax_fid, ha_service=ha_fid, rm_service=rm_fid)
+        halink.start(hax_ep,
+                     process=hax_fid,
+                     ha_service=ha_fid,
+                     rm_service=rm_fid)
         # [KN] This is a blocking call. It will work until the program is
         # terminated by signal
         # l.test_broadcast()
-        run_server(thread_to_wait=t, halink=l)
+        run_server(thread_to_wait=thread, halink=halink)
     finally:
-        l.close()
+        halink.close()
 
 
 if __name__ == "__main__":

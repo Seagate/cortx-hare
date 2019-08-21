@@ -1,5 +1,7 @@
-import consul as c
 import json
+
+import consul as c
+
 from hax.exception import HAConsistencyException
 from hax.types import Fid
 
@@ -68,7 +70,8 @@ class ConsulUtil:
         principal_rm = sess_details.get('Node')
         return principal_rm
 
-    def _to_canonical_service_data(self, service):
+    @staticmethod
+    def _to_canonical_service_data(service):
         node = service.get('Node')
         fid = service.get('ServiceID')
         address = service.get('Address')

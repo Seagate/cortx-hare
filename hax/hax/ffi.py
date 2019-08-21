@@ -1,13 +1,13 @@
 import ctypes as c
 import logging
 import os
-from hax.types import FidStruct, Uint128Struct, HaNoteStruct
+
+from hax.types import FidStruct, HaNoteStruct, Uint128Struct
+
 py_func_proto = c.PYFUNCTYPE(None, c.c_void_p)
 
 
 def make_c_str(str_val: str) -> c.c_char_p:
-    if not str_val:
-        return None
     byte_str = str_val.encode('utf-8')
     return c.c_char_p(byte_str)
 
@@ -25,7 +25,7 @@ class HaxFFI:
     def __init__(self):
         dirname = os.path.dirname(os.path.abspath(__file__))
         lib_path = '{}/../libhax.so'.format(dirname)
-        logging.debug('Loading library from path: {}'.format(lib_path))
+        logging.debug('Loading library from path: %s', lib_path)
         lib = c.cdll.LoadLibrary(lib_path)
         lib.init_halink.argtypes = [c.py_object, c.c_char_p]
         lib.init_halink.restype = c.c_void_p
