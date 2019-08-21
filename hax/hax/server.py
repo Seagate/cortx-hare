@@ -16,8 +16,8 @@ class KVHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         self._set_headers()
-        s = json.dumps({'message': 'I am alive'})
-        self.wfile.write(s.encode('utf-8'))
+        result = json.dumps({'message': 'I am alive'})
+        self.wfile.write(result.encode())
 
     def do_HEAD(self):
         self._set_headers()
@@ -26,11 +26,10 @@ class KVHandler(BaseHTTPRequestHandler):
         self._set_headers()
         content_length = int(self.headers['Content-Length'])
         post_data = self.rfile.read(content_length)
-        logging.debug('POST request received: {}'.format(post_data))
+        logging.debug('POST request received: %s', post_data)
 
         ha_states = self.to_ha_states(self.parse_request(post_data))
-        logging.info('HA states: {}'.format(ha_states))
-        # TODO instead of this call something to m0d must be done
+        logging.info('HA states: %s', ha_states)
         self.server.halink.broadcast_ha_states(ha_states)
 
     @staticmethod
@@ -38,7 +37,7 @@ class KVHandler(BaseHTTPRequestHandler):
         try:
             return json.loads(raw_data.decode('utf-8'))
         except json.JSONDecodeError:
-            logging.warn('Invalid JSON object received')
+            logging.warning('Invalid JSON object received')
 
     @staticmethod
     def to_ha_states(data):
