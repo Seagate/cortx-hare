@@ -7,3 +7,4 @@
   * [5/HAX](5/README.md)
   * [6/BOOT](6/README.md)
   * [7/FAIL](7/README.md)
+  * [8/COSTY](8/README.md)
