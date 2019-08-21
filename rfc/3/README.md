@@ -69,13 +69,15 @@ usage: cfgen [-o <output-dir>] [--mock]
 Generate configuration files required to start Mero cluster.
 
 optional arguments:
-  -h, --help     show this help message and exit
-  --help-schema  show cluster description file schema
-  -o output-dir  output directory (defaults to '.')
-  --mock         Generate pseudo-random "facts". The hosts specified in the
-                 cluster description file will not be visited and don't even
-                 have to exist.
-  -V, --version  show program's version number and exit
+  -h, --help           show this help message and exit
+  --help-schema        show cluster description file schema
+  -D dir, --dhall dir  directory with auxiliary Dhall expressions (defaults to
+                       '/opt/cfgen/dhall')
+  -o output-dir        output directory (defaults to '.')
+  --mock               Generate pseudo-random "facts". The hosts specified in
+                       the cluster description file will not be visited and
+                       don't even have to exist.
+  -V, --version        show program's version number and exit
 
 The program reads cluster description in YAML format from the standard input;
 '--help-schema' option shows the schema.

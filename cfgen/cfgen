@@ -18,6 +18,12 @@ __version__ = '0.1'
 __author__ = 'Valery V. Vorotyntsev <valery.vorotyntsev@seagate.com>'
 
 
+def die(msg: str, status: int = 1):
+    assert status != 0
+    print(msg, file=sys.stderr)
+    sys.exit(status)
+
+
 def parse_opts(argv):
     p = argparse.ArgumentParser(
         description='Generate configuration files required to start'
@@ -27,11 +33,11 @@ def parse_opts(argv):
         " standard input; '--help-schema' option shows the schema.")
     p.add_argument('--help-schema', nargs=0, help='show cluster description'
                    ' file schema', action=ShowSchema)
-    # default_dhall_dir = '/opt/cfgen/dhall'
-    # p.add_argument('--dhall', metavar='dir',
-    #                help='directory with auxiliary Dhall expressions'
-    #                f' (defaults to {default_dhall_dir!r})',
-    #                dest='dhall_dir', default=default_dhall_dir)
+    default_dhall_dir = '/opt/cfgen/dhall'
+    p.add_argument('-D', '--dhall', metavar='dir',
+                   help='directory with auxiliary Dhall expressions'
+                   f' (defaults to {default_dhall_dir!r})',
+                   dest='dhall_dir', default=default_dhall_dir)
     p.add_argument('-o', metavar='output-dir',
                    help="output directory (defaults to '.')",
                    dest='output_dir', default='.')
@@ -44,12 +50,13 @@ def parse_opts(argv):
     opts = p.parse_args(argv)
 
     # Sanity checking
-    d = opts.output_dir
-    if not (d and os.path.isdir(d) and os.access(d, os.X_OK | os.W_OK)):
-        print("`-o' argument must be a path to writable directory",
-              file=sys.stderr)
-        sys.exit(1)
+    for opt, d, perm in [('--dhall', opts.dhall_dir, os.R_OK),
+                         ('-o', opts.output_dir, os.W_OK)]:
+        if not (d and os.path.isdir(d) and os.access(d, os.X_OK | perm)):
+            what = 'read' if perm == os.R_OK else 'writ'
+            die(f'{opt!r} argument must be a path to {what}able directory')
 
+    opts.dhall_dir = os.path.abspath(opts.dhall_dir)
     return opts
 
 
@@ -92,28 +99,24 @@ pools:
         sys.exit()
 
 
-def ensure_compliant(input_str: str, path: str):
-    p = subprocess.Popen(['yaml-to-dhall', path],
-                         stdin=subprocess.PIPE,
-                         stdout=subprocess.PIPE,
-                         stderr=subprocess.PIPE)
-    output, err = p.communicate(input=input_str.encode())
-    rc = p.returncode
-    if rc != 0:
-        print('Wrong input string given')
-        print(output.decode())
-        print(err.decode())
-        sys.exit(rc)
+def validate_schema(input_str: str, schema_path: str) -> None:
+    assert os.path.isabs(schema_path)
+    proc = subprocess.Popen(['yaml-to-dhall', schema_path],
+                            stdin=subprocess.PIPE,
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE)
+    err = proc.communicate(input=input_str.encode(), timeout=15)[1]
+    if proc.returncode != 0:
+        die('Invalid input\n' + err.decode(), proc.returncode)
 
 
 def main(argv=None):
     opts = parse_opts(argv)
     try:
         input_str = sys.stdin.read()
+        validate_schema(input_str, os.path.join(opts.dhall_dir,
+                                                'ClusterDesc', 'ClusterDesc'))
         cluster_desc = yaml.safe_load(input_str)
-        dir_path = os.path.dirname(os.path.realpath(__file__))
-        ensure_compliant(input_str,
-                         '{}/dhall/ClusterDesc/ClusterDesc'.format(dir_path))
     except KeyboardInterrupt:
         sys.exit(1)
 
@@ -130,12 +133,12 @@ def main(argv=None):
 
     validate_cluster_desc(cluster_desc)
 
-    nodes = cluster_nodes(cluster_desc)
     outs: List[Tuple[str, Callable[..., str], List[Any]]] = [
-            ('bootstrap-env', generate_bootstrap_env, nodes),
-            ('confd.dhall', generate_confd, [cluster_desc]),
+            ('bootstrap-env',
+             generate_bootstrap_env, *cluster_nodes(cluster_desc)),
+            ('confd.dhall', generate_confd, cluster_desc, opts.dhall_dir),
     ]
-    for path, generate, args in outs:
+    for path, generate, *args in outs:
         with open(os.path.join(opts.output_dir, path), 'w') as f:
             f.write(generate(*args))
 
@@ -625,7 +628,8 @@ def build_m0conf(cluster_desc: Dict[str, Any]) -> Dict[Oid, ToDhall]:
     return conf
 
 
-def generate_confd(cluster_desc: Dict[str, Any]) -> str:
+def generate_confd(cluster_desc: Dict[str, Any], dhall_dir: str) -> str:
+    assert os.path.isabs(dhall_dir)
     m0conf = build_m0conf(cluster_desc)
 
     def objt(obj: ToDhall) -> str:
@@ -633,25 +637,26 @@ def generate_confd(cluster_desc: Dict[str, Any]) -> str:
         assert objt.startswith('Conf')
         return objt[len('Conf'):]
 
-    return """\
-let Endpoint/tcp = ./dhall/Endpoint/tcp
-let Obj          = ./dhall/Conf/Obj/Obj
-let ObjT         = ./dhall/Conf/ObjT/ObjT
-let Oid          = ./dhall/Conf/Oid/Oid
-let SvcT         = ./dhall/Conf/SvcT/SvcT
-let confgen      = ./dhall/Conf/confgen
-let zoid         = ./dhall/Conf/Oid/zoid
-
-let objs =
-  [ {}
-  ]
-
-in confgen objs
-""".format('\n  , '.join('Obj.{} {}'.format(objt(v), v.to_dhall(k))
+    objs = '\n  , '.join('Obj.{} {}'.format(objt(v), v.to_dhall(k))
                          for k, v in m0conf.items()
                          # XXX DELETEME
                          if k.type not in (ObjT.root, ObjT.site, ObjT.rack,
-                                           ObjT.enclosure, ObjT.controller)))
+                                           ObjT.enclosure, ObjT.controller))
+    return f"""\
+let Endpoint/tcp = {dhall_dir}/Endpoint/tcp
+let Obj          = {dhall_dir}/Conf/Obj/Obj
+let ObjT         = {dhall_dir}/Conf/ObjT/ObjT
+let Oid          = {dhall_dir}/Conf/Oid/Oid
+let SvcT         = {dhall_dir}/Conf/SvcT/SvcT
+let confgen      = {dhall_dir}/Conf/confgen
+let zoid         = {dhall_dir}/Conf/Oid/zoid
+
+let objs =
+  [ {objs}
+  ]
+
+in confgen objs
+"""
 
 
 if __name__ == '__main__':
