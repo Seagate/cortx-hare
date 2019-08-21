@@ -80,8 +80,9 @@ class Fid(object):
     def __repr__(self):
         return '{}:{}'.format(hex(self.container), hex(self.key))
 
-    def __eq__(self, other: Fid):
-        return other.container == self.container and other.key == self.key
+    def __eq__(self, other):
+        return type(other) is Fid and \
+            other.container == self.container and other.key == self.key
 
 
 class Uint128(object):
