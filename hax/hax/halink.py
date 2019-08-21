@@ -18,7 +18,7 @@ def log_exception(fn):
     return wrapper
 
 
-class HaLink(object):
+class HaLink:
     def __init__(self, node_uuid='', ffi=None, queue=None, rm_fid=None):
         self._ffi = ffi or HaxFFI()
         self._ha_ctx = self._ffi.init_halink(self, make_c_str(node_uuid))

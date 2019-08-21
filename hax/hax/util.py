@@ -6,7 +6,7 @@ from hax.types import Fid
 SERVICE_CONTAINER = 0x7300000000000001
 
 
-class ConsulUtil(object):
+class ConsulUtil:
     def __init__(self):
         self.cns = c.Consul()
         self.event_map = {

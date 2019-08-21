@@ -1,4 +1,4 @@
-class BaseMessage(object):
+class BaseMessage:
     pass
 
 

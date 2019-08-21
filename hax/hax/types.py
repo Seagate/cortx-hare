@@ -52,7 +52,7 @@ class HaNoteStruct(c.Structure):
 
 
 # Mostly duplicates mero/conf/ha.h:m0_conf_ha_process
-class ConfHaProcess(object):
+class ConfHaProcess:
     def __init__(self, chp_event=0, chp_type=0, chp_pid=0, fid=None):
         self.chp_event = chp_event
         self.chp_type = chp_type
@@ -61,7 +61,7 @@ class ConfHaProcess(object):
 
 
 # Duplicates mero/fid/fid.h
-class Fid(object):
+class Fid:
     def __init__(self, container, key):
         self.container = container
         self.key = key
@@ -85,7 +85,7 @@ class Fid(object):
             other.container == self.container and other.key == self.key
 
 
-class Uint128(object):
+class Uint128:
     def __init__(self, hi, lo):
         self.hi = hi
         self.lo = lo

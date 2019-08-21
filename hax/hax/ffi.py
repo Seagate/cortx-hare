@@ -21,7 +21,7 @@ def make_array(ctr, some_list):
     return arr_type(*some_list)
 
 
-class HaxFFI(object):
+class HaxFFI:
     def __init__(self):
         dirname = os.path.dirname(os.path.abspath(__file__))
         lib_path = '{}/../libhax.so'.format(dirname)

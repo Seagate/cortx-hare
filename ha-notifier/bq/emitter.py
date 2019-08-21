@@ -3,7 +3,7 @@ import base64
 
 
 # FIXME not finished
-class Queue(object):
+class Queue:
     def __init__(self):
         self.client = consul.Consul()
 
