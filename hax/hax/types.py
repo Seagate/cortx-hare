@@ -78,7 +78,7 @@ class Fid:
         return Fid(self.container, self.key)
 
     def __repr__(self):
-        return '{}:{}'.format(hex(self.container), hex(self.key))
+        return f'{self.container:#x}:{self.key:#x}'
 
     def __eq__(self, other):
         return type(other) is Fid and \
@@ -91,7 +91,7 @@ class Uint128:
         self.lo = lo
 
     def __repr__(self):
-        return '{}:{}'.format(hex(self.hi), hex(self.lo))
+        return f'{self.hi:#x}:{self.lo:#x}'
 
     def to_c(self):
         return Uint128Struct(self.hi, self.lo)
