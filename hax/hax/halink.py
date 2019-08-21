@@ -101,12 +101,13 @@ class HaLink(object):
         logging.debug('Entrypoint request has been replied to')
 
     def broadcast_ha_states(self, ha_states):
-        logging.debug('Broadcasting HA states {} over ha_link'.format(
-            ha_states))
-        notes = [HaNoteStruct(st['fid'].to_c(),
-                              HaNoteStruct.M0_NC_ONLINE \
-                              if st['status'] == 'online' \
-                              else HaNoteStruct.M0_NC_FAILED) \
+        logging.debug(f'Broadcasting HA states {ha_states} over ha_link')
+
+        def ha_obj_state(st):
+            return HaNoteStruct.M0_NC_ONLINE if st['status'] == 'online' \
+                else HaNoteStruct.M0_NC_FAILED
+
+        notes = [HaNoteStruct(st['fid'].to_c(), ha_obj_state(st))
                  for st in ha_states]
         self._ffi.ha_broadcast(self._ha_ctx, make_array(HaNoteStruct, notes),
                                len(notes))
