@@ -220,11 +220,10 @@ static void nvec_test_reply_send(const struct hax_msg *hm)
 	struct m0_fid                obj_fid;
 	int32_t                      i;
 
-	M0_LOG(M0_DEBUG, "nvec nv_nr=%"PRIu32" hmvn_type=%s", nvec.nv_nr,
-			nvec_req->hmnv_type == M0_HA_NVEC_SET ? "SET" :
-
-	       nvec_req->hmnv_type == M0_HA_NVEC_GET ? "GET" :
-			"UNKNOWN!");
+	M0_PRE(M0_IN(nvec_req->hmnv_type, (M0_HA_NVEC_SET, M0_HA_NVEC_GET)));
+	M0_LOG(M0_DEBUG, "nvec nv_nr=%"PRIu32" hmvn_type=M0_HA_NVEC_%s",
+	       nvec.nv_nr,
+	       nvec_req->hmnv_type == M0_HA_NVEC_SET ? "SET" : "GET");
 
 	M0_ALLOC_ARR(nvec.nv_note, nvec.nv_nr);
 	M0_ASSERT(nvec.nv_note != NULL);
@@ -235,7 +234,6 @@ static void nvec_test_reply_send(const struct hax_msg *hm)
 		       " no_state=%"PRIu32")", i, FID_P(&nvec.nv_note[i].no_id),
 		       nvec.nv_note[i].no_state);
 	}
-
 	switch (nvec_req->hmnv_type) {
 	case M0_HA_NVEC_GET:
 		for (i = 0; i < (int32_t)nvec_req->hmnv_nr; ++i) {
