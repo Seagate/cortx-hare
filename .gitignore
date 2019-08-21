@@ -1,6 +1,7 @@
 *$py.class
 *.py[cod]
 .mypy_cache
+.env/
 __pycache__
 tags
 
