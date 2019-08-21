@@ -4,4 +4,14 @@ set -eu -o pipefail
 #
 # This is the Health Check for the Mero confd service.
 #
-test $(consul kv get processes/0x7200000000000001:0x1 | jq '.state' -r) = "M0_CONF_HA_PROCESS_STARTED"
+if [ $(consul kv get processes/0x7200000000000001:0x1 | jq '.state' -r) = "M0_CONF_HA_PROCESS_STARTED" ]
+then
+  rm -f /tmp/confd # cleanup after the bootstrap stage
+  exit 0
+else
+  if [ -f /tmp/confd ]; then
+    exit 0 # bootstrap stage
+  else
+    exit 2
+  fi
+fi
