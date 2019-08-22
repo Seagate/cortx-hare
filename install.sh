@@ -8,5 +8,5 @@ export SRC_DIR="$(dirname $(readlink -f $0))"
 sudo mkdir -p /opt/seagate
 sudo ln -sfn $SRC_DIR /opt/seagate/consul
 
-sudo cp systemd/* /usr/lib/systemd/system/
+sudo ln -sf $SRC_DIR/systemd/* /usr/lib/systemd/system/
 sudo systemctl daemon-reload
