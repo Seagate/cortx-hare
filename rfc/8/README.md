@@ -19,6 +19,8 @@ editor: Valery V. Vorotyntsev <valery.vorotyntsev@seagate.com>
   From user's perspective it does not matter what language a program
   is written in.
 
+* All error messages should go to stderr.
+
 ### Bash code
 
 * Use 4 spaces for indentation.
