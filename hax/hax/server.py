@@ -1,6 +1,7 @@
-from http.server import BaseHTTPRequestHandler, HTTPServer
-import logging
 import json
+import logging
+from http.server import BaseHTTPRequestHandler, HTTPServer
+
 from hax.types import Fid
 
 
@@ -28,12 +29,12 @@ class KVHandler(BaseHTTPRequestHandler):
         post_data = self.rfile.read(content_length)
         logging.debug('POST request received: %s', post_data)
 
-        ha_states = self.to_ha_states(self.parse_request(post_data))
+        ha_states = self.to_ha_states(KVHandler.parse_json(post_data))
         logging.info('HA states: %s', ha_states)
         self.server.halink.broadcast_ha_states(ha_states)
 
     @staticmethod
-    def parse_request(raw_data):
+    def parse_json(raw_data):
         try:
             return json.loads(raw_data.decode('utf-8'))
         except json.JSONDecodeError:
