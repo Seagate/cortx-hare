@@ -15,6 +15,8 @@ document are to be interpreted as described in
 
 ## Mero cluster bootstrap
 
+![hare_5nodes](hare_5nodes.png)
+
 Cluster administrator
 
 1. Prepares the
