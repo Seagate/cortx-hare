@@ -8,11 +8,22 @@ editor: Valery V. Vorotyntsev <valery.vorotyntsev@seagate.com>
 
 ## Coding Style Guidelines
 
+* Executables should have no file extension.
+  ```
+  ./foo.sh  # bad
+  ./bar.py  # bad
+
+  ./foo     # good
+  ./bar     # good
+  ```
+  From user's perspective it does not matter what language a program
+  is written in.
+
 ### Bash code
 
 * Use 4 spaces for indentation.
 
-* Start executable scripts with
+* Executable scripts should start with
   ```bash
   #!/usr/bin/env bash
   set -eu -o pipefail
@@ -29,6 +40,11 @@ editor: Valery V. Vorotyntsev <valery.vorotyntsev@seagate.com>
 
 * [mypy](https://mypy.readthedocs.io/en/stable/) type check should pass.
   Type annotations are optional.
+
+* Executable scripts should start with
+  ```python
+  #!/usr/bin/env python3
+  ```
 
 ### C code
 
