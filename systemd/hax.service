@@ -1,9 +1,10 @@
 [Unit]
-Description=hax daemon for Hare
+Description=HAX daemon for Hare
 Requires=consul-agent.service mero-kernel.service
 After=consul-agent.service mero-kernel.service
 
 [Service]
-ExecStart=/usr/bin/python3 /opt/seagate/consul/hax/hax.py
+EnvironmentFile=/opt/seagate/consul/systemd/hax-environment
+ExecStart=/bin/bash -c "LD_LIBRARY_PATH=${LD_LIB_PATH} ${PYTHON_EXE} /opt/seagate/consul/hax/hax.py"
 KillMode=process
 Restart=on-failure
