@@ -31,8 +31,15 @@ struct m0_halon_interface;
 struct hax_context {
 	struct m0_halon_interface *hc_hi;
 	struct m0_mutex            hc_mutex;
-	bool			   alive;
+	struct m0_tl               hc_links;
+	bool			   hc_alive;
 	PyObject                  *hc_handler;
+};
+
+struct hax_link {
+	struct m0_ha_link *hxl_link;
+	struct m0_tlink    hxl_tlink;
+	uint64_t           hxl_magic;
 };
 
 struct hax_entrypoint_request {
@@ -40,9 +47,9 @@ struct hax_entrypoint_request {
 };
 
 struct hax_msg {
-	struct hax_context *hm_hc;
-	struct m0_ha_link  *hm_hl;
-	struct m0_ha_msg   *hm_msg;
+	struct hax_context       *hm_hc;
+	struct m0_ha_link        *hm_hl;
+	const struct m0_ha_msg   *hm_msg;
 };
 
 struct hax_context *init_halink(PyObject *obj, const char *node_uuid);
@@ -69,6 +76,8 @@ void m0_ha_failvec_reply_send(unsigned long long hm, struct m0_fid *pool_fid,
 void m0_ha_nvec_reply_send(unsigned long long hm, struct m0_ha_nvec *nvec);
 void m0_ha_notify(unsigned long long ctx, struct m0_ha_note *notes, uint32_t nr_notes);
 void m0_ha_broadcast_test(unsigned long long ctx);
+void hax_lock(struct hax_context *hc);
+void hax_unlock(struct hax_context *hc);
 
 /* __HAX_H__ */
 #endif

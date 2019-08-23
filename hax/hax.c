@@ -35,13 +35,11 @@
 #include "lib/trace.h"           /* M0_LOG, M0_DEBUG */
 #include "mero/version.h"        /* M0_VERSION_GIT_REV_ID */
 #include "ha/msg.h"
+#include "ha/link.h"
 #include "hax.h"
 
-static struct hax_context *hc;
-
-// XXX Shouldn't these be `static`?
-struct m0_thread    m0thread;
-struct m0          *m0;
+static struct hax_context *hc0;
+static struct m0_thread    m0thread;
 
 static void __ha_failvec_reply_send(const struct hax_msg *hm,
 				    struct m0_fid *pool_fid,
@@ -49,6 +47,24 @@ static void __ha_failvec_reply_send(const struct hax_msg *hm,
 static void nvec_test_reply_send(const struct hax_msg *hm);
 static void __ha_nvec_reply_send(const struct hax_msg *hm,
 				 struct m0_ha_nvec *nvec);
+static struct m0_ha_msg *_ha_nvec_msg_alloc(const struct m0_ha_nvec *nvec,
+					    uint64_t id_of_get,int direction);
+
+
+M0_TL_DESCR_DEFINE(hx_links, "hax_context::hc_links", static,
+                   struct hax_link, hxl_tlink, hxl_magic,
+                   9, 10);
+M0_TL_DEFINE(hx_links, static, struct hax_link);
+
+void hax_lock(struct hax_context *hx)
+{
+	m0_mutex_lock(&hx->hc_mutex);
+}
+
+void hax_unlock(struct hax_context *hx)
+{
+	m0_mutex_unlock(&hx->hc_mutex);
+}
 
 PyObject* getModule(char *module_name)
 {
@@ -107,7 +123,7 @@ static void entrypoint_request_cb(struct m0_halon_interface *hi,
 
 	M0_ALLOC_PTR(ep);
 	M0_ASSERT(ep != NULL);
-	ep->hep_hc = hc;
+	ep->hep_hc = hc0;
 
 	M0_LOG(M0_INFO, "In entrypoint_request_cb\n");
 	PyObject *py_fid = toFid(process_fid);
@@ -120,12 +136,12 @@ static void entrypoint_request_cb(struct m0_halon_interface *hi,
 	 * Note that `K` stands for `unsigned long long` while `k` is simply
 	 * `unsigned long` (be aware of overflow).
 	 */
-	PyObject_CallMethod(hc->hc_handler, "_entrypoint_request_cb",
-			    "(KOsOsKb)", ep, py_req, remote_rpc_endpoint,
-			    py_fid, git_rev_id, pid, first_request);
+	PyObject_CallMethod(hc0->hc_handler, "_entrypoint_request_cb", "(KOsOsKb)",
+			    ep, py_req, remote_rpc_endpoint, py_fid, git_rev_id, pid,
+			    first_request);
 	Py_DECREF(py_req);
 	Py_DECREF(py_fid);
-	// XXX Note that the Python threads get unblocked only after this call.
+	/* XXX Note that the Python threads get unblocked only after this call. */
 	PyGILState_Release(gstate);
   }
 
@@ -179,10 +195,10 @@ static void __ha_failvec_reply_send(const struct hax_msg *hm,
 				    struct m0_fid *pool_fid,
 				    uint32_t nr_notes)
 {
-	struct m0_ha_link *hl = hm->hm_hl;
-	struct m0_ha_msg  *msg = hm->hm_msg;
-	struct m0_ha_msg  *repmsg;
-	uint64_t           tag;
+	struct m0_ha_link      *hl = hm->hm_hl;
+	const struct m0_ha_msg *msg = hm->hm_msg;
+	struct m0_ha_msg       *repmsg;
+	uint64_t                tag;
 
 	M0_PRE(hm != NULL);
 	M0_PRE(hl != NULL);
@@ -190,7 +206,6 @@ static void __ha_failvec_reply_send(const struct hax_msg *hm,
 	M0_ALLOC_PTR(repmsg);
 	M0_ASSERT(repmsg != NULL);
 	repmsg->hm_data.hed_type = M0_HA_MSG_FAILURE_VEC_REP;
-	// XXX Fabricated pool_fid; fetch the information from Consul.
 	repmsg->hm_data.u.hed_fvec_rep.mfp_pool = *pool_fid;
 	repmsg->hm_data.u.hed_fvec_rep.mfp_cookie =
 		msg->hm_data.u.hed_fvec_req.mfq_cookie;
@@ -212,7 +227,7 @@ static void handle_nvec(const struct hax_msg *hm)
 
 static void nvec_test_reply_send(const struct hax_msg *hm)
 {
-	struct m0_ha_msg            *msg = hm->hm_msg;
+	const struct m0_ha_msg      *msg = hm->hm_msg;
 	const struct m0_ha_msg_nvec *nvec_req = &msg->hm_data.u.hed_nvec;
 	struct m0_ha_nvec            nvec = {
 		.nv_nr = (int32_t)nvec_req->hmnv_nr
@@ -250,7 +265,7 @@ static void nvec_test_reply_send(const struct hax_msg *hm)
 		}
 		break;
 	case M0_HA_NVEC_SET:
-		// XXX IMPLEMENTME
+		/* XXX IMPLEMENTME */
 		break;
 	default:
 		M0_IMPOSSIBLE("Unexpected value of hmnv_type: %"PRIu64,
@@ -273,19 +288,19 @@ M0_INTERNAL void m0_ha_nvec_reply_send(unsigned long long hm,
 static void __ha_nvec_reply_send(const struct hax_msg *hm,
 				 struct m0_ha_nvec *nvec)
 {
-	struct m0_ha_link *hl = hm->hm_hl;
-	struct m0_ha_msg  *msg = hm->hm_msg;
+	struct m0_ha_link      *hl = hm->hm_hl;
+	const struct m0_ha_msg *msg = hm->hm_msg;
 
 	M0_PRE(hm != NULL);
 	M0_PRE(nvec != NULL);
 
 	m0_ha_msg_nvec_send(nvec, msg->hm_data.u.hed_nvec.hmnv_id_of_get,
-			M0_HA_NVEC_SET, hl);
+			    M0_HA_NVEC_SET, hl);
 }
 
 static void handle_process_event(const struct hax_msg *hm)
 {
-	if (!hm->hm_hc->alive) {
+	if (!hm->hm_hc->hc_alive) {
 		M0_LOG(M0_DEBUG, "Skipping the event processing since"
 		       " Python object is already destructed");
 		return;
@@ -293,9 +308,10 @@ static void handle_process_event(const struct hax_msg *hm)
 	PyGILState_STATE gstate;
 	gstate = PyGILState_Ensure();
 
-	struct hax_context *hc = hm->hm_hc;
-	struct m0_ha_msg   *hmsg = hm->hm_msg;
+	struct hax_context     *hc = hm->hm_hc;
+	const struct m0_ha_msg *hmsg = hm->hm_msg;
 
+	M0_LOG(M0_INFO, "Process fid: "FID_F, FID_P(&hmsg->hm_fid));
 	PyObject *py_fid = toFid(&hmsg->hm_fid);
 	PyObject_CallMethod(hc->hc_handler, "_process_event_cb", "(OKKK)",
 			    py_fid,
@@ -304,6 +320,15 @@ static void handle_process_event(const struct hax_msg *hm)
 			    hmsg->hm_data.u.hed_event_process.chp_pid);
 	Py_DECREF(py_fid);
 	PyGILState_Release(gstate);
+}
+
+static void _dummy_handle(const struct hax_msg *msg)
+{
+	/*
+	 * This function handles few events that are received but
+	 * can be ignored. Relevant implementation can be added as
+	 * required.
+	 */
 }
 
 static void _impossible(const struct hax_msg *hm)
@@ -320,25 +345,25 @@ static void (*hax_action[])(const struct hax_msg *hm) = {
 	[M0_HA_MSG_KEEPALIVE_REQ]   = _impossible,
 	[M0_HA_MSG_KEEPALIVE_REP]   = _impossible,
 	[M0_HA_MSG_EVENT_PROCESS]   = handle_process_event,
-	[M0_HA_MSG_EVENT_SERVICE]   = _impossible,
-	[M0_HA_MSG_EVENT_RPC]       = _impossible,
+	[M0_HA_MSG_EVENT_SERVICE]   = _dummy_handle,
+	[M0_HA_MSG_EVENT_RPC]       = _dummy_handle,
 	[M0_HA_MSG_BE_IO_ERR]       = _impossible,
 	[M0_HA_MSG_SNS_ERR]         = _impossible,
 };
 
 static void msg_received_cb(struct m0_halon_interface *hi,
 			    struct m0_ha_link *hl,
-			    struct m0_ha_msg *msg,
+			    const struct m0_ha_msg *msg,
 			    uint64_t tag)
 {
 	const enum m0_ha_msg_type msg_type = m0_ha_msg_type_get(msg);
 
 	M0_PRE(M0_HA_MSG_INVALID < msg_type && msg_type <= M0_HA_MSG_SNS_ERR);
-	M0_LOG(M0_ALWAYS, "Received msg of type %d", m0_ha_msg_type_get(msg));
+	M0_LOG(M0_INFO, "Received msg of type %d", m0_ha_msg_type_get(msg));
 
 	hax_action[msg_type](
 		&(struct hax_msg){
-			.hm_hc = hc,
+			.hm_hc = hc0,
 			.hm_hl = hl,
 			.hm_msg = msg
 		});
@@ -363,7 +388,17 @@ static void link_connected_cb(struct m0_halon_interface *hi,
 			      const struct m0_uint128 *req_id,
 			      struct m0_ha_link *link)
 {
-	M0_LOG(M0_DEBUG, "noop");
+	struct hax_link *hxl;
+
+	M0_ALLOC_PTR(hxl);
+	if (hxl == NULL) {
+		M0_LOG(M0_ERROR, "Cannot allocate hax_link");
+		return;
+	}
+	hxl->hxl_link = link;
+	hax_lock(hc0);
+	hx_links_tlink_init_at_tail(hxl, &hc0->hc_links);
+	hax_unlock(hc0);
 }
 
 static void link_reused_cb(struct m0_halon_interface *hi,
@@ -376,14 +411,25 @@ static void link_reused_cb(struct m0_halon_interface *hi,
 static void link_is_disconnecting_cb(struct m0_halon_interface *hi,
 				     struct m0_ha_link *hl)
 {
-	M0_LOG(M0_ALWAYS, "Disconnecting ha");
 	m0_halon_interface_disconnect(hi, hl);
 }
 
 static void link_disconnected_cb(struct m0_halon_interface *hi,
 			         struct m0_ha_link *link)
 {
-	M0_LOG(M0_DEBUG, "noop");
+	struct hax_link *hxl_out;
+
+	hax_lock(hc0);
+	hxl_out = m0_tl_find(hx_links, hxl, &hc0->hc_links,
+			 m0_uint128_eq(&hxl->hxl_link->hln_conn_cfg.hlcc_params.hlp_id_local,
+				       &link->hln_conn_cfg.hlcc_params.hlp_id_local) &&
+			 m0_uint128_eq(&hxl->hxl_link->hln_conn_cfg.hlcc_params.hlp_id_remote,
+				       &link->hln_conn_cfg.hlcc_params.hlp_id_remote));
+	if (hxl_out != NULL) {
+		hx_links_tlink_del_fini(hxl_out);
+		m0_free(hxl_out);
+	}
+	hax_unlock(hc0);
 }
 
 M0_INTERNAL struct hax_context *init_halink(PyObject *obj,
@@ -391,38 +437,42 @@ M0_INTERNAL struct hax_context *init_halink(PyObject *obj,
 {
 	int rc;
 
-	// Since we depend on the Python object, we don't want to let it die
-	// before us.
+	/* Since we depend on the Python object, we don't want to let
+	 * it die before us.
+	 */
 	Py_INCREF(obj);
 
-	hc = malloc(sizeof(*hc));
-	assert(hc != NULL);
+	hc0 = malloc(sizeof(*hc0));
+	assert(hc0 != NULL);
 
-	hc->alive = true;
-	rc = m0_halon_interface_init(&hc->hc_hi, "M0_VERSION_GIT_REV_ID",
+	hc0->hc_alive = true;
+	hx_links_tlist_init(&hc0->hc_links);
+	m0_mutex_init(&hc0->hc_mutex);
+	rc = m0_halon_interface_init(&hc0->hc_hi, "M0_VERSION_GIT_REV_ID",
 			"M0_VERSION_BUILD_CONFIGURE_OPTS",
 			"disable-compatibility-check", NULL);
 	if (rc != 0) {
-		free(hc);
+		hx_links_tlist_fini(&hc0->hc_links);
+		m0_mutex_fini(&hc0->hc_mutex);
+		free(hc0);
 		return 0;
 	}
-	m0_mutex_init(&hc->hc_mutex);
-	M0_SET0(&m0thread);
-	m0 = m0_halon_interface_m0_get(hc->hc_hi);
 
-	hc->hc_handler = obj;
-	return hc;
+	hc0->hc_handler = obj;
+
+	return hc0;
 }
 
 void destroy_halink(unsigned long long ctx)
 {
 	struct hax_context *hc = (struct hax_context *)ctx;
 
-	hc->alive = false;
+	hc->hc_alive = false;
 	Py_DECREF(hc->hc_handler);
-	m0_mutex_fini(&hc->hc_mutex);
 	m0_halon_interface_stop(hc->hc_hi);
 	m0_halon_interface_fini(hc->hc_hi);
+	m0_mutex_fini(&hc->hc_mutex);
+	hx_links_tlist_fini(&hc->hc_links);
 }
 
 int start(unsigned long long   ctx,
@@ -479,18 +529,58 @@ void m0_ha_broadcast_test(unsigned long long ctx)
 void m0_ha_notify(unsigned long long ctx, struct m0_ha_note *notes,
 		  uint32_t nr_notes)
 {
-	struct hax_context *hc = (struct hax_context *)ctx;
-	struct m0_ha_nvec nvec = {
-		.nv_nr = nr_notes,
-		.nv_note = notes
+	struct hax_context         *hc = (struct hax_context *)ctx;
+	struct m0_ha_nvec           nvec = {
+					.nv_nr = nr_notes,
+					.nv_note = notes
+				    };
+	struct m0_halon_interface *hi = hc->hc_hi;
+	struct hax_link           *hxl;
+	struct m0_ha_msg          *msg;
+	uint64_t                   tag;
+
+	msg = _ha_nvec_msg_alloc(&nvec, 0, M0_HA_NVEC_SET);
+	hax_lock(hc0);
+	m0_tl_for(hx_links, &hc->hc_links, hxl) {
+		m0_halon_interface_send(hi, hxl->hxl_link, msg, &tag);
+	} m0_tl_endfor;
+	hax_unlock(hc0);
+}
+
+static struct m0_ha_msg *_ha_nvec_msg_alloc(const struct m0_ha_nvec *nvec,
+					    uint64_t id_of_get,int direction)
+{
+	struct m0_ha_msg *msg;
+
+	M0_ALLOC_PTR(msg);
+	M0_ASSERT(msg != NULL);
+	*msg = (struct m0_ha_msg){
+		.hm_data = {
+			.hed_type   = M0_HA_MSG_NVEC,
+			.u.hed_nvec = {
+				.hmnv_type      = direction,
+				.hmnv_id_of_get = id_of_get,
+				.hmnv_nr        = nvec->nv_nr,
+			},
+		},
 	};
-	m0_halon_interface_nvec_broadcast(hc->hc_hi, &nvec);
+	M0_ASSERT(nvec->nv_nr > 0 &&
+		  (nvec->nv_nr <=
+		   (int)ARRAY_SIZE(msg->hm_data.u.hed_nvec.hmnv_arr.hmna_arr)));
+	memcpy(msg->hm_data.u.hed_nvec.hmnv_arr.hmna_arr, nvec->nv_note,
+			nvec->nv_nr * sizeof(nvec->nv_note[0]));
+
+	return msg;
 }
 
 void adopt_mero_thread(void)
 {
-	int rc = m0_thread_adopt(&m0thread, m0);
-	assert(rc == 0);
+	int rc;
+
+	rc = m0_halon_interface_thread_adopt(hc0->hc_hi, &m0thread);
+	if (rc != 0) {
+		M0_LOG(M0_ERROR, "Mero thread adoption failed: %d\n", rc);
+	}
 }
 
 /*

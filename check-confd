@@ -12,7 +12,7 @@ if [[ $CONFD_STATE = 'M0_CONF_HA_PROCESS_STARTED' ]]; then
 fi
 
 if [[ -f /tmp/confd ]]; then
-    exit 0  # confd is still starting
+    exit 1  # confd is still starting
 fi
 
 exit 2
