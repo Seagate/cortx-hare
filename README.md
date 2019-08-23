@@ -8,15 +8,16 @@ The scripts in this repository constitute a middleware layer between [Consul](ht
 ## Installation
 
 - [Download Consul](https://www.consul.io/downloads.html).  Copy `consul` executable to a `$PATH` directory (e.g., `/usr/local/bin/`) on each node of the cluster.
-- Make sure Python-3 version (3.4 or 3.6) is installed.
+- Make sure Python-3.6 version is installed and is available by /usr/bin/python3.
 - Install python dependencies:
 
 ```
 pip3 install -r hax/requirements.txt
 ```
-- Make sure that the mero source code is patched:
+- Make sure that the mero source code is patched and built:
 ```
 cd $M0_SRC/ && git apply $HARE_SRC/hax/mero-patch.patch
+make
 ```
 
 ### Single node
@@ -25,42 +26,25 @@ cd $M0_SRC/ && git apply $HARE_SRC/hax/mero-patch.patch
    ```sh
    cd
    git clone ssh://git@gitlab.mero.colo.seagate.com:6022/mero/hare.git
-   sudo mkdir -p /opt/seagate
-   sudo ln -s ~/hare /opt/seagate/consul
-   touch /tmp/confd  # "Mero confd service is alive and well" indicator
-   ```
-
-2. Start Consul server agent:
-   ```sh
-   consul agent -bind='{{GetPrivateIP}}' -server -config-dir=~/hare \
-       -data-dir=/tmp/consul -bootstrap-expect=1 \
-       -client='127.0.0.1 {{GetPrivateIP}}' -ui &
-   ```
-
-3. Initialise Consul KV store:
-   ```sh
    cd hare
-   ./kv-init
+   ./install.sh
    ```
 
-4. Generate and assign Mero processes fids to the "services", mentioned in `consul-srv-conf.json`:
+2. Start Consul server agent and hax:
    ```sh
-   ./gen-service-ids
-   ```
-
-5. Start `hax`:
-   ```sh
-   python3 hax/hax.py &
+   ./bootstrap.sh
    ```
 
 ### Multiple nodes
+
+XXX: this won't work atm.
 
 1. Prepare each of the cluster nodes; see step 1 of the [Single node](#single-node) section.
 
 2. Start Consul agent (server or client) on each of the nodes.  Use [`-retry-join`](https://www.consul.io/docs/agent/options.html#_retry_join) option so that it joins already running Consul server(s).
    ```sh
    consul agent -bind='{{GetPrivateIP}}' -server -config-dir=~/hare \
-       -data-dir=/tmp/consul -retry-join=192.168.180.1
+       -data-dir=/tmp/consul -retry-join=<ip-address-of-already-started-node>
    ```
    **Note:** If you plan to test RC leader election, there should be at least 3 Consul servers in the cluster.
 
