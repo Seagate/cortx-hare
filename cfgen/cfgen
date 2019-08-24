@@ -134,9 +134,9 @@ def main(argv=None):
     validate_cluster_desc(cluster_desc)
 
     outs: List[Tuple[str, Callable[..., str], List[Any]]] = [
-            ('bootstrap-env',
-             generate_bootstrap_env, *cluster_nodes(cluster_desc)),
-            ('confd.dhall', generate_confd, cluster_desc, opts.dhall_dir),
+        ('bootstrap-env', generate_bootstrap_env,
+         *cluster_nodes(cluster_desc)),
+        ('confd.dhall', generate_confd, cluster_desc, opts.dhall_dir),
     ]
     for path, generate, *args in outs:
         with open(os.path.join(opts.output_dir, path), 'w') as f:
