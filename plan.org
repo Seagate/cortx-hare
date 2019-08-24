@@ -195,17 +195,152 @@ The function blocks until the epoch is returned or an error occurs.
 
 See the [[https://docs.google.com/document/d/1cR-BbxtMjGuZPj8NOc95RyFjqmeFsYf4JJ5Hw_tL1zA/edit#bookmark=id.whq5d31z34][prototype]].
 
-** _sprint-5
+** _sprint-6
 
-*** init conf
+*** DONE bootstrap RFC
 
-**** confd.xc
+**** CANCELLED we might be able to start Mero processes simultaneously :CANCELLED:
 
-***** LNet protocol (lo/tcp/o2ib) selection
+- State "CANCELLED"  from              [2019-08-24 Sat 13:27] \\
+  This would require non-trivial changes in Mero.  We won't be doing those in the nearest future.
+***** this requires m0mkfs's fid and endpoint to be different from those of m0d
 
-~m0genfacts --lnet-transport {tcp|o2ib}~, defaults to ~tcp~.
+*** ! testing & CI
 
-***** from roles to services
+**** [proto-bootstrap] script(s) for starting cluster, consul agents, Hare executables, etc.
+- install Mero rpm
+- insmod Mero kernel modules
+- /etc./
+
+*** @andriy
+
+**** DONE [[[https://jts.seagate.com/browse/EOS-1427][EOS-1427]]] systemd scripts for hax
+
+**** cfgen: ~consul-config.json~, ~consul-kv.json~
+
+*** @kostya
+- [[[https://jts.seagate.com/browse/EOS-1456][EOS-1456]]] Ensure that hax doesn't require confd to start
+
+*** @mandar
+- [[[https://jts.seagate.com/browse/EOS-1436][EOS-1436]]] hax: Remove dependency on the m0_halon_interface patch
+
+- remove dependency on the ~m0_halon_interface~ patch
+- broadcast ~m0_ha_msg~s to Mero processes
+- handle ~m0_ha_link~ disconnects
+
+*** @vvv
+- [[[https://jts.seagate.com/browse/EOS-1433][EOS-1433]]] cfgen: ConfSdev and ConfDrive objects
+- cfgen: complete confd.xc
+
+**** confsd.xc
+- [[~/src/mero/scripts/install/usr/share/mero/templates/halon_facts.yaml.erb][halon_facts.yaml.erb]]
+
+***** disks
+
+****** m0genfacts: How are disk regexes processed? Does len(drives) depend on glob or regex?
+
+#+BEGIN_SRC ruby
+log 'Collecting facts about nodes and disks'
+build_nodes_from(cluster_config).each do |node|
+    log "Getting facts about '#{node['address']}' node"
+    q_dbfacts[ node['address'] ] = collect_facts_for(node)
+    ios_hash[ node['address'] ] =
+        if node.has_key?('disks')
+            log "Getting disks info for '#{node['address']}' node"
+            collect_disks_for(node)
+        else
+            []
+        end
+end
+#+END_SRC
+
+#+BEGIN_SRC ruby
+def build_disk_info(host, disk_path, index)
+    debug "processing disk '#{disk_path}'"
+
+    # block devices that don't represent a real drive (e.g. file-backed loop
+    # devices) will have this field set to 'true'
+    is_fake = false
+
+    size = $options[:devsize] ||
+           run("sudo blockdev --getsize64 #{disk_path} 2>/dev/null", host: host)
+
+    die "[#{host}]: failed to obtain device size for '#{disk_path}' disk" \
+        if size.nil?
+
+    serial = run("sudo lsblk -ndo SERIAL #{disk_path} 2>/dev/null", host: host)
+    if serial.to_s.strip.empty?
+        is_fake = true
+        stob    = size.to_i.zero? ? 'STOBLNX' : 'STOBAD'
+        serial  = stob + format('%03d', index)
+    end
+
+    wwn = run("sudo lsblk -ndo WWN #{disk_path} 2>/dev/null", host: host)
+    if wwn.to_s.strip.empty?
+        is_fake = true
+        wwn = '0x0000000' + format('%04d', index)
+    end
+
+    slot = run("ls /sys/block/$(basename $(readlink -f #{disk_path}))/device/ 2>/dev/null" +
+               " | grep enclosure | cut -f2 -d':'", host: host)
+    if slot.to_s.strip.empty?
+        slot = index
+    end
+
+    return {
+        'bay'     => slot,
+        'path'    => disk_path,
+        'size'    => size,
+        'serial'  => serial,
+        'wwn'     => wwn,
+        'is_fake' => is_fake,
+    }
+end
+#+END_SRC
+
+#+BEGIN_SRC ruby
+cluster_config['pools'].each do |pool|
+    disks = []
+    pool['disks'].each do |d|
+        die "pools configuration refers to unknown SSU host '#{ios_hash[d['host']]}'" \
+            if ! ios_hash.has_key? d['host']
+
+        if d.has_key? 'filter'
+            filtered_disks = ios_hash[d['host']].select{|x| x['path'] =~ Regexp.new(d['filter'])}
+            disks.concat(filtered_disks)
+        else
+            disks.concat(ios_hash[d['host']])
+        end
+    end
+    pools.push({name: pool['name'],
+                disks: disks,
+                allowed_failures: pool['allowed_failures'],
+                data_units: pool['data_units'],
+                parity_units: pool['parity_units']})
+end
+#+END_SRC
+
+****** halon_facts.yaml.erb
+#+BEGIN_SRC yaml
+    <%- if !ios_hash[ dbfact['hostname'] ].empty? -%>
+    m0h_devices:
+      <%- ios_hash[ dbfact['hostname'] ].each do |key| -%>
+      - m0d_wwn: "<%= key['wwn'] %>"
+        m0d_serial: "<%= key['serial'] %>"
+        m0d_bsize: <%= m0_block_size %>
+        m0d_size: <%= key['size'] %>
+        m0d_path: "<%= key['path'] %>"
+        m0d_slot: <%= key['bay'] %>
+      <%- end -%>
+    <%- else -%>
+    m0h_devices: []
+    <%- end -%>
+#+END_SRC
+
+****** halond: How are CAS/IOS sdevs generated?
+- [[file:~/src/halon/mero-halon/src/lib/HA/RecoveryCoordinator/Mero/Actions/Initial.hs::if%20null%20m0h_devices][loadMeroServers.goHost]]
+
+***** from roles to services :ARCHIVE:
 
 ****** m0genfacts
 
@@ -295,28 +430,11 @@ q_dbfacts = {
 <%- end -%>
 #+END_SRC
 
-**** consul-kv-import.json
+***** LNet protocol (lo/tcp/o2ib) selection :ARCHIVE:
 
-**** ? /etc/sysconfig/* files
+~m0genfacts --lnet-transport {tcp|o2ib}~, defaults to ~tcp~.
 
-**** ? systemd scripts
-
-*** hax
-
-**** DONE [[[https://jts.seagate.com/browse/EOS-1244][EOS-1244]]] concurrency issues
-
-**** [[[https://jts.seagate.com/browse/EOS-1247][EOS-1247]]] m0_ha_msg types
-
-***** incoming/outgoing ha_links -- when to use which?
-
-**** refactoring
-
-- document coding style
-
-*** bootstrap
-
-- use a bash script for starting Consul + hax + m0d(s)
-- write an RFC
+*** HOLD QA                                                          :HOLD:
 
 ** scoping
 
@@ -376,4 +494,3 @@ XXX Needed only if we want Hare to handle events that cannot be handled with Con
 *** rabbix (RabbitMQ exchanger)
 
 XXX Do we have to process SSPL sensor messages for EES?
-

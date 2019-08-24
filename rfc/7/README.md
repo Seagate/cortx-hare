@@ -10,7 +10,7 @@ editor: Valery V. Vorotyntsev <valery.vorotyntsev@seagate.com>
 
 * EVENT: IOS crashes
 
-  DETECTED BY: Consul watch
+  DETECTED BY: Consul watch (e.g., `pgrep`)
 
   REACTION: Watch handler updates the KV: sets the value of key
   `processes/<fid>` to `{ "state": "failed" }`.
