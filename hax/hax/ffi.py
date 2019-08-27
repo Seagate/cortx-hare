@@ -65,4 +65,4 @@ class HaxFFI:
         lib.adopt_mero_thread.argtypes = []
         lib.adopt_mero_thread.restype = c.c_int
         self.adopt_mero_thread = lib.adopt_mero_thread
-        self.shun_mero_thread = lib.m0_thread_shun
+        self.shun_mero_thread = lib.shun_mero_thread

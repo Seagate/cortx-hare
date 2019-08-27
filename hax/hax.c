@@ -583,6 +583,11 @@ void adopt_mero_thread(void)
 	}
 }
 
+void shun_mero_thread(void)
+{
+	m0_halon_interface_thread_shun();
+}
+
 /*
  *  Local variables:
  *  c-indentation-style: "K&R"
