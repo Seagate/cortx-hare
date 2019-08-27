@@ -5,20 +5,28 @@ The scripts in this repository constitute a middleware layer between [Consul](ht
 - generate initial configuration of Mero cluster;
 - mediate communications between Mero services and Consul agents.
 
+## Dependencies
+
+* Python &geq; 3.6
+* [Consul](https://www.consul.io/downloads.html)
+* [Dhall](https://github.com/dhall-lang/dhall-lang/wiki/Getting-started%3A-Generate-JSON-or-YAML#linux)
+
 ## Installation
 
-- [Download Consul](https://www.consul.io/downloads.html).  Copy `consul` executable to a `$PATH` directory (e.g., `/usr/local/bin/`) on each node of the cluster.
-- Make sure Python-3.6 version is installed and is available by /usr/bin/python3.
-- Install python dependencies:
-
-```
-pip3 install -r hax/requirements.txt
-```
-- Make sure that the mero source code is patched and built:
-```
-cd $M0_SRC/ && git apply $HARE_SRC/hax/mero-patch.patch
-make
-```
+* Copy `consul` executable to a `$PATH` directory (e.g., `/usr/local/bin/`) on each node of the cluster.
+* Install Python dependencies:
+  ```sh
+  pip3 install -r hax/requirements.txt
+  ```
+* Make sure that Mero sources are patched and built:  <!-- XXX DELETEME -->
+  ```sh
+  (
+      cd $M0_SRC
+      git fetch http://gerrit.mero.colo.seagate.com:8080/mero \
+          refs/changes/16/18316/2 && git checkout FETCH_HEAD
+      ./scripts/m0 make
+  )
+  ```
 
 ### Single node
 
@@ -33,24 +41,6 @@ make
 2. Start Consul server agent and hax:
    ```sh
    ./bootstrap.sh
-   ```
-
-### Multiple nodes
-
-XXX: this won't work atm.
-
-1. Prepare each of the cluster nodes; see step 1 of the [Single node](#single-node) section.
-
-2. Start Consul agent (server or client) on each of the nodes.  Use [`-retry-join`](https://www.consul.io/docs/agent/options.html#_retry_join) option so that it joins already running Consul server(s).
-   ```sh
-   consul agent -bind='{{GetPrivateIP}}' -server -config-dir=~/hare \
-       -data-dir=/tmp/consul -retry-join=<ip-address-of-already-started-node>
-   ```
-   **Note:** If you plan to test RC leader election, there should be at least 3 Consul servers in the cluster.
-
-3. Generate and assign Mero processes fids (on each node):
-   ```sh
-   ./gen-service-ids
    ```
 
 ## Observe
