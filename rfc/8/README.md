@@ -8,17 +8,6 @@ editor: Valery V. Vorotyntsev <valery.vorotyntsev@seagate.com>
 
 ## Coding Style Guidelines
 
-* Executables should have no file extension.
-  ```
-  ./foo.sh  # bad
-  ./bar.py  # bad
-
-  ./foo     # good
-  ./bar     # good
-  ```
-  From user's perspective it does not matter what language a program
-  is written in.
-
 * All error messages should go to stderr.
 
 ### Bash code
