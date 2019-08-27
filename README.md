@@ -35,12 +35,12 @@ The scripts in this repository constitute a middleware layer between [Consul](ht
    cd
    git clone ssh://git@gitlab.mero.colo.seagate.com:6022/mero/hare.git
    cd hare
-   ./install.sh
+   ./install
    ```
 
-2. Start Consul server agent and hax:
+2. Start Consul server agent and `hax`:
    ```sh
-   ./bootstrap.sh
+   ./bootstrap
    ```
 
 ## Observe
