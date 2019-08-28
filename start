@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 set -eu -o pipefail
-set -x
 export PS4='+ [${FUNCNAME[0]:+${FUNCNAME[0]}:}${LINENO}] '
 
 ### ------------------------------------------------------------------
