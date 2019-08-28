@@ -10,13 +10,16 @@ from hax.server import run_server
 from hax.util import ConsulUtil
 
 
-def setup_logging():
+__all__ = ['main']
+
+
+def _setup_logging():
     logging.basicConfig(
         level=logging.DEBUG,
         format='%(asctime)s [%(levelname)s] {%(threadName)s} %(message)s')
 
 
-def run_qconsumer_thread(queue: Queue, ffi: HaxFFI):
+def _run_qconsumer_thread(queue: Queue, ffi: HaxFFI):
     thread = ConsumerThread(queue, ffi)
     thread.start()
     return thread
@@ -46,7 +49,7 @@ def main():
 
     # The node UUID is simply random
     ffi = HaxFFI()
-    halink = HaLink(node_uuid="d63141b1-a7f7-4258-b22a-59fda4ad86d1",
+    halink = HaLink(node_uuid='d63141b1-a7f7-4258-b22a-59fda4ad86d1',
                     queue=q,
                     rm_fid=rm_fid,
                     ffi=ffi)
@@ -65,5 +68,5 @@ def main():
         halink.close()
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
