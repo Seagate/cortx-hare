@@ -24,7 +24,8 @@ def make_array(ctr, some_list):
 class HaxFFI:
     def __init__(self):
         dirname = os.path.dirname(os.path.abspath(__file__))
-        lib_path = '{}/../libhax.so'.format(dirname)
+        lib_path = '{}/../libhax.cpython-36m-x86_64-linux-gnu.so'.format(
+            dirname)
         logging.debug('Loading library from path: %s', lib_path)
         lib = c.cdll.LoadLibrary(lib_path)
         lib.init_halink.argtypes = [c.py_object, c.c_char_p]

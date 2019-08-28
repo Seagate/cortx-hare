@@ -9,7 +9,6 @@ from hax.handler import ConsumerThread
 from hax.server import run_server
 from hax.util import ConsulUtil
 
-
 __all__ = ['main']
 
 
@@ -28,7 +27,7 @@ def _run_qconsumer_thread(queue: Queue, ffi: HaxFFI):
 def main():
     # Note: no logging must happen before this call.
     # Otherwise the log configuration will not apply.
-    setup_logging()
+    _setup_logging()
 
     # [KN] The elements in the queue will appear if
     # 1. A callback is invoked from ha_link (this will happen in a mero
@@ -53,7 +52,7 @@ def main():
                     queue=q,
                     rm_fid=rm_fid,
                     ffi=ffi)
-    thread = run_qconsumer_thread(q, ffi)
+    thread = _run_qconsumer_thread(q, ffi)
 
     try:
         halink.start(hax_ep,
@@ -62,7 +61,6 @@ def main():
                      rm_service=rm_fid)
         # [KN] This is a blocking call. It will work until the program is
         # terminated by signal
-        # l.test_broadcast()
         run_server(thread_to_wait=thread, halink=halink)
     finally:
         halink.close()
