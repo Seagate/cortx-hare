@@ -33,13 +33,12 @@ class ConsulUtil:
         return Fid.parse(serv.get('ServiceID'))
 
     def get_my_nodename(self):
-        hostname = self.cns.agent.self().get('Config').get('NodeName')
-        return hostname
+        return self.cns.agent.self().get('Config').get('NodeName')
 
     def get_local_service_by_name(self, name):
         hostname = self.get_my_nodename()
 
-        _, service = self.cns.catalog.service(service=name)
+        service = self.cns.catalog.service(service=name)[1]
         srv = list(filter(lambda x: x.get('Node') == hostname, service))
         if not len(srv):
             raise HAConsistencyException(
@@ -49,16 +48,15 @@ class ConsulUtil:
 
     def get_hax_endpoint(self):
         my_fid = self.get_hax_fid()
-        _, services = self.cns.catalog.service(service='hax')
+        services = self.cns.catalog.service(service='hax')[1]
         data = list(
-            map(
-                self._to_canonical_service_data,
+            map(self._to_canonical_service_data,
                 filter(lambda x: Fid.parse(x.get('ServiceID')) == my_fid,
                        services)))
         return data[0].get('address')
 
     def get_leader_session(self):
-        _, leader = self.cns.kv.get('leader')
+        leader = self.cns.kv.get('leader')[1]
         session = leader.get('Session')
         if not session:
             raise HAConsistencyException(
@@ -66,9 +64,8 @@ class ConsulUtil:
         return session
 
     def get_session_node(self, session_id):
-        _, sess_details = self.cns.session.info(session_id)
-        principal_rm = sess_details.get('Node')
-        return principal_rm
+        sess_details = self.cns.session.info(session_id)[1]
+        return sess_details.get('Node')  # principal RM
 
     @staticmethod
     def _to_canonical_service_data(service):
@@ -84,10 +81,8 @@ class ConsulUtil:
         }
 
     def get_confd_list(self):
-        _, services = self.cns.catalog.service(service='confd')
-
-        confd_list = list(map(self._to_canonical_service_data, services))
-        return confd_list
+        services = self.cns.catalog.service(service='confd')[1]
+        return list(map(self._to_canonical_service_data, services))
 
     def update_process_status(self, event):
         key = 'processes/{}'.format(event.fid)
