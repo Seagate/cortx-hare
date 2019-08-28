@@ -7,14 +7,14 @@ SRC_DIR="$(dirname $(readlink -f $0))"
 M0_SRC_DIR=${M0_SRC_DIR:-${SRC_DIR%/*}/mero}
 
 init_hax() {
-    echo "Installing Python dependencies into the virtualenv"
+    echo 'Installing Python dependencies into the virtualenv'
     local env_dir=$SRC_DIR/.env
 
     python3 -m venv $env_dir
     . $env_dir/bin/activate
     pip3 install -r $SRC_DIR/hax/requirements.txt
     pushd $SRC_DIR/hax >/dev/null
-    echo "Building libhax.so"
+    echo 'Building libhax.so'
     make clean && make
     popd >/dev/null
 }
