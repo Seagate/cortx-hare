@@ -1,12 +1,13 @@
-let local_ip = "127.0.0.1"
+let localIP = "127.0.0.1"
 let ip = "{{GetPrivateIP}}"
 
-let watch =
+let Watch =
   < key :
       { type: Text, key: Text, args: List Text }
   | service_http :
       { type: Text, service: Text, handler_type: Text,
-        http_handler_config : { path: Text, method: Text, timeout: Text } }
+        http_handler_config :
+          { path: Text, method: Text, timeout: Text } }
   | service_args :
       { type: Text, service: Text, args: List Text }
   >
@@ -19,20 +20,22 @@ let service =
       { id: Text, name: Text, address: Text, port: Natural }
   >
 
+let dir = "/opt/seagate/consul"
+
 in
 { server = True
 , addresses =
   { grpc = ip
-  , dns = "${local_ip} ${ip}"
-  , http = "${local_ip} ${ip}"
+  , dns = "${localIP} ${ip}"
+  , http = "${localIP} ${ip}"
   }
 , watches = [
-    watch.key {
+    Watch.key {
       type = "key",
       key = "leader",
-      args = ["/opt/seagate/consul/elect-rc-leader"]
+      args = ["${dir}/elect-rc-leader"]
     },
-    watch.service_http {
+    Watch.service_http {
       type = "service",
       service = "confd",
       handler_type = "http",
@@ -42,10 +45,10 @@ in
         timeout = "10s"
       }
     },
-    watch.service_args {
+    Watch.service_args {
       type = "service",
       service = "confd",
-      args = ["/opt/seagate/consul/watch-service"]
+      args = ["${dir}/Watch-service"]
     }
   ]
 , services = [
@@ -56,7 +59,7 @@ in
       port = 1,
       checks = [
         {
-          args = ["/opt/seagate/consul/check-confd"],
+          args = ["${dir}/check-confd"],
           interval = "10s"
         }
       ]
