@@ -2,7 +2,7 @@
 domain: gitlab.mero.colo.seagate.com
 shortname: 3/CFGEN
 name: Configuration Generation
-status: raw
+status: draft
 editor: Valery V. Vorotyntsev <valery.vorotyntsev@seagate.com>
 ---
 
