@@ -28,7 +28,7 @@ $(SRC_DIR)/%.d: $(SRC_DIR)/%.c
  sed -r 's%^(.+)\.o:%$(@D)/\1.d $(@D)/\1.o:%' >$@
 
 $(SRC_DIR)/%.so: $(SRC_DIR)/%.so.0
-	ln -s $^ $@
+	ln -s $(notdir $^) $@
 
 $(SRC_DIR)/lib%.so.0: $(SRC_DIR)/%.o
 	$(CC) $(LDFLAGS) -Wl,-soname,$@ $^ -o $@
