@@ -1,6 +1,6 @@
 import json
 
-import consul as c
+from consul import Consul
 
 from hax.exception import HAConsistencyException
 from hax.types import Fid
@@ -10,7 +10,7 @@ SERVICE_CONTAINER = 0x7300000000000001
 
 class ConsulUtil:
     def __init__(self):
-        self.cns = c.Consul()
+        self.cns = Consul()
         self.event_map = {
             0: "M0_CONF_HA_PROCESS_STARTING",
             1: "M0_CONF_HA_PROCESS_STARTED",
