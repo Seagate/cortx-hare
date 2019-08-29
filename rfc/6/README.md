@@ -43,8 +43,11 @@ The `bootstrap` script
 
 4. Starts `consul` agents on every node of the cluster, knowing from
    `bootstrap-env` file where the server and the client agents should
-   be running.  Consul configuration is taken from
-   `consul-config_{server,client}.json` templates.
+   be running.  Consul configuration SHOULD be taken from
+   `consul-config_{server,client}.json` templates.  `bootstrap` script
+   MAY use
+   [`--bind`](https://www.consul.io/docs/agent/options.html#_bind)
+   option to specify IP addresses of consul agents.
 
 5. Gets fids of Mero services from the Consul KV.  Updates the
    corresponding fields in `consul-config-{server,client}.json`
