@@ -18,15 +18,11 @@ The scripts in this repository constitute a middleware layer between [Consul](ht
   ```sh
   pip3 install -r hax/requirements.txt
   ```
-* Make sure that Mero sources are patched and built:  <!-- XXX DELETEME -->
+* Ensure that Mero sources are built.
   ```sh
-  (
-      cd $M0_SRC
-      git fetch http://gerrit.mero.colo.seagate.com:8080/mero \
-          refs/changes/16/18316/2 && git checkout FETCH_HEAD
-      ./scripts/m0 make
-  )
+  $M0_SRC_DIR/scripts/m0 make
   ```
+  <!-- XXX TODO: Hare should be able to work with Mero installed from rpm. -->
 
 ### Single node
 
