@@ -22,7 +22,7 @@ various configuration files required to start Mero cluster.
 
 ![cfgen](cfgen.png)
 
-### Cluster Description File
+### Cluster Description File (CDF)
 
 Cluster administrator SHALL provide a _cluster description file_,
 specifying which hosts the cluster is made of, how many Mero services
@@ -85,9 +85,9 @@ The program reads cluster description in YAML format from the standard input;
 '--help-schema' option shows the schema.
 ```
 
-**cfgen** reads cluster description file from stdin, ssh-es to the
-hosts mentioned in it, collects their "facts" (e.g., number of CPUs,
-RAM size), and uses that information to generate configuration data.
+**cfgen** reads the CDF from stdin, ssh-es to the hosts mentioned in it,
+collects their "facts" (e.g., number of CPUs, RAM size), and uses that
+information to generate configuration data.
 
 ### Output files
 

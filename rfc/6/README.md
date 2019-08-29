@@ -22,7 +22,7 @@ document are to be interpreted as described in
 Cluster administrator
 
 1. Prepares the
-   [cluster description file](rfc/3/README.md#cluster-description-file).
+   [cluster description file (CDF)](rfc/3/README.md#cluster-description-file-cdf).
 
 2. Runs `bootstrap` script, passing it the cluster description file
    via standard input.  The script MAY be started on any node of the
