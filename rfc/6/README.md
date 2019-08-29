@@ -2,7 +2,7 @@
 domain: gitlab.mero.colo.seagate.com
 shortname: 6/BOOT
 name: Mero Cluster Bootstrap
-status: raw
+status: draft
 editor: Valery V. Vorotyntsev <valery.vorotyntsev@seagate.com>
 ---
 
