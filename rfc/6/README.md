@@ -24,33 +24,37 @@ Cluster administrator
 1. Prepares the
    [cluster description file](rfc/3/README.md#cluster-description-file).
 
-1. Runs `bootstrap` script, passing it the cluster description file
+2. Runs `bootstrap` script, passing it the cluster description file
    via standard input.  The script MAY be started on any node of the
-   cluster where consul server agent will be running.
+   cluster.
 
 The `bootstrap` script
 
 1. Executes [‘cfgen’ script](rfc/3/README.md#cfgen), which generates
    `bootstrap-env`, `consul-kv.json`, and `confd.xc` files.
 
-1. Starts `consul` server agent with `--bootstrap-expect=1` option.
-   (Waits for a few seconds to allow Consul to finish its internal bootstrap.)
+2. Starts `consul` server agent with
+   [`--bootstrap-expect=1`](https://www.consul.io/docs/agent/options.html#_bootstrap_expect)
+   option and gives it a few seconds to get going.
 
-1. Initialises [Consul KV](rfc/4/README.md) by executing
+3. Initialises [Consul KV](rfc/4/README.md) by executing
    `consul kv import @consul-kv.json` command.
 
-1. Starts `consul` agents on all the cluster nodes, knowing from `bootstrap-env`
-   file where the server and the client agents should be running and using the
-   template `consul-config-{client,server}.json` configuration files.
+4. Starts `consul` agents on every node of the cluster, knowing from
+   `bootstrap-env` file where the server and the client agents should
+   be running.  Consul configuration is taken from
+   `consul-config_{server,client}.json` templates.
 
-1. Updates the template `consul-config-{client,server}.json` files on all the
-   cluster nodes with the correspondent Mero services FIDs from the Consul KV
-   and runs `consul reload` command on them.
+5. Gets fids of Mero services from the Consul KV.  Updates the
+   corresponding fields in `consul-config-{server,client}.json`
+   templates on every node of the cluster.  Executes
+   [`consul reload`](https://www.consul.io/docs/commands/reload.html)
+   on every node.
 
-1. Starts `hax` on every node of the cluster.  Each `hax` process
+6. Starts `hax` on every node of the cluster.  Each `hax` process
    obtains its [three fids](#8) from the Consul KV.
 
-1. Starts ‘confd’ Mero servers on the Consul server nodes.  For each
+7. Starts ‘confd’ Mero servers on the Consul server nodes.  For each
    confd Mero server:
 
    - obtains host name and process fid from the Consul KV;
@@ -59,9 +63,9 @@ The `bootstrap` script
    - waits for `m0mkfs` to terminate;
    - starts `m0d` process.
 
-1. Waits for ‘confd’ servers to start.
+8. Waits for ‘confd’ servers to start.
 
-1. Starts other (non-confd) Mero servers.  For each non-confd Mero
+9. Starts other (non-confd) Mero servers.  For each non-confd Mero
    server:
 
    - obtains host name and process fid from the Consul KV;
