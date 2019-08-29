@@ -1,4 +1,4 @@
-# HaRe RFC
+# Hare RFC
 
 We collect specifications for APIs, file formats, wire protocols, and
 processes.
@@ -20,6 +20,7 @@ processes.
   * [7/FAIL](7/README.md)
   * [8/COSTY](8/README.md)
   * [9/PC3](9/README.md)
+  * [10/GLOSS](10/README.md)
 * Draft
   * [3/CFGEN](3/README.md)
   * [6/BOOT](6/README.md)
