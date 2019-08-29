@@ -4,6 +4,8 @@ shortname: 6/BOOT
 name: Mero Cluster Bootstrap
 status: draft
 editor: Valery V. Vorotyntsev <valery.vorotyntsev@seagate.com>
+contributors:
+  - Andriy Tkachuk <andriy.tkachuk@seagate.com>
 ---
 
 ## Language
