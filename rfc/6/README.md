@@ -24,9 +24,10 @@ Cluster administrator
 1. Prepares the
    [cluster description file (CDF)](rfc/3/README.md#cluster-description-file-cdf).
 
-2. Runs `bootstrap` script, passing it the cluster description file
-   via standard input.  The script MAY be started on any node of the
-   cluster.
+2. Runs `bootstrap` script, passing it the CDF via standard input.
+   The script MUST be started on a node which, accordingly to the CDF,
+   will run ‘confd’ Mero service.  If `bootstrap` is started on a
+   non-confd node, the script MUST exit with non-zero code.
 
 The `bootstrap` script
 
