@@ -4,6 +4,8 @@ shortname: 3/CFGEN
 name: Configuration Generation
 status: draft
 editor: Valery V. Vorotyntsev <valery.vorotyntsev@seagate.com>
+contributors:
+  - Andriy Tkachuk <andriy.tkachuk@seagate.com>
 ---
 
 ## Language
