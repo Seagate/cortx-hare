@@ -24,19 +24,26 @@ Cluster administrator
 
 1. Runs `bootstrap` script, passing it the cluster description file
    via standard input.  The script MAY be started on any node of the
-   cluster.
+   cluster where consul server agent will be running.
 
 The `bootstrap` script
 
 1. Executes [‘cfgen’ script](rfc/3/README.md#cfgen), which generates
-   `bootstrap-env`, `consul-config.json`, `consul-kv.json`, and
-   `confd.xc` files.
+   `bootstrap-env`, `consul-kv.json`, and `confd.xc` files.
 
-1. Starts `consul` agents, knowing from `bootstrap-env` file where
-   server and client agents should be running.
+1. Starts `consul` server agent with `--bootstrap-expect=1` option.
+   (Waits for a few seconds to allow Consul to finish its internal bootstrap.)
 
 1. Initialises [Consul KV](rfc/4/README.md) by executing
    `consul kv import @consul-kv.json` command.
+
+1. Starts `consul` agents on all the cluster nodes, knowing from `bootstrap-env`
+   file where the server and the client agents should be running and using the
+   template `consul-config-{client,server}.json` configuration files.
+
+1. Updates the template `consul-config-{client,server}.json` files on all the
+   cluster nodes with the correspondent Mero services FIDs from the Consul KV
+   and runs `consul reload` command on them.
 
 1. Starts `hax` on every node of the cluster.  Each `hax` process
    obtains its [three fids](#8) from the Consul KV.

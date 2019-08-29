@@ -100,15 +100,9 @@ RAM size), and uses that information to generate configuration data.
     # Comments start with a hash symbol and run to the end of the line.
     ```
 
-  * `consul-config_<hostname>.json` -- Consul
-    [configuration files](https://www.consul.io/docs/agent/options.html#configuration-files),
-    one for each node.  These files contain definitions of
-    [services](https://www.consul.io/docs/agent/services.html) and
-    [checks](https://www.consul.io/docs/agent/checks.html).
+  * `confd.xc` -- Mero configuration in xcode string format, ready to
+    be used by confd services.
 
   * `consul-kv.json` -- key/value pairs in JSON format, ready to be
     consumed by
     [`consul kv import`](https://www.consul.io/docs/commands/kv/import.html).
-
-  * `confd.xc` -- Mero configuration in xcode string format, ready to
-    be used by confd services.
