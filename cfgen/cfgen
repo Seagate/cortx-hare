@@ -275,11 +275,11 @@ def _infinite_counter():
         k += 1
 
 
-_fidk = _infinite_counter()  # fid key generator
+fid_keygen = _infinite_counter()  # fid key generator
 
 
 def new_oid(objt: ObjT) -> Oid:
-    return Oid(objt, next(_fidk))
+    return Oid(objt, next(fid_keygen))
 
 
 def oid_to_dhall(oid: Oid) -> str:
@@ -689,6 +689,11 @@ def generate_consul_kv(m0conf: Dict[Oid, Any], dhall_dir: str) -> str:
 
     services = '\n  , '.join(entry_to_dhall(x) for x in gen_services())
 
+    global fid_keygen
+    _fid_keygen = next(fid_keygen)
+    # `cfgen` gives up ownership of fid_keygen, passing it to the Consul KV.
+    del fid_keygen
+
     return f"""\
 let SvcT  = {dhall_dir}/Conf/SvcT/SvcT
 let ObjT  = {dhall_dir}/Conf/ObjT/ObjT
@@ -698,7 +703,7 @@ let kvgen = {dhall_dir}/ConsulKV/kvgen
 let services =
   [ {services}
   ]
-in kvgen services
+in kvgen {_fid_keygen} services
 """
 
 

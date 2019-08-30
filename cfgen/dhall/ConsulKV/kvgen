@@ -30,14 +30,13 @@ let ConsulService/toKVEntry : ConsulService -> KVEntry
       ]
   }
 
-let kvgen : List ConsulService -> List KVEntry
-  = \(xs : List ConsulService)
+let kvgen : Natural -> List ConsulService -> List KVEntry
+  = \(fid_keygen : Natural)
+ -> \(xs : List ConsulService)
  ->
     [ { key = "leader", value = Value.vText "" }
     , { key = "epoch", value = Value.vNatural 1 }
-    , { key = "fid"  -- XXX s/fid/fid_keygen/
-      , value = Value.vNatural 999  -- XXX the value should come from `cfgen`
-      }
+    , { key = "fid_keygen", value = Value.vNatural fid_keygen }
     ]
     # List/map ConsulService KVEntry ConsulService/toKVEntry xs
 
