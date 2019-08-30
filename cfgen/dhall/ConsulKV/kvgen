@@ -1,0 +1,30 @@
+{-*- dhall -*-}
+
+let List/map       = https://prelude.dhall-lang.org/List/map
+
+let Oid       = ../Conf/Oid/Oid
+let SvcT      = ../Conf/SvcT/SvcT
+let SvcT/show = ../Conf/SvcT/show
+
+let Svc = { node : Oid, service : SvcT, fid : Oid }
+
+let KV =
+    < tt : { key : Text, value : Text }
+    | tn : { key : Text, value : Natural }
+    >
+
+let wrapKV : Svc -> KV =
+    \(svc : Svc) ->
+    KV.tt { key = "node/" ++ Natural/show svc.node.key
+               ++ "/service/" ++ SvcT/show svc.service
+               ++ "/" ++ Natural/show svc.fid.key
+          , value = ""}
+
+let kvgen : List Svc -> List KV =
+    \(svcs : List Svc) ->
+    [KV.tt {key = "leader", value = ""},
+     KV.tn {key = "epoch",  value = 1},
+     KV.tn {key = "fid",    value = 1}]
+    # List/map Svc KV wrapKV svcs
+
+in kvgen

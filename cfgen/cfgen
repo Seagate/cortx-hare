@@ -133,10 +133,13 @@ def main(argv=None):
 
     validate_cluster_desc(cluster_desc)
 
+    m0conf = build_m0conf(cluster_desc)
+
     outs: List[Tuple[str, Callable[..., str], List[Any]]] = [
         ('bootstrap-env', generate_bootstrap_env,
          *cluster_nodes(cluster_desc)),
-        ('confd.dhall', generate_confd, cluster_desc, opts.dhall_dir),
+        ('confd.dhall', generate_confd, m0conf, opts.dhall_dir),
+        ('consul-kv.dhall', generate_consul_kv, m0conf, opts.dhall_dir),
     ]
     for path, generate, *args in outs:
         with open(os.path.join(opts.output_dir, path), 'w') as f:
@@ -627,10 +630,8 @@ def build_m0conf(cluster_desc: Dict[str, Any]) -> Dict[Oid, ToDhall]:
                for k, v in conf.items())
     return conf
 
-
-def generate_confd(cluster_desc: Dict[str, Any], dhall_dir: str) -> str:
+def generate_confd(m0conf: Dict[Oid, ToDhall], dhall_dir: str) -> str:
     assert os.path.isabs(dhall_dir)
-    m0conf = build_m0conf(cluster_desc)
 
     def objt(obj: ToDhall) -> str:
         objt = obj.__class__.__name__
@@ -656,6 +657,37 @@ let objs =
   ]
 
 in confgen objs
+"""
+
+def generate_consul_kv(m0conf: Dict[Oid, ToDhall], dhall_dir: str) -> str:
+    assert os.path.isabs(dhall_dir)
+
+    def objt(obj: ToDhall) -> str:
+        objt = obj.__class__.__name__
+        assert objt.startswith('Conf')
+        return objt[len('Conf'):]
+
+    svcs = '\n  , '.join(f'{{node = {oid_to_dhall(nk)}, service = {sv.type}, fid = {oid_to_dhall(pk)}}}'
+                       for nk, nv in m0conf.items()
+                       for sk, sv in m0conf.items()
+                       for pk, pv in m0conf.items()
+                       if (sk.type is ObjT.service and
+                           sv.type in (SvcT.M0_CST_CONFD, SvcT.M0_CST_IOS))
+                       if (pk.type is ObjT.process and sk in pv.services)
+                       if (nk.type is ObjT.node and pk in nv.processes))
+
+    return f"""\
+let SvcT  = {dhall_dir}/Conf/SvcT/SvcT
+let ObjT  = {dhall_dir}/Conf/ObjT/ObjT
+let Oid   = {dhall_dir}/Conf/Oid/Oid
+let kvgen = {dhall_dir}/ConsulKV/kvgen
+let zoid  = {dhall_dir}/Conf/Oid/zoid
+
+let svcs =
+  [ {svcs}
+  ]
+
+in kvgen svcs
 """
 
 
