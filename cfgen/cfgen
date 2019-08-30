@@ -669,8 +669,7 @@ def generate_consul_kv(m0conf: Dict[Oid, Any], dhall_dir: str) -> str:
 
     def entry_to_dhall(x: ConsulService) -> str:
         args = ', '.join([f'node = {oid_to_dhall(x.node_id)}',
-                          # XXX s/fid/process/
-                          f'fid = {oid_to_dhall(x.proc_id)}',
+                          f'process = {oid_to_dhall(x.proc_id)}',
                           f'service = {x.svc_t}'])
         return '{ %s }' % args
 

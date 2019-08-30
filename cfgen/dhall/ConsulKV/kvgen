@@ -9,8 +9,8 @@ let SvcT/show = ../Conf/SvcT/show
 
 let ConsulService =
   { node : Oid
+  , process : Oid
   , service : SvcT
-  , fid : Oid  -- XXX 1) s/fid/process/; 2) swap the last 2 fields.
   }
 
 let Value = < vText : Text | vNatural : Natural >
@@ -26,7 +26,7 @@ let ConsulService/toKVEntry : ConsulService -> KVEntry
       , Natural/show x.node.key
       , "service"
       , SvcT/show x.service
-      , Natural/show x.fid.key
+      , Natural/show x.process.key
       ]
   }
 
