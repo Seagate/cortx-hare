@@ -43,7 +43,7 @@ class HaLink:
                                remote_rpc_endpoint, process_fid, git_rev, pid,
                                is_first_request):
         logging.debug('Received entrypoint request from remote endpoint'
-                      " '{}', process fid = {}.".format(
+                      " '{}', process fid = {}".format(
                           remote_rpc_endpoint, str(process_fid)) +
                       ' The request will be processed in another thread.')
         self.queue.put(

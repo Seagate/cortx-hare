@@ -42,8 +42,7 @@ class ConsulUtil:
         srv = list(filter(lambda x: x.get('Node') == hostname, service))
         if not len(srv):
             raise HAConsistencyException(
-                'No {} service found in Consul at Node={}'.format(
-                    name, hostname))
+                f'No {name} service found in Consul at Node={hostname}')
         return srv[0]
 
     def get_hax_endpoint(self):
@@ -77,7 +76,7 @@ class ConsulUtil:
         return {
             'node': node,
             'fid': Fid.parse(fid),
-            'address': '{}{}:{}'.format(address, srv_address, srv_port)
+            'address': f'{address}{srv_address}:{srv_port}'
         }
 
     def get_confd_list(self):
@@ -85,11 +84,10 @@ class ConsulUtil:
         return list(map(self._to_canonical_service_data, services))
 
     def update_process_status(self, event):
-        key = 'processes/{}'.format(event.fid)
+        key = f'processes/{event.fid}'
         status_value = self.get_status_line(event.chp_event)
         self.cns.kv.put(key, status_value)
 
     def get_status_line(self, event_type):
         state_name = self.event_map[event_type]
-        ret = {'state': state_name}
-        return json.dumps(ret)
+        return json.dumps({'state': state_name})
