@@ -10,7 +10,7 @@ import random
 import re
 import subprocess
 import sys
-from typing import Any, Callable, Dict, NamedTuple, List, Tuple
+from typing import Any, Callable, Dict, Iterator, NamedTuple, List, Tuple
 import yaml
 
 
@@ -630,6 +630,7 @@ def build_m0conf(cluster_desc: Dict[str, Any]) -> Dict[Oid, ToDhall]:
                for k, v in conf.items())
     return conf
 
+
 def generate_confd(m0conf: Dict[Oid, ToDhall], dhall_dir: str) -> str:
     assert os.path.isabs(dhall_dir)
 
@@ -659,22 +660,35 @@ let objs =
 in confgen objs
 """
 
-def generate_consul_kv(m0conf: Dict[Oid, ToDhall], dhall_dir: str) -> str:
+
+def generate_consul_kv(m0conf: Dict[Oid, Any], dhall_dir: str) -> str:
     assert os.path.isabs(dhall_dir)
 
-    def objt(obj: ToDhall) -> str:
-        objt = obj.__class__.__name__
-        assert objt.startswith('Conf')
-        return objt[len('Conf'):]
+    Entry = NamedTuple('Entry',
+                       [('node_id', Oid), ('proc_id', Oid), ('svc_t', SvcT)])
 
-    svcs = '\n  , '.join(f'{{node = {oid_to_dhall(nk)}, service = {sv.type}, fid = {oid_to_dhall(pk)}}}'
-                       for nk, nv in m0conf.items()
-                       for sk, sv in m0conf.items()
-                       for pk, pv in m0conf.items()
-                       if (sk.type is ObjT.service and
-                           sv.type in (SvcT.M0_CST_CONFD, SvcT.M0_CST_IOS))
-                       if (pk.type is ObjT.process and sk in pv.services)
-                       if (nk.type is ObjT.node and pk in nv.processes))
+    def entry_to_dhall(x: Entry) -> str:
+        args = ', '.join([f'node = {oid_to_dhall(x.node_id)}',
+                          # XXX s/fid/process/
+                          f'fid = {oid_to_dhall(x.proc_id)}',
+                          f'service = {x.svc_t}'])
+        return '{ %s }' % args
+
+    def gen_entries() -> Iterator[Entry]:
+        for node_id, node in m0conf.items():
+            if node_id.type is not ObjT.node:
+                continue
+            for proc_id in node.processes:
+                assert proc_id.type is ObjT.process
+                for svc_id in m0conf[proc_id].services:
+                    assert svc_id.type is ObjT.service
+                    svc = m0conf[svc_id]
+                    if svc.type in (SvcT.M0_CST_CONFD, SvcT.M0_CST_IOS):
+                        yield Entry(node_id=node_id,
+                                    proc_id=proc_id,
+                                    svc_t=svc.type)
+
+    entries = '\n  , '.join(entry_to_dhall(x) for x in gen_entries())
 
     return f"""\
 let SvcT  = {dhall_dir}/Conf/SvcT/SvcT
@@ -683,11 +697,11 @@ let Oid   = {dhall_dir}/Conf/Oid/Oid
 let kvgen = {dhall_dir}/ConsulKV/kvgen
 let zoid  = {dhall_dir}/Conf/Oid/zoid
 
-let svcs =
-  [ {svcs}
+let entries =
+  [ {entries}
   ]
 
-in kvgen svcs
+in kvgen entries
 """
 
 

@@ -1,12 +1,16 @@
 {-*- dhall -*-}
 
-let List/map       = https://prelude.dhall-lang.org/List/map
+let List/map = https://prelude.dhall-lang.org/List/map
 
 let Oid       = ../Conf/Oid/Oid
 let SvcT      = ../Conf/SvcT/SvcT
 let SvcT/show = ../Conf/SvcT/show
 
-let Svc = { node : Oid, service : SvcT, fid : Oid }
+let Svc =
+  { node : Oid
+  , service : SvcT
+  , fid : Oid  -- XXX 1) s/fid/process/; 2) swap the last 2 fields.
+  }
 
 let KV =
     < tt : { key : Text, value : Text }
