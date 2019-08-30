@@ -16,6 +16,9 @@ def get_mero_dir():
 def get_mero_libs_dir():
     m0path = get_mero_dir()
     libs_dir = f'{m0path}/mero/.libs'
+    assert os.path.isfile(
+        f'{libs_dir}/libmero.so'
+    ), f'The path {libs_dir} doesn\'t seem to contain mero libraries'
     return libs_dir
 
 
