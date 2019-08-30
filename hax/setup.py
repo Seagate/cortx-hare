@@ -4,20 +4,24 @@ from setuptools import Extension, setup
 
 
 def get_mero_dir():
+    m0path = os.environ.get('M0_SRC_DIR')
+    if m0path:
+        return m0path
+
     dirname = os.path.dirname(os.path.abspath(__file__))
-    m0path = '{}/../../mero'.format(dirname)
+    m0path = f'{dirname}/../../mero'
     return m0path
 
 
 def get_mero_libs_dir():
-    dirname = os.path.dirname(os.path.abspath(__file__))
-    m0path = '{}/../../mero/mero/.libs'.format(dirname)
-    return m0path
+    m0path = get_mero_dir()
+    libs_dir = f'{m0path}/mero/.libs'
+    return libs_dir
 
 
 setup(
-    name="hax",
-    version="0.0.1",
+    name='hax',
+    version='0.0.1',
     packages=['hax'],
     install_requires=['python-consul>=1.1.0'],
     entry_points={

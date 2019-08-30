@@ -48,10 +48,7 @@ def main():
 
     # The node UUID is simply random
     ffi = HaxFFI()
-    halink = HaLink(node_uuid='d63141b1-a7f7-4258-b22a-59fda4ad86d1',
-                    queue=q,
-                    rm_fid=rm_fid,
-                    ffi=ffi)
+    halink = HaLink(queue=q, rm_fid=rm_fid, ffi=ffi)
     thread = _run_qconsumer_thread(q, ffi)
 
     try:

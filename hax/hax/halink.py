@@ -2,10 +2,11 @@ import ctypes as c
 import logging
 import threading
 from errno import EAGAIN
-from hax.types import Fid, FidStruct, HaNoteStruct, ConfHaProcess
-from hax.util import ConsulUtil
-from hax.message import EntrypointRequest, ProcessEvent
+
 from hax.ffi import HaxFFI, make_array, make_c_str
+from hax.message import EntrypointRequest, ProcessEvent
+from hax.types import ConfHaProcess, Fid, FidStruct, HaNoteStruct
+from hax.util import ConsulUtil
 
 
 def log_exception(fn):
@@ -21,6 +22,8 @@ def log_exception(fn):
 class HaLink:
     def __init__(self, node_uuid='', ffi=None, queue=None, rm_fid=None):
         self._ffi = ffi or HaxFFI()
+        # [KN] Note that node_uuid is currently ignored by the corresponding
+        # hax.c function
         self._ha_ctx = self._ffi.init_halink(self, make_c_str(node_uuid))
         self.queue = queue
         self.rm_fid = rm_fid
@@ -32,16 +35,16 @@ class HaLink:
               rm_service: Fid):
         tname = threading.currentThread().getName()
         logging.info("'start' method invoked from thread {}".format(tname))
-        self._ffi.start(self._ha_ctx, make_c_str(rpc_endpoint),
-                        process.to_c(), ha_service.to_c(), rm_service.to_c())
+        self._ffi.start(self._ha_ctx, make_c_str(rpc_endpoint), process.to_c(),
+                        ha_service.to_c(), rm_service.to_c())
 
     @log_exception
     def _entrypoint_request_cb(self, reply_context, req_id,
                                remote_rpc_endpoint, process_fid, git_rev, pid,
                                is_first_request):
         logging.debug('Received entrypoint request from remote endpoint'
-                      " '{}', process fid = {}.".format(remote_rpc_endpoint,
-                                                        str(process_fid)) +
+                      " '{}', process fid = {}.".format(
+                          remote_rpc_endpoint, str(process_fid)) +
                       ' The request will be processed in another thread.')
         self.queue.put(
             EntrypointRequest(reply_context=reply_context,
@@ -80,7 +83,7 @@ class HaLink:
             logging.debug('Reply sent')
             return
 
-        rc_quorum = int(len(confds)/2 + 1)
+        rc_quorum = int(len(confds) / 2 + 1)
 
         rm_eps = None
         for cnf in confds:
@@ -95,9 +98,9 @@ class HaLink:
         self._ffi.entrypoint_reply(reply_context, req_id.to_c(), 0,
                                    len(confds),
                                    make_array(FidStruct, confd_fids),
-                                   make_array(c.c_char_p, confd_eps),
-                                   rc_quorum, self.rm_fid.to_c(),
-                                   make_c_str(rm_eps))
+                                   make_array(c.c_char_p,
+                                              confd_eps), rc_quorum,
+                                   self.rm_fid.to_c(), make_c_str(rm_eps))
         logging.debug('Entrypoint request has been replied to')
 
     def broadcast_ha_states(self, ha_states):
@@ -107,8 +110,10 @@ class HaLink:
             return HaNoteStruct.M0_NC_ONLINE if st['status'] == 'online' \
                 else HaNoteStruct.M0_NC_FAILED
 
-        notes = [HaNoteStruct(st['fid'].to_c(), ha_obj_state(st))
-                 for st in ha_states]
+        notes = [
+            HaNoteStruct(st['fid'].to_c(), ha_obj_state(st))
+            for st in ha_states
+        ]
         self._ffi.ha_broadcast(self._ha_ctx, make_array(HaNoteStruct, notes),
                                len(notes))
 
