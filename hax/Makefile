@@ -10,9 +10,11 @@ CFLAGS = -g -Werror -Wall -Wextra -Wno-attributes -Wno-unused-parameter -fPIC
 LDFLAGS = -shared
 LDLIBS = $(shell python-config --libs) -L$(M0_SRC_DIR)/mero/.libs -lmero
 
-SRC = hax.c
+SRC_DIR = hax
 
-SONAMES := $(SRC:%.c=lib%.so.0)
+SRC = $(SRC_DIR)/hax.c
+
+SONAMES := $(SRC:$(SRC_DIR)/%.c=$(SRC_DIR)/lib%.so.0)
 SYMLINKS := $(basename $(SONAMES))  # strip version suffix
 
 all: $(SONAMES) $(SYMLINKS)
@@ -21,22 +23,17 @@ OBJ := $(SRC:.c=.o)
 -include $(OBJ:.o=.d)
 
 # Generate dependencies.
-%.d: %.c
+$(SRC_DIR)/%.d: $(SRC_DIR)/%.c
 	cpp -MM -MG $(CPPFLAGS) $< |\
  sed -r 's%^(.+)\.o:%$(@D)/\1.d $(@D)/\1.o:%' >$@
 
-%.so: %.so.0
+$(SRC_DIR)/%.so: $(SRC_DIR)/%.so.0
 	ln -s $^ $@
 
-lib%.so.0: %.o
+$(SRC_DIR)/lib%.so.0: $(SRC_DIR)/%.o
 	$(CC) $(LDFLAGS) -Wl,-soname,$@ $^ -o $@
 # Output file should be versioned.
 # See http://tldp.org/HOWTO/Program-Library-HOWTO/shared-libraries.html#AEN95
-
-hax.so: hax.c
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) $(LDLIBS) $^ -o $@
-libhax.so: hax.c
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) $(LDLIBS) $^ -o $@
 
 .PHONY: mostlyclean
 mostlyclean:

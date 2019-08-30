@@ -1,8 +1,11 @@
 *$py.class
+*.egg-info/
 *.py[cod]
 .env/
 .mypy_cache
 __pycache__
+build/
+dist/
 systemd/hax-environment
 tags
 
