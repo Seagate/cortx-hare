@@ -18,6 +18,8 @@ Key | Value | Description
 `eq/<epoch>` | event | `eq/*` items are collectively referred to as the EQ (Event Queue).  Events are consumed and dequeued by the RC script.
 `leader` | node name | This key is used for RC leader election.  Created with [`consul lock`](https://www.consul.io/docs/commands/lock.html) command.
 `processes/<fid>` | `{ "state": "<HA state>" }` | The items are created and updated by `hax` processes.  Supported values of \<HA state\>: `M0_CONF_HA_PROCESS_STARTING`, `M0_CONF_HA_PROCESS_STARTED`, `M0_CONF_HA_PROCESS_STOPPING`, `M0_CONF_HA_PROCESS_STOPPED`.
+`timeout` | YYYYmmddHHMM.SS | This value is used by the RC timeout mechanism.
+
 <!--
   XXX TODO: s/processes/m0-servers/
 
@@ -36,6 +38,4 @@ Key | Value | Description
   Right now we don't know for sure if this will actually be a problem.
   The [specification of `bootstrap` script](rfc/6/README.md) should
   cover this topic.
-
 -->
-`timeout` | YYYYmmddHHMM.SS | This value is used by the RC timeout mechanism.
