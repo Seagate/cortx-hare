@@ -34,7 +34,7 @@ def main():
     #    thread which must be free ASAP)
     # 2. TBD: a new HA notification has come form Consul via HTTP
     # [KN] The messages are consumed by Python thread created by
-    # run_qconsumer_thread function.
+    # _run_qconsumer_thread function.
     #
     # [KN] Note: The server is launched in the main thread.
     q = Queue(maxsize=8)
@@ -46,7 +46,6 @@ def main():
     ha_fid = util.get_ha_fid()
     rm_fid = util.get_rm_fid()
 
-    # The node UUID is simply random
     ffi = HaxFFI()
     halink = HaLink(queue=q, rm_fid=rm_fid, ffi=ffi)
     thread = _run_qconsumer_thread(q, ffi)
