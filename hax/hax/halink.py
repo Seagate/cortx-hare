@@ -104,7 +104,7 @@ class HaLink:
         logging.debug('Entrypoint request has been replied to')
 
     def broadcast_ha_states(self, ha_states):
-        logging.debug('Broadcasting HA states {ha_states} over ha_link')
+        logging.debug(f'Broadcasting HA states {ha_states} over ha_link')
 
         def ha_obj_state(st):
             return HaNoteStruct.M0_NC_ONLINE if st['status'] == 'online' \
