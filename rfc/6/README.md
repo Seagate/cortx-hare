@@ -47,7 +47,7 @@ The `bootstrap` script
    `consul-config_{server,client}.json` templates.  `bootstrap` script
    MAY use
    [`--bind`](https://www.consul.io/docs/agent/options.html#_bind)
-   option to specify IP addresses of consul agents.
+   option to assign IP addresses to consul agents.
 
 5. Gets fids of Mero services from the Consul KV.  Updates the
    corresponding fields in `consul-config-{server,client}.json`
