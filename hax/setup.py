@@ -27,9 +27,7 @@ setup(
     version='0.0.1',
     packages=['hax'],
     install_requires=['python-consul>=1.1.0'],
-    entry_points={
-        'console_scripts': ['hax=hax.hax:main'],
-    },
+    entry_points={'console_scripts': ['hax=hax.hax:main']},
     ext_modules=[
         Extension(name='libhax',
                   sources=['hax/hax.c'],

@@ -5,6 +5,6 @@ After=consul-agent.service mero-kernel.service
 
 [Service]
 EnvironmentFile=/opt/seagate/consul/systemd/hax-environment
-ExecStart=/usr/bin/sh -c "${HAX_EXE}"
+ExecStart=/bin/sh -c "${HAX_EXE}"
 KillMode=process
 Restart=on-failure
