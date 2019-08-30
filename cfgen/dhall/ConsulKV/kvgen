@@ -1,34 +1,44 @@
 {-*- dhall -*-}
 
 let List/map = https://prelude.dhall-lang.org/List/map
+let Text/concatSep = https://prelude.dhall-lang.org/Text/concatSep
 
 let Oid       = ../Conf/Oid/Oid
 let SvcT      = ../Conf/SvcT/SvcT
 let SvcT/show = ../Conf/SvcT/show
 
-let Svc =
+let ConsulService =
   { node : Oid
   , service : SvcT
   , fid : Oid  -- XXX 1) s/fid/process/; 2) swap the last 2 fields.
   }
 
-let KV =
-    < tt : { key : Text, value : Text }
-    | tn : { key : Text, value : Natural }
-    >
+let Value = < vText : Text | vNatural : Natural >
 
-let wrapKV : Svc -> KV =
-    \(svc : Svc) ->
-    KV.tt { key = "node/" ++ Natural/show svc.node.key
-               ++ "/service/" ++ SvcT/show svc.service
-               ++ "/" ++ Natural/show svc.fid.key
-          , value = ""}
+let KVEntry = { key : Text, value : Value }
 
-let kvgen : List Svc -> List KV =
-    \(svcs : List Svc) ->
-    [KV.tt {key = "leader", value = ""},
-     KV.tn {key = "epoch",  value = 1},
-     KV.tn {key = "fid",    value = 1}]
-    # List/map Svc KV wrapKV svcs
+let ConsulService/toKVEntry : ConsulService -> KVEntry
+  = \(x : ConsulService)
+ ->
+  { value = Value.vText ""
+  , key = Text/concatSep "/"
+      [ "node"
+      , Natural/show x.node.key
+      , "service"
+      , SvcT/show x.service
+      , Natural/show x.fid.key
+      ]
+  }
+
+let kvgen : List ConsulService -> List KVEntry
+  = \(xs : List ConsulService)
+ ->
+    [ { key = "leader", value = Value.vText "" }
+    , { key = "epoch", value = Value.vNatural 1 }
+    , { key = "fid"  -- XXX s/fid/fid_keygen/
+      , value = Value.vNatural 999  -- XXX the value should come from `cfgen`
+      }
+    ]
+    # List/map ConsulService KVEntry ConsulService/toKVEntry xs
 
 in kvgen
