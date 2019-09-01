@@ -22,6 +22,7 @@ test-cfgen:
  out=$$(mktemp -d);\
  ./cfgen --mock -o $$out --dhall ./dhall <_misc/singlenode.yaml;\
  dhall text <$$out/confd.dhall | $(M0_SRC_DIR)/utils/m0confgen >/dev/null;\
+ dhall-to-json <$$out/consul-kv.dhall >/dev/null;\
  rm -r $$out
 
 .PHONY: check-dhall

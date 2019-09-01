@@ -695,16 +695,17 @@ def generate_consul_kv(m0conf: Dict[Oid, Any], dhall_dir: str) -> str:
     del fid_keygen
 
     return f"""\
-let SvcT  = {dhall_dir}/Conf/SvcT/SvcT
-let ObjT  = {dhall_dir}/Conf/ObjT/ObjT
-let zoid  = {dhall_dir}/Conf/Oid/zoid
+let SvcT = {dhall_dir}/Conf/SvcT/SvcT
+let ObjT = {dhall_dir}/Conf/ObjT/ObjT
+let zoid = {dhall_dir}/Conf/Oid/zoid
 
 let build = {dhall_dir}/ConsulKV/build
 
 let services =
   [ {services}
   ]
-in build {_fid_keygen} services
+
+in build {{ services = services, fid_keygen = {_fid_keygen} }}
 """
 
 
