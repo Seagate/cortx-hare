@@ -114,8 +114,8 @@ def main(argv=None):
     opts = parse_opts(argv)
     try:
         input_str = sys.stdin.read()
-        validate_schema(input_str, os.path.join(opts.dhall_dir,
-                                                'ClusterDesc', 'ClusterDesc'))
+        validate_schema(input_str, os.path.join(opts.dhall_dir, 'types',
+                                                'ClusterDesc.dhall'))
         cluster_desc = yaml.safe_load(input_str)
     except KeyboardInterrupt:
         sys.exit(1)
@@ -134,7 +134,6 @@ def main(argv=None):
     validate_cluster_desc(cluster_desc)
 
     m0conf = build_m0conf(cluster_desc)
-
     outs: List[Tuple[str, Callable[..., str], List[Any]]] = [
         ('bootstrap-env', generate_bootstrap_env,
          *cluster_nodes(cluster_desc)),
@@ -251,6 +250,81 @@ consul_client_nodes={}
 """.format(','.join(servers), ','.join(clients))
 
 
+def generate_confd(cluster_desc: Dict[str, Any], dhall_dir: str) -> str:
+    assert os.path.isabs(dhall_dir)
+    m0conf = build_m0conf(cluster_desc)
+
+    def objt(obj: ToDhall) -> str:
+        objt = obj.__class__.__name__
+        assert objt.startswith('Conf')
+        return objt[len('Conf'):]
+
+    objs = '\n  , '.join('types.Obj.{} {}'.format(objt(v), v.to_dhall(k))
+                         for k, v in m0conf.items())
+    return f"""\
+let types = {dhall_dir}/types.dhall
+let utils = {dhall_dir}/utils.dhall
+let toConfGen = {dhall_dir}/toConfGen.dhall
+
+let oid_XXX_IMPLEMENTME = utils.zoid types.ObjT.Root 999
+let oids_XXX_IMPLEMENTME = [] : List types.Oid
+
+let objs =
+  [ {objs}
+  ]
+
+in toConfGen objs
+"""
+
+
+def generate_consul_kv(m0conf: Dict[Oid, Any], dhall_dir: str) -> str:
+    assert os.path.isabs(dhall_dir)
+
+    ConsulService = NamedTuple(
+        'ConsulService', [('node_id', Oid), ('proc_id', Oid), ('svc_t', SvcT)])
+
+    def entry_to_dhall(x: ConsulService) -> str:
+        args = ', '.join([f'node = {oid_to_dhall(x.node_id)}',
+                          f'process = {oid_to_dhall(x.proc_id)}',
+                          f'service = {x.svc_t}'])
+        return '{ %s }' % args
+
+    def gen_services() -> Iterator[ConsulService]:
+        for node_id, node in m0conf.items():
+            if node_id.type is not ObjT.node:
+                continue
+            for proc_id in node.processes:
+                assert proc_id.type is ObjT.process
+                for svc_id in m0conf[proc_id].services:
+                    assert svc_id.type is ObjT.service
+                    svc = m0conf[svc_id]
+                    if svc.type in (SvcT.M0_CST_CONFD, SvcT.M0_CST_IOS):
+                        yield ConsulService(node_id=node_id,
+                                            proc_id=proc_id,
+                                            svc_t=svc.type)
+
+    services = '\n  , '.join(entry_to_dhall(x) for x in gen_services())
+
+    global fid_keygen
+    _fid_keygen = next(fid_keygen)
+    # `cfgen` gives up ownership of fid_keygen, passing it to the Consul KV.
+    del fid_keygen
+
+    return f"""\
+let SvcT = {dhall_dir}/Conf/SvcT/SvcT
+let ObjT = {dhall_dir}/Conf/ObjT/ObjT
+let zoid = {dhall_dir}/Conf/Oid/zoid
+
+let build = {dhall_dir}/ConsulKV/build
+
+let services =
+  [ {services}
+  ]
+
+in build {{ services = services, fid_keygen = {_fid_keygen} }}
+"""
+
+
 ObjT = Enum('ObjT', 'root fdmi_flt_grp fdmi_filter'
             ' node process service sdev'  # software subtree
             ' site rack enclosure controller drive'  # hardware subtree
@@ -260,7 +334,7 @@ ObjT.__doc__ = 'Mero conf object type'
 
 
 def objT_to_dhall(t: ObjT) -> str:
-    return 'ObjT.' + ''.join(s.capitalize() for s in t.name.split('_'))
+    return 'types.ObjT.' + ''.join(s.capitalize() for s in t.name.split('_'))
 
 
 Oid = NamedTuple('Oid', [('type', ObjT), ('fidk', int)])
@@ -283,12 +357,12 @@ def new_oid(objt: ObjT) -> Oid:
 
 
 def oid_to_dhall(oid: Oid) -> str:
-    return f'zoid {objT_to_dhall(oid.type)} {oid.fidk}'
+    return f'utils.zoid {objT_to_dhall(oid.type)} {oid.fidk}'
 
 
 def oids_to_dhall(oids: List[Oid]) -> str:
     if not oids:
-        return '[] : List Oid'
+        return '[] : List types.Oid'
     return '[ {} ]'.format(', '.join(oid_to_dhall(x) for x in oids))
 
 
@@ -310,7 +384,7 @@ class Endpoint:
         return f'{self.__class__.__name__}({args})'
 
     def to_dhall(self):
-        return f'Endpoint/tcp "{self.ipaddr}" 1975 {self.tmid}'
+        return f'utils.tcpEndpoint "{self.ipaddr}" 1975 {self.tmid}'
 
 
 class ToDhall(metaclass=abc.ABCMeta):
@@ -333,12 +407,12 @@ class ConfRoot(ToDhall):
     def to_dhall(self, oid: Oid) -> str:
         assert oid.type is ObjT.root
         args = ', '.join([f'id = {oid_to_dhall(oid)}',
-                          'mdpool = XXX',
-                          'imeta_pver = XXX',
+                          'mdpool = oid_XXX_IMPLEMENTME',
+                          'imeta_pver = Some oid_XXX_IMPLEMENTME',
                           f'nodes = {oids_to_dhall(self.nodes)}',
                           f'sites = {oids_to_dhall(self.sites)}',
-                          'pools = [XXX]',
-                          'profiles = [XXX]'])
+                          'pools = oids_XXX_IMPLEMENTME',
+                          'profiles = oids_XXX_IMPLEMENTME'])
         return '{ %s }' % args
 
 
@@ -447,6 +521,29 @@ class SvcT(Enum):
     M0_CST_ISCS = auto()
 
 
+def service_types(process_desc: Dict[str, Any] = None) -> List[SvcT]:
+    # Every program that uses m0_halon_interface API (ha/halon/interface.h
+    # in `mero` repository) must be represented by at least 3 conf objects
+    # in the Mero conf cache: a process object and two service objects
+    # (HA and RMS).
+    #
+    # See http://gitlab.mero.colo.seagate.com/mero/hare/issues/8
+    ts = [SvcT.M0_CST_HA, SvcT.M0_CST_RMS]
+
+    if process_desc is not None:
+        if process_desc.get('runs_confd'):
+            ts.append(SvcT.M0_CST_CONFD)
+
+        if process_desc['io_disks']['path_regex']:
+            ts.extend([SvcT.M0_CST_IOS,
+                       SvcT.M0_CST_SNS_REP,
+                       SvcT.M0_CST_SNS_REB,
+                       SvcT.M0_CST_ADDB2,
+                       SvcT.M0_CST_CAS,
+                       SvcT.M0_CST_ISCS])
+    return ts
+
+
 class ConfService(ToDhall):
     def __init__(self, stype: SvcT, endpoint: Endpoint, sdevs: List[Oid] = []):
         self.type = stype
@@ -463,7 +560,7 @@ class ConfService(ToDhall):
     def to_dhall(self, oid: Oid) -> str:
         assert oid.type is ObjT.service
         args = ', '.join([f'id = {oid_to_dhall(oid)}',
-                          f'type = SvcT.{self.type.name}',
+                          f'type = types.SvcT.{self.type.name}',
                           f'endpoint = {self.endpoint.to_dhall()}',
                           f'sdevs = {oids_to_dhall(self.sdevs)}'])
         return '{ %s }' % args
@@ -490,7 +587,7 @@ class ConfSite(ToDhall):
         assert oid.type is ObjT.site
         args = ', '.join([f'id = {oid_to_dhall(oid)}',
                           f'racks = {oids_to_dhall(self.racks)}',
-                          'pvers = [XXX]'])
+                          'pvers = oids_XXX_IMPLEMENTME'])
         return '{ %s }' % args
 
     @classmethod
@@ -515,7 +612,7 @@ class ConfRack(ToDhall):
         assert oid.type is ObjT.rack
         args = ', '.join([f'id = {oid_to_dhall(oid)}',
                           f'encls = {oids_to_dhall(self.encls)}',
-                          'pvers = [XXX]'])
+                          'pvers = oids_XXX_IMPLEMENTME'])
         return '{ %s }' % args
 
     @classmethod
@@ -540,7 +637,7 @@ class ConfEnclosure(ToDhall):
         assert oid.type is ObjT.enclosure
         args = ', '.join([f'id = {oid_to_dhall(oid)}',
                           f'ctrls = {oids_to_dhall(self.ctrls)}',
-                          'pvers = [XXX]'])
+                          'pvers = oids_XXX_IMPLEMENTME'])
         return '{ %s }' % args
 
     @classmethod
@@ -568,7 +665,7 @@ class ConfController(ToDhall):
         args = ', '.join([f'id = {oid_to_dhall(oid)}',
                           f'node = {oid_to_dhall(self.node)}',
                           f'drives = {oids_to_dhall(self.drives)}',
-                          'pvers = [XXX]'])
+                          'pvers = oids_XXX_IMPLEMENTME'])
         return '{ %s }' % args
 
     @classmethod
@@ -581,29 +678,6 @@ class ConfController(ToDhall):
         assert not m0conf[parent].ctrls
         m0conf[parent].ctrls = [ctrl_id]  # enclosure:controller = 1:1
         return ctrl_id
-
-
-def service_types(process_desc: Dict[str, Any] = None) -> List[SvcT]:
-    # Every program that uses m0_halon_interface API (ha/halon/interface.h
-    # in `mero` repository) must be represented by at least 3 conf objects
-    # in the Mero conf cache: a process object and two service objects
-    # (HA and RMS).
-    #
-    # See http://gitlab.mero.colo.seagate.com/mero/hare/issues/8
-    ts = [SvcT.M0_CST_HA, SvcT.M0_CST_RMS]
-
-    if process_desc is not None:
-        if process_desc.get('runs_confd'):
-            ts.append(SvcT.M0_CST_CONFD)
-
-        if process_desc['io_disks']['path_regex']:
-            ts.extend([SvcT.M0_CST_IOS,
-                       SvcT.M0_CST_SNS_REP,
-                       SvcT.M0_CST_SNS_REB,
-                       SvcT.M0_CST_ADDB2,
-                       SvcT.M0_CST_CAS,
-                       SvcT.M0_CST_ISCS])
-    return ts
 
 
 def build_m0conf(cluster_desc: Dict[str, Any]) -> Dict[Oid, ToDhall]:
@@ -626,87 +700,12 @@ def build_m0conf(cluster_desc: Dict[str, Any]) -> Dict[Oid, ToDhall]:
         for _ in range(host['c0_clients'] + host['m0t1fs_clients']):
             ConfProcess.build(conf, node_id, facts)
 
+        # for disk in host['disks']['items']:
+        #     ConfDrive.build(conf, ctrl_id, disk)
+
     assert all(k.type.name == v.__class__.__name__[len('Conf'):].lower()
                for k, v in conf.items())
     return conf
-
-
-def generate_confd(m0conf: Dict[Oid, ToDhall], dhall_dir: str) -> str:
-    assert os.path.isabs(dhall_dir)
-
-    def objt(obj: ToDhall) -> str:
-        objt = obj.__class__.__name__
-        assert objt.startswith('Conf')
-        return objt[len('Conf'):]
-
-    objs = '\n  , '.join('Obj.{} {}'.format(objt(v), v.to_dhall(k))
-                         for k, v in m0conf.items()
-                         # XXX DELETEME
-                         if k.type not in (ObjT.root, ObjT.site, ObjT.rack,
-                                           ObjT.enclosure, ObjT.controller))
-    return f"""\
-let Endpoint/tcp = {dhall_dir}/Endpoint/tcp
-let Obj          = {dhall_dir}/Conf/Obj/Obj
-let ObjT         = {dhall_dir}/Conf/ObjT/ObjT
-let Oid          = {dhall_dir}/Conf/Oid/Oid
-let SvcT         = {dhall_dir}/Conf/SvcT/SvcT
-let confgen      = {dhall_dir}/Conf/confgen
-let zoid         = {dhall_dir}/Conf/Oid/zoid
-
-let objs =
-  [ {objs}
-  ]
-
-in confgen objs
-"""
-
-
-def generate_consul_kv(m0conf: Dict[Oid, Any], dhall_dir: str) -> str:
-    assert os.path.isabs(dhall_dir)
-
-    ConsulService = NamedTuple(
-        'ConsulService', [('node_id', Oid), ('proc_id', Oid), ('svc_t', SvcT)])
-
-    def entry_to_dhall(x: ConsulService) -> str:
-        args = ', '.join([f'node = {oid_to_dhall(x.node_id)}',
-                          f'process = {oid_to_dhall(x.proc_id)}',
-                          f'service = {x.svc_t}'])
-        return '{ %s }' % args
-
-    def gen_services() -> Iterator[ConsulService]:
-        for node_id, node in m0conf.items():
-            if node_id.type is not ObjT.node:
-                continue
-            for proc_id in node.processes:
-                assert proc_id.type is ObjT.process
-                for svc_id in m0conf[proc_id].services:
-                    assert svc_id.type is ObjT.service
-                    svc = m0conf[svc_id]
-                    if svc.type in (SvcT.M0_CST_CONFD, SvcT.M0_CST_IOS):
-                        yield ConsulService(node_id=node_id,
-                                            proc_id=proc_id,
-                                            svc_t=svc.type)
-
-    services = '\n  , '.join(entry_to_dhall(x) for x in gen_services())
-
-    global fid_keygen
-    _fid_keygen = next(fid_keygen)
-    # `cfgen` gives up ownership of fid_keygen, passing it to the Consul KV.
-    del fid_keygen
-
-    return f"""\
-let SvcT = {dhall_dir}/Conf/SvcT/SvcT
-let ObjT = {dhall_dir}/Conf/ObjT/ObjT
-let zoid = {dhall_dir}/Conf/Oid/zoid
-
-let build = {dhall_dir}/ConsulKV/build
-
-let services =
-  [ {services}
-  ]
-
-in build {{ services = services, fid_keygen = {_fid_keygen} }}
-"""
 
 
 if __name__ == '__main__':

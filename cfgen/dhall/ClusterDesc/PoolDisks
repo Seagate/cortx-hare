@@ -1,8 +1,0 @@
-{-*- dhall -*-}
-
-let PoolDisks =
-  < all
-  | select : List { host : Text, path_regex : Text }
-  >
-
-in PoolDisks

@@ -1,4 +1,5 @@
-let CD = ./cfgen/dhall/ClusterDesc/package.dhall
+let types = ./cfgen/dhall/types.dhall
+
 in
 { hosts =
     [ { name = "localhost"
@@ -14,10 +15,10 @@ in
     ]
 , pools =
     [ { name = "the pool"
-      , disks = CD.PoolDisks.all
+      , disks = types.PoolDisks.all
       , data_units = 1
       , parity_units = 0
-      , allowed_failures = None CD.FailVec
+      , allowed_failures = None types.FailVec
       }
     ]
-} : CD.ClusterDesc
+} : types.ClusterDesc
