@@ -2,110 +2,94 @@ let Prelude = ../dhall/Prelude.dhall
 
 let types = ../dhall/types.dhall
 
+let utils = ../dhall/utils.dhall
+
 let toConfGen = ../dhall/toConfGen.dhall
 
-----------------------------------------------------------------------
--- Create an `Oid` value with zeroed `cont7` field.
-let zoid =
-    \(objt : types.ObjT)
- -> \(key : Natural)
- ->
-    { cont7 = 0 } /\ { type = objt, key = key } : types.Oid
-
-let tcpEndpoint =
-    \(ipaddr : Text)
- -> \(portal : Natural)
- -> \(tmid : Natural)
- ->
-    let addr = { ipaddr = ipaddr, mdigit = None Natural }
-    in
-      { nid = types.NetId.tcp { tcp = addr }
-      , portal = portal
-      , tmid = tmid
-      } : types.Endpoint
-----------------------------------------------------------------------
-
 let ids =
-  { root       = zoid types.ObjT.Root 0
-  , node       = zoid types.ObjT.Node 6
-  , process_24 = zoid types.ObjT.Process 24
-  , process_27 = zoid types.ObjT.Process 27
-  , process_30 = zoid types.ObjT.Process 30
-  , process_38 = zoid types.ObjT.Process 38
-  , process_40 = zoid types.ObjT.Process 40
-  , process_42 = zoid types.ObjT.Process 42
-  , process_44 = zoid types.ObjT.Process 44
-  , process_45 = zoid types.ObjT.Process 44
-  , process_46 = zoid types.ObjT.Process 46
-  , service_25 = zoid types.ObjT.Service 25
-  , service_26 = zoid types.ObjT.Service 26
-  , service_28 = zoid types.ObjT.Service 28
-  , service_29 = zoid types.ObjT.Service 29
-  , service_31 = zoid types.ObjT.Service 31
-  , service_32 = zoid types.ObjT.Service 32
-  , service_33 = zoid types.ObjT.Service 33
-  , service_34 = zoid types.ObjT.Service 34
-  , service_35 = zoid types.ObjT.Service 35
-  , service_36 = zoid types.ObjT.Service 36
-  , service_37 = zoid types.ObjT.Service 37
-  , service_39 = zoid types.ObjT.Service 39
-  , service_41 = zoid types.ObjT.Service 41
-  , service_43 = zoid types.ObjT.Service 43
-  , service_45 = zoid types.ObjT.Service 45
-  , service_47 = zoid types.ObjT.Service 47
-  , site       = zoid types.ObjT.Site 3
-  , pool_1     = zoid types.ObjT.Pool 1
-  , pool_48    = zoid types.ObjT.Pool 48
-  , pool_69    = zoid types.ObjT.Pool 69
-  , pver_2     = zoid types.ObjT.Pver 2
-  , pver_49    = zoid types.ObjT.Pver 49
-  , pver_63    = zoid types.ObjT.Pver 63
-  , pver_f     = zoid types.ObjT.PverF 62
-  , profile    = zoid types.ObjT.Profile 77
-  , sdev_8     = zoid types.ObjT.Sdev 8
-  , sdev_10    = zoid types.ObjT.Sdev 10
-  , sdev_12    = zoid types.ObjT.Sdev 12
-  , sdev_14    = zoid types.ObjT.Sdev 14
-  , sdev_16    = zoid types.ObjT.Sdev 16
-  , sdev_18    = zoid types.ObjT.Sdev 18
-  , sdev_20    = zoid types.ObjT.Sdev 20
-  , sdev_22    = zoid types.ObjT.Sdev 22
-  , sdev_70    = zoid types.ObjT.Sdev 70
-  , objv_50    = zoid types.ObjT.Objv 50
-  , objv_51    = zoid types.ObjT.Objv 51
-  , objv_52    = zoid types.ObjT.Objv 52
-  , objv_53    = zoid types.ObjT.Objv 53
-  , objv_54    = zoid types.ObjT.Objv 54
-  , objv_55    = zoid types.ObjT.Objv 55
-  , objv_56    = zoid types.ObjT.Objv 56
-  , objv_57    = zoid types.ObjT.Objv 57
-  , objv_58    = zoid types.ObjT.Objv 58
-  , objv_59    = zoid types.ObjT.Objv 59
-  , objv_60    = zoid types.ObjT.Objv 60
-  , objv_61    = zoid types.ObjT.Objv 61
-  , objv_64    = zoid types.ObjT.Objv 64
-  , objv_65    = zoid types.ObjT.Objv 65
-  , objv_66    = zoid types.ObjT.Objv 66
-  , objv_67    = zoid types.ObjT.Objv 67
-  , objv_68    = zoid types.ObjT.Objv 68
-  , objv_72    = zoid types.ObjT.Objv 72
-  , objv_73    = zoid types.ObjT.Objv 73
-  , objv_74    = zoid types.ObjT.Objv 74
-  , objv_75    = zoid types.ObjT.Objv 75
-  , objv_76    = zoid types.ObjT.Objv 76
-  , drive_9    = zoid types.ObjT.Drive 9
-  , drive_11   = zoid types.ObjT.Drive 11
-  , drive_13   = zoid types.ObjT.Drive 13
-  , drive_15   = zoid types.ObjT.Drive 15
-  , drive_17   = zoid types.ObjT.Drive 17
-  , drive_19   = zoid types.ObjT.Drive 19
-  , drive_21   = zoid types.ObjT.Drive 21
-  , drive_23   = zoid types.ObjT.Drive 23
-  , drive_71   = zoid types.ObjT.Drive 71
-  , controller = zoid types.ObjT.Controller 7
-  , enclosure  = zoid types.ObjT.Enclosure 5
-  , rack       = zoid types.ObjT.Rack 4
-  }
+    let zoid = utils.zoid
+    let ObjT = types.ObjT
+    in
+      { root       = zoid ObjT.Root 0
+      , node       = zoid ObjT.Node 6
+      , process_24 = zoid ObjT.Process 24
+      , process_27 = zoid ObjT.Process 27
+      , process_30 = zoid ObjT.Process 30
+      , process_38 = zoid ObjT.Process 38
+      , process_40 = zoid ObjT.Process 40
+      , process_42 = zoid ObjT.Process 42
+      , process_44 = zoid ObjT.Process 44
+      , process_45 = zoid ObjT.Process 44
+      , process_46 = zoid ObjT.Process 46
+      , service_25 = zoid ObjT.Service 25
+      , service_26 = zoid ObjT.Service 26
+      , service_28 = zoid ObjT.Service 28
+      , service_29 = zoid ObjT.Service 29
+      , service_31 = zoid ObjT.Service 31
+      , service_32 = zoid ObjT.Service 32
+      , service_33 = zoid ObjT.Service 33
+      , service_34 = zoid ObjT.Service 34
+      , service_35 = zoid ObjT.Service 35
+      , service_36 = zoid ObjT.Service 36
+      , service_37 = zoid ObjT.Service 37
+      , service_39 = zoid ObjT.Service 39
+      , service_41 = zoid ObjT.Service 41
+      , service_43 = zoid ObjT.Service 43
+      , service_45 = zoid ObjT.Service 45
+      , service_47 = zoid ObjT.Service 47
+      , site       = zoid ObjT.Site 3
+      , pool_1     = zoid ObjT.Pool 1
+      , pool_48    = zoid ObjT.Pool 48
+      , pool_69    = zoid ObjT.Pool 69
+      , pver_2     = zoid ObjT.Pver 2
+      , pver_49    = zoid ObjT.Pver 49
+      , pver_63    = zoid ObjT.Pver 63
+      , pver_f     = zoid ObjT.PverF 62
+      , profile    = zoid ObjT.Profile 77
+      , sdev_8     = zoid ObjT.Sdev 8
+      , sdev_10    = zoid ObjT.Sdev 10
+      , sdev_12    = zoid ObjT.Sdev 12
+      , sdev_14    = zoid ObjT.Sdev 14
+      , sdev_16    = zoid ObjT.Sdev 16
+      , sdev_18    = zoid ObjT.Sdev 18
+      , sdev_20    = zoid ObjT.Sdev 20
+      , sdev_22    = zoid ObjT.Sdev 22
+      , sdev_70    = zoid ObjT.Sdev 70
+      , objv_50    = zoid ObjT.Objv 50
+      , objv_51    = zoid ObjT.Objv 51
+      , objv_52    = zoid ObjT.Objv 52
+      , objv_53    = zoid ObjT.Objv 53
+      , objv_54    = zoid ObjT.Objv 54
+      , objv_55    = zoid ObjT.Objv 55
+      , objv_56    = zoid ObjT.Objv 56
+      , objv_57    = zoid ObjT.Objv 57
+      , objv_58    = zoid ObjT.Objv 58
+      , objv_59    = zoid ObjT.Objv 59
+      , objv_60    = zoid ObjT.Objv 60
+      , objv_61    = zoid ObjT.Objv 61
+      , objv_64    = zoid ObjT.Objv 64
+      , objv_65    = zoid ObjT.Objv 65
+      , objv_66    = zoid ObjT.Objv 66
+      , objv_67    = zoid ObjT.Objv 67
+      , objv_68    = zoid ObjT.Objv 68
+      , objv_72    = zoid ObjT.Objv 72
+      , objv_73    = zoid ObjT.Objv 73
+      , objv_74    = zoid ObjT.Objv 74
+      , objv_75    = zoid ObjT.Objv 75
+      , objv_76    = zoid ObjT.Objv 76
+      , drive_9    = zoid ObjT.Drive 9
+      , drive_11   = zoid ObjT.Drive 11
+      , drive_13   = zoid ObjT.Drive 13
+      , drive_15   = zoid ObjT.Drive 15
+      , drive_17   = zoid ObjT.Drive 17
+      , drive_19   = zoid ObjT.Drive 19
+      , drive_21   = zoid ObjT.Drive 21
+      , drive_23   = zoid ObjT.Drive 23
+      , drive_71   = zoid ObjT.Drive 71
+      , controller = zoid ObjT.Controller 7
+      , enclosure  = zoid ObjT.Enclosure 5
+      , rack       = zoid ObjT.Rack 4
+      }
 
 let root = types.Obj.Root
   { id = ids.root
@@ -127,7 +111,7 @@ let node = types.Obj.Node
   }
 
 let endpoints =
-    let ep = tcpEndpoint "172.28.128.3"
+    let ep = utils.tcpEndpoint "172.28.128.3"
     in
       { process_24 = ep 34 101
       , process_27 = ep 44 101
