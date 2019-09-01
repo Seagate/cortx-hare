@@ -99,17 +99,6 @@ pools:
         sys.exit()
 
 
-def validate_schema(input_str: str, schema_path: str) -> None:
-    assert os.path.isabs(schema_path)
-    proc = subprocess.Popen(['yaml-to-dhall', schema_path],
-                            stdin=subprocess.PIPE,
-                            stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE)
-    err = proc.communicate(input=input_str.encode(), timeout=15)[1]
-    if proc.returncode != 0:
-        die('Invalid input\n' + err.decode(), proc.returncode)
-
-
 def main(argv=None):
     opts = parse_opts(argv)
     try:
@@ -152,6 +141,17 @@ def all_unique(xs):
         # `xs` is a generator.  We should not consume it twice.
         xs = list(xs)
     return len(xs) == len(set(xs))
+
+
+def validate_schema(input_str: str, schema_path: str) -> None:
+    assert os.path.isabs(schema_path)
+    proc = subprocess.Popen(['yaml-to-dhall', schema_path],
+                            stdin=subprocess.PIPE,
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE)
+    err = proc.communicate(input=input_str.encode(), timeout=15)[1]
+    if proc.returncode != 0:
+        die('Invalid input\n' + err.decode(), proc.returncode)
 
 
 def validate_cluster_desc(desc: Dict[str, Any]):
