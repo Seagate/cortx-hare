@@ -26,7 +26,9 @@ test-cfgen:
  rm -r $$out
 
 .PHONY: check-dhall
-check-dhall: _misc/sample-confd.dhall
+check-dhall:
+	yaml-to-dhall ./dhall/types/ClusterDesc.dhall <_misc/singlenode.yaml\
+ | dhall-to-yaml | diff -u - <(dhall-to-yaml <<<./_misc/singlenode.dhall)
 	xcode() { sort | $(M0_SRC_DIR)/utils/m0confgen; };\
- dhall text --file $< | xcode |\
- diff -u - <(xcode <_misc/conf.cg)
+ dhall text --file _misc/sample-confd.dhall | xcode\
+ | diff -u - <(xcode <_misc/conf.cg)

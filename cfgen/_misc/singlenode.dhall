@@ -1,4 +1,4 @@
-let types = ./cfgen/dhall/types.dhall
+let types = ../dhall/types.dhall
 
 in
 { hosts =
