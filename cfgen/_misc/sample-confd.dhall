@@ -2,7 +2,7 @@ let Prelude = ../dhall/Prelude.dhall
 
 let types = ../dhall/types.dhall
 
-let renderObj = ../dhall/render/Obj.dhall
+let toConfGen = ../dhall/toConfGen.dhall
 
 ----------------------------------------------------------------------
 -- Create an `Oid` value with zeroed `cont7` field.
@@ -23,9 +23,6 @@ let tcpEndpoint =
       , portal = portal
       , tmid = tmid
       } : types.Endpoint
-
-let toConfGen = \(objs : List types.Obj) ->
-    Prelude.Text.concatMapSep "\n" types.Obj renderObj objs ++ "\n"
 ----------------------------------------------------------------------
 
 let ids =

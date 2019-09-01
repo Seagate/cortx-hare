@@ -2,6 +2,7 @@
 , NetId      = ./render/NetId.dhall
 
 , Obj        = ./render/Obj.dhall
+, Objs       = ./render/Objs.dhall
 , ObjT       = ./render/ObjT.dhall
 , Oid        = ./render/Oid.dhall
 , SvcT       = ./render/SvcT.dhall
