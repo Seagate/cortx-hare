@@ -27,4 +27,6 @@
 , PverF      = ./render/PverF.dhall
 , Objv       = ./render/Objv.dhall
 , Profile    = ./render/Profile.dhall
+
+, ConsulService = ./render/ConsulService.dhall
 }
