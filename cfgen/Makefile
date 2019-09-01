@@ -27,5 +27,5 @@ test-cfgen:
 .PHONY: check-dhall
 check-dhall: _misc/sample-confd.dhall
 	xcode() { sort | $(M0_SRC_DIR)/utils/m0confgen; };\
- dhall text < $< | xcode |\
+ dhall text --file $< | xcode |\
  diff -u - <(xcode <_misc/conf.cg)
