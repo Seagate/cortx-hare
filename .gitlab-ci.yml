@@ -48,15 +48,27 @@ build:
     # make sure that build image is up to date
     - docker pull $DOCKER_REGISTRY/mero/mero:$CENTOS_RELEASE
 
-    # build Mero
-    # XXX Remove `sudo` and `USER` hacks after `m0` script is updated to not require them.
+    - |
+      cat >mero/_build-m0.sh <<'EOF'
+      set -eu -o pipefail
+
+      KERNEL=$(yum list installed kernel | tail -n1 | awk '{ print $2 }')
+      KERNEL=/lib/modules/${KERNEL}.x86_64/build
+
+      # XXX Remove `sudo` and `USER` hacks after `m0` script is updated to not require them.
+      sudo() { $@; }
+      export -f sudo
+
+      export USER=$(id -un)
+
+      CONFIGURE_OPTS=--with-linux=$KERNEL MAKE_OPTS='-j10' scripts/m0 make
+      EOF
+
+    # Build Mero.
     - time docker run --rm --name ${JOB_NAME}
                       -v ~+:/data -w /data/mero
                   $DOCKER_REGISTRY/mero/mero:$CENTOS_RELEASE
-                      bash -c "KERNEL=/lib/modules/\$(yum list installed kernel | tail -n1 | awk '{ print \$2 }').x86_64/build;
-                               sudo() { \"$@\"; }; export -f sudo;
-                               export USER=\$(id -un);
-                               CONFIGURE_OPTS=--with-linux=\$KERNEL MAKE_OPTS='-j10' scripts/m0 make"
+                      bash -x ./_build-m0.sh
 
     # Build hax's C extension.
     - time docker run --rm --name ${JOB_NAME}
