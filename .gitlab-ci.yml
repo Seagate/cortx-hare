@@ -30,12 +30,33 @@ after_script:
 
 build:
   stage: build
-  tags: [ docker-build ]
+  tags: [ m0vg ]
   except: [ tags ]
-  image: $DOCKER_REGISTRY/mero/mero:$CENTOS_RELEASE
 
   script:
-    - export RELEASE_DIR="$(ls -td /releases/master/B* | head -n1)"
-    - yum install -y $RELEASE_DIR/mero{,-devel}-[0-9]*.rpm
+    # can't be defined in the 'variables:' section because it supports only
+    # sinle level of variable expansion, e.g. A=$VAR; B=$A won't work for B
+    - export JOB_NAME="${WORKSPACE_NAME}-build"
+
+    - sudo rm -rf ${WORKSPACE_DIR}
+    - mkdir -p ${WORKSPACE_DIR}
+    - cp -a ../${CI_PROJECT_NAME} ${WORKSPACE_DIR}
+    - cd ${WORKSPACE_DIR}
+
+    # get fresh Mero copy
+    - git clone --recursive --depth 1 --shallow-submodules http://gitlab.mero.colo.seagate.com/mero/mero.git
+
+    # make sure that build image is up to date
+    - docker pull $DOCKER_REGISTRY/mero/mero:$CENTOS_RELEASE
+
+    # build Mero
+    - time docker run --rm --name ${JOB_NAME}
+                      -v ~+:/data -w /data/mero
+                  $DOCKER_REGISTRY/mero/mero:$CENTOS_RELEASE
+                      bash -c "KERNEL=/lib/modules/\$(yum list installed kernel | tail -n1 | awk '{ print \$2 }').x86_64/build ;
+                               CONFIGURE_OPTS=--with-linux=\$KERNEL MAKE_OPTS='-j10' scripts/m0"
+
+    # containers run commands as 'root' user, seize ownership back
+    - sudo chown -R $(id -u):$(id -g) .
 
 # vim: foldmethod=marker shiftwidth=2 tabstop=2 expandtab
