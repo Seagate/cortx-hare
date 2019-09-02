@@ -14,7 +14,6 @@ variables:
 stages:
   - build
   - test
-  # - cleanup
 
 before_script:
   - date -u -Isec
@@ -42,11 +41,13 @@ build:
     - cp -a ../${CI_PROJECT_NAME} ${WORKSPACE_DIR}
     - cd ${WORKSPACE_DIR}
 
-    # get fresh Mero copy
-    - git clone --recursive --depth 1 --shallow-submodules http://gitlab.mero.colo.seagate.com/mero/mero.git
-
     # make sure that build image is up to date
     - docker pull $DOCKER_REGISTRY/mero/mero:$CENTOS_RELEASE
+
+    - exit 0  # XXX DELETEME
+
+    # Get fresh Mero copy.
+    - git clone --recursive --depth 1 --shallow-submodules http://gitlab.mero.colo.seagate.com/mero/mero.git
 
     - |
       cat >mero/_build-m0.sh <<'EOF'
@@ -82,11 +83,30 @@ build:
     # containers run commands as 'root' user, seize ownership back
     - sudo chown -R $(id -u):$(id -g) .
 
-# test_cfgen:
-#   stage: test
-#   tags: [ m0vg ]
-#   except: [ tags ]
-#   script:
-#     - XXX
+test-cfgen:
+  stage: test
+  tags: [ m0vg ]
+  except: [ tags ]
+  script:
+    # can't be defined in the 'variables:' section because it supports only
+    # single level of variable expansion, e.g. A=$VAR; B=$A won't work for B
+    - export JOB_NAME="${WORKSPACE_NAME}-${CI_JOB_NAME}"
+
+    - cd ${WORKSPACE_DIR}
+
+    - |
+      cat >hare/_test-cfgen.sh <<'EOF'
+      set -eu -o pipefail
+
+      yum install -y python36 python36-pip
+      pip3 install flake8 mypy
+
+      make -C cfgen
+      EOF
+
+    - time docker run --rm --name ${JOB_NAME}
+                      -v ~+:/data -w /data/hare
+                  $DOCKER_REGISTRY/mero/mero:$CENTOS_RELEASE
+                      bash -x _test-cfgen.sh
 
 # vim: foldmethod=marker shiftwidth=2 tabstop=2 expandtab
