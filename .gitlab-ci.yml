@@ -63,13 +63,21 @@ build:
     - time docker run --rm --name ${JOB_NAME}
                       -v ~+:/data -w /data/mero
                   $DOCKER_REGISTRY/mero/mero:$CENTOS_RELEASE
-                      bash -x ./_build-m0.sh
+                      bash -x _build-m0.sh
+
+    - |
+      cat >hare/_build-hax.sh <<'EOF'
+      set -eu -o pipefail
+
+      yum install -y python36 python36-devel python36-pip
+      make -C hax
+      EOF
 
     # Build hax's C extension.
     - time docker run --rm --name ${JOB_NAME}
                       -v ~+:/data -w /data/hare
                   $DOCKER_REGISTRY/mero/mero:$CENTOS_RELEASE
-                      make -C hax
+                      bash -x _build-hax.sh
 
     # containers run commands as 'root' user, seize ownership back
     - sudo chown -R $(id -u):$(id -g) .
