@@ -2,8 +2,7 @@ SHELL = bash
 
 PYTHON_SCRIPTS = cfgen
 
-# XXX YMMV
-M0_SRC_DIR = ~/src/mero
+M0_SRC_DIR = ../../mero
 
 .PHONY: check
 check: flake8 typecheck test-cfgen check-dhall
