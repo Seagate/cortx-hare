@@ -44,10 +44,10 @@ build:
     # make sure that build image is up to date
     - docker pull $DOCKER_REGISTRY/mero/mero:$CENTOS_RELEASE
 
-    - exit 0  # XXX DELETEME
-
     # Get fresh Mero copy.
     - git clone --recursive --depth 1 --shallow-submodules http://gitlab.mero.colo.seagate.com/mero/mero.git
+
+    - exit 0  # XXX DELETEME
 
     - |
       cat >mero/_build-m0.sh <<'EOF'
@@ -98,8 +98,15 @@ test-cfgen:
       cat >hare/_test-cfgen.sh <<'EOF'
       set -eu -o pipefail
 
-      yum install -y python36 python36-pip
+      yum install -y python36 python36-pip python36-PyYAML
       pip3 install flake8 mypy
+
+      download=https://github.com/dhall-lang/dhall-haskell/releases/download
+      for f in $download/1.25.0/dhall-1.25.0-x86_64-linux.tar.bz2 \
+               $download/1.25.0/dhall-json-1.4.0-x86_64-linux.tar.bz2; do
+          curl -LO $f
+          tar -C /usr/local/ -xf ${f##*/}
+      done
 
       make -C cfgen
       EOF
