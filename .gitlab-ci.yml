@@ -1,0 +1,41 @@
+# Globals ----------------------------------------------------------------- {{{1
+#
+
+variables:
+  GIT_DEPTH: 1  # clone only the current commit
+  GIT_STRATEGY: clone  # make a fresh `git clone` of the repo for every new CI job
+  GIT_SUBMODULE_STRATEGY: normal  # init and check out submodules
+  CENTOS_RELEASE: '7.5'
+  DOCKER_REGISTRY: registry.gitlab.mero.colo.seagate.com
+  M0_VG_NO_SYMLINKS: "true"
+  WORKSPACE_NAME: "${CI_PROJECT_NAME}${CI_PIPELINE_ID}"
+  WORKSPACE_DIR:  "/home/gitlab-runner/workspaces/${CI_PROJECT_NAME}${CI_PIPELINE_ID}"
+
+stages:
+  - build
+  # - test
+  # - cleanup
+
+before_script:
+  - date -u -Isec
+  - git log -1 --pretty=fuller
+  - printenv
+
+after_script:
+  - date -u -Isec
+
+
+# Build ------------------------------------------------------------------- {{{1
+#
+
+build:
+  stage: build
+  tags: [ docker-build ]
+  except: [ tags ]
+  image: $DOCKER_REGISTRY/mero/mero:$CENTOS_RELEASE
+
+  script:
+    - export RELEASE_DIR="$(ls -td /releases/master/B* | head -n1)"
+    - yum install -y $RELEASE_DIR/mero{,-devel}-[0-9]*.rpm
+
+# vim: foldmethod=marker shiftwidth=2 tabstop=2 expandtab
