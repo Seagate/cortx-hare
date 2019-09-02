@@ -56,7 +56,7 @@ build:
       KERNEL=/lib/modules/${KERNEL}.x86_64/build
 
       # XXX Remove `sudo` and `USER` hacks after `m0` script is updated to not require them.
-      sudo() { $@; }
+      sudo() { if [[ ${1:-} = '-E' ]]; then shift; fi; $@; }
       export -f sudo
 
       export USER=$(id -un)
