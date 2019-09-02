@@ -2,13 +2,13 @@ SHELL = /bin/bash
 
 M0_SRC_DIR ?= ../../mero
 
-CPPFLAGS := -I$(M0_SRC_DIR) $(shell python-config --includes)
+CPPFLAGS := -I$(M0_SRC_DIR) $(shell python3-config --includes)
 CPPFLAGS += -DM0_INTERNAL= -DM0_EXTERN=extern
 
 CFLAGS = -g -Werror -Wall -Wextra -Wno-attributes -Wno-unused-parameter -fPIC
 
 LDFLAGS = -shared
-LDLIBS = $(shell python-config --libs) -L$(M0_SRC_DIR)/mero/.libs -lmero
+LDLIBS = -L$(M0_SRC_DIR)/mero/.libs -lmero $(shell python3-config --libs)
 
 SRC_DIR = hax
 
