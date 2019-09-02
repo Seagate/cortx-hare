@@ -13,7 +13,7 @@ variables:
 
 stages:
   - build
-  # - test
+  - test
   # - cleanup
 
 before_script:
@@ -28,15 +28,14 @@ after_script:
 # Build ------------------------------------------------------------------- {{{1
 #
 
-build:
+build_m0:
   stage: build
   tags: [ m0vg ]
   except: [ tags ]
-
   script:
     # can't be defined in the 'variables:' section because it supports only
-    # sinle level of variable expansion, e.g. A=$VAR; B=$A won't work for B
-    - export JOB_NAME="${WORKSPACE_NAME}-build"
+    # single level of variable expansion, e.g. A=$VAR; B=$A won't work for B
+    - export JOB_NAME="${WORKSPACE_NAME}-${CI_JOB_NAME}"
 
     - sudo rm -rf ${WORKSPACE_DIR}
     - mkdir -p ${WORKSPACE_DIR}
@@ -61,5 +60,32 @@ build:
 
     # containers run commands as 'root' user, seize ownership back
     - sudo chown -R $(id -u):$(id -g) .
+
+build_hax:
+  stage: build
+  tags: [ m0vg ]
+  except: [ tags ]
+  dependencies: [ build_m0 ]
+  script:
+    # can't be defined in the 'variables:' section because it supports only
+    # single level of variable expansion, e.g. A=$VAR; B=$A won't work for B
+    - export JOB_NAME="${WORKSPACE_NAME}-${CI_JOB_NAME}"
+
+    - cd ${WORKSPACE_DIR}
+
+    - time docker run --rm --name ${JOB_NAME}
+                      -v ~+:/data -w /data/hare
+                  $DOCKER_REGISTRY/mero/mero:$CENTOS_RELEASE
+                      make -C hax
+
+    # containers run commands as 'root' user, seize ownership back
+    - sudo chown -R $(id -u):$(id -g) .
+
+# test_cfgen:
+#   stage: test
+#   tags: [ m0vg ]
+#   except: [ tags ]
+#   script:
+#     - XXX
 
 # vim: foldmethod=marker shiftwidth=2 tabstop=2 expandtab
