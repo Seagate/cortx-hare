@@ -28,7 +28,7 @@ after_script:
 # Build ------------------------------------------------------------------- {{{1
 #
 
-build_m0:
+build:
   stage: build
   tags: [ m0vg ]
   except: [ tags ]
@@ -58,21 +58,7 @@ build_m0:
                                export USER=\$(id -un);
                                CONFIGURE_OPTS=--with-linux=\$KERNEL MAKE_OPTS='-j10' scripts/m0 make"
 
-    # containers run commands as 'root' user, seize ownership back
-    - sudo chown -R $(id -u):$(id -g) .
-
-build_hax:
-  stage: build
-  tags: [ m0vg ]
-  except: [ tags ]
-  dependencies: [ build_m0 ]
-  script:
-    # can't be defined in the 'variables:' section because it supports only
-    # single level of variable expansion, e.g. A=$VAR; B=$A won't work for B
-    - export JOB_NAME="${WORKSPACE_NAME}-${CI_JOB_NAME}"
-
-    - cd ${WORKSPACE_DIR}
-
+    # Build hax's C extension.
     - time docker run --rm --name ${JOB_NAME}
                       -v ~+:/data -w /data/hare
                   $DOCKER_REGISTRY/mero/mero:$CENTOS_RELEASE
