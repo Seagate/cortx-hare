@@ -53,15 +53,10 @@ build:
       set -eu -o pipefail
 
       KERNEL=$(yum list installed kernel | tail -n1 | awk '{ print $2 }')
-      KERNEL=/lib/modules/${KERNEL}.x86_64/build
 
-      # XXX Remove `sudo` and `USER` hacks after `m0` script is updated to not require them.
-      sudo() { if [[ ${1:-} = '-E' ]]; then shift; fi; $@; }
-      export -f sudo
-
-      export USER=$(id -un)
-
-      CONFIGURE_OPTS=--with-linux=$KERNEL MAKE_OPTS='-j10' scripts/m0 make
+      ./autogen.sh
+      ./configure --with-linux=/lib/modules/${KERNEL}.x86_64/build
+      make -j10
       EOF
 
     # Build Mero.
