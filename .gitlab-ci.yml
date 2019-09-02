@@ -55,9 +55,9 @@ build:
                       -v ~+:/data -w /data/mero
                   $DOCKER_REGISTRY/mero/mero:$CENTOS_RELEASE
                       bash -c "KERNEL=/lib/modules/\$(yum list installed kernel | tail -n1 | awk '{ print \$2 }').x86_64/build;
-                               sudo() { :; };
-                               USER=\$(id -un)
-                               CONFIGURE_OPTS=--with-linux=\$KERNEL MAKE_OPTS='-j10' scripts/m0"
+                               sudo() { :; }; export -f sudo;
+                               export USER=\$(id -un);
+                               CONFIGURE_OPTS=--with-linux=\$KERNEL MAKE_OPTS='-j10' scripts/m0 make"
 
     # containers run commands as 'root' user, seize ownership back
     - sudo chown -R $(id -u):$(id -g) .
