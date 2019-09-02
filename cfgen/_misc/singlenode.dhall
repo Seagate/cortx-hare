@@ -3,10 +3,9 @@ let types = ../dhall/types.dhall
 in
 { hosts =
     [ { name = "localhost"
-      , disks = { path_glob = "/dev/loop[0-9]*" }
       , m0_servers =
           [ { runs_confd = Some True
-            , io_disks = { path_regex = "." }
+            , io_disks = Some { path_glob = "/dev/loop[0-9]*" }
             }
           ]
       , c0_clients = 2

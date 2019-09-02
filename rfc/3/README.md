@@ -24,20 +24,20 @@ various configuration files required to start Mero cluster.
 
 ### Cluster Description File (CDF)
 
-Cluster administrator SHALL provide a _cluster description file_,
+Cluster administrator SHALL provide a _cluster description file_ (CDF),
 specifying which hosts the cluster is made of, how many Mero services
 and clients to run, where to run confd services, which drives to use
 for Mero I/O.
 
-The file is in YAML format and has the following schema:
+CDF is a YAML file with the following schema:
 ```yaml
 hosts:
   - name: <str>  # [user@]hostname; e.g., localhost, samir@10.22.33.44
-    disks: { path_glob: <str> }  # e.g. "/dev/loop[0-9]*"
+    disks:
     m0_servers:
-      - runs_confd: <bool>   # optional, defaults to false
-        io_disks:
-          path_regex: <str>  # e.g. "."; empty string means no IO service
+      - runs_confd: <bool>  # optional, defaults to false
+        #io_disks: null                 # no IO service
+        io_disks: { path_glob: <str> }  # e.g. "/dev/loop[0-9]*"
     c0_clients: <int>        # max quantity of Clovis apps this host may have
     m0t1fs_clients: <int>    # max quantity of m0t1fs clients
 pools:

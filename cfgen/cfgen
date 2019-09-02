@@ -4,13 +4,14 @@ import abc
 import argparse
 import ast
 from enum import Enum, auto
+from glob import glob
 import json
 import os
 import random
 import re
 import subprocess
 import sys
-from typing import Any, Callable, Dict, Iterator, NamedTuple, List, Tuple
+from typing import Any, Callable, Dict, Iterator, List, NamedTuple, Tuple
 import yaml
 
 
@@ -67,11 +68,11 @@ class ShowSchema(argparse.Action):
 ---  # start of the document (optional)
 hosts:
   - name: <str>  # [user@]hostname; e.g., localhost, samir@10.22.33.44
-    disks: { path_glob: <str> }  # e.g. "/dev/loop[0-9]*"
+    disks:
     m0_servers:
-      - runs_confd: <bool>   # optional, defaults to false
-        io_disks:
-          path_regex: <str>  # e.g. "."; empty string means no IO service
+      - runs_confd: <bool>  # optional, defaults to false
+        #io_disks: null                 # no IO service
+        io_disks: { path_glob: <str> }  # e.g. "/dev/loop[0-9]*"
     c0_clients: <int>        # max quantity of Clovis apps this host may have
     m0t1fs_clients: <int>    # max quantity of m0t1fs clients
 pools:
@@ -117,10 +118,17 @@ def main(argv=None):
                                   'memorysize_mb', 'ipaddress', 'macaddress')
         host['facts']['_memsize_MB'] = int(float(
             host['facts']['memorysize_mb']))
-        host['disks']['items'] = get_disks(host['name'],
-                                           host['disks']['path_glob'])
+
+        for m0d in host['m0_servers']:
+            disks = m0d.setdefault('io_disks', {})
+            disks['items'] = get_disks(host['name'], disks['path_glob'])
 
     validate_cluster_desc(cluster_desc)
+    # # XXX DELETEME <<<<<<<
+    # from pprint import pprint
+    # pprint(cluster_desc)
+    # # sys.exit(9)
+    # # XXX >>>>>>>
 
     m0conf = build_m0conf(cluster_desc)
     outs: List[Tuple[str, Callable[..., str], List[Any]]] = [
@@ -165,12 +173,24 @@ def validate_cluster_desc(desc: Dict[str, Any]):
     total_nr_confds = 0
 
     for host in desc['hosts']:
+        def err(msg: str) -> str:
+            return '{}: {}'.format(host['name'], msg)
+
         nr_confds = sum(1 for m0d in host['m0_servers'] if m0d['runs_confd'])
-        assert nr_confds < 2, host['name'] + ': Too many confd services'
+        assert nr_confds < 2, err('Too many confd services')
         total_nr_confds += nr_confds
 
+        for m0d in host['m0_servers']:
+            assert m0d['runs_confd'] or m0d['io_disks']['path_glob'], \
+                err("Either 'runs_confd' or 'io_disks' must be set")
+
+        disks: List[Disk] = []
+        for m0d in host['m0_servers']:
+            disks.extend(m0d['io_disks']['items'])
+        assert all_unique(disks), err('Same disk used by several IO services')
+
         assert nr_confds + host['c0_clients'] + host['m0t1fs_clients'] > 0, \
-            host['name'] + ': At least one Mero server or client is required'
+            err('At least one Mero server or client is required')
 
     assert total_nr_confds > 0, 'At least one confd is required'
 
@@ -183,27 +203,6 @@ def run_command(hostname: str, *args: str) -> str:
         cmd = ['ssh', hostname]
     cmd.extend(args)
     return subprocess.check_output(cmd, timeout=15).decode()
-
-
-Disk = NamedTuple('Disk', [('path', str), ('size', int)])
-Disk.size.__doc__ = 'Total space in bytes'
-
-
-# XXX see build_disk_info() in mero's `utils/m0genfacts`
-def get_disks(hostname: str, path_glob: str) -> List[Disk]:
-    cmd = ['sudo', 'python3', '-c', f"""\
-import glob
-import io
-
-def blockdev_size(path):
-    with open(path, 'rb') as f:
-        return f.seek(0, io.SEEK_END)
-
-print([dict(path=path, size=blockdev_size(path))
-       for path in glob.glob({path_glob!r})])
-"""]
-    return [Disk(**kwargs) for kwargs in
-            ast.literal_eval(run_command(hostname, *cmd))]
 
 
 def get_facts(hostname: str, mock_p: bool, *args: str) -> Dict[str, Any]:
@@ -227,6 +226,30 @@ def fabricate_facts(hostname: str, *args: str) -> Dict[str, Any]:
             rng(256), rng(256), rng(256), rng(256), rng(256), rng(256)]),
     }
     return dict((k, fabricated[k]) for k in args)
+
+
+Disk = NamedTuple('Disk', [('path', str), ('size', int)])
+Disk.size.__doc__ = 'Total space in bytes'
+
+
+# XXX see build_disk_info() in mero's `utils/m0genfacts`
+def get_disks(hostname: str, path_glob: str) -> List[Disk]:
+    # XXX Use `mock_p` parameter, similarly to `get_facts` function.
+    paths: List[str] = glob(path_glob) if path_glob else []
+    if not paths:
+        return []
+
+    cmd = ['sudo', 'python3', '-c', f"""\
+import io
+
+def blockdev_size(path):
+    with open(path, 'rb') as f:
+        return f.seek(0, io.SEEK_END)
+
+print([dict(path=path, size=blockdev_size(path)) for path in {paths!r}])
+"""]
+    return [Disk(**kwargs) for kwargs in
+            ast.literal_eval(run_command(hostname, *cmd))]
 
 
 def cluster_nodes(cluster_desc: Dict[str, Any]) -> Tuple[List[str], List[str]]:
@@ -325,12 +348,12 @@ class ConfRoot(ToDhall):
     def to_dhall(self, oid: Oid) -> str:
         assert oid.type is ObjT.root
         args = ', '.join([f'id = {oid_to_dhall(oid)}',
-                          'mdpool = oid_XXX_IMPLEMENTME',
-                          'imeta_pver = Some oid_XXX_IMPLEMENTME',
+                          'mdpool = XXX.Oid',
+                          'imeta_pver = Some XXX.Oid',
                           f'nodes = {oids_to_dhall(self.nodes)}',
                           f'sites = {oids_to_dhall(self.sites)}',
-                          'pools = oids_XXX_IMPLEMENTME',
-                          'profiles = oids_XXX_IMPLEMENTME'])
+                          'pools = XXX.Oids',
+                          'profiles = XXX.Oids'])
         return '{ %s }' % args
 
 
@@ -397,8 +420,10 @@ class ConfProcess(ToDhall):
     @classmethod
     def build(cls, m0conf: Dict[Oid, Any], parent: Oid,
               host_facts: Dict[str, Any],
-              process_desc: Dict[str, Any] = None) -> Oid:
+              process_desc: Dict[str, Any] = None,
+              ctrl: Oid = None) -> Oid:
         assert parent.type is ObjT.node
+        assert ctrl is None or ctrl.type is ObjT.controller
 
         ep = Endpoint(ipaddr=host_facts['ipaddress'])
         proc_id = new_oid(ObjT.process)
@@ -408,7 +433,12 @@ class ConfProcess(ToDhall):
         m0conf[parent].processes.append(proc_id)
 
         for stype in service_types(process_desc):
-            ConfService.build(m0conf, proc_id, stype, ep)
+            svc_id = ConfService.build(m0conf, proc_id, stype, ep)
+            if stype is SvcT.M0_CST_IOS:  # XXX What about M0_CST_CAS?
+                assert process_desc is not None and ctrl is not None
+                for disk in process_desc['io_disks']['items']:
+                    ConfDrive.build(m0conf, ctrl,
+                                    ConfSdev.build(m0conf, svc_id, disk))
         return proc_id
 
 
@@ -455,7 +485,7 @@ def service_types(process_desc: Dict[str, Any] = None) -> List[SvcT]:
         if process_desc.get('runs_confd'):
             ts.append(SvcT.M0_CST_CONFD)
 
-        if process_desc['io_disks']['path_regex']:
+        if process_desc['io_disks']['items']:
             ts.extend([SvcT.M0_CST_IOS,
                        SvcT.M0_CST_SNS_REP,
                        SvcT.M0_CST_SNS_REB,
@@ -496,6 +526,44 @@ class ConfService(ToDhall):
         return svc_id
 
 
+class ConfSdev(ToDhall):
+    _dev_idx = _infinite_counter()
+
+    def __init__(self, dev_idx: int, filename: str, size: int):
+        self.dev_idx = dev_idx
+        self.filename = filename
+        self.size = size
+
+    def __repr__(self):
+        args = ', '.join([f'dev_idx={self.dev_idx}',
+                          f'filename={self.filename}',
+                          f'size={self.size}'])
+        return f'{self.__class__.__name__}({args})'
+
+    def to_dhall(self, oid: Oid) -> str:
+        assert oid.type is ObjT.sdev
+        args = ', '.join([f'id = {oid_to_dhall(oid)}',
+                          f'dev_idx = {self.dev_idx}',
+                          'iface = XXX.Natural',
+                          'media = XXX.Natural',
+                          'bsize = XXX.Natural',
+                          f'size = {self.size}',
+                          f'filename = "{self.filename}"'])
+        return '{ %s }' % args
+
+    @classmethod
+    def build(cls, m0conf: Dict[Oid, Any], parent: Oid,
+              disk_desc: Disk) -> Oid:
+        assert parent.type is ObjT.service
+
+        sdev_id = new_oid(ObjT.sdev)
+        m0conf[sdev_id] = cls(dev_idx=next(cls._dev_idx),
+                              filename=disk_desc.path,
+                              size=disk_desc.size)
+        m0conf[parent].sdevs.append(sdev_id)
+        return sdev_id
+
+
 class ConfSite(ToDhall):
     def __init__(self, racks: List[Oid] = []):
         assert all(x.type is ObjT.rack for x in racks)
@@ -508,7 +576,7 @@ class ConfSite(ToDhall):
         assert oid.type is ObjT.site
         args = ', '.join([f'id = {oid_to_dhall(oid)}',
                           f'racks = {oids_to_dhall(self.racks)}',
-                          'pvers = oids_XXX_IMPLEMENTME'])
+                          'pvers = XXX.Oids'])
         return '{ %s }' % args
 
     @classmethod
@@ -533,7 +601,7 @@ class ConfRack(ToDhall):
         assert oid.type is ObjT.rack
         args = ', '.join([f'id = {oid_to_dhall(oid)}',
                           f'encls = {oids_to_dhall(self.encls)}',
-                          'pvers = oids_XXX_IMPLEMENTME'])
+                          'pvers = XXX.Oids'])
         return '{ %s }' % args
 
     @classmethod
@@ -558,7 +626,7 @@ class ConfEnclosure(ToDhall):
         assert oid.type is ObjT.enclosure
         args = ', '.join([f'id = {oid_to_dhall(oid)}',
                           f'ctrls = {oids_to_dhall(self.ctrls)}',
-                          'pvers = oids_XXX_IMPLEMENTME'])
+                          'pvers = XXX.Oids'])
         return '{ %s }' % args
 
     @classmethod
@@ -586,7 +654,7 @@ class ConfController(ToDhall):
         args = ', '.join([f'id = {oid_to_dhall(oid)}',
                           f'node = {oid_to_dhall(self.node)}',
                           f'drives = {oids_to_dhall(self.drives)}',
-                          'pvers = oids_XXX_IMPLEMENTME'])
+                          'pvers = XXX.Oids'])
         return '{ %s }' % args
 
     @classmethod
@@ -599,6 +667,32 @@ class ConfController(ToDhall):
         assert not m0conf[parent].ctrls
         m0conf[parent].ctrls = [ctrl_id]  # enclosure:controller = 1:1
         return ctrl_id
+
+
+class ConfDrive(ToDhall):
+    def __init__(self, sdev: Oid):
+        assert sdev.type is ObjT.sdev
+        self.sdev = sdev
+
+    def __repr__(self):
+        return f'{self.__class__.__name__}(sdev={self.sdev})'
+
+    def to_dhall(self, oid: Oid) -> str:
+        assert oid.type is ObjT.drive
+        args = ', '.join([f'id = {oid_to_dhall(oid)}',
+                          f'sdev = {oid_to_dhall(self.sdev)}',
+                          'pvers = XXX.Oids'])
+        return '{ %s }' % args
+
+    @classmethod
+    def build(cls, m0conf: Dict[Oid, Any], parent: Oid, sdev: Oid) -> Oid:
+        assert parent.type is ObjT.controller
+        assert sdev.type is ObjT.sdev
+
+        drive_id = new_oid(ObjT.drive)
+        m0conf[drive_id] = cls(sdev)
+        m0conf[parent].drives.append(drive_id)
+        return drive_id
 
 
 def generate_bootstrap_env(servers: List[str], clients: List[str]) -> str:
@@ -623,8 +717,11 @@ let types = {dhall_dir}/types.dhall
 let utils = {dhall_dir}/utils.dhall
 let toConfGen = {dhall_dir}/toConfGen.dhall
 
-let oid_XXX_IMPLEMENTME = utils.zoid types.ObjT.Root 999
-let oids_XXX_IMPLEMENTME = [] : List types.Oid
+let XXX =
+  {{ Natural = 0
+  , Oid = utils.zoid types.ObjT.Root 999
+  , Oids = [] : List types.Oid
+  }}
 
 let objs =
   [ {objs}
@@ -691,18 +788,19 @@ def build_m0conf(cluster_desc: Dict[str, Any]) -> Dict[Oid, ToDhall]:
         facts = host['facts']
 
         node_id = ConfNode.build(conf, root_id, facts)
-        ConfController.build(conf, ConfEnclosure.build(conf, rack_id), node_id)
+        encl_id = ConfEnclosure.build(conf, rack_id)
 
-        ConfProcess.build(conf, node_id, facts)  # `hax`
+        ctrl_id = ConfController.build(conf, encl_id, node_id) \
+            if any(m0d['io_disks']['items'] for m0d in host['m0_servers']) \
+            else None
 
-        for proc in host['m0_servers']:
-            ConfProcess.build(conf, node_id, facts, proc)
+        ConfProcess.build(conf, node_id, facts)  # hax
+
+        for m0d in host['m0_servers']:
+            ConfProcess.build(conf, node_id, facts, m0d, ctrl_id)
 
         for _ in range(host['c0_clients'] + host['m0t1fs_clients']):
             ConfProcess.build(conf, node_id, facts)
-
-        # for disk in host['disks']['items']:
-        #     ConfDrive.build(conf, ctrl_id, disk)
 
     assert all(k.type.name == v.__class__.__name__[len('Conf'):].lower()
                for k, v in conf.items())
