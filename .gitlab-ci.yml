@@ -47,8 +47,6 @@ build:
     # Get fresh Mero copy.
     - git clone --recursive --depth 1 --shallow-submodules http://gitlab.mero.colo.seagate.com/mero/mero.git
 
-    - exit 0  # XXX DELETEME
-
     - |
       cat >mero/_build-m0.sh <<'EOF'
       set -eu -o pipefail
