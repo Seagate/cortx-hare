@@ -18,6 +18,10 @@ get_current_value() {
     consul kv get $KEY
 }
 
+get_new_value() {
+    expr $(get_current_value) + $INC
+}
+
 get_current_index() {
     consul kv get -detailed $KEY | awk '/ModifyIndex/ {print $2}'
 }
@@ -26,10 +30,10 @@ commit_new_value() {
     consul kv put -cas -modify-index=$1 $KEY $2 > /dev/null
 }
 
-NEW_VALUE=$(($(get_current_value) + $INC))
+NEW_VALUE=$(get_new_value)
 
 while ! commit_new_value $(get_current_index) $NEW_VALUE; do
-    NEW_VALUE=$(($(get_current_value) + $INC))
+    NEW_VALUE=$(get_new_value)
 done
 
 echo $NEW_VALUE
