@@ -46,8 +46,4 @@
 , PverF       = ./types/PverF.dhall
 , Objv        = ./types/Objv.dhall
 , Profile     = ./types/Profile.dhall
-
-, ConsulService = ./types/ConsulService.dhall
-, KeyValue      = ./types/KeyValue.dhall
-, Value         = ./types/Value.dhall
 }

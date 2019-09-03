@@ -135,7 +135,7 @@ def main(argv=None):
         ('bootstrap-env', generate_bootstrap_env,
          *cluster_nodes(cluster_desc)),
         ('confd.dhall', generate_confd, m0conf, opts.dhall_dir),
-        ('consul-kv.dhall', generate_consul_kv, m0conf, opts.dhall_dir),
+        ('consul-kv.json', generate_consul_kv, m0conf, opts.dhall_dir),
     ]
     for path, generate, *args in outs:
         with open(os.path.join(opts.output_dir, path), 'w') as f:
@@ -734,16 +734,15 @@ in toConfGen objs
 def generate_consul_kv(m0conf: Dict[Oid, Any], dhall_dir: str) -> str:
     assert os.path.isabs(dhall_dir)
 
+    global fid_keygen
+    _fid_keygen = next(fid_keygen)
+    # Give up ownership of `fid_keygen`, passing it to the Consul KV.
+    del fid_keygen
+
     ConsulService = NamedTuple(
         'ConsulService', [('node_id', Oid), ('proc_id', Oid), ('svc_t', SvcT)])
 
-    def cservice_to_dhall(x: ConsulService) -> str:
-        args = ', '.join([f'node = {oid_to_dhall(x.node_id)}',
-                          f'process = {oid_to_dhall(x.proc_id)}',
-                          f'service = {x.svc_t.to_dhall()}'])
-        return '{ %s }' % args
-
-    def gen_cservices() -> Iterator[ConsulService]:
+    def services() -> Iterator[ConsulService]:
         for node_id, node in m0conf.items():
             if node_id.type is not ObjT.node:
                 continue
@@ -757,25 +756,13 @@ def generate_consul_kv(m0conf: Dict[Oid, Any], dhall_dir: str) -> str:
                                             proc_id=proc_id,
                                             svc_t=svc.type)
 
-    services = '\n  , '.join(cservice_to_dhall(x) for x in gen_cservices())
-
-    global fid_keygen
-    _fid_keygen = next(fid_keygen)
-    # `cfgen` gives up ownership of fid_keygen, passing it to the Consul KV.
-    del fid_keygen
-
-    return f"""\
-let types = {dhall_dir}/types.dhall
-let utils = {dhall_dir}/utils.dhall
-
-let consulKV = {dhall_dir}/consulKV.dhall
-
-let services =
-  [ {services}
-  ]
-
-in consulKV {{ services = services, fid_keygen = {_fid_keygen} }}
-"""
+    return json.dumps([dict(key=k, value=v) for k, v in (
+        ('leader', ''),
+        ('epoch', 1),
+        ('fid_keygen', _fid_keygen),
+        *[(f'node/{x.node_id.fidk}/service/{x.svc_t.name}/{x.proc_id.fidk}',
+           '') for x in services()])],
+                      indent=2) + "\n"
 
 
 def build_m0conf(cluster_desc: Dict[str, Any]) -> Dict[Oid, ToDhall]:
