@@ -10,34 +10,38 @@ editor: Valery V. Vorotyntsev <valery.vorotyntsev@seagate.com>
 
 * EVENT: IOS crashes
 
-  DETECTED BY: Consul watch (e.g., `pgrep`)
+  DETECTED BY: Consul health check (e.g., `pgrep`, `systemctl status <service-name>`)
 
-  REACTION: Watch handler updates the KV: sets the value of key
-  `processes/<fid>` to `{ "state": "failed" }`.
+  REACTION: Based on consul health check output, consul service (mero process, i.e.
+  confd, ios) state is updated.
 
-  CHAIN REACTION (EES): `processes/` key prefix is being watched.
-  The watch handler notifies Pacemaker, which
+  CHAIN REACTION (EES): Consul service is being watched.
+  The watch handler notifies Pacemaker, which tries to restart the service or
   [~~nukes the entire site from orbit~~](https://www.youtube.com/watch?v=aCbfMkh940Q)
   performs failover.
 
   CHAIN REACTION (POST-EES):
 
-  1. `processes/` key prefix is being watched.  The watch handler
-     broadcasts HTTP POST request to all `hax` processes.
+  1. Consul service is being watched.  The watch handler broadcasts HTTP POST request
+  to all `hax` processes.
 
-  1. `hax` processes send HA state update to Mero processes.
+  2. `hax` processes sends HA state update to Mero processes.
 
 * EVENT: confd crashes
 
-  DETECTED BY: Consul watch
+  DETECTED BY: Consul health check (e.g. `systemctl status <service-name>`)
 
-  REACTION: XXX TBD
+  REACTION: Consul service is being watched. Based on health checker output, Consul
+  service state is updated which triggers the corresponding watcher.
+
+  CHAIN REACTION: Consul service watcher, notifies hax which notifies Mero nodes
+  about the mero process's state change.
 
 * EVENT: hax crashes
 
-  DETECTED BY: Consul watch
+  DETECTED BY: systemd/pacemaker
 
-  REACTION: XXX TBD
+  REACTION: systemd/pacemaker tries to restart hax service.
 
 * EVENT: consul agent is not accessible
 

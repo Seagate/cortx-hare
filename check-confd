@@ -1,18 +1,22 @@
 #!/usr/bin/env bash
-set -eu -o pipefail
 
 #
 # Health check for the Mero confd service.
 #
+CONFD_STATE=$(systemctl status mero-server-confd | sed -e 's/^[ \t]*//' | grep "^Active" | cut -d ' ' -f 2)
+# pipefail before the above comman causes it to exit with last unsuccessfull
+# command exit code, i.e. 3 (No such process) in case the process is
+# inactive.
+set -eu -o pipefail
 
-CONFD_STATE=$(consul kv get processes/0x7200000000000001:0x1 | jq '.state' -r)
-if [[ $CONFD_STATE = 'M0_CONF_HA_PROCESS_STARTED' ]]; then
-    rm -f /tmp/confd  # cleanup after the bootstrap stage
-    exit 0
-fi
-
-if [[ -f /tmp/confd ]]; then
-    exit 1  # confd is still starting
-fi
-
-exit 2
+case $CONFD_STATE in
+'active')
+  exit 0
+  ;;
+'failed')
+  exit 2
+  ;;
+'inactive')
+  exit 1
+  ;;
+esac
