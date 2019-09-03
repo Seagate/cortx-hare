@@ -741,8 +741,8 @@ def generate_consul_kv(m0conf: Dict[Oid, Any], dhall_dir: str) -> str:
     # Give up ownership of `fid_keygen`, passing it to the Consul KV.
     del fid_keygen
 
-    ConsulService = NamedTuple(
-        'ConsulService', [('node_name', str), ('proc_id', Oid), ('svc_t', SvcT)])
+    ConsulService = NamedTuple('ConsulService', [
+        ('node_name', str), ('proc_id', Oid), ('svc_t', SvcT)])
 
     def services() -> Iterator[ConsulService]:
         for node_id, node in m0conf.items():
