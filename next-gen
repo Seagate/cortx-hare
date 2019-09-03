@@ -29,7 +29,7 @@ commit_new_value() {
 NEW_VALUE=$(($(get_current_value) + $INC))
 
 while ! commit_new_value $(get_current_index) $NEW_VALUE; do
-    NEW_VALUE=$(($(get_current_value) + 1))
+    NEW_VALUE=$(($(get_current_value) + $INC))
 done
 
 echo $NEW_VALUE
