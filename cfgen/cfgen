@@ -358,8 +358,9 @@ class ConfRoot(ToDhall):
 
 
 class ConfNode(ToDhall):
-    def __init__(self, nr_cpu: int, memsize_MB: int,
+    def __init__(self, hostname: str, nr_cpu: int, memsize_MB: int,
                  processes: List[Oid] = []):
+        self.hostname = hostname
         self.nr_cpu = nr_cpu
         self.memsize_MB = memsize_MB
         assert all(x.type is ObjT.process for x in processes)
@@ -384,7 +385,8 @@ class ConfNode(ToDhall):
               host_facts: Dict[str, Any]) -> Oid:
         assert parent.type is ObjT.root
         node_id = new_oid(ObjT.node)
-        m0conf[node_id] = cls(nr_cpu=host_facts['processorcount'],
+        m0conf[node_id] = cls(hostname=host_facts['hostname'],
+                              nr_cpu=host_facts['processorcount'],
                               memsize_MB=host_facts['_memsize_MB'])
         m0conf[parent].nodes.append(node_id)
         return node_id
@@ -740,7 +742,7 @@ def generate_consul_kv(m0conf: Dict[Oid, Any], dhall_dir: str) -> str:
     del fid_keygen
 
     ConsulService = NamedTuple(
-        'ConsulService', [('node_id', Oid), ('proc_id', Oid), ('svc_t', SvcT)])
+        'ConsulService', [('node_name', str), ('proc_id', Oid), ('svc_t', SvcT)])
 
     def services() -> Iterator[ConsulService]:
         for node_id, node in m0conf.items():
@@ -752,7 +754,7 @@ def generate_consul_kv(m0conf: Dict[Oid, Any], dhall_dir: str) -> str:
                     assert svc_id.type is ObjT.service
                     svc = m0conf[svc_id]
                     if svc.type in (SvcT.M0_CST_CONFD, SvcT.M0_CST_IOS):
-                        yield ConsulService(node_id=node_id,
+                        yield ConsulService(node_name=node.hostname,
                                             proc_id=proc_id,
                                             svc_t=svc.type)
 
@@ -760,7 +762,7 @@ def generate_consul_kv(m0conf: Dict[Oid, Any], dhall_dir: str) -> str:
         ('leader', ''),
         ('epoch', 1),
         ('fid_keygen', _fid_keygen),
-        *[(f'node/{x.node_id.fidk}/service/{x.svc_t.name}/{x.proc_id.fidk}',
+        *[(f'node/{x.node_name}/service/{x.svc_t.name}/{x.proc_id.fidk}',
            '') for x in services()])],
                       indent=2) + "\n"
 
