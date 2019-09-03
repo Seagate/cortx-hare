@@ -1,32 +1,33 @@
 #!/usr/bin/env bash
 set -eu -o pipefail
 
-# Helper script to install the stuff on the local node
+# Install Hare software on the local node.
 
 SRC_DIR="$(dirname $(readlink -f $0))"
 M0_SRC_DIR=${M0_SRC_DIR:-${SRC_DIR%/*}/mero}
 
 init_hax() {
-    echo 'Installing Python dependencies into the virtualenv'
     local env_dir=$SRC_DIR/.env
 
     python3 -m venv $env_dir
     set +u
     . $env_dir/bin/activate
     set -u
+
     pushd $SRC_DIR/hax >/dev/null
-    pip install wheel
-    python ./setup.py bdist_wheel
-    pip install ./dist/hax-0.0.1-cp36-cp36m-linux_x86_64.whl
+    pip3 install wheel
+    python3 setup.py bdist_wheel
+    pip3 install dist/hax-0.0.1-cp36-cp36m-linux_x86_64.whl
     popd >/dev/null
 }
 
-create_env_file () {
+create_env_file() {
     export HAX_EXE="$SRC_DIR/.env/bin/hax"
-    envsubst <$SRC_DIR/systemd/hax-environment.src >$SRC_DIR/systemd/hax-environment
+    envsubst <$SRC_DIR/systemd/hax-environment.src \
+             >$SRC_DIR/systemd/hax-environment
 }
 
-install_systemd () {
+install_systemd() {
     sudo mkdir -p /opt/seagate
     sudo ln -sfn $SRC_DIR /opt/seagate/consul
     sudo cp $SRC_DIR/systemd/*.service /usr/lib/systemd/system/
