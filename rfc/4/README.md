@@ -15,10 +15,12 @@ Key | Value | Description
 --- | --- | ---
 `bq/<epoch>` | (conf object fid, HA state) | `bq/*` items are collectively referred to as the BQ (Broadcast Queue).  The items - HA state updates - are produced by the RC (Recovery Coordinator) script.
 `epoch` | current epoch (natural number) | Atomically incremented counter, which is used to generate unique ordered identifiers for EQ and BQ entries.
+`last_fid` | last generated FID (natural number) | Atomically incremented counter, which is used to generate unique FIDs.
 `eq/<epoch>` | event | `eq/*` items are collectively referred to as the EQ (Event Queue).  Events are consumed and dequeued by the RC script.
 `leader` | node name | This key is used for RC leader election.  Created with [`consul lock`](https://www.consul.io/docs/commands/lock.html) command.
 `processes/<fid>` | `{ "state": "<HA state>" }` | The items are created and updated by `hax` processes.  Supported values of \<HA state\>: `M0_CONF_HA_PROCESS_STARTING`, `M0_CONF_HA_PROCESS_STARTED`, `M0_CONF_HA_PROCESS_STOPPING`, `M0_CONF_HA_PROCESS_STOPPED`.
 `timeout` | YYYYmmddHHMM.SS | This value is used by the RC timeout mechanism.
+`node/<name>/service/<confd\|ios>/<fid>` | N/A | Used to update Consul configuration files with services and their FIDs.
 
 <!--
   XXX TODO: s/processes/m0-servers/
