@@ -195,47 +195,26 @@ The function blocks until the epoch is returned or an error occurs.
 
 See the [[https://docs.google.com/document/d/1cR-BbxtMjGuZPj8NOc95RyFjqmeFsYf4JJ5Hw_tL1zA/edit#bookmark=id.whq5d31z34][prototype]].
 
-** _sprint-6
+** _sprint-7
 
-*** DONE bootstrap RFC
+Sprint goal: "Complete confd.xc"
 
-**** CANCELLED we might be able to start Mero processes simultaneously :CANCELLED:
+*** @mandar: [[[https://jts.seagate.com/browse/EOS-1773][EOS-1773]]] complete ConfSdev
 
-- State "CANCELLED"  from              [2019-08-24 Sat 13:27] \\
-  This would require non-trivial changes in Mero.  We won't be doing those in the nearest future.
-***** this requires m0mkfs's fid and endpoint to be different from those of m0d
+*** complete confd.xc
+- @vvv: Conf{Pool,PverF,Objv} [[[https://jts.seagate.com/browse/EOS-880][EOS-880]]]
+- @prasanna: ConfProfile [[[https://jts.seagate.com/browse/EOS-1771][EOS-1771]]]
+- @rajanikant: ConfPver [[[https://jts.seagate.com/browse/EOS-1772][EOS-1772]]]
 
-*** ! testing & CI
+**** use 5-node cluster desc file for testing
 
-**** [proto-bootstrap] script(s) for starting cluster, consul agents, Hare executables, etc.
-- install Mero rpm
-- insmod Mero kernel modules
-- /etc./
+**** ? Conf*.build methods to build children as well
+Similarly to how ConfProcess.build does that.
 
-*** @andriy
-
-**** DONE [[[https://jts.seagate.com/browse/EOS-1427][EOS-1427]]] systemd scripts for hax
-
-**** cfgen: ~consul-config.json~, ~consul-kv.json~
-
-*** @kostya
-- [[[https://jts.seagate.com/browse/EOS-1456][EOS-1456]]] Ensure that hax doesn't require confd to start
-
-*** @mandar
-- [[[https://jts.seagate.com/browse/EOS-1436][EOS-1436]]] hax: Remove dependency on the m0_halon_interface patch
-
-- remove dependency on the ~m0_halon_interface~ patch
-- broadcast ~m0_ha_msg~s to Mero processes
-- handle ~m0_ha_link~ disconnects
-
-*** @vvv
-- [[[https://jts.seagate.com/browse/EOS-1433][EOS-1433]]] cfgen: ConfSdev and ConfDrive objects
-- cfgen: complete confd.xc
-
-**** confsd.xc
+**** confd.xc
 - [[~/src/mero/scripts/install/usr/share/mero/templates/halon_facts.yaml.erb][halon_facts.yaml.erb]]
 
-***** disks
+***** disks :ARCHIVE:
 
 ****** m0genfacts: How are disk regexes processed? Does len(drives) depend on glob or regex?
 
@@ -434,7 +413,9 @@ q_dbfacts = {
 
 ~m0genfacts --lnet-transport {tcp|o2ib}~, defaults to ~tcp~.
 
-*** HOLD QA                                                          :HOLD:
+*** @andriy: [[[https://jts.seagate.com/browse/EOS-1704][EOS-1704]]] consul-kv.json
+
+*** ?XXX [[[https://jts.seagate.com/browse/EOS-1705][EOS-1705]]] consul-config_{server,client}.json
 
 ** scoping
 
