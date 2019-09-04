@@ -198,7 +198,7 @@ def validate_cluster_desc(desc: Dict[str, Any]):
 def run_command(hostname: str, *args: str) -> str:
     assert hostname
 
-    cmd = []  # type: List[str]
+    cmd: List[str] = []
     if hostname not in ('localhost', '127.0.0.1'):
         cmd = ['ssh', hostname]
     cmd.extend(args)
@@ -349,7 +349,7 @@ class ConfRoot(ToDhall):
     #               Downlink('profiles', ObjT.profile),
     #               Downlink('fdmi_flt_grps', ObjT.fdmi_flt_grp)}
 
-    def __init__(self, nodes: List[Oid] = [], sites: List[Oid] = []):
+    def __init__(self, nodes: List[Oid], sites: List[Oid]):
         assert all(x.type is ObjT.node for x in nodes)
         self.nodes = nodes
         assert all(x.type is ObjT.site for x in sites)
@@ -376,7 +376,7 @@ class ConfNode(ToDhall):
     _downlinks = {Downlink('processes', ObjT.process)}
 
     def __init__(self, hostname: str, nr_cpu: int, memsize_MB: int,
-                 processes: List[Oid] = []):
+                 processes: List[Oid]):
         self.hostname = hostname
         self.nr_cpu = nr_cpu
         self.memsize_MB = memsize_MB
@@ -404,7 +404,8 @@ class ConfNode(ToDhall):
         node_id = new_oid(ObjT.node)
         m0conf[node_id] = cls(hostname=host_facts['hostname'],
                               nr_cpu=host_facts['processorcount'],
-                              memsize_MB=host_facts['_memsize_MB'])
+                              memsize_MB=host_facts['_memsize_MB'],
+                              processes=[])
         m0conf[parent].nodes.append(node_id)
         return node_id
 
@@ -414,16 +415,14 @@ class ConfProcess(ToDhall):
     _downlinks = {Downlink('services', ObjT.service)}
 
     def __init__(self, nr_cpu: int, memsize_MB: int, endpoint: Endpoint,
-                 services: List[Oid] = []):
+                 services: List[Oid]):
         assert nr_cpu > 0
         self.nr_cpu = nr_cpu
         assert memsize_MB > 0
         self.memsize_MB = memsize_MB
         self.endpoint = endpoint
         assert all(x.type is ObjT.service for x in services)
-        # NB: Instances of this class will share the same list, unless
-        # we give each instance its own copy.
-        self.services = services.copy()
+        self.services = services
 
     def __repr__(self):
         args = ', '.join([f'nr_cpu={self.nr_cpu}',
@@ -453,7 +452,7 @@ class ConfProcess(ToDhall):
         proc_id = new_oid(ObjT.process)
         m0conf[proc_id] = cls(nr_cpu=host_facts['processorcount'],
                               memsize_MB=host_facts['_memsize_MB'],
-                              endpoint=ep)
+                              endpoint=ep, services=[])
         m0conf[parent].processes.append(proc_id)
 
         for stype in service_types(process_desc):
@@ -523,12 +522,11 @@ class ConfService(ToDhall):
     _objt = ObjT.service
     _downlinks = {Downlink('sdevs', ObjT.sdev)}
 
-    def __init__(self, stype: SvcT, endpoint: Endpoint, sdevs: List[Oid] = []):
+    def __init__(self, stype: SvcT, endpoint: Endpoint, sdevs: List[Oid]):
         self.type = stype
         self.endpoint = endpoint
         assert all(x.type is ObjT.sdev for x in sdevs)
-        # See the comment in ConfProcess.__init__.
-        self.sdevs = sdevs.copy()
+        self.sdevs = sdevs
 
     def __repr__(self):
         args = ', '.join([f'stype={self.type}',
@@ -549,7 +547,7 @@ class ConfService(ToDhall):
               stype: SvcT, endpoint: Endpoint) -> Oid:
         assert parent.type is ObjT.process
         svc_id = new_oid(ObjT.service)
-        m0conf[svc_id] = cls(stype, endpoint)
+        m0conf[svc_id] = cls(stype, endpoint, sdevs=[])
         m0conf[parent].services.append(svc_id)
         return svc_id
 
@@ -598,7 +596,7 @@ class ConfSite(ToDhall):
     _objt = ObjT.site
     _downlinks = {Downlink('racks', ObjT.rack)}
 
-    def __init__(self, racks: List[Oid] = []):
+    def __init__(self, racks: List[Oid]):
         assert all(x.type is ObjT.rack for x in racks)
         self.racks = racks
 
@@ -616,7 +614,7 @@ class ConfSite(ToDhall):
     def build(cls, m0conf: Dict[Oid, Any], parent: Oid) -> Oid:
         assert parent.type is ObjT.root
         site_id = new_oid(ObjT.site)
-        m0conf[site_id] = cls()
+        m0conf[site_id] = cls([])
         assert not m0conf[parent].sites
         m0conf[parent].sites = [site_id]  # NB: a single site
         return site_id
@@ -626,7 +624,7 @@ class ConfRack(ToDhall):
     _objt = ObjT.rack
     _downlinks = {Downlink('encls', ObjT.enclosure)}
 
-    def __init__(self, encls: List[Oid] = []):
+    def __init__(self, encls: List[Oid]):
         assert all(x.type is ObjT.enclosure for x in encls)
         self.encls = encls
 
@@ -644,7 +642,7 @@ class ConfRack(ToDhall):
     def build(cls, m0conf: Dict[Oid, Any], parent: Oid) -> Oid:
         assert parent.type is ObjT.site
         rack_id = new_oid(ObjT.rack)
-        m0conf[rack_id] = cls()
+        m0conf[rack_id] = cls([])
         assert not m0conf[parent].racks
         m0conf[parent].racks = [rack_id]  # NB: a single rack
         return rack_id
@@ -654,7 +652,7 @@ class ConfEnclosure(ToDhall):
     _objt = ObjT.enclosure
     _downlinks = {Downlink('ctrls', ObjT.controller)}
 
-    def __init__(self, ctrls: List[Oid] = []):
+    def __init__(self, ctrls: List[Oid]):
         assert all(x.type is ObjT.controller for x in ctrls)
         self.ctrls = ctrls
 
@@ -672,7 +670,7 @@ class ConfEnclosure(ToDhall):
     def build(cls, m0conf: Dict[Oid, Any], parent: Oid) -> Oid:
         assert parent.type is ObjT.rack
         encl_id = new_oid(ObjT.enclosure)
-        m0conf[encl_id] = cls()
+        m0conf[encl_id] = cls([])
         m0conf[parent].encls.append(encl_id)
         return encl_id
 
@@ -681,7 +679,7 @@ class ConfController(ToDhall):
     _objt = ObjT.controller
     _downlinks = {Downlink('drives', ObjT.drive)}
 
-    def __init__(self, node: Oid, drives: List[Oid] = []):
+    def __init__(self, node: Oid, drives: List[Oid]):
         assert node.type is ObjT.node
         self.node = node
         assert all(x.type is ObjT.drive for x in drives)
@@ -705,7 +703,7 @@ class ConfController(ToDhall):
         assert node.type is ObjT.node
 
         ctrl_id = new_oid(ObjT.controller)
-        m0conf[ctrl_id] = cls(node)
+        m0conf[ctrl_id] = cls(node, [])
         assert not m0conf[parent].ctrls
         m0conf[parent].ctrls = [ctrl_id]  # enclosure:controller = 1:1
         return ctrl_id
@@ -813,7 +811,7 @@ def generate_consul_kv(m0conf: Dict[Oid, Any], dhall_dir: str) -> str:
 
 def build_m0conf(cluster_desc: Dict[str, Any]) -> Dict[Oid, ToDhall]:
     root_id = new_oid(ObjT.root)
-    conf = {root_id: ConfRoot()}  # type: Dict[Oid, Any]
+    conf: Dict[Oid, Any] = {root_id: ConfRoot([], [])}
 
     rack_id = ConfRack.build(conf, ConfSite.build(conf, root_id))
 
