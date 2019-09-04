@@ -17,8 +17,8 @@ Key | Value | Description
 `epoch` | current epoch | Atomically incremented counter, which is used to generate unique ordered identifiers for EQ and BQ entries.  Natural number.
 `eq/<epoch>` | event | `eq/*` items are collectively referred to as the EQ (Event Queue).  Events are consumed and dequeued by the RC script.
 `leader` | node name | This key is used for RC leader election.  Created with [`consul lock`](https://www.consul.io/docs/commands/lock.html) command.
-`next-fid-key` | max(fid.key) + 1 | Atomically incremented counter that is used to generate fids.  Natural number.
-`node/<name>/service/<service-type>/<fid-key>` | `""` | The data contained in the key is being used during update of Consul configuration files.  Supported values of \<service-type\>: `confd`, `ios`.
+`last_fidk` | last genarated FID key | Atomically incremented counter that is used to generate fids.  Natural number.
+`node/<name>/service/<service_type>/<fid_key>` | `""` | The data contained in the key is being used during update of Consul configuration files.  Supported values of \<service_type\>: `confd`, `ios`.
 `processes/<fid>` | `{ "state": "<HA state>" }` | The items are created and updated by `hax` processes.  Supported values of \<HA state\>: `M0_CONF_HA_PROCESS_STARTING`, `M0_CONF_HA_PROCESS_STARTED`, `M0_CONF_HA_PROCESS_STOPPING`, `M0_CONF_HA_PROCESS_STOPPED`.
 `timeout` | YYYYmmddHHMM.SS | This value is used by the RC timeout mechanism.
 

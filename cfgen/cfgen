@@ -762,7 +762,7 @@ def generate_consul_kv(m0conf: Dict[Oid, Any], dhall_dir: str) -> str:
     return json.dumps([dict(key=k, value=v) for k, v in (
         ('leader', ''),
         ('epoch', 1),
-        ('next-fid-key', _fid_keygen),
+        ('last_fidk', _fid_keygen),
         *[(f'node/{x.node_name}/service/{x.svc_type}/{x.proc_id.fidk}', '')
           for x in services()])],
                       indent=2) + "\n"
