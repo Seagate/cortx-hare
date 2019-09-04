@@ -1,5 +1,6 @@
 {
   "server" : true,
+  "bootstrap_expect" : 1,
   "addresses" : {
     "grpc" : "{{GetPrivateIP}}",
     "dns"  : "127.0.0.1 {{GetPrivateIP}}",

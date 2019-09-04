@@ -29,7 +29,7 @@ create_env_file () {
 install_systemd () {
     sudo mkdir -p /opt/seagate
     sudo ln -sfn $SRC_DIR /opt/seagate/consul
-    sudo ln -sf $SRC_DIR/systemd/* /usr/lib/systemd/system/
+    sudo cp $SRC_DIR/systemd/*.service /usr/lib/systemd/system/
 }
 
 init_hax
