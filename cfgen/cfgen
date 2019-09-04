@@ -4,6 +4,7 @@ import abc
 import argparse
 import ast
 from enum import Enum, auto
+from functools import reduce
 from glob import glob
 import json
 import os
@@ -401,7 +402,7 @@ class ConfProcess(ToDhall):
         self.memsize_MB = memsize_MB
         self.endpoint = endpoint
         assert all(x.type is ObjT.service for x in services)
-        self.services = services
+        self.services = services.copy()
 
     def __repr__(self):
         args = ', '.join([f'nr_cpu={self.nr_cpu}',
@@ -794,6 +795,9 @@ def build_m0conf(cluster_desc: Dict[str, Any]) -> Dict[Oid, ToDhall]:
 
     assert all(k.type.name == v.__class__.__name__[len('Conf'):].lower()
                for k, v in conf.items())
+    assert all_unique(reduce(list.__add__, [v.services
+                                            for k, v in conf.items()
+                                            if k.type is ObjT.process]))
     return conf
 
 
