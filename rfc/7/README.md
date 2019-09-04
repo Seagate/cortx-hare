@@ -41,9 +41,12 @@ CHAIN REACTION:
 
 ### EVENT: `hax` crashes
 
-DETECTED BY: systemd/Pacemaker
+DETECTED BY: systemd
 
-REACTION: systemd/Pacemaker tries to restart hax service.
+REACTION:
+- systemd restarts hax service ..
+- .. and m0d services &mdash; they are defined in systemd scripts as
+  dependent on hax.
 
 ### EVENT: `consul` agent is not accessible
 
