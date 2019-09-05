@@ -106,7 +106,7 @@ specific goals:
 
 6. A patch commit message MUST consist of a single short (less than 50
    characters ) line stating the problem ("Problem: ...") being solved,
-   followed by a blank lin e and then the proposed solution
+   followed by a blank line and then the proposed solution
    ("Solution: ...").
 
 7. A "Correct Patch" is one that satisfies the above requirements.
