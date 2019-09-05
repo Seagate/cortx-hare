@@ -48,6 +48,15 @@ REACTION:
 - .. and m0d services &mdash; they are defined in systemd scripts as
   dependent on hax.
 
+### EVENT: node crashes
+
+DETECTED BY: Consul
+
+REACTION: Consul node state changes.
+
+CHAIN REACTION: Pacemaker, which is polling nodes' state information from the Consul,
+learns about the node crash and does the failover.
+
 ### EVENT: `consul` agent is not accessible
 
 XXX
