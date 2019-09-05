@@ -1,9 +1,4 @@
 {
-  "addresses" : {
-    "grpc" : "{{GetPrivateIP}}",
-    "dns"  : "127.0.0.1 {{GetPrivateIP}}",
-    "http" : "127.0.0.1 {{GetPrivateIP}}"
-  },
   "watches": [
   ],
   "enable_local_script_checks" : true,

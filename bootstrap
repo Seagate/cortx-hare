@@ -9,8 +9,7 @@ sudo rm -rf /tmp/consul*
 
 touch /tmp/confd
 
-sudo systemctl start consul-agent@server
-sudo systemctl enable consul-agent@server
+sudo systemctl start consul-agent
 
 sleep 2
 

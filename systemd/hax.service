@@ -1,7 +1,7 @@
 [Unit]
 Description=HAX daemon for Hare
-Requires=mero-kernel.service
-After=mero-kernel.service
+Requires=consul-agent.service mero-kernel.service
+After=consul-agent.service mero-kernel.service
 
 [Service]
 EnvironmentFile=/opt/seagate/consul/systemd/hax-environment
