@@ -881,6 +881,7 @@ def build_m0conf(cluster_desc: Dict[str, Any]) -> Dict[Oid, ToDhall]:
     assert all(all_unique(children)
                for parent_t, rel_children in children_by_parent_type.items()
                for rel, children in rel_children.items())
+
     assert all(k.type.name == v.__class__.__name__[len('Conf'):].lower()
                for k, v in conf.items())
     return conf
