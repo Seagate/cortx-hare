@@ -335,15 +335,18 @@ class ToDhall(metaclass=abc.ABCMeta):
 
 
 class ConfRoot(ToDhall):
-    def __init__(self, nodes: List[Oid] = [], sites: List[Oid] = []):
+    def __init__(self, nodes: List[Oid] = [], sites: List[Oid] = [],
+                 profiles: List[Oid] = []):
         assert all(x.type is ObjT.node for x in nodes)
         self.nodes = nodes
         assert all(x.type is ObjT.site for x in sites)
         self.sites = sites
+        assert all(x.type is ObjT.profile for x in profiles)
+        self.profiles = profiles
 
     def __repr__(self):
         return f'{self.__class__.__name__}(nodes={self.nodes},' \
-            f' sites={self.sites})'
+            f' sites={self.sites}, profiles={self.profiles})'
 
     def to_dhall(self, oid: Oid) -> str:
         assert oid.type is ObjT.root
@@ -353,7 +356,7 @@ class ConfRoot(ToDhall):
                           f'nodes = {oids_to_dhall(self.nodes)}',
                           f'sites = {oids_to_dhall(self.sites)}',
                           'pools = XXX.Oids',
-                          'profiles = XXX.Oids'])
+                          f'profiles = {oids_to_dhall(self.profiles)}'])
         return '{ %s }' % args
 
 
@@ -440,6 +443,28 @@ class ConfProcess(ToDhall):
                     ConfDrive.build(m0conf, ctrl,
                                     ConfSdev.build(m0conf, svc_id, disk))
         return proc_id
+
+
+class ConfProfile(ToDhall):
+    def __init__(self, pools: List[Oid] = []):
+        # assert all(x.types is ObjT.pool for x in pools)
+        self.pools = pools
+
+    def __repr__(self):
+        return f'{self.__class__.__name__}(pools=XXX.Oids)'
+
+    def to_dhall(self, oid: Oid) -> str:
+        args = ', '.join([f'id = {oid_to_dhall(oid)}', f'pools = XXX.Oids'])
+        return '{ %s }' % args
+
+    @classmethod
+    def build(cls, m0conf: Dict[Oid, Any], parent: Oid,
+              host_facts: Dict[str, Any]) -> Oid:
+        assert parent.type is ObjT.root
+        profile_id = new_oid(ObjT.profile)
+        m0conf[profile_id] = cls(pools=host_facts['pools'])
+        m0conf[parent].profiles.append(profile_id)
+        return profile_id
 
 
 # m0_conf_service_type
@@ -801,6 +826,9 @@ def build_m0conf(cluster_desc: Dict[str, Any]) -> Dict[Oid, ToDhall]:
 
         for _ in range(host['c0_clients'] + host['m0t1fs_clients']):
             ConfProcess.build(conf, node_id, facts)
+
+    for pool in cluster_desc['pools']:
+        ConfProfile.build(conf, root_id, cluster_desc)
 
     assert all(k.type.name == v.__class__.__name__[len('Conf'):].lower()
                for k, v in conf.items())
