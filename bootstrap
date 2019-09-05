@@ -9,11 +9,14 @@ sudo rm -rf /tmp/consul*
 
 touch /tmp/confd
 
+cd $SRC_DIR
+cfgen/cfgen -D cfgen/dhall/ -o /tmp/ < cfgen/_misc/singlenode.yaml
+
 sudo systemctl start consul-agent
 
 sleep 2
 
-$SRC_DIR/kv-init
+cat /tmp/consul-kv.json | jq '[.[] | {key, value: (.value | @base64)}]' | consul kv import -
 consul reload
 
 sleep 1

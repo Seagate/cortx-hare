@@ -38,9 +38,6 @@ while ! consul kv get -keys /; do
     sleep 1
 done
 
-$SRC_DIR/kv-init
-$SRC_DIR/gen-service-ids
-
 echo 'Starting hax' >&2
 sudo LD_LIBRARY_PATH=$M0_SRC_DIR/mero/.libs/ $SRC_DIR/env/bin/python \
      $SRC_DIR/hax/hax.py
