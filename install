@@ -22,7 +22,7 @@ init_hax() {
 }
 
 create_env_file () {
-    export HAX_EXE="$SRC_DIR/env/bin/hax"
+    export HAX_EXE="$SRC_DIR/.env/bin/hax"
     envsubst <$SRC_DIR/systemd/hax-environment.src >$SRC_DIR/systemd/hax-environment
 }
 
