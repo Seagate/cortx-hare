@@ -293,6 +293,10 @@ def _infinite_counter():
 fid_keygen = _infinite_counter()  # fid key generator
 
 
+def zero_oid(objt: ObjT) -> Oid:
+    return Oid(objt, 0)
+
+
 def new_oid(objt: ObjT) -> Oid:
     return Oid(objt, next(fid_keygen))
 
@@ -340,27 +344,31 @@ Downlink.__doc__ = 'parent -> children relation'
 
 class ConfRoot(ToDhall):
     _objt = ObjT.root
-    _downlinks = {Downlink('nodes', ObjT.node),
+    _downlinks = {Downlink('profiles', ObjT.profile),
+                  Downlink('nodes', ObjT.node),
                   Downlink('sites', ObjT.site),
-                  Downlink('profiles', ObjT.profile)}
+                  Downlink('pools', ObjT.pool)}
     # XXX UNCOMMENTME
     # _downlinks = {Downlink('nodes', ObjT.node),
     #               Downlink('sites', ObjT.site),
     #               Downlink('pools', ObjT.pool),
     #               Downlink('fdmi_flt_grps', ObjT.fdmi_flt_grp)}
 
-    def __init__(self, nodes: List[Oid] = [], sites: List[Oid] = [],
-                 profiles: List[Oid] = []):
+    def __init__(self, profiles: List[Oid] = [], nodes: List[Oid] = [],
+                 sites: List[Oid] = [], pools: List[Oid] = []):
         assert all(x.type is ObjT.node for x in nodes)
         self.nodes = nodes
         assert all(x.type is ObjT.site for x in sites)
         self.sites = sites
+        assert all(x.type is ObjT.pool for x in pools)
+        self.pools = pools
         assert all(x.type is ObjT.profile for x in profiles)
         self.profiles = profiles
 
     def __repr__(self):
         args = ', '.join([f'(nodes={self.nodes}',
                           f'sites={self.sites}, ',
+                          f'pools={self.pools},',
                           f'profiles={self.profiles})'])
         return f'{self.__class__.__name__}({args})'
 
@@ -371,7 +379,7 @@ class ConfRoot(ToDhall):
                           'imeta_pver = Some XXX.Oid',
                           f'nodes = {oids_to_dhall(self.nodes)}',
                           f'sites = {oids_to_dhall(self.sites)}',
-                          'pools = XXX.Oids',
+                          f'pools = {oids_to_dhall(self.pools)}',
                           f'profiles = {oids_to_dhall(self.profiles)}'])
         return '{ %s }' % args
 
@@ -768,6 +776,108 @@ class ConfDrive(ToDhall):
         return drive_id
 
 
+class ConfPool(ToDhall):
+    _objt = ObjT.pool
+    _downlinks = {Downlink('pvers', ObjT.pver)}
+
+    def __init__(self, pvers: List[Oid]):
+        assert all(x.type is ObjT.pver for x in pvers)
+        self.pvers = pvers
+
+    def __repr__(self):
+        return f'{self.__class__.__name__}(pvers={self.pvers})'
+
+    def to_dhall(self, oid: Oid) -> str:
+        args = ', '.join([f'id = {oid_to_dhall(oid)}',
+                          f'pvers = {oids_to_dhall(self.pvers)}'])
+        return '{ %s }' % args
+
+    @classmethod
+    def build(cls, m0conf: Dict[Oid, Any], parent: Oid) -> Oid:
+        assert parent.type is ObjT.root
+
+        pool_id = new_oid(ObjT.pool)
+        m0conf[pool_id] = cls([])
+        m0conf[parent].pools.append(pool_id)
+        return pool_id
+
+
+class ConfPver(ToDhall):
+    _objt = ObjT.pver
+    _downlinks = {Downlink('sitevs', ObjT.objv)}
+
+    def __init__(self, N: int, K: int, P: int, tolerance: List[int],
+                 sitevs: List[Oid]):
+        assert all(x.type is ObjT.objv for x in sitevs)
+        self.N = N
+        self.K = K
+        self.P = P
+        self.tolerance = tolerance
+        self.sitevs = sitevs
+
+    def __repr__(self):
+        args = ', '.join([f'N={self.N}',
+                          f'K={self.K}',
+                          f'P={self.P}',
+                          f'tolerance={self.tolerance}',
+                          f'sitevs={self.sitevs}'])
+        return f'{self.__class__.__name__}({args})'
+
+    def to_dhall(self, oid: Oid) -> str:
+        args = ', '.join([f'id = {oid_to_dhall(oid)}',
+                          f'N = {self.N}',
+                          f'K = {self.K}',
+                          f'P = {self.P}',
+                          f'tolerance = {self.tolerance}',
+                          f'sitevs={oids_to_dhall(self.sitevs)}'])
+        return '{ %s }' % args
+
+    @classmethod
+    def build(cls, m0conf: Dict[Oid, Any], parent: Oid,
+              N: int, K: int, P: int, tolerance: List[int],
+              sitevs: List[Oid]) -> Oid:
+        assert all(x.type is ObjT.objv for x in sitevs)
+        pver_id = new_oid(ObjT.pver)
+        m0conf[pver_id] = cls(N, K, P, tolerance, [])
+        m0conf[parent].pvers.append(pver_id)
+        return pver_id
+
+
+class ConfObjv(ToDhall):
+    _objt = ObjT.objv
+    _downlinks = {Downlink('children', ObjT.objv)}
+
+    def __init__(self, real: Oid, children: List[Oid]):
+        assert all(x.type is ObjT.objv for x in children)
+        self.real = real
+        self.children = children
+
+    def __repr__(self):
+        args = ', '.join([f'real={self.real}',
+                          f'children={self.children}'])
+        return f'{self.__class__.__name__}({args})'
+
+    def to_dhall(self, oid: Oid) -> str:
+        args = ', '.join([f'id={oid_to_dhall(oid)}',
+                          f'real={oid_to_dhall(self.real)}',
+                          f'children={oids_to_dhall(self.children)}'])
+        return '{ %s }' % args
+
+    @classmethod
+    def build(cls, m0conf: Dict[Oid, Any], parent: Oid,
+              real: Oid, children: List[Oid] = []) -> Oid:
+        assert all(x.type is ObjT.objv for x in children)
+        assert real.type in [ObjT.site, ObjT.rack, ObjT.enclosure,
+                             ObjT.controller, ObjT.drive]
+        objv_id = new_oid(ObjT.objv)
+        m0conf[objv_id] = cls(real, children)
+        if real.type is ObjT.site:
+            m0conf[parent].sitevs.append(objv_id)
+        else:
+            m0conf[parent].children.append(objv_id)
+        return objv_id
+
+
 def generate_bootstrap_env(servers: List[str], clients: List[str]) -> str:
     return """\
 consul_server_nodes={}
@@ -839,10 +949,35 @@ def generate_consul_kv(m0conf: Dict[Oid, Any], dhall_dir: str) -> str:
                       indent=2) + "\n"
 
 
+def parent_of(m0conf: Dict[Oid, Any], id: Oid, t: ObjT) -> Oid:
+    assert t in [ObjT.controller, ObjT.enclosure, ObjT.rack, ObjT.site]
+    for parent_id, parent in m0conf.items():
+        if parent_id.type is t:
+            if t is t.controller and id in parent.drives:
+                return parent_id
+            elif t is t.enclosure and id in parent.ctrls:
+                return parent_id
+            elif t is t.rack and id in parent.encls:
+                return parent_id
+            elif t is t.site and id in parent.racks:
+                return parent_id
+    return zero_oid(ObjT.controller)
+
+
+def pool_drives(m0conf: Dict[Oid, Any], expr: str) -> List[Oid]:
+    pool_drives = []
+    if expr == "all":
+        for drive_id, drive in m0conf.items():
+            if drive_id.type is ObjT.drive:
+                pool_drives.append(drive_id)
+    return pool_drives
+
+
 def build_m0conf(cluster_desc: Dict[str, Any]) -> Dict[Oid, ToDhall]:
     root_id = new_oid(ObjT.root)
-    conf: Dict[Oid, Any] = {root_id: ConfRoot([], [])}
+    conf: Dict[Oid, Any] = {root_id: ConfRoot([], [], [])}
 
+    ConfProfile.build(conf, root_id)
     rack_id = ConfRack.build(conf, ConfSite.build(conf, root_id))
 
     for host in cluster_desc['hosts']:
@@ -864,7 +999,34 @@ def build_m0conf(cluster_desc: Dict[str, Any]) -> Dict[Oid, ToDhall]:
             ConfProcess.build(conf, node_id, facts)
 
     for pool in cluster_desc['pools']:
-        ConfProfile.build(conf, root_id)
+        pdrives: List[Oid] = []
+        pdev_vs: List[Oid] = []
+        pdrives = pool_drives(conf, pool['disks'])
+        pver_id = ConfPver.build(conf, ConfPool.build(conf, root_id),
+                                 pool['data_units'],
+                                 pool['parity_units'],
+                                 len(pdrives),
+                                 [0, 0, 0, 0], [])  # XXX FIX failure vec
+
+        for drive_id in pdrives:
+            ctrl_id = parent_of(conf, drive_id, ObjT.controller)
+            encl_id = parent_of(conf, ctrl_id, ObjT.enclosure)
+            rack_id = parent_of(conf, encl_id, ObjT.rack)
+            site_id = parent_of(conf, rack_id, ObjT.site)
+
+            if site_id not in pdev_vs:
+                sitev_id = ConfObjv.build(conf, pver_id, site_id, [])
+                pdev_vs.append(site_id)
+            if rack_id not in pdev_vs:
+                rackv_id = ConfObjv.build(conf, sitev_id, rack_id, [])
+                pdev_vs.append(rack_id)
+            if encl_id not in pdev_vs:
+                enclv_id = ConfObjv.build(conf, rackv_id, encl_id, [])
+                pdev_vs.append(encl_id)
+            if ctrl_id not in pdev_vs:
+                ctrlv_id = ConfObjv.build(conf, enclv_id, ctrl_id, [])
+                pdev_vs.append(ctrl_id)
+            ConfObjv.build(conf, ctrlv_id, drive_id, [])
 
     # Sanity check.
     children_by_parent_type: Dict[ObjT, Dict[Downlink, List[Oid]]] = \
