@@ -525,6 +525,38 @@ class SvcT(Enum):
         return f'types.{self}'
 
 
+# m0_cfg_storage_device_interface_type
+class SdiT(Enum):
+    """Storage device interface type
+    """
+    M0_CFG_DEVICE_INTERFACE_ATA = 1
+    M0_CFG_DEVICE_INTERFACE_SATA = auto()
+    M0_CFG_DEVICE_INTERFACE_SCSI = auto()
+    M0_CFG_DEVICE_INTERFACE_SATA2 = auto()
+    M0_CFG_DEVICE_INTERFACE_SCSI2 = auto()
+    M0_CFG_DEVICE_INTERFACE_SAS = auto()
+    M0_CFG_DEVICE_INTERFACE_SAS2 = auto()
+
+    def to_dhall(self) -> str:
+        return f'types.{self}'
+
+
+# m0_cfg_storage_device_media_type
+class SdmT(Enum):
+    """Storage device media type
+    """
+    M0_CFG_DEVICE_MEDIA_DISK = 1
+    M0_CFG_DEVICE_MEDIA_SSD = auto()
+    M0_CFG_DEVICE_MEDIA_TAPE = auto()
+    M0_CFG_DEVICE_MEDIA_ROM = auto()
+
+    def to_dhall(self) -> str:
+        return f'types.{self}'
+
+
+BLOCK_SIZE = 4096
+
+
 def service_types(process_desc: Dict[str, Any] = None) -> List[SvcT]:
     # Every program that uses m0_halon_interface API (ha/halon/interface.h
     # in `mero` repository) must be represented by at least 3 conf objects
@@ -602,9 +634,11 @@ class ConfSdev(ToDhall):
         assert oid.type is ObjT.sdev
         args = ', '.join([f'id = {oid_to_dhall(oid)}',
                           f'dev_idx = {self.dev_idx}',
-                          'iface = XXX.Natural',
-                          'media = XXX.Natural',
-                          'bsize = XXX.Natural',
+                          f'''iface =
+                          {SdiT.M0_CFG_DEVICE_INTERFACE_SATA2.to_dhall()}''',
+                          f'''media =
+                          {SdmT.M0_CFG_DEVICE_MEDIA_DISK.to_dhall()}''',
+                          f'bsize = {BLOCK_SIZE}',
                           f'size = {self.size}',
                           f'filename = "{self.filename}"'])
         return '{ %s }' % args
