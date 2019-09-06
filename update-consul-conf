@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+set -eu -o pipefail
+
+SRC_DIR="$(dirname $(readlink -f $0))"
+
+get_service_ids() {
+  consul kv get -recurse node/`hostname`/service/$1 | sed 's;.*/\|:;;g'
+}
+CONFD_IDs=$(get_service_ids confd)
+IOS_IDs=$(get_service_ids ios)
+
+if [[ $CONFD_IDs ]]; then
+  CONF_FILE=$SRC_DIR/consul-server-conf.json
+else
+  CONF_FILE=$SRC_DIR/consul-client-conf.json
+fi
+
+SVCS_CONF=''
+
+append_confd_svc() {
+  local id=$1
+  local port=$2
+  SVCS_CONF+="${SVCS_CONF:+,}{
+    \"id\": \"$id\",
+    \"name\": \"confd\",
+    \"address\": \"@tcp:12345:44\",
+    \"port\": $((port++)),
+    \"checks\": [
+        {
+          \"args\": [
+            \"/opt/seagate/consul/check-confd\"
+          ],
+          \"interval\": \"10s\"
+        }
+      ]
+  }"
+}
+
+append_ios_svc() {
+  local id=$1
+  local port=$2
+  SVCS_CONF+="${SVCS_CONF:+,}{
+    \"id\": \"$id\",
+    \"name\": \"ios\",
+    \"address\": \"@tcp:12345:41\",
+    \"port\": $((port++))
+  }"
+}
+
+port=101
+for id in $CONFD_IDs; do
+  append_confd_svc $id $((port++))
+done
+
+port=401
+for id in $IOS_IDs; do
+  append_ios_svc $id $((port++))
+done
+
+tmpfile=$(mktemp /tmp/$(basename $CONF_FILE).XXXXXX)
+trap "rm $tmpfile" EXIT
+cat $CONF_FILE | jq ".services = [$SVCS_CONF]" > $tmpfile
+cat $tmpfile > $CONF_FILE
+
+consul reload
