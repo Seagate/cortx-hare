@@ -1,31 +1,30 @@
 {
-  "watches": [
-  ],
-  "enable_local_script_checks" : true,
+  "watches": [],
+  "enable_local_script_checks": true,
   "services": [
-   {
-    "id": "0x7200000000000001:0x3",
-    "name": "ios",
-    "address": "@tcp:12345:42",
-    "port": 401
-   },
-   {
-    "id": "0x7200000000000001:0x0",
-    "name": "hax",
-    "address": "@tcp:12345:45",
-    "port": 1
-   },
-   {
-    "id": "0x7300000000000005:0x0",
-    "name": "ha",
-    "address": "@tcp:12345:45",
-    "port": 1
-   },
-   {
-    "id": "0x7300000000000004:0x0",
-    "name": "rm",
-    "address": "@tcp:12345:44",
-    "port": 1
-   }
+    {
+      "id": "0x7200000000000001:0x3",
+      "name": "ios",
+      "address": "@tcp:12345:42",
+      "port": 401
+    },
+    {
+      "id": "0x7200000000000001:0x0",
+      "name": "hax",
+      "address": "@tcp:12345:45",
+      "port": 1
+    },
+    {
+      "id": "0x7300000000000005:0x0",
+      "name": "ha",
+      "address": "@tcp:12345:45",
+      "port": 1
+    },
+    {
+      "id": "0x7300000000000004:0x0",
+      "name": "rm",
+      "address": "@tcp:12345:44",
+      "port": 1
+    }
   ]
 }

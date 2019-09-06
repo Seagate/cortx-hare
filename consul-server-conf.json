@@ -1,65 +1,71 @@
 {
-  "server" : true,
-  "bootstrap_expect" : 1,
+  "server": true,
+  "bootstrap_expect": 1,
   "watches": [
     {
       "type": "key",
       "key": "leader",
-      "args": ["/opt/seagate/consul/elect-rc-leader"]
+      "args": [
+        "/opt/seagate/consul/elect-rc-leader"
+      ]
     },
     {
       "type": "service",
       "service": "confd",
       "handler_type": "http",
       "http_handler_config": {
-         "path":"http://localhost:8080",
-         "method": "POST",
-         "timeout": "10s"
+        "path": "http://localhost:8080",
+        "method": "POST",
+        "timeout": "10s"
       }
     },
     {
       "type": "service",
       "service": "confd",
-      "args": ["/opt/seagate/consul/watch-service"]
+      "args": [
+        "/opt/seagate/consul/watch-service"
+      ]
     }
   ],
-  "enable_local_script_checks" : true,
+  "enable_local_script_checks": true,
   "services": [
-   {
-    "id": "0x7200000000000001:0x1",
-    "name": "confd",
-    "address": "@tcp:12345:44",
-    "port": 1,
-    "checks": [
-      {
-        "args": ["/opt/seagate/consul/check-confd"],
-        "interval": "10s"
-      }
-    ]
-   },
-   {
-    "id": "0x7200000000000001:0x3",
-    "name": "ios",
-    "address": "@tcp:12345:42",
-    "port": 401
-   },
-   {
-    "id": "0x7200000000000001:0x0",
-    "name": "hax",
-    "address": "@tcp:12345:45",
-    "port": 1
-   },
-   {
-    "id": "0x7300000000000005:0x0",
-    "name": "ha",
-    "address": "@tcp:12345:45",
-    "port": 1
-   },
-   {
-    "id": "0x7300000000000004:0x0",
-    "name": "rm",
-    "address": "@tcp:12345:44",
-    "port": 1
-   }
+    {
+      "id": "0x7200000000000001:0x1",
+      "name": "confd",
+      "address": "@tcp:12345:44",
+      "port": 1,
+      "checks": [
+        {
+          "args": [
+            "/opt/seagate/consul/check-confd"
+          ],
+          "interval": "10s"
+        }
+      ]
+    },
+    {
+      "id": "0x7200000000000001:0x3",
+      "name": "ios",
+      "address": "@tcp:12345:42",
+      "port": 401
+    },
+    {
+      "id": "0x7200000000000001:0x0",
+      "name": "hax",
+      "address": "@tcp:12345:45",
+      "port": 1
+    },
+    {
+      "id": "0x7300000000000005:0x0",
+      "name": "ha",
+      "address": "@tcp:12345:45",
+      "port": 1
+    },
+    {
+      "id": "0x7300000000000004:0x0",
+      "name": "rm",
+      "address": "@tcp:12345:44",
+      "port": 1
+    }
   ]
 }
