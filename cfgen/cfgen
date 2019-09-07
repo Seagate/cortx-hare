@@ -507,7 +507,7 @@ class ConfProfile(ToDhall):
 class SvcT(Enum):
     """Mero service type
     """
-    M0_CST_MDS = auto()
+    M0_CST_MDS = 1
     M0_CST_IOS = auto()
     M0_CST_CONFD = auto()
     M0_CST_RMS = auto()
@@ -534,7 +534,7 @@ class SvcT(Enum):
 
 
 # m0_cfg_storage_device_interface_type
-class SdiT(Enum):
+class SdevIfaceT(Enum):
     """Storage device interface type
     """
     M0_CFG_DEVICE_INTERFACE_ATA = 1
@@ -550,7 +550,7 @@ class SdiT(Enum):
 
 
 # m0_cfg_storage_device_media_type
-class SdmT(Enum):
+class SdevMediaT(Enum):
     """Storage device media type
     """
     M0_CFG_DEVICE_MEDIA_DISK = 1
@@ -640,12 +640,13 @@ class ConfSdev(ToDhall):
 
     def to_dhall(self, oid: Oid) -> str:
         assert oid.type is ObjT.sdev
+        iface = ('iface = '
+                 f'{SdevIfaceT.M0_CFG_DEVICE_INTERFACE_SATA2.to_dhall()}')
+        media = f'media = {SdevMediaT.M0_CFG_DEVICE_MEDIA_DISK.to_dhall()}'
         args = ', '.join([f'id = {oid_to_dhall(oid)}',
                           f'dev_idx = {self.dev_idx}',
-                          f'''iface =
-                          {SdiT.M0_CFG_DEVICE_INTERFACE_SATA2.to_dhall()}''',
-                          f'''media =
-                          {SdmT.M0_CFG_DEVICE_MEDIA_DISK.to_dhall()}''',
+                          iface,
+                          media,
                           f'bsize = {BLOCK_SIZE}',
                           f'size = {self.size}',
                           f'filename = "{self.filename}"'])
