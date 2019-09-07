@@ -143,7 +143,7 @@ specific goals:
 10. To discuss a patch, people MAY comment on the Platform pull request,
     on the commit, or elsewhere.
 
-11. To accept or reject a patch, a Maintainer SHALL use the Platform
+11. To accept or reject a patch, a Maintainer SHOULD use the Platform
     interface.
 
 12. Maintainers SHOULD NOT merge their own patches except in
