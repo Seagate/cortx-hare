@@ -192,7 +192,7 @@ let process_46 = types.Obj.Process
 let sdev_16 = types.Obj.Sdev
   { id = ids.sdev_16
   , dev_idx = 4
-  , bsize = 4096
+  , block_size = 4096
   , size = 68719476736
   , filename = "/dev/loop5"
   }
@@ -200,7 +200,7 @@ let sdev_16 = types.Obj.Sdev
 let sdev_20 = types.Obj.Sdev
   { id = ids.sdev_20
   , dev_idx = 6
-  , bsize = 4096
+  , block_size = 4096
   , size = 68719476736
   , filename = "/dev/loop7"
   }
@@ -208,7 +208,7 @@ let sdev_20 = types.Obj.Sdev
 let sdev_12 = types.Obj.Sdev
   { id = ids.sdev_12
   , dev_idx = 2
-  , bsize = 4096
+  , block_size = 4096
   , size = 68719476736
   , filename = "/dev/loop3"
   }
@@ -216,7 +216,7 @@ let sdev_12 = types.Obj.Sdev
 let sdev_18 = types.Obj.Sdev
   { id = ids.sdev_18
   , dev_idx = 5
-  , bsize = 4096
+  , block_size = 4096
   , size = 68719476736
   , filename = "/dev/loop6"
   }
@@ -224,7 +224,7 @@ let sdev_18 = types.Obj.Sdev
 let sdev_14 = types.Obj.Sdev
   { id = ids.sdev_14
   , dev_idx = 3
-  , bsize = 4096
+  , block_size = 4096
   , size = 68719476736
   , filename = "/dev/loop4"
   }
@@ -232,7 +232,7 @@ let sdev_14 = types.Obj.Sdev
 let sdev_22 = types.Obj.Sdev
   { id = ids.sdev_22
   , dev_idx = 7
-  , bsize = 4096
+  , block_size = 4096
   , size = 68719476736
   , filename = "/dev/loop8"
   }
@@ -240,7 +240,7 @@ let sdev_22 = types.Obj.Sdev
 let sdev_8 = types.Obj.Sdev
   { id = ids.sdev_8
   , dev_idx = 0
-  , bsize = 4096
+  , block_size = 4096
   , size = 68719476736
   , filename = "/dev/loop1"
   }
@@ -248,7 +248,7 @@ let sdev_8 = types.Obj.Sdev
 let sdev_10 = types.Obj.Sdev
   { id = ids.sdev_10
   , dev_idx = 1
-  , bsize = 4096
+  , block_size = 4096
   , size = 68719476736
   , filename = "/dev/loop2"
   }
@@ -256,7 +256,7 @@ let sdev_10 = types.Obj.Sdev
 let sdev_70 = types.Obj.Sdev
   { id = ids.sdev_70
   , dev_idx = 8
-  , bsize = 1
+  , block_size = 1
   , size = 1024
   , filename = "/dev/null"
   }
