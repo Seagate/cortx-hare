@@ -22,4 +22,5 @@ let Pool =
 in
 { hosts : List Host
 , pools : List Pool
+-- XXX-TODO: add `profiles` section
 }
