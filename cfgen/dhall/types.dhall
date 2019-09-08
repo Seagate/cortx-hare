@@ -24,6 +24,8 @@
 , Obj         = ./types/Obj.dhall
 , ObjT        = ./types/ObjT.dhall
 , Oid         = ./types/Oid.dhall
+, SdevIfaceT  = ./types/SdevIfaceT.dhall
+, SdevMediaT  = ./types/SdevMediaT.dhall
 , SvcT        = ./types/SvcT.dhall
 
 , Root        = ./types/Root.dhall

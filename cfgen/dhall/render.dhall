@@ -5,6 +5,8 @@
 , Objs       = ./render/Objs.dhall
 , ObjT       = ./render/ObjT.dhall
 , Oid        = ./render/Oid.dhall
+, SdevIfaceT = ./render/SdevIfaceT.dhall
+, SdevMediaT = ./render/SdevMediaT.dhall
 , SvcT       = ./render/SvcT.dhall
 
 , Root       = ./render/Root.dhall

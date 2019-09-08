@@ -199,7 +199,7 @@ See the [[https://docs.google.com/document/d/1cR-BbxtMjGuZPj8NOc95RyFjqmeFsYf4JJ
 
 Sprint goal: "Complete confd.xc"
 
-*** @mandar: [[[https://jts.seagate.com/browse/EOS-1773][EOS-1773]]] complete ConfSdev
+*** DONE @mandar: [[[https://jts.seagate.com/browse/EOS-1773][EOS-1773]]] complete ConfSdev
 
 *** complete confd.xc
 - @vvv: Conf{Pool,PverF,Objv} [[[https://jts.seagate.com/browse/EOS-880][EOS-880]]]
@@ -413,7 +413,7 @@ q_dbfacts = {
 
 ~m0genfacts --lnet-transport {tcp|o2ib}~, defaults to ~tcp~.
 
-*** @andriy: [[[https://jts.seagate.com/browse/EOS-1704][EOS-1704]]] consul-kv.json
+*** DONE @andriy: [[[https://jts.seagate.com/browse/EOS-1704][EOS-1704]]] consul-kv.json
 
 *** ?XXX [[[https://jts.seagate.com/browse/EOS-1705][EOS-1705]]] consul-config_{server,client}.json
 
