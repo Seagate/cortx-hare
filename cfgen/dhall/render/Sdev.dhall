@@ -10,8 +10,8 @@ in
  ++ Prelude.Text.concatSep " "
       [ ./Oid.dhall x.id
       , named.Natural "dev_idx" x.dev_idx
-      , named.TextUnquoted "iface" (./SdevIfaceT.dhall types.SdevIfaceT.SATA)
-      , named.TextUnquoted "media" (./SdevMediaT.dhall types.SdevMediaT.DISK)
+      , "iface=2"
+      , "media=1"
       , named.Natural "bsize" x.bsize
       , named.Natural "size" x.size
       , "last_state=0"
