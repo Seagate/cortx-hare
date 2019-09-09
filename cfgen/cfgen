@@ -662,6 +662,7 @@ class ConfRack(ToDhall):
         assert parent.type is ObjT.site
         rack_id = new_oid(ObjT.rack)
         m0conf[rack_id] = cls([])
+        m0conf[rack_id]._parent = parent
         assert not m0conf[parent].racks
         m0conf[parent].racks = [rack_id]  # NB: a single rack
         return rack_id
@@ -690,6 +691,7 @@ class ConfEnclosure(ToDhall):
         assert parent.type is ObjT.rack
         encl_id = new_oid(ObjT.enclosure)
         m0conf[encl_id] = cls([])
+        m0conf[encl_id]._parent = parent
         m0conf[parent].encls.append(encl_id)
         return encl_id
 
@@ -723,6 +725,7 @@ class ConfController(ToDhall):
 
         ctrl_id = new_oid(ObjT.controller)
         m0conf[ctrl_id] = cls(node, drives=[])
+        m0conf[ctrl_id]._parent = parent
         m0conf[parent].ctrls.append(ctrl_id)
         return ctrl_id
 
@@ -752,6 +755,7 @@ class ConfDrive(ToDhall):
 
         drive_id = new_oid(ObjT.drive)
         m0conf[drive_id] = cls(sdev)
+        m0conf[drive_id]._parent = parent
         m0conf[parent].drives.append(drive_id)
         return drive_id
 
@@ -768,6 +772,7 @@ class ConfProfile(ToDhall):
         return f'{self.__class__.__name__}(pools=XXX.Oids)'
 
     def to_dhall(self, oid: Oid) -> str:
+        assert oid.type is ObjT.profile
         args = ', '.join([f'id = {oid_to_dhall(oid)}', f'pools = XXX.Oids'])
         return '{ %s }' % args
 
@@ -799,6 +804,7 @@ class ConfPool(ToDhall):
         return f'{self.__class__.__name__}(pvers={self.pvers})'
 
     def to_dhall(self, oid: Oid) -> str:
+        assert oid.type is ObjT.pool
         args = ', '.join([f'id = {oid_to_dhall(oid)}',
                           f'pvers = {oids_to_dhall(self.pvers)}'])
         return '{ %s }' % args
@@ -917,6 +923,7 @@ class ConfPver(ToDhall):
         return f'{self.__class__.__name__}({args})'
 
     def to_dhall(self, oid: Oid) -> str:
+        assert oid.type is ObjT.pver
         args = ', '.join([f'id = {oid_to_dhall(oid)}',
                           f'data_units = {self.data_units}',
                           f'parity_units = {self.parity_units}',
@@ -932,7 +939,7 @@ class ConfPver(ToDhall):
         assert drives and all(x.type is ObjT.drive for x in drives)
         assert all_unique(drives)
 
-        pver_id = new_oid(ObjT.pver)  # XXX base
+        pver_id = new_oid(ObjT.pver)  # "base" pool version
         m0conf[pver_id] = cls(
             data_units=pd_attrs.data_units,
             parity_units=pd_attrs.parity_units,
@@ -941,30 +948,59 @@ class ConfPver(ToDhall):
             sitevs=[])
         m0conf[parent].pvers.append(pver_id)
         build_pver_subtree(m0conf, pver_id, drives)
+        # XXX-TODO: add formulaic pool versions; see addPVerFormulaic in Halon
         return pver_id
 
 
-# def parent_of(m0conf: Dict[Oid, Any], oid: Oid) -> Oid:
-#     XXX-TODO Implement `connect(src, rel, dst)`
-
-
-def build_pver_subtree(m0conf: Dict[Oid, Any], base: Oid,
+def build_pver_subtree(m0conf: Dict[Oid, Any], pver: Oid,
                        drives: List[Oid]) -> None:
-    assert base.type is ObjT.pver
+    assert pver.type is ObjT.pver
     assert drives and all(x.type is ObjT.drive for x in drives)
 
-    # Pool version devices.  Maps fid of real object to the fid of the
-    # corresponding virtual object.
-    devs: Dict[Oid, Oid] = {}
+    # Maps real object to the corresponding virtual object.
+    virtual: Dict[Oid, Oid] = {}
 
     for drive in drives:
-        # Drive level
-        assert drive not in devs
-        diskv = new_oid(ObjT.objv)
-        devs[drive] = diskv
+        assert drive not in virtual
+        virtual[drive] = ConfObjv.build(m0conf, real=drive)
 
-        # # Controller level
-        # XXX see `buildPVerTree` in Halon code
+        ctrl = m0conf[drive]._parent
+        assert ctrl.type is ObjT.controller
+        parent_ready = ctrl in virtual
+        if not parent_ready:
+            virtual[ctrl] = ConfObjv.build(m0conf, real=ctrl)
+        m0conf[virtual[ctrl]].children.append(virtual[drive])
+        if parent_ready:
+            continue
+
+        encl = m0conf[ctrl]._parent
+        assert encl.type is ObjT.enclosure
+        parent_ready = encl in virtual
+        if not parent_ready:
+            virtual[encl] = ConfObjv.build(m0conf, real=encl)
+        m0conf[virtual[encl]].children.append(virtual[ctrl])
+        if parent_ready:
+            continue
+
+        rack = m0conf[encl]._parent
+        assert rack.type is ObjT.rack
+        parent_ready = rack in virtual
+        if not parent_ready:
+            virtual[rack] = ConfObjv.build(m0conf, real=rack)
+        m0conf[virtual[rack]].children.append(virtual[encl])
+        if parent_ready:
+            continue
+
+        site = m0conf[rack]._parent
+        assert site.type is ObjT.site
+        parent_ready = site in virtual
+        if not parent_ready:
+            virtual[site] = ConfObjv.build(m0conf, real=site)
+        m0conf[virtual[site]].children.append(virtual[rack])
+        if parent_ready:
+            continue
+
+        m0conf[pver].sitevs.append(virtual[site])
 
 
 class ConfObjv(ToDhall):
@@ -972,33 +1008,27 @@ class ConfObjv(ToDhall):
     _downlinks = {Downlink('children', ObjT.objv)}
 
     def __init__(self, real: Oid, children: List[Oid]):
-        assert all(x.type is ObjT.objv for x in children)
+        assert real.type in (ObjT.site, ObjT.rack, ObjT.enclosure,
+                             ObjT.controller, ObjT.drive)
         self.real = real
+        assert all(x.type is ObjT.objv for x in children)
         self.children = children
 
     def __repr__(self):
-        args = ', '.join([f'real={self.real}',
-                          f'children={self.children}'])
+        args = ', '.join([f'real={self.real}', f'children={self.children}'])
         return f'{self.__class__.__name__}({args})'
 
     def to_dhall(self, oid: Oid) -> str:
+        assert oid.type is ObjT.objv
         args = ', '.join([f'id={oid_to_dhall(oid)}',
                           f'real={oid_to_dhall(self.real)}',
                           f'children={oids_to_dhall(self.children)}'])
         return '{ %s }' % args
 
     @classmethod
-    def build(cls, m0conf: Dict[Oid, Any], parent: Oid,
-              real: Oid, children: List[Oid] = []) -> Oid:
-        assert all(x.type is ObjT.objv for x in children)
-        assert real.type in [ObjT.site, ObjT.rack, ObjT.enclosure,
-                             ObjT.controller, ObjT.drive]
+    def build(cls, m0conf: Dict[Oid, Any], real: Oid) -> Oid:
         objv_id = new_oid(ObjT.objv)
-        m0conf[objv_id] = cls(real, children)
-        if real.type is ObjT.site:
-            m0conf[parent].sitevs.append(objv_id)
-        else:
-            m0conf[parent].children.append(objv_id)
+        m0conf[objv_id] = cls(real, [])
         return objv_id
 
 
@@ -1073,25 +1103,6 @@ def generate_consul_kv(m0conf: Dict[Oid, Any], dhall_dir: str) -> str:
                       indent=2) + "\n"
 
 
-# XXX <<<<<<<
-# def parent_of(m0conf: Dict[Oid, Any], oid: Oid, objt: ObjT) -> Oid:
-#     assert objt in (ObjT.site, ObjT.rack, ObjT.enclosure, ObjT.controller)
-#     for parent_id, parent in m0conf.items():
-#         if parent_id.type is not objt:
-#             continue
-
-#         if objt is objt.controller and oid in parent.drives:
-#             return parent_id
-#         elif objt is objt.enclosure and oid in parent.ctrls:
-#             return parent_id
-#         elif objt is objt.rack and oid in parent.encls:
-#             return parent_id
-#         elif objt is objt.site and oid in parent.racks:
-#             return parent_id
-#     return Oid(ObjT.controller, 0)
-# XXX >>>>>>>
-
-
 def validate_m0conf(m0conf: Dict[Oid, Any]) -> None:
     children_by_parent_type: Dict[ObjT, Dict[Downlink, List[Oid]]] = \
         dict((parent_t, {}) for parent_t in ObjT)
@@ -1105,8 +1116,8 @@ def validate_m0conf(m0conf: Dict[Oid, Any]) -> None:
             children_by_parent_type[oid.type].setdefault(rel.name, []) \
                                              .extend(children)
     assert all(all_unique(children)
-               for parent_t, rel_children in children_by_parent_type.items()
-               for rel, children in rel_children.items())
+               for _parent_t, rel_children in children_by_parent_type.items()
+               for _rel, children in rel_children.items())
 
 
 def build_m0conf(cluster_desc: Dict[str, Any]) -> Dict[Oid, ToDhall]:
@@ -1135,35 +1146,11 @@ def build_m0conf(cluster_desc: Dict[str, Any]) -> Dict[Oid, ToDhall]:
             ConfProcess.build(conf, node_id, facts)
 
     for pool in cluster_desc['pools']:
-        pver_id = ConfPver.build(
-            conf,
-            ConfPool.build(conf, root_id),
-            PDClustAttrs0(data_units=pool['data_units'],
-                          parity_units=pool['parity_units']),
-            pool_drives(conf, pool['disks']))
-        assert pver_id  # XXX DELETEME
-        # XXX UNCOMMENTME <<<<<<<
-        # pdev_vs: List[Oid] = []
-        # for drive_id in drives:
-        #     ctrl_id = parent_of(conf, drive_id, ObjT.controller)
-        #     encl_id = parent_of(conf, ctrl_id, ObjT.enclosure)
-        #     rack_id = parent_of(conf, encl_id, ObjT.rack)
-        #     site_id = parent_of(conf, rack_id, ObjT.site)
-
-        #     if site_id not in pdev_vs:
-        #         sitev_id = ConfObjv.build(conf, pver_id, site_id, [])
-        #         pdev_vs.append(site_id)
-        #     if rack_id not in pdev_vs:
-        #         rackv_id = ConfObjv.build(conf, sitev_id, rack_id, [])
-        #         pdev_vs.append(rack_id)
-        #     if encl_id not in pdev_vs:
-        #         enclv_id = ConfObjv.build(conf, rackv_id, encl_id, [])
-        #         pdev_vs.append(encl_id)
-        #     if ctrl_id not in pdev_vs:
-        #         ctrlv_id = ConfObjv.build(conf, enclv_id, ctrl_id, [])
-        #         pdev_vs.append(ctrl_id)
-        #     ConfObjv.build(conf, ctrlv_id, drive_id, [])
-        # XXX >>>>>>>
+        ConfPver.build(conf,
+                       ConfPool.build(conf, root_id),
+                       PDClustAttrs0(data_units=pool['data_units'],
+                                     parity_units=pool['parity_units']),
+                       pool_drives(conf, pool['disks']))
 
     ConfProfile.build(conf, root_id)  # XXX-TODO: support multiple profiles
 
