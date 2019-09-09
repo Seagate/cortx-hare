@@ -3,7 +3,7 @@ original-author: Pieter Hintjens <ph@imatix.com>
 original-url: http://hintjens.com/blog:23
 domain: gitlab.mero.colo.seagate.com
 shortname: 9/PC3
-name: Pedantic Code Construction Contract (PC3)
+name: Pedantic Code Construction Contract
 status: raw
 editor: Valery V. Vorotyntsev <valery.vorotyntsev@seagate.com>
 ---

@@ -1,7 +1,7 @@
 ---
 domain: gitlab.mero.colo.seagate.com
 shortname: 5/HAX
-name: HA eXchange (hax)
+name: HAlink eXchange
 status: raw
 editor: Valery V. Vorotyntsev <valery.vorotyntsev@seagate.com>
 contributors:
@@ -13,7 +13,7 @@ contributors:
 
 The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "MAY", and "OPTIONAL" in this document are to be interpreted as described in [RFC 2119](https://tools.ietf.org/html/rfc2119).
 
-## HA eXchange (hax)
+## HAlink eXchange (hax)
 
 Mero process and Consul agent cannot communicate directly.  They communicate over `hax` server — a bridge, one side of which accepts connections from Mero processes, the other side communicates with Consul agent over HTTP.
 
