@@ -705,8 +705,8 @@ class ConfController(ToDhall):
         self.drives = drives
 
     def __repr__(self):
-        return f'{self.__class__.__name__}(node={self.node},' \
-            f' drives={self.drives})'
+        args = ', '.join([f'node={self.node}', f'drives={self.drives}'])
+        return f'{self.__class__.__name__}({args})'
 
     def to_dhall(self, oid: Oid) -> str:
         assert oid.type is ObjT.controller
@@ -723,8 +723,7 @@ class ConfController(ToDhall):
 
         ctrl_id = new_oid(ObjT.controller)
         m0conf[ctrl_id] = cls(node, drives=[])
-        assert not m0conf[parent].ctrls
-        m0conf[parent].ctrls = [ctrl_id]  # enclosure:controller = 1:1
+        m0conf[parent].ctrls.append(ctrl_id)
         return ctrl_id
 
 
