@@ -615,25 +615,29 @@ class ConfSite(ToDhall):
     _objt = ObjT.site
     _downlinks = {Downlink('racks', ObjT.rack)}
 
-    def __init__(self, racks: List[Oid]):
+    def __init__(self, racks: List[Oid], pvers: List[Oid]):
         assert all(x.type is ObjT.rack for x in racks)
         self.racks = racks
+        assert all(x.type is ObjT.pver for x in pvers)
+        self.pvers = pvers
 
     def __repr__(self):
-        return f'{self.__class__.__name__}(racks={self.racks})'
+        args = ', '.join([f'racks={self.racks}',
+                          f'pvers={self.pvers}'])
+        return f'{self.__class__.__name__}({args})'
 
     def to_dhall(self, oid: Oid) -> str:
         assert oid.type is ObjT.site
         args = ', '.join([f'id = {oid_to_dhall(oid)}',
                           f'racks = {oids_to_dhall(self.racks)}',
-                          'pvers = XXX.Oids'])
+                          f'pvers = {oids_to_dhall(self.pvers)}'])
         return '{ %s }' % args
 
     @classmethod
     def build(cls, m0conf: Dict[Oid, Any], parent: Oid) -> Oid:
         assert parent.type is ObjT.root
         site_id = new_oid(ObjT.site)
-        m0conf[site_id] = cls([])
+        m0conf[site_id] = cls(racks=[], pvers=[])
         assert not m0conf[parent].sites
         m0conf[parent].sites = [site_id]  # NB: a single site
         return site_id
@@ -643,25 +647,29 @@ class ConfRack(ToDhall):
     _objt = ObjT.rack
     _downlinks = {Downlink('encls', ObjT.enclosure)}
 
-    def __init__(self, encls: List[Oid]):
+    def __init__(self, encls: List[Oid], pvers: List[Oid]):
         assert all(x.type is ObjT.enclosure for x in encls)
         self.encls = encls
+        assert all(x.type is ObjT.pver for x in pvers)
+        self.pvers = pvers
 
     def __repr__(self):
-        return f'{self.__class__.__name__}(encls={self.encls})'
+        args = ', '.join([f'encls={self.encls}',
+                          f'pvers={self.pvers}'])
+        return f'{self.__class__.__name__}({args})'
 
     def to_dhall(self, oid: Oid) -> str:
         assert oid.type is ObjT.rack
         args = ', '.join([f'id = {oid_to_dhall(oid)}',
                           f'encls = {oids_to_dhall(self.encls)}',
-                          'pvers = XXX.Oids'])
+                          f'pvers = {oids_to_dhall(self.pvers)}'])
         return '{ %s }' % args
 
     @classmethod
     def build(cls, m0conf: Dict[Oid, Any], parent: Oid) -> Oid:
         assert parent.type is ObjT.site
         rack_id = new_oid(ObjT.rack)
-        m0conf[rack_id] = cls([])
+        m0conf[rack_id] = cls(encls=[], pvers=[])
         m0conf[rack_id]._parent = parent
         assert not m0conf[parent].racks
         m0conf[parent].racks = [rack_id]  # NB: a single rack
@@ -672,25 +680,29 @@ class ConfEnclosure(ToDhall):
     _objt = ObjT.enclosure
     _downlinks = {Downlink('ctrls', ObjT.controller)}
 
-    def __init__(self, ctrls: List[Oid]):
+    def __init__(self, ctrls: List[Oid], pvers: List[Oid]):
         assert all(x.type is ObjT.controller for x in ctrls)
         self.ctrls = ctrls
+        assert all(x.type is ObjT.pver for x in pvers)
+        self.pvers = pvers
 
     def __repr__(self):
-        return f'{self.__class__.__name__}(ctrls={self.ctrls})'
+        args = ', '.join([f'ctrls={self.ctrls}',
+                          f'pvers={self.pvers}'])
+        return f'{self.__class__.__name__}({args})'
 
     def to_dhall(self, oid: Oid) -> str:
         assert oid.type is ObjT.enclosure
         args = ', '.join([f'id = {oid_to_dhall(oid)}',
                           f'ctrls = {oids_to_dhall(self.ctrls)}',
-                          'pvers = XXX.Oids'])
+                          f'pvers = {oids_to_dhall(self.pvers)}'])
         return '{ %s }' % args
 
     @classmethod
     def build(cls, m0conf: Dict[Oid, Any], parent: Oid) -> Oid:
         assert parent.type is ObjT.rack
         encl_id = new_oid(ObjT.enclosure)
-        m0conf[encl_id] = cls([])
+        m0conf[encl_id] = cls(ctrls=[], pvers=[])
         m0conf[encl_id]._parent = parent
         m0conf[parent].encls.append(encl_id)
         return encl_id
@@ -700,14 +712,18 @@ class ConfController(ToDhall):
     _objt = ObjT.controller
     _downlinks = {Downlink('drives', ObjT.drive)}
 
-    def __init__(self, node: Oid, drives: List[Oid]):
+    def __init__(self, node: Oid, drives: List[Oid], pvers: List[Oid]):
         assert node.type is ObjT.node
         self.node = node
         assert all(x.type is ObjT.drive for x in drives)
         self.drives = drives
+        assert all(x.type is ObjT.pver for x in pvers)
+        self.pvers = pvers
 
     def __repr__(self):
-        args = ', '.join([f'node={self.node}', f'drives={self.drives}'])
+        args = ', '.join([f'node={self.node}',
+                          f'drives={self.drives}',
+                          f'pvers={self.pvers}'])
         return f'{self.__class__.__name__}({args})'
 
     def to_dhall(self, oid: Oid) -> str:
@@ -715,7 +731,7 @@ class ConfController(ToDhall):
         args = ', '.join([f'id = {oid_to_dhall(oid)}',
                           f'node = {oid_to_dhall(self.node)}',
                           f'drives = {oids_to_dhall(self.drives)}',
-                          'pvers = XXX.Oids'])
+                          f'pvers = {oids_to_dhall(self.pvers)}'])
         return '{ %s }' % args
 
     @classmethod
@@ -724,7 +740,7 @@ class ConfController(ToDhall):
         assert node.type is ObjT.node
 
         ctrl_id = new_oid(ObjT.controller)
-        m0conf[ctrl_id] = cls(node, drives=[])
+        m0conf[ctrl_id] = cls(node, drives=[], pvers=[])
         m0conf[ctrl_id]._parent = parent
         m0conf[parent].ctrls.append(ctrl_id)
         return ctrl_id
@@ -734,18 +750,22 @@ class ConfDrive(ToDhall):
     _objt = ObjT.drive
     _downlinks: Set[Downlink] = set()
 
-    def __init__(self, sdev: Oid):
+    def __init__(self, sdev: Oid, pvers: List[Oid]):
         assert sdev.type is ObjT.sdev
         self.sdev = sdev
+        assert all(x.type is ObjT.pver for x in pvers)
+        self.pvers = pvers
 
     def __repr__(self):
-        return f'{self.__class__.__name__}(sdev={self.sdev})'
+        args = ', '.join([f'sdev={self.sdev}',
+                          f'pvers={self.pvers}'])
+        return f'{self.__class__.__name__}({args})'
 
     def to_dhall(self, oid: Oid) -> str:
         assert oid.type is ObjT.drive
         args = ', '.join([f'id = {oid_to_dhall(oid)}',
                           f'sdev = {oid_to_dhall(self.sdev)}',
-                          'pvers = XXX.Oids'])
+                          f'pvers = {oids_to_dhall(self.pvers)}'])
         return '{ %s }' % args
 
     @classmethod
@@ -754,7 +774,7 @@ class ConfDrive(ToDhall):
         assert sdev.type is ObjT.sdev
 
         drive_id = new_oid(ObjT.drive)
-        m0conf[drive_id] = cls(sdev)
+        m0conf[drive_id] = cls(sdev, pvers=[])
         m0conf[drive_id]._parent = parent
         m0conf[parent].drives.append(drive_id)
         return drive_id
@@ -963,12 +983,16 @@ def build_pver_subtree(m0conf: Dict[Oid, Any], pver: Oid,
 
     for drive in drives:
         assert drive not in virtual
+        assert pver not in m0conf[drive].pvers
+        m0conf[drive].pvers.append(pver)
         virtual[drive] = ConfObjv.build(m0conf, real=drive)
 
         ctrl = m0conf[drive]._parent
         assert ctrl.type is ObjT.controller
         parent_ready = ctrl in virtual
         if not parent_ready:
+            assert pver not in m0conf[ctrl].pvers
+            m0conf[ctrl].pvers.append(pver)
             virtual[ctrl] = ConfObjv.build(m0conf, real=ctrl)
         m0conf[virtual[ctrl]].children.append(virtual[drive])
         if parent_ready:
@@ -978,6 +1002,8 @@ def build_pver_subtree(m0conf: Dict[Oid, Any], pver: Oid,
         assert encl.type is ObjT.enclosure
         parent_ready = encl in virtual
         if not parent_ready:
+            assert pver not in m0conf[encl].pvers
+            m0conf[encl].pvers.append(pver)
             virtual[encl] = ConfObjv.build(m0conf, real=encl)
         m0conf[virtual[encl]].children.append(virtual[ctrl])
         if parent_ready:
@@ -987,6 +1013,8 @@ def build_pver_subtree(m0conf: Dict[Oid, Any], pver: Oid,
         assert rack.type is ObjT.rack
         parent_ready = rack in virtual
         if not parent_ready:
+            assert pver not in m0conf[rack].pvers
+            m0conf[rack].pvers.append(pver)
             virtual[rack] = ConfObjv.build(m0conf, real=rack)
         m0conf[virtual[rack]].children.append(virtual[encl])
         if parent_ready:
@@ -996,6 +1024,8 @@ def build_pver_subtree(m0conf: Dict[Oid, Any], pver: Oid,
         assert site.type is ObjT.site
         parent_ready = site in virtual
         if not parent_ready:
+            assert pver not in m0conf[site].pvers
+            m0conf[site].pvers.append(pver)
             virtual[site] = ConfObjv.build(m0conf, real=site)
         m0conf[virtual[site]].children.append(virtual[rack])
         if parent_ready:
