@@ -40,3 +40,7 @@ editor: Valery V. Vorotyntsev <valery.vorotyntsev@seagate.com>
 ### C code
 
 * Follow [Linux kernel coding style](https://www.kernel.org/doc/html/latest/process/coding-style.html).
+
+<!-- XXX Editor settings
+Consider using https://editorconfig.org
+-->
