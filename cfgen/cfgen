@@ -200,6 +200,8 @@ def validate_cluster_desc(desc: Dict[str, Any]) -> None:
     assert total_nr_confds > 0, 'At least one confd is required'
     assert total_nr_disks > 0, 'No disks found'
 
+    assert desc['pools'], 'List of pools must not be empty'
+
 
 def run_command(hostname: str, *args: str) -> str:
     assert hostname
@@ -359,7 +361,7 @@ class ConfRoot(ToDhall):
                   Downlink('profiles', ObjT.profile)}  # XXX + fdmi_flt_grps
 
     def __init__(self, nodes: List[Oid], sites: List[Oid], pools: List[Oid],
-                 profiles: List[Oid]):
+                 profiles: List[Oid], mdpool: Oid = None):
         assert all(x.type is ObjT.node for x in nodes)
         self.nodes = nodes
         assert all(x.type is ObjT.site for x in sites)
@@ -368,18 +370,21 @@ class ConfRoot(ToDhall):
         self.pools = pools
         assert all(x.type is ObjT.profile for x in profiles)
         self.profiles = profiles
+        self.mdpool = mdpool
 
     def __repr__(self):
         args = ', '.join([f'nodes={self.nodes}',
                           f'sites={self.sites}',
                           f'pools={self.pools}',
-                          f'profiles={self.profiles}'])
+                          f'profiles={self.profiles}',
+                          f'mdpool={self.mdpool}'])
         return f'{self.__class__.__name__}({args})'
 
     def to_dhall(self, oid: Oid) -> str:
         assert oid.type is ObjT.root
+        assert self.mdpool is not None
         args = ', '.join([f'id = {oid_to_dhall(oid)}',
-                          'mdpool = XXX.Oid',
+                          f'mdpool = {oid_to_dhall(self.mdpool)}',
                           'imeta_pver = Some XXX.Oid',
                           f'nodes = {oids_to_dhall(self.nodes)}',
                           f'sites = {oids_to_dhall(self.sites)}',
@@ -849,10 +854,11 @@ PDClustAttrs0.__doc__ = 'Mero parity de-clustering layout attributes'
 
 
 def tolerated_failures(m0conf: Dict[Oid, Any], pd_attrs: PDClustAttrs0,
-                       drives: Set[Oid]) -> Failures:
+                       drives: List[Oid]) -> Failures:
     assert pd_attrs.data_units > 0
     assert pd_attrs.parity_units >= 0
     assert drives and all(x.type is ObjT.drive for x in drives)
+    assert all_unique(drives)
 
     n, k = pd_attrs
 
@@ -860,7 +866,7 @@ def tolerated_failures(m0conf: Dict[Oid, Any], pd_attrs: PDClustAttrs0,
     for ctrl_id, ctrl in m0conf.items():
         if ctrl_id.type is not ObjT.controller:
             continue
-        if not set(m0conf[ctrl_id].drives).isdisjoint(drives):
+        if not set(m0conf[ctrl_id].drives).isdisjoint(set(drives)):
             nr_ctrls += 1
     assert nr_ctrls > 0
 
@@ -934,7 +940,8 @@ class ConfPver(ToDhall):
 
     @classmethod
     def build(cls, m0conf: Dict[Oid, Any], parent: Oid,
-              pd_attrs: PDClustAttrs0, drives: List[Oid]) -> Oid:
+              pd_attrs: PDClustAttrs0, drives: List[Oid],
+              tolerance: Failures = None) -> Oid:
         assert parent.type is ObjT.pool
         assert drives and all(x.type is ObjT.drive for x in drives)
         assert all_unique(drives)
@@ -944,7 +951,8 @@ class ConfPver(ToDhall):
             data_units=pd_attrs.data_units,
             parity_units=pd_attrs.parity_units,
             pool_width=len(drives),
-            tolerance=list(tolerated_failures(m0conf, pd_attrs, set(drives))),
+            tolerance=list(tolerated_failures(m0conf, pd_attrs, drives)
+                           if tolerance is None else tolerance),
             sitevs=[])
         m0conf[parent].pvers.append(pver_id)
         build_pver_subtree(m0conf, pver_id, drives)
@@ -1163,6 +1171,16 @@ def build_m0conf(cluster_desc: Dict[str, Any]) -> Dict[Oid, ToDhall]:
                                      parity_units=pool['parity_units']),
                        pool_drives(conf, pool['disks']))
         conf[prof_id].pools.append(pool_id)
+
+    mdpool_id = ConfPool.build(conf, root_id)  # metadata pool
+    pool0 = cluster_desc['pools'][0]  # XXX Why the first pool?
+    ctrls = set(conf[d]._parent for d in pool_drives(conf, pool0['disks']))
+    first_drives = [conf[c].drives[0] for c in ctrls if conf[c].drives]
+    ConfPver.build(conf, mdpool_id,
+                   PDClustAttrs0(data_units=len(first_drives), parity_units=0),
+                   drives=first_drives,
+                   tolerance=Failures(0, 0, 0, 1, 0))
+    conf[root_id].mdpool = mdpool_id
 
     validate_m0conf(conf)
     return conf
