@@ -769,11 +769,12 @@ class ConfProfile(ToDhall):
         self.pools = pools
 
     def __repr__(self):
-        return f'{self.__class__.__name__}(pools=XXX.Oids)'
+        return f'{self.__class__.__name__}(pools={self.pools})'
 
     def to_dhall(self, oid: Oid) -> str:
         assert oid.type is ObjT.profile
-        args = ', '.join([f'id = {oid_to_dhall(oid)}', f'pools = XXX.Oids'])
+        args = ', '.join([f'id = {oid_to_dhall(oid)}',
+                          f'pools = {oids_to_dhall(self.pools)}'])
         return '{ %s }' % args
 
     @classmethod
@@ -1125,6 +1126,9 @@ def build_m0conf(cluster_desc: Dict[str, Any]) -> Dict[Oid, ToDhall]:
     root_id = ConfRoot.build(conf)
     # XXX Move all the logic into ConfRoot.build.
 
+    # XXX-TODO: support multiple profiles
+    prof_id = ConfProfile.build(conf, root_id)
+
     rack_id = ConfRack.build(conf, ConfSite.build(conf, root_id))
 
     for host in cluster_desc['hosts']:
@@ -1146,13 +1150,12 @@ def build_m0conf(cluster_desc: Dict[str, Any]) -> Dict[Oid, ToDhall]:
             ConfProcess.build(conf, node_id, facts)
 
     for pool in cluster_desc['pools']:
-        ConfPver.build(conf,
-                       ConfPool.build(conf, root_id),
+        pool_id = ConfPool.build(conf, root_id)
+        ConfPver.build(conf, pool_id,
                        PDClustAttrs0(data_units=pool['data_units'],
                                      parity_units=pool['parity_units']),
                        pool_drives(conf, pool['disks']))
-
-    ConfProfile.build(conf, root_id)  # XXX-TODO: support multiple profiles
+        conf[prof_id].pools.append(pool_id)
 
     validate_m0conf(conf)
     return conf
