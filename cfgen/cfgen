@@ -1108,7 +1108,7 @@ def generate_consul_kv(m0conf: Dict[Oid, Any], dhall_dir: str) -> str:
     del fid_keygen
 
     ConsulService = NamedTuple('ConsulService', [
-        ('node_name', str), ('proc_id', Oid), ('svc_type', str)])
+        ('node_name', str), ('proc_id', Oid), ('svc_types', str)])
 
     def services() -> Iterator[ConsulService]:
         for node_id, node in m0conf.items():
@@ -1116,20 +1116,19 @@ def generate_consul_kv(m0conf: Dict[Oid, Any], dhall_dir: str) -> str:
                 continue
             for proc_id in node.processes:
                 assert proc_id.type is ObjT.process
-                for svc_id in m0conf[proc_id].services:
-                    assert svc_id.type is ObjT.service
-                    svc = m0conf[svc_id]
-                    if svc.type in (SvcT.M0_CST_CONFD, SvcT.M0_CST_IOS):
-                        svc_type = svc.type.name[len('M0_CST_'):].lower()
-                        yield ConsulService(node_name=node.hostname,
-                                            proc_id=proc_id,
-                                            svc_type=svc_type)
+                stypes = ' '.join(
+                    m0conf[svc_id].type.name[len('M0_CST_'):].lower()
+                    for svc_id in m0conf[proc_id].services)
+                yield ConsulService(node_name=node.hostname,
+                                    proc_id=proc_id,
+                                    svc_types=stypes)
 
     return json.dumps([dict(key=k, value=v) for k, v in (
         ('leader', ''),
         ('epoch', 1),
         ('last_fidk', _fid_keygen),
-        *[(f'node/{x.node_name}/service/{x.svc_type}/{x.proc_id.fidk}', '')
+        *[(f'node/{x.node_name}/service/{x.proc_id.fidk}/types',
+           f'{x.svc_types}')
           for x in services()])],
                       indent=2) + "\n"
 

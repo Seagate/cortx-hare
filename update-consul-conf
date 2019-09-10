@@ -4,10 +4,13 @@ set -eu -o pipefail
 SRC_DIR="$(dirname $(readlink -f $0))"
 
 get_service_ids() {
-  consul kv get -recurse node/`hostname`/service/$1 | sed 's;.*/\|:;;g'
+  local cmd="consul kv get -recurse node/`hostname`/service/ \
+                | $1 | sed -r 's;.*/(.+)/types:.*;\1;g'"
+  eval $cmd || echo ''
 }
-CONFD_IDs=$(get_service_ids confd)
-IOS_IDs=$(get_service_ids ios)
+
+CONFD_IDs=$(get_service_ids 'grep -i confd')
+IOS_IDs=$(get_service_ids 'grep -i ios | grep -iv confd')
 
 if [[ $CONFD_IDs ]]; then
   CONF_FILE=$SRC_DIR/consul-server-conf.json
