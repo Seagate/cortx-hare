@@ -20,12 +20,6 @@ __version__ = '0.1'
 __author__ = 'Valery V. Vorotyntsev <valery.vorotyntsev@seagate.com>'
 
 
-def die(msg: str, status: int = 1):
-    assert status != 0
-    print(msg, file=sys.stderr)
-    sys.exit(status)
-
-
 def parse_opts(argv):
     p = argparse.ArgumentParser(
         description='Generate configuration files required to start'
@@ -135,14 +129,21 @@ def main(argv=None):
     m0conf = build_m0conf(cluster_desc)
 
     outs: List[Tuple[str, Callable[..., str], List[Any]]] = [
-        ('bootstrap-env', generate_bootstrap_env,
-         *cluster_nodes(cluster_desc)),
+        ('bootstrap-env',  # XXX Do we still need this file?
+         generate_bootstrap_env, *cluster_nodes(cluster_desc)),
         ('confd.dhall', generate_confd, m0conf, opts.dhall_dir),
         ('consul-kv.json', generate_consul_kv, m0conf, opts.dhall_dir),
     ]
     for path, generate, *args in outs:
         with open(os.path.join(opts.output_dir, path), 'w') as f:
             f.write(generate(*args))
+
+
+def die(msg: str, status: int = 1):
+    assert msg
+    assert status != 0
+    print(msg, file=sys.stderr)
+    sys.exit(status)
 
 
 def all_unique(xs) -> bool:
@@ -295,18 +296,18 @@ Oid.__doc__ = 'Mero conf object identifier'
 Oid.fidk.__doc__ = '.f_key part of the corresponding m0_fid'
 
 
-def _infinite_counter():
-    k = 0
+def _infinite_counter(start: int = 0) -> Iterator[int]:
+    k = start
     while True:
         yield k
         k += 1
 
 
-fid_keygen = _infinite_counter()  # fid key generator
+fidk_gen = _infinite_counter()  # fid key generator
 
 
 def new_oid(objt: ObjT) -> Oid:
-    return Oid(objt, next(fid_keygen))
+    return Oid(objt, next(fidk_gen))
 
 
 def oid_to_dhall(oid: Oid) -> str:
@@ -580,8 +581,10 @@ class ConfSdev(ToDhall):
     _downlinks: Set[Downlink] = set()
 
     def __init__(self, dev_idx: int, filename: str, size: int):
+        assert dev_idx >= 0
         self.dev_idx = dev_idx
         self.filename = filename
+        assert size >= 0
         self.size = size
 
     def __repr__(self):
@@ -780,36 +783,10 @@ class ConfDrive(ToDhall):
         return drive_id
 
 
-class ConfProfile(ToDhall):
-    _objt = ObjT.profile
-    _downlinks = {Downlink('pools', ObjT.pool)}
-
-    def __init__(self, pools: List[Oid]):
-        assert all(x.type is ObjT.pool for x in pools)
-        self.pools = pools
-
-    def __repr__(self):
-        return f'{self.__class__.__name__}(pools={self.pools})'
-
-    def to_dhall(self, oid: Oid) -> str:
-        assert oid.type is ObjT.profile
-        args = ', '.join([f'id = {oid_to_dhall(oid)}',
-                          f'pools = {oids_to_dhall(self.pools)}'])
-        return '{ %s }' % args
-
-    @classmethod
-    def build(cls, m0conf: Dict[Oid, Any], parent: Oid) -> Oid:
-        assert parent.type is ObjT.root
-        prof_id = new_oid(ObjT.profile)
-        m0conf[prof_id] = cls(pools=[])
-        assert not m0conf[parent].profiles
-        m0conf[parent].profiles = [prof_id]  # XXX-TODO: multiple profiles
-        return prof_id
-
-
 def pool_drives(m0conf: Dict[Oid, Any],
                 pattern: Union[str, List[Dict[str, str]]]) -> List[Oid]:
-    assert pattern == 'all'  # XXX-TODO: support "select"
+    # XXX-TODO: support 'select' pattern; see cfgen/dhall/types/PoolDisks.dhall
+    assert pattern == 'all'
     return [oid for oid in m0conf if oid.type is ObjT.drive]
 
 
@@ -834,13 +811,16 @@ class ConfPool(ToDhall):
     def build(cls, m0conf: Dict[Oid, Any], parent: Oid) -> Oid:
         assert parent.type is ObjT.root
         pool_id = new_oid(ObjT.pool)
-        m0conf[pool_id] = cls([])
+        m0conf[pool_id] = cls(pvers=[])
         m0conf[parent].pools.append(pool_id)
         return pool_id
 
 
-Failures = NamedTuple('Failures', [
-    ('site', int), ('rack', int), ('encl', int), ('ctrl', int), ('disk', int)])
+Failures = NamedTuple('Failures', [('site', int),
+                                   ('rack', int),
+                                   ('enclosure', int),
+                                   ('controller', int),
+                                   ('drive', int)])
 Failures.__doc__ = """\
 Failure tolerance vector.
 
@@ -858,9 +838,7 @@ units.  We can put an upper bound on this by considering
 floor((nr_encls)/(N+K)), though distributional issues may result
 in a lower value.
 """
-
-
-M0_CONF_PVER_HEIGHT = len(Failures._fields)
+pver_levels = Failures._fields
 
 
 # m0_pdclust_attr
@@ -913,7 +891,8 @@ def tolerated_failures(m0conf: Dict[Oid, Any], pd_attrs: PDClustAttrs0,
         # kc == k.  We can lose precisely `r` controllers;
         # no more, no less.
         ctrl_failures = r
-    return Failures(site=0, rack=0, encl=0, ctrl=ctrl_failures, disk=k)
+    return Failures(site=0, rack=0, enclosure=0, controller=ctrl_failures,
+                    drive=k)
 
 
 class ConfPver(ToDhall):
@@ -925,7 +904,7 @@ class ConfPver(ToDhall):
         assert data_units > 0
         assert parity_units >= 0
         assert pool_width > 0
-        assert len(tolerance) == M0_CONF_PVER_HEIGHT
+        assert len(tolerance) == len(pver_levels)
         assert all(n >= 0 for n in tolerance)
         assert all(x.type is ObjT.objv for x in sitevs)
 
@@ -987,51 +966,23 @@ def build_pver_subtree(m0conf: Dict[Oid, Any], pver: Oid,
         m0conf[drive].pvers.append(pver)
         virtual[drive] = ConfObjv.build(m0conf, real=drive)
 
-        ctrl = m0conf[drive]._parent
-        assert ctrl.type is ObjT.controller
-        parent_ready = ctrl in virtual
-        if not parent_ready:
-            assert pver not in m0conf[ctrl].pvers
-            m0conf[ctrl].pvers.append(pver)
-            virtual[ctrl] = ConfObjv.build(m0conf, real=ctrl)
-        m0conf[virtual[ctrl]].children.append(virtual[drive])
-        if parent_ready:
-            continue
+        devs = [drive]
+        parent_types = [getattr(ObjT, x) for x in pver_levels[:-1]]
+        while parent_types:
+            devs.insert(0, m0conf[devs[0]]._parent)
+            dev = devs[0]
+            assert dev.type is parent_types.pop()
+            parent_ready = dev in virtual
+            if not parent_ready:
+                assert pver not in m0conf[dev].pvers
+                m0conf[dev].pvers.append(pver)
+                virtual[dev] = ConfObjv.build(m0conf, real=dev)
+            m0conf[virtual[dev]].children.append(virtual[devs[1]])
+            if parent_ready:
+                break
 
-        encl = m0conf[ctrl]._parent
-        assert encl.type is ObjT.enclosure
-        parent_ready = encl in virtual
-        if not parent_ready:
-            assert pver not in m0conf[encl].pvers
-            m0conf[encl].pvers.append(pver)
-            virtual[encl] = ConfObjv.build(m0conf, real=encl)
-        m0conf[virtual[encl]].children.append(virtual[ctrl])
-        if parent_ready:
-            continue
-
-        rack = m0conf[encl]._parent
-        assert rack.type is ObjT.rack
-        parent_ready = rack in virtual
-        if not parent_ready:
-            assert pver not in m0conf[rack].pvers
-            m0conf[rack].pvers.append(pver)
-            virtual[rack] = ConfObjv.build(m0conf, real=rack)
-        m0conf[virtual[rack]].children.append(virtual[encl])
-        if parent_ready:
-            continue
-
-        site = m0conf[rack]._parent
-        assert site.type is ObjT.site
-        parent_ready = site in virtual
-        if not parent_ready:
-            assert pver not in m0conf[site].pvers
-            m0conf[site].pvers.append(pver)
-            virtual[site] = ConfObjv.build(m0conf, real=site)
-        m0conf[virtual[site]].children.append(virtual[rack])
-        if parent_ready:
-            continue
-
-        m0conf[pver].sitevs.append(virtual[site])
+        if not parent_types:
+            m0conf[pver].sitevs.append(virtual[devs[0]])
 
 
 class ConfObjv(ToDhall):
@@ -1039,14 +990,14 @@ class ConfObjv(ToDhall):
     _downlinks = {Downlink('children', ObjT.objv)}
 
     def __init__(self, real: Oid, children: List[Oid]):
-        assert real.type in (ObjT.site, ObjT.rack, ObjT.enclosure,
-                             ObjT.controller, ObjT.drive)
+        assert real.type in [getattr(ObjT, x) for x in pver_levels]
         self.real = real
         assert all(x.type is ObjT.objv for x in children)
         self.children = children
 
     def __repr__(self):
-        args = ', '.join([f'real={self.real}', f'children={self.children}'])
+        args = ', '.join([f'real={self.real}',
+                          f'children={self.children}'])
         return f'{self.__class__.__name__}({args})'
 
     def to_dhall(self, oid: Oid) -> str:
@@ -1058,9 +1009,37 @@ class ConfObjv(ToDhall):
 
     @classmethod
     def build(cls, m0conf: Dict[Oid, Any], real: Oid) -> Oid:
+        assert real in m0conf
         objv_id = new_oid(ObjT.objv)
         m0conf[objv_id] = cls(real, [])
         return objv_id
+
+
+class ConfProfile(ToDhall):
+    _objt = ObjT.profile
+    _downlinks = {Downlink('pools', ObjT.pool)}
+
+    def __init__(self, pools: List[Oid]):
+        assert all(x.type is ObjT.pool for x in pools)
+        self.pools = pools
+
+    def __repr__(self):
+        return f'{self.__class__.__name__}(pools={self.pools})'
+
+    def to_dhall(self, oid: Oid) -> str:
+        assert oid.type is ObjT.profile
+        args = ', '.join([f'id = {oid_to_dhall(oid)}',
+                          f'pools = {oids_to_dhall(self.pools)}'])
+        return '{ %s }' % args
+
+    @classmethod
+    def build(cls, m0conf: Dict[Oid, Any], parent: Oid) -> Oid:
+        assert parent.type is ObjT.root
+        prof_id = new_oid(ObjT.profile)
+        m0conf[prof_id] = cls(pools=[])
+        assert not m0conf[parent].profiles
+        m0conf[parent].profiles = [prof_id]  # XXX-TODO: multiple profiles
+        return prof_id
 
 
 def generate_bootstrap_env(servers: List[str], clients: List[str]) -> str:
@@ -1083,7 +1062,6 @@ def generate_confd(m0conf: Dict[Oid, ToDhall], dhall_dir: str) -> str:
     return f"""\
 let types = {dhall_dir}/types.dhall
 let utils = {dhall_dir}/utils.dhall
-let toConfGen = {dhall_dir}/toConfGen.dhall
 
 let XXX =
   {{ Natural = 0
@@ -1095,17 +1073,17 @@ let objs =
   [ {objs}
   ]
 
-in toConfGen objs
+in {dhall_dir}/toConfGen.dhall objs
 """
 
 
 def generate_consul_kv(m0conf: Dict[Oid, Any], dhall_dir: str) -> str:
     assert os.path.isabs(dhall_dir)
 
-    global fid_keygen
-    _fid_keygen = next(fid_keygen)
-    # Give up ownership of `fid_keygen`, passing it to the Consul KV.
-    del fid_keygen
+    global fidk_gen
+    _fidk_gen = next(fidk_gen)
+    # Give up ownership of `fidk_gen`, passing it to the Consul KV.
+    del fidk_gen
 
     ConsulService = NamedTuple('ConsulService', [
         ('node_name', str), ('proc_id', Oid), ('svc_types', str)])
@@ -1126,7 +1104,7 @@ def generate_consul_kv(m0conf: Dict[Oid, Any], dhall_dir: str) -> str:
     return json.dumps([dict(key=k, value=v) for k, v in (
         ('leader', ''),
         ('epoch', 1),
-        ('last_fidk', _fid_keygen),
+        ('last_fidk', _fidk_gen),
         *[(f'node/{x.node_name}/service/{x.proc_id.fidk}/types',
            f'{x.svc_types}')
           for x in services()])],
@@ -1155,18 +1133,15 @@ def build_m0conf(cluster_desc: Dict[str, Any]) -> Dict[Oid, ToDhall]:
     root_id = ConfRoot.build(conf)
     # XXX Move all the logic into ConfRoot.build.
 
-    # XXX-TODO: support multiple profiles
-    prof_id = ConfProfile.build(conf, root_id)
-
     rack_id = ConfRack.build(conf, ConfSite.build(conf, root_id))
 
     for host in cluster_desc['hosts']:
         facts = host['facts']
 
         node_id = ConfNode.build(conf, root_id, facts)
-        encl_id = ConfEnclosure.build(conf, rack_id)
-
-        ctrl_id = ConfController.build(conf, encl_id, node_id) \
+        ctrl_id = ConfController.build(conf,
+                                       ConfEnclosure.build(conf, rack_id),
+                                       node_id) \
             if any(m0d['io_disks']['items'] for m0d in host['m0_servers']) \
             else None
 
@@ -1177,6 +1152,9 @@ def build_m0conf(cluster_desc: Dict[str, Any]) -> Dict[Oid, ToDhall]:
 
         for _ in range(host['c0_clients'] + host['m0t1fs_clients']):
             ConfProcess.build(conf, node_id, facts)
+
+    # XXX-TODO: support multiple profiles
+    prof_id = ConfProfile.build(conf, root_id)
 
     for pool in cluster_desc['pools']:
         pool_id = ConfPool.build(conf, root_id)
