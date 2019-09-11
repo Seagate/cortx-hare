@@ -350,6 +350,9 @@ class Endpoint:
     def to_dhall(self):
         return f'utils.tcpEndpoint "{self.ipaddr}" 1975 {self.tmid}'
 
+    def __str__(self):
+        return f'{self.ipaddr}@tcp:12345:1975:{self.tmid}'
+
 
 class ToDhall(metaclass=abc.ABCMeta):
     @abc.abstractmethod
@@ -1110,7 +1113,7 @@ def generate_consul_kv(m0conf: Dict[Oid, Any], dhall_dir: str) -> str:
     del fidk_gen
 
     ConsulService = NamedTuple('ConsulService', [
-        ('node_name', str), ('proc_id', Oid), ('svc_types', str)])
+        ('node_name', str), ('proc_id', Oid), ('svc_types', str), ('ep', str)])
 
     def services() -> Iterator[ConsulService]:
         for node_id, node in m0conf.items():
@@ -1123,14 +1126,16 @@ def generate_consul_kv(m0conf: Dict[Oid, Any], dhall_dir: str) -> str:
                     for svc_id in m0conf[proc_id].services)
                 yield ConsulService(node_name=node.hostname,
                                     proc_id=proc_id,
-                                    svc_types=stypes)
+                                    svc_types=stypes,
+                                    ep=str(m0conf[proc_id].endpoint))
 
     return json.dumps([dict(key=k, value=v) for k, v in (
         ('leader', ''),
         ('epoch', 1),
         ('last_fidk', _fidk_gen),
         *[(f'node/{x.node_name}/service/{x.proc_id.fidk}/types',
-           f'{x.svc_types}')
+           f'{x.svc_types}') for x in services()],
+        *[(f'node/{x.node_name}/service/{x.proc_id.fidk}/ep', f'{x.ep}')
           for x in services()])],
                       indent=2) + "\n"
 
