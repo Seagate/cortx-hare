@@ -236,8 +236,9 @@ def fabricate_facts(hostname: str, *args: str) -> Dict[str, Any]:
     return dict((k, fabricated[k]) for k in args)
 
 
-Disk = NamedTuple('Disk', [('path', str), ('size', int)])
-Disk.size.__doc__ = 'Total space in bytes'
+Disk = NamedTuple('Disk', [('path', str), ('size', int), ('blksize', int)])
+Disk.size.__doc__ = 'Total size, in bytes'
+Disk.blksize.__doc__ = 'Block size for file system I/O'
 
 
 # XXX see build_disk_info() in mero's `utils/m0genfacts`
@@ -251,12 +252,18 @@ def get_disks(hostname: str, mock_p: bool, path_glob: str) -> List[Disk]:
 
     cmd = ['sudo', 'python3', '-c', f"""\
 import io
+import os
 
+# os.path.getsize() and os.stat().st_size don't work well with loop devices,
+# they always return 0.
 def blockdev_size(path):
     with open(path, 'rb') as f:
         return f.seek(0, io.SEEK_END)
 
-print([dict(path=path, size=blockdev_size(path)) for path in {paths!r}])
+print([dict(path=path,
+            size=blockdev_size(path),
+            blksize=os.stat(path).st_blksize)
+       for path in {paths!r}])
 """]
     return [Disk(**kwargs) for kwargs in
             ast.literal_eval(run_command(hostname, *cmd))]
@@ -264,7 +271,8 @@ print([dict(path=path, size=blockdev_size(path)) for path in {paths!r}])
 
 def fabricate_disks(hostname: str, path_glob: str) -> List[Disk]:
     # XXX use `path_glob`
-    return [Disk(path=f'/mock/disk{i}', size=0) for i in range(10)]
+    return [Disk(path=f'/mock/disk{i}', size=0, blksize=4096)
+            for i in range(10)]
 
 
 def cluster_nodes(cluster_desc: Dict[str, Any]) -> Tuple[List[str], List[str]]:
@@ -361,31 +369,39 @@ class ConfRoot(ToDhall):
                   Downlink('profiles', ObjT.profile)}  # XXX + fdmi_flt_grps
 
     def __init__(self, nodes: List[Oid], sites: List[Oid], pools: List[Oid],
-                 profiles: List[Oid], mdpool: Oid = None):
+                 profiles: List[Oid], mdpool: Oid = None,
+                 imeta_pver: Oid = None):
         assert all(x.type is ObjT.node for x in nodes)
-        self.nodes = nodes
         assert all(x.type is ObjT.site for x in sites)
-        self.sites = sites
         assert all(x.type is ObjT.pool for x in pools)
-        self.pools = pools
         assert all(x.type is ObjT.profile for x in profiles)
+        assert mdpool is None or mdpool.type is ObjT.pool
+        assert imeta_pver is None or imeta_pver.type is ObjT.pver
+
+        self.nodes = nodes
+        self.sites = sites
+        self.pools = pools
         self.profiles = profiles
         self.mdpool = mdpool
+        self.imeta_pver = imeta_pver
 
     def __repr__(self):
         args = ', '.join([f'nodes={self.nodes}',
                           f'sites={self.sites}',
                           f'pools={self.pools}',
                           f'profiles={self.profiles}',
-                          f'mdpool={self.mdpool}'])
+                          f'mdpool={self.mdpool}',
+                          f'imeta_pver={self.imeta_pver}'])
         return f'{self.__class__.__name__}({args})'
 
     def to_dhall(self, oid: Oid) -> str:
         assert oid.type is ObjT.root
         assert self.mdpool is not None
+        imeta_pver = 'None types.Oid' if self.imeta_pver is None \
+            else f'Some ({oid_to_dhall(self.imeta_pver)})'
         args = ', '.join([f'id = {oid_to_dhall(oid)}',
                           f'mdpool = {oid_to_dhall(self.mdpool)}',
-                          'imeta_pver = Some XXX.Oid',
+                          f'imeta_pver = {imeta_pver}',
                           f'nodes = {oids_to_dhall(self.nodes)}',
                           f'sites = {oids_to_dhall(self.sites)}',
                           f'pools = {oids_to_dhall(self.pools)}',
@@ -585,26 +601,31 @@ class ConfSdev(ToDhall):
     _objt = ObjT.sdev
     _downlinks: Set[Downlink] = set()
 
-    def __init__(self, dev_idx: int, filename: str, size: int):
+    def __init__(self, dev_idx: int, filename: str, size: int, blksize: int):
         assert dev_idx >= 0
+        assert filename
+        assert size >= 0
+        assert blksize >= 0
+
         self.dev_idx = dev_idx
         self.filename = filename
-        assert size >= 0
         self.size = size
+        self.blksize = blksize
 
     def __repr__(self):
         args = ', '.join([f'dev_idx={self.dev_idx}',
                           f'filename={self.filename}',
-                          f'size={self.size}'])
+                          f'size={self.size}',
+                          f'blksize={self.blksize}'])
         return f'{self.__class__.__name__}({args})'
 
     def to_dhall(self, oid: Oid) -> str:
         assert oid.type is ObjT.sdev
         args = ', '.join([f'id = {oid_to_dhall(oid)}',
                           f'dev_idx = {self.dev_idx}',
-                          f'block_size = 4096',  # XXX BLOCK_SIZE
+                          f'filename = "{self.filename}"',
                           f'size = {self.size}',
-                          f'filename = "{self.filename}"'])
+                          f'blksize = {self.blksize}'])
         return '{ %s }' % args
 
     @classmethod
@@ -614,7 +635,8 @@ class ConfSdev(ToDhall):
         sdev_id = new_oid(ObjT.sdev)
         m0conf[sdev_id] = cls(dev_idx=next(cls._dev_idx),
                               filename=disk_desc.path,
-                              size=disk_desc.size)
+                              size=disk_desc.size,
+                              blksize=disk_desc.blksize)
         m0conf[parent].sdevs.append(sdev_id)
         return sdev_id
 
@@ -1071,12 +1093,6 @@ def generate_confd(m0conf: Dict[Oid, ToDhall], dhall_dir: str) -> str:
 let types = {dhall_dir}/types.dhall
 let utils = {dhall_dir}/utils.dhall
 
-let XXX =
-  {{ Natural = 0
-  , Oid = utils.zoid types.ObjT.Root 999
-  , Oids = [] : List types.Oid
-  }}
-
 let objs =
   [ {objs}
   ]
@@ -1172,15 +1188,44 @@ def build_m0conf(cluster_desc: Dict[str, Any]) -> Dict[Oid, ToDhall]:
                        pool_drives(conf, pool['disks']))
         conf[prof_id].pools.append(pool_id)
 
-    mdpool_id = ConfPool.build(conf, root_id)  # metadata pool
-    pool0 = cluster_desc['pools'][0]  # XXX Why the first pool?
-    ctrls = set(conf[d]._parent for d in pool_drives(conf, pool0['disks']))
-    first_drives = [conf[c].drives[0] for c in ctrls if conf[c].drives]
-    ConfPver.build(conf, mdpool_id,
-                   PDClustAttrs0(data_units=len(first_drives), parity_units=0),
-                   drives=first_drives,
-                   tolerance=Failures(0, 0, 0, 1, 0))
-    conf[root_id].mdpool = mdpool_id
+    # Metadata pool.
+    if True:
+        pool_id = ConfPool.build(conf, root_id)
+        pool0 = cluster_desc['pools'][0]  # XXX Why the first pool?
+        ctrls = set(conf[d]._parent for d in pool_drives(conf, pool0['disks']))
+        first_drives = [conf[c].drives[0] for c in ctrls if conf[c].drives]
+        ConfPver.build(conf, pool_id,
+                       PDClustAttrs0(data_units=len(first_drives),
+                                     parity_units=0),
+                       drives=first_drives,
+                       tolerance=Failures(0, 0, 0, 1, 0))
+        conf[root_id].mdpool = pool_id
+
+    # DIX pool.
+    cas = [(svc_id, ctrl_id)
+           for ctrl_id in conf if ctrl_id.type is ObjT.controller
+           for proc_id in conf[conf[ctrl_id].node].processes
+           for svc_id in conf[proc_id].services
+           if conf[svc_id].type is SvcT.M0_CST_CAS]
+    if cas:
+        drives = [ConfDrive.build(conf, ctrl_id,
+                                  ConfSdev.build(conf, svc_id,
+                                                 Disk(path='/dev/null',
+                                                      size=1024,
+                                                      blksize=1)))
+                  for (svc_id, ctrl_id) in cas]
+        imeta_pver = ConfPver.build(
+            conf,
+            ConfPool.build(conf, root_id),
+            PDClustAttrs0(
+                # For CAS service N must always be equal to 1
+                # as CAS records are indivisible pieces of data:
+                # the whole CAS record is always stored on one node.
+                data_units=1,
+                parity_units=0),
+            drives=drives,
+            tolerance=Failures(0, 0, 0, 1, 0))
+        conf[root_id].imeta_pver = imeta_pver
 
     validate_m0conf(conf)
     return conf

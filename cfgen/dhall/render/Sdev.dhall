@@ -12,7 +12,7 @@ in
       , named.Natural "dev_idx" x.dev_idx
       , "iface=2"
       , "media=1"
-      , named.Natural "bsize" x.block_size
+      , named.Natural "bsize" x.blksize
       , named.Natural "size" x.size
       , "last_state=0"
       , "flags=0"
