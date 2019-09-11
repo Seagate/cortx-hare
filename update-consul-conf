@@ -2,11 +2,28 @@
 set -eu -o pipefail
 
 SRC_DIR="$(dirname $(readlink -f $0))"
+NODE_NAME=$(hostname)
 
 get_service_ids() {
-  local cmd="consul kv get -recurse node/`hostname`/service/ \
-                | $1 | sed -r 's;.*/(.+)/types:.*;\1;g'"
+  local filter=$1
+  local cmd="consul kv get -recurse node/$NODE_NAME/service/ \
+                | $filter | sed -r 's;.*/(.+)/types:.*;\1;g'"
   eval $cmd || echo ''
+}
+
+get_service_ep() {
+  local id=$1
+  consul kv get node/$NODE_NAME/service/$id/ep
+}
+
+get_service_addr() {
+  local ep=$1
+  echo $ep | sed -r 's/:[0-9]+$//'
+}
+
+get_service_port() {
+  local ep=$1
+  echo $ep | sed 's/.*://'
 }
 
 HAX_IDs=$(get_service_ids 'grep -i ha')
@@ -23,23 +40,27 @@ SVCS_CONF=''
 
 append_hax_svc() {
   local id=$1
-  local port=$2
+  local ep=$(get_service_ep $id)
+  local addr=$(get_service_addr $ep)
+  local port=$(get_service_port $ep)
   SVCS_CONF+="${SVCS_CONF:+,}{
     \"id\": \"$id\",
     \"name\": \"hax\",
     \"address\": \"@tcp:12345:34\",
-    \"port\": $((port++))
+    \"port\": $port
   }"
 }
 
 append_confd_svc() {
   local id=$1
-  local port=$2
+  local ep=$(get_service_ep $id)
+  local addr=$(get_service_addr $ep)
+  local port=$(get_service_port $ep)
   SVCS_CONF+="${SVCS_CONF:+,}{
     \"id\": \"$id\",
     \"name\": \"confd\",
-    \"address\": \"@tcp:12345:44\",
-    \"port\": $((port++)),
+    \"address\": \"$addr\",
+    \"port\": $port,
     \"checks\": [
         {
           \"args\": [
@@ -53,28 +74,27 @@ append_confd_svc() {
 
 append_ios_svc() {
   local id=$1
-  local port=$2
+  local ep=$(get_service_ep $id)
+  local addr=$(get_service_addr $ep)
+  local port=$(get_service_port $ep)
   SVCS_CONF+="${SVCS_CONF:+,}{
     \"id\": \"$id\",
     \"name\": \"ios\",
-    \"address\": \"@tcp:12345:41\",
-    \"port\": $((port++))
+    \"address\": \"$addr\",
+    \"port\": $port
   }"
 }
 
-port=101
 for id in $HAX_IDs; do
-  append_hax_svc $id $((port++))
+  append_hax_svc $id
 done
 
-port=101
 for id in $CONFD_IDs; do
-  append_confd_svc $id $((port++))
+  append_confd_svc $id
 done
 
-port=401
 for id in $IOS_IDs; do
-  append_ios_svc $id $((port++))
+  append_ios_svc $id
 done
 
 tmpfile=$(mktemp /tmp/$(basename $CONF_FILE).XXXXXX)
