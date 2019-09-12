@@ -18,8 +18,8 @@ Key | Value | Description
 `eq/<epoch>` | event | `eq/*` items are collectively referred to as the EQ (Event Queue).  Events are consumed and dequeued by the RC script.
 `leader` | node name | This key is used for RC leader election.  Created with [`consul lock`](https://www.consul.io/docs/commands/lock.html) command.
 `last_fidk` | last genarated FID key | Atomically incremented counter that is used to generate fids.  Natural number.
-`node/<name>/service/<fid_key>/types` | `<Mero_service_types>` | Used during update of Consul configuration files with the services (Merp processes) information (like IDs).  \<Mero_service_types\> value is the list of Mero service types enabled in the particular Mero process (e.g `ha rms confd ios`).
-`node/<name>/service/<fid_key>/ep` | endpoint address | Endpoint address of the service (Mero process). E.g `192.168.180.162@tcp:12345:44:101`.
+`node/<node_name>/service/<process_fidk>/types` | Mero service types | Space-separated list of Mero service types running on the Mero process (Consul service) with fid key `<process_fidk>`.  Example: `rms confd`.
+`node/<node_name>/service/<process_fidk>/ep` | endpoint address | Endpoint address of the Mero process (Consul service) with fid key `<process_fidk>`.  Example: `192.168.180.162@tcp:12345:44:101`.
 `processes/<fid>` | `{ "state": "<HA state>" }` | The items are created and updated by `hax` processes.  Supported values of \<HA state\>: `M0_CONF_HA_PROCESS_STARTING`, `M0_CONF_HA_PROCESS_STARTED`, `M0_CONF_HA_PROCESS_STOPPING`, `M0_CONF_HA_PROCESS_STOPPED`.
 `timeout` | YYYYmmddHHMM.SS | This value is used by the RC timeout mechanism.
 
