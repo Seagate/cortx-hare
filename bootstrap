@@ -14,9 +14,10 @@ sudo systemctl start consul-agent
 cd $SRC_DIR
 cfgen/cfgen -D cfgen/dhall/ -o /tmp/ < cfgen/_misc/singlenode.yaml
 
-cat /tmp/consul-kv.json | jq '[.[] | {key, value: (.value | @base64)}]' | consul kv import -
-consul reload
-
 sleep 2
+
+cat /tmp/consul-kv.json | jq '[.[] | {key, value: (.value | @base64)}]' | consul kv import -
+
+$SRC_DIR/update-consul-conf
 
 sudo systemctl start hax
