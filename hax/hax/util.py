@@ -70,13 +70,12 @@ class ConsulUtil:
     def _to_canonical_service_data(service):
         node = service.get('Node')
         fid = service.get('ServiceID')
-        address = service.get('Address')
         srv_address = service.get('ServiceAddress')
         srv_port = service.get('ServicePort')
         return {
             'node': node,
             'fid': Fid.parse(fid),
-            'address': f'{address}{srv_address}:{srv_port}'
+            'address': f'{srv_address}:{srv_port}'
         }
 
     def get_confd_list(self):

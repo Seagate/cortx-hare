@@ -14,6 +14,8 @@ sudo systemctl start consul-agent
 cd $SRC_DIR
 cfgen/cfgen -D cfgen/dhall/ -o /tmp/ < cfgen/_misc/singlenode.yaml
 
+# Let Consul some time to finish its internal bootstrap and elect
+# its internal leader, so the KV Store could be accessible.
 sleep 2
 
 cat /tmp/consul-kv.json | jq '[.[] | {key, value: (.value | @base64)}]' | consul kv import -
