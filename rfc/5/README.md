@@ -32,23 +32,29 @@ The code of `hax` consists of C and Python parts.
 - HA service fid (<0x73...:...>) — fid of the HA service run by current process;
 - RM service fid — fid of the RM service run by current process.
 
-When `hax` is starting up, it fetches its process fid from Consul:
+When `hax` is starting up, it fetches its process `.f_key` from Consul:
+
 ```
 $ curl -s \
     http://localhost:8500/v1/catalog/service/hax?filter=Node==$(hostname) |
     jq -r '.[] | .ServiceID'
-0x7200000000000001:0x007d
+10
 ```
 
-HA service fid is obtained from the process fid by changing the most significant byte of `.f_container` to 0x73 and incrementing `.f_key`.
+From this the Process fid is obtained by adding 0x7200000000000001 `.f_container`
+to it (always the same for processes). Note, the value is in decimal format,
+so the resulting fid here will be `0x7200000000000001:0xa`.
+
+HA service fid is obtained from the process fid by changing the most significant
+byte of `.f_container` to 0x73 and incrementing `.f_key`.
 
 RM service fid is obtained by incrementing `.f_key` of the HA service fid.
 
 Example:
 ```
-0x7200000000000001:0x7d -- hax process fid (received from Consul)
-0x7300000000000001:0x7e -- HA service fid (MSB of .f_container changed to 0x73, .f_key incremented)
-0x7300000000000001:0x7f -- RM service fid (.f_key incremented)
+0x7200000000000001:0xa -- hax process fid (received from Consul)
+0x7300000000000001:0xb -- HA service fid (MSB of .f_container changed to 0x73, .f_key incremented)
+0x7300000000000001:0xc -- RM service fid (.f_key incremented)
 ```
 
 **Notes:**
