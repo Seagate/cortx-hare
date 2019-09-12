@@ -91,15 +91,29 @@ information to generate configuration data.
 
 ### Output files
 
-  * `bootstrap-env` -- tells [`bootstrap`](rfc/6/README.md) script
-    where Consul server and client agents should be started.
+  * `bootstrap.json` -- tells [`bootstrap`](rfc/6/README.md) script
+    where Consul server and client agents should be started, which
+    IP address they should bind to and which Consul agent they should join.
 
     Format:
     ```
-    consul_server_nodes=host1,host2,host3
-    consul_client_nodes=host4,host5
-
-    # Comments start with a hash symbol and run to the end of the line.
+    {
+        "consul_agent_to_join": "<ip>",
+        "consul_server_nodes": [
+            {
+                "name": "<hostname>",
+                "bind_addr": "<ip>",
+            },
+            ...
+        ],
+        "consul_client_nodes": [
+            {
+                "name": "<hostname>",
+                "bind_addr": "<ip>"
+            },
+            ...
+        ]
+    }
     ```
 
   * `confd.xc` -- Mero configuration in xcode string format, ready to

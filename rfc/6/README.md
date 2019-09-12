@@ -32,7 +32,7 @@ Cluster administrator
 The `bootstrap` script
 
 1. Executes [‘cfgen’ script](rfc/3/README.md#cfgen), which generates
-   `bootstrap-env`, `consul-kv.json`, and `confd.xc` files.
+   `bootstrap.json`, `consul-kv.json`, and `confd.xc` files.
 
 2. Starts `consul` server agent with
    [`--bootstrap-expect=1`](https://www.consul.io/docs/agent/options.html#_bootstrap_expect)
@@ -42,8 +42,9 @@ The `bootstrap` script
    `consul kv import @consul-kv.json` command.
 
 4. Starts `consul` agents on every node of the cluster, knowing from
-   `bootstrap-env` file where the server and the client agents should
-   be running.  Consul configuration SHOULD be taken from
+   `bootstrap.json` file where the server and the client agents should
+   be running, on which IP addresses and to which agent to join.
+   Consul configuration SHOULD be taken from
    `consul-config_{server,client}.json` templates.  `bootstrap` script
    MAY use
    [`--bind`](https://www.consul.io/docs/agent/options.html#_bind)
@@ -53,7 +54,7 @@ The `bootstrap` script
    corresponding fields in `consul-config-{server,client}.json`
    templates on every node of the cluster.  Executes
    [`consul reload`](https://www.consul.io/docs/commands/reload.html)
-   on every node.
+   on every node. (See update-consul-conf script.)
 
 6. Starts `hax` on every node of the cluster.  Each `hax` process
    obtains its [three fids](#8) from the Consul KV.
