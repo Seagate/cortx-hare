@@ -9,6 +9,7 @@ get_service_ids() {
   eval $cmd || echo ''
 }
 
+HAX_IDs=$(get_service_ids 'grep -i ha')
 CONFD_IDs=$(get_service_ids 'grep -i confd')
 IOS_IDs=$(get_service_ids 'grep -i ios | grep -iv confd')
 
@@ -19,6 +20,17 @@ else
 fi
 
 SVCS_CONF=''
+
+append_hax_svc() {
+  local id=$1
+  local port=$2
+  SVCS_CONF+="${SVCS_CONF:+,}{
+    \"id\": \"$id\",
+    \"name\": \"hax\",
+    \"address\": \"@tcp:12345:34\",
+    \"port\": $((port++))
+  }"
+}
 
 append_confd_svc() {
   local id=$1
@@ -49,6 +61,11 @@ append_ios_svc() {
     \"port\": $((port++))
   }"
 }
+
+port=101
+for id in $HAX_IDs; do
+  append_hax_svc $id $((port++))
+done
 
 port=101
 for id in $CONFD_IDs; do
