@@ -17,6 +17,6 @@ cfgen/cfgen -D cfgen/dhall/ -o /tmp/ < cfgen/_misc/singlenode.yaml
 cat /tmp/consul-kv.json | jq '[.[] | {key, value: (.value | @base64)}]' | consul kv import -
 consul reload
 
-sleep 1
+sleep 2
 
 sudo systemctl start hax
