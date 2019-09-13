@@ -46,7 +46,7 @@ append_hax_svc() {
   SVCS_CONF+="${SVCS_CONF:+,}{
     \"id\": \"$id\",
     \"name\": \"hax\",
-    \"address\": \"@tcp:12345:34\",
+    \"address\": \"$addr\",
     \"port\": $port
   }"
 }
