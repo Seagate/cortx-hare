@@ -7,7 +7,7 @@ NODE_NAME=$(hostname)
 get_service_ids() {
   local filter=$1
   local cmd="consul kv get -recurse node/$NODE_NAME/service/ \
-                | $filter | sed -r 's;.*/(.+)/types:.*;\1;g'"
+                | grep types | $filter | sed -r 's;.*/(.+)/types:.*;\1;g'"
   eval $cmd || echo ''
 }
 
