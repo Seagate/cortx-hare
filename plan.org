@@ -195,227 +195,39 @@ The function blocks until the epoch is returned or an error occurs.
 
 See the [[https://docs.google.com/document/d/1cR-BbxtMjGuZPj8NOc95RyFjqmeFsYf4JJ5Hw_tL1zA/edit#bookmark=id.whq5d31z34][prototype]].
 
-** _sprint-7
+** _sprint-8
 
-Sprint goal: "Complete confd.xc"
+Sprint goal: "bootstrap works"
 
-*** DONE @mandar: [[[https://jts.seagate.com/browse/EOS-1773][EOS-1773]]] complete ConfSdev
+- minimal: single-node
+- better: 2 nodes
 
-*** complete confd.xc
-- @vvv: Conf{Pool,PverF,Objv} [[[https://jts.seagate.com/browse/EOS-880][EOS-880]]]
-- @prasanna: ConfProfile [[[https://jts.seagate.com/browse/EOS-1771][EOS-1771]]]
-- @rajanikant: ConfPver [[[https://jts.seagate.com/browse/EOS-1772][EOS-1772]]]
+*** @prasanna: CI install & bootstrap scripts -- issue #33
+- single-node
+- 2 nodes
+- [optional] it would be nice to test 5-node cluster also
 
-**** use 5-node cluster desc file for testing
+*** @rajanikant: 2-node configuration: test; CI
 
-**** ? Conf*.build methods to build children as well
-Similarly to how ConfProcess.build does that.
+*** @vvv: cfgen modifications and bug fixing
 
-**** confd.xc
-- [[~/src/mero/scripts/install/usr/share/mero/templates/halon_facts.yaml.erb][halon_facts.yaml.erb]]
+**** @vvv: issue #42: cfgen to provide Consul IP addresses
 
-***** disks :ARCHIVE:
+*** @andriy: bootstrap script
+Make it conform to the 6/BOOT.
 
-****** m0genfacts: How are disk regexes processed? Does len(drives) depend on glob or regex?
+**** @kostya, @mandar: start m0ds + hax
 
-#+BEGIN_SRC ruby
-log 'Collecting facts about nodes and disks'
-build_nodes_from(cluster_config).each do |node|
-    log "Getting facts about '#{node['address']}' node"
-    q_dbfacts[ node['address'] ] = collect_facts_for(node)
-    ios_hash[ node['address'] ] =
-        if node.has_key?('disks')
-            log "Getting disks info for '#{node['address']}' node"
-            collect_disks_for(node)
-        else
-            []
-        end
-end
-#+END_SRC
+**** m0d depends on ~/etc/sysconfig/m0d*~ file(s)
+We have to provide those somehow.
 
-#+BEGIN_SRC ruby
-def build_disk_info(host, disk_path, index)
-    debug "processing disk '#{disk_path}'"
+**** @max Mero modification: support HA states diff
 
-    # block devices that don't represent a real drive (e.g. file-backed loop
-    # devices) will have this field set to 'true'
-    is_fake = false
+*** @kostya: hax CI: pylint?, flake8, mypy
 
-    size = $options[:devsize] ||
-           run("sudo blockdev --getsize64 #{disk_path} 2>/dev/null", host: host)
+*** @mandar: XXX hax modifications, when needed
 
-    die "[#{host}]: failed to obtain device size for '#{disk_path}' disk" \
-        if size.nil?
-
-    serial = run("sudo lsblk -ndo SERIAL #{disk_path} 2>/dev/null", host: host)
-    if serial.to_s.strip.empty?
-        is_fake = true
-        stob    = size.to_i.zero? ? 'STOBLNX' : 'STOBAD'
-        serial  = stob + format('%03d', index)
-    end
-
-    wwn = run("sudo lsblk -ndo WWN #{disk_path} 2>/dev/null", host: host)
-    if wwn.to_s.strip.empty?
-        is_fake = true
-        wwn = '0x0000000' + format('%04d', index)
-    end
-
-    slot = run("ls /sys/block/$(basename $(readlink -f #{disk_path}))/device/ 2>/dev/null" +
-               " | grep enclosure | cut -f2 -d':'", host: host)
-    if slot.to_s.strip.empty?
-        slot = index
-    end
-
-    return {
-        'bay'     => slot,
-        'path'    => disk_path,
-        'size'    => size,
-        'serial'  => serial,
-        'wwn'     => wwn,
-        'is_fake' => is_fake,
-    }
-end
-#+END_SRC
-
-#+BEGIN_SRC ruby
-cluster_config['pools'].each do |pool|
-    disks = []
-    pool['disks'].each do |d|
-        die "pools configuration refers to unknown SSU host '#{ios_hash[d['host']]}'" \
-            if ! ios_hash.has_key? d['host']
-
-        if d.has_key? 'filter'
-            filtered_disks = ios_hash[d['host']].select{|x| x['path'] =~ Regexp.new(d['filter'])}
-            disks.concat(filtered_disks)
-        else
-            disks.concat(ios_hash[d['host']])
-        end
-    end
-    pools.push({name: pool['name'],
-                disks: disks,
-                allowed_failures: pool['allowed_failures'],
-                data_units: pool['data_units'],
-                parity_units: pool['parity_units']})
-end
-#+END_SRC
-
-****** halon_facts.yaml.erb
-#+BEGIN_SRC yaml
-    <%- if !ios_hash[ dbfact['hostname'] ].empty? -%>
-    m0h_devices:
-      <%- ios_hash[ dbfact['hostname'] ].each do |key| -%>
-      - m0d_wwn: "<%= key['wwn'] %>"
-        m0d_serial: "<%= key['serial'] %>"
-        m0d_bsize: <%= m0_block_size %>
-        m0d_size: <%= key['size'] %>
-        m0d_path: "<%= key['path'] %>"
-        m0d_slot: <%= key['bay'] %>
-      <%- end -%>
-    <%- else -%>
-    m0h_devices: []
-    <%- end -%>
-#+END_SRC
-
-****** halond: How are CAS/IOS sdevs generated?
-- [[file:~/src/halon/mero-halon/src/lib/HA/RecoveryCoordinator/Mero/Actions/Initial.hs::if%20null%20m0h_devices][loadMeroServers.goHost]]
-
-***** from roles to services :ARCHIVE:
-
-****** m0genfacts
-
-#+BEGIN_SRC ruby
-Role_of = {
-    'clients'     => 'datamover',
-    'clovis-apps' => 'clovis-app',
-    's3servers'   => 's3server',
-    'confds'      => 'confd',
-    'ssus'        => 'storage',
-}.freeze
-
-uniq_host[host]['roles'].push('station') \
-    if uniq_host[host]['roles'].include? 'confd'
-#+END_SRC
-
-#+BEGIN_SRC python
-uniq_host = {
-    'hostA1': {
-        'roles': ['datamover', 's3server'],
-        'pos': 0,
-        'address': 'hostA1'
-    },
-    'hostB1': {
-        'roles': ['clovis-app'],
-        'pos': 1,
-        'address': 'hostB1'
-    },
-    'hostC1': {
-        'roles': ['confd', 'station'],
-        'pos': 2,
-        'address': 'hostC1'
-    },
-    'hostD1': {
-        'roles': ['storage'],
-        'pos': 3,
-        'address': 'hostD1',
-        'disks': 'sh-glob-pattern'
-    },
-}
-
-q_dbfacts = {
-    'hostA1': {
-        'role': ['datamover', 's3server'],
-        'hostname': 'hostA1'
-    },
-    'hostC1': {
-        'role': ['confd', 'station'],
-        'hostname': 'hostC1'
-    },
-}
-#+END_SRC
-
-****** halon_facts.yaml
-
-******* mero roles
-#+BEGIN_SRC erb
-    m0h_roles:
-      - name: ha
-  <%- if dbfact['role'].include? 'confd' -%>
-      - name: confd
-  <%- end -%>
-  <%- if dbfact['role'].include? 'storage' -%>
-      - name: storage
-  <%- end -%>
-  <%- if dbfact['role'].include? 'datamover' -%>
-      - name: m0t1fs
-  <%- end -%>
-  <%- if dbfact['role'].include? 'clovis-app' -%>
-      - name: clovis-app
-  <%- end -%>
-  <%- if dbfact['role'].include? 's3server' -%>
-      - name: s3server
-  <%- end -%>
-#+END_SRC
-
-******* halon roles
-#+BEGIN_SRC erb
-<%- if dbfact['role'].include? 'station' -%>
-               - name: station
-<%- end -%>
-<%- if dbfact['role'].include? 'storage' -%>
-               - name: ssu
-<%- end -%>
-<%- if !(dbfact['role'] & ['datamover', 's3server', 'clovis-app']).empty? -%>
-               - name: dm
-<%- end -%>
-#+END_SRC
-
-***** LNet protocol (lo/tcp/o2ib) selection :ARCHIVE:
-
-~m0genfacts --lnet-transport {tcp|o2ib}~, defaults to ~tcp~.
-
-*** DONE @andriy: [[[https://jts.seagate.com/browse/EOS-1704][EOS-1704]]] consul-kv.json
-
-*** ?XXX [[[https://jts.seagate.com/browse/EOS-1705][EOS-1705]]] consul-config_{server,client}.json
+*** ? start replacing Halon with Hare
 
 ** scoping
 
