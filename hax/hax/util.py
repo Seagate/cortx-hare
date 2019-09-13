@@ -6,6 +6,11 @@ from hax.exception import HAConsistencyException
 from hax.types import Fid
 
 SERVICE_CONTAINER = 0x7300000000000001
+PROCESS_CONTAINER = 0x7200000000000001
+
+
+def _to_process_fid(key: int):
+    return Fid(PROCESS_CONTAINER, key)
 
 
 class ConsulUtil:
@@ -22,15 +27,15 @@ class ConsulUtil:
     # "my" fid)
     def get_hax_fid(self):
         serv = self.get_local_service_by_name('hax')
-        return Fid.parse(serv.get('ServiceID'))
+        return _to_process_fid(serv.get('ServiceID'))
 
     def get_ha_fid(self):
         serv = self.get_local_service_by_name('ha')
-        return Fid.parse(serv.get('ServiceID'))
+        return _to_process_fid(serv.get('ServiceID'))
 
     def get_rm_fid(self):
         serv = self.get_local_service_by_name('rm')
-        return Fid.parse(serv.get('ServiceID'))
+        return _to_process_fid(serv.get('ServiceID'))
 
     def get_my_nodename(self):
         return self.cns.agent.self().get('Config').get('NodeName')
@@ -40,7 +45,7 @@ class ConsulUtil:
 
         service = self.cns.catalog.service(service=name)[1]
         srv = list(filter(lambda x: x.get('Node') == hostname, service))
-        if not len(srv):
+        if not srv:
             raise HAConsistencyException(
                 f'No {name} service found in Consul at Node={hostname}')
         return srv[0]
@@ -49,8 +54,9 @@ class ConsulUtil:
         my_fid = self.get_hax_fid()
         services = self.cns.catalog.service(service='hax')[1]
         data = list(
-            map(self._to_canonical_service_data,
-                filter(lambda x: Fid.parse(x.get('ServiceID')) == my_fid,
+            map(
+                self._to_canonical_service_data,
+                filter(lambda x: int(x.get('ServiceID')) == my_fid.key,
                        services)))
         return data[0].get('address')
 
@@ -69,12 +75,12 @@ class ConsulUtil:
     @staticmethod
     def _to_canonical_service_data(service):
         node = service.get('Node')
-        fid = service.get('ServiceID')
+        raw_id = service.get('ServiceID')
         srv_address = service.get('ServiceAddress')
         srv_port = service.get('ServicePort')
         return {
             'node': node,
-            'fid': Fid.parse(fid),
+            'fid': _to_process_fid(raw_id),
             'address': f'{srv_address}:{srv_port}'
         }
 
