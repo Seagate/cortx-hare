@@ -277,9 +277,9 @@ print([dict(path=path,
 
 
 def fabricate_disks(hostname: str, path_glob: str) -> List[Disk]:
-    if path_glob is None:
+    if not path_glob:
         return []
-
+    # XXX use `path_glob`
     return [Disk(path=f'/mock/disk{i}', size=0, blksize=4096)
             for i in range(10)]
 
