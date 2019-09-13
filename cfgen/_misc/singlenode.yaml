@@ -2,7 +2,7 @@ hosts:
   - name: localhost
     m0_servers:
       - runs_confd: true
-        io_disks: { path_glob: "/dev/loop[0-9]*" }
+      - io_disks: { path_glob: "/dev/loop[0-9]*" }
     c0_clients: 2
     m0t1fs_clients: 0
 pools:
