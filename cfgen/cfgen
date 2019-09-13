@@ -556,10 +556,11 @@ class SvcT(Enum):
 
 def service_types(proc_t: ProcT,
                   proc_desc: Dict[str, Any] = None) -> List[SvcT]:
-    ts = [SvcT.M0_CST_RMS]
+    ts = []
     if proc_t is ProcT.hax:
         ts.append(SvcT.M0_CST_HA)
-    elif proc_t is ProcT.m0_server:
+    ts.append(SvcT.M0_CST_RMS)
+    if proc_t is ProcT.m0_server:
         assert proc_desc is not None
         if proc_desc.get('runs_confd'):
             ts.append(SvcT.M0_CST_CONFD)
