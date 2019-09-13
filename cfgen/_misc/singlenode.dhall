@@ -1,42 +1,26 @@
+let types = ../dhall/types.dhall
+
+in
 { hosts =
-    [ { c0_clients =
-          2
+    [ { name = "localhost"
       , m0_servers =
-          [ { io_disks = None { path_glob : Text }, runs_confd = Some True }
-          , { io_disks =
-                Some { path_glob = "/dev/loop[0-9]*" }
-            , runs_confd =
-                None Bool
+          [ { runs_confd = Some True
+            , io_disks = None { path_glob : Text }
+            }
+          , { runs_confd = None Bool
+            , io_disks = Some { path_glob = "/dev/loop[0-9]*" }
             }
           ]
-      , m0t1fs_clients =
-          0
-      , name =
-          "localhost"
+      , c0_clients = 2
+      , m0t1fs_clients = 0
       }
     ]
 , pools =
-    [ { allowed_failures =
-          None
-          { ctrl :
-              Natural
-          , disk :
-              Natural
-          , encl :
-              Natural
-          , rack :
-              Natural
-          , site :
-              Natural
-          }
-      , data_units =
-          1
-      , disks =
-          < all | select : List { host : Text, path_regex : Text } >.all
-      , name =
-          "the pool"
-      , parity_units =
-          0
+    [ { name = "the pool"
+      , disks = types.PoolDisks.all
+      , data_units = 1
+      , parity_units = 0
+      , allowed_failures = None types.FailVec
       }
     ]
-}
+} : types.ClusterDesc
