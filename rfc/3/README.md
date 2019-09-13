@@ -79,6 +79,7 @@ optional arguments:
   --mock               Generate pseudo-random "facts". The hosts specified in
                        the cluster description file will not be visited and
                        don't even have to exist.
+  --debug              print the enriched cluster description and exit
   -V, --version        show program's version number and exit
 
 The program reads cluster description in YAML format from the standard input;

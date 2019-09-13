@@ -7,6 +7,7 @@ from enum import Enum, auto
 from glob import glob
 import json
 import os
+from pprint import pprint
 import random
 import re
 import subprocess
@@ -40,6 +41,9 @@ def parse_opts(argv):
     p.add_argument('--mock', help='Generate pseudo-random "facts". The hosts'
                    ' specified in the cluster description file will not be'
                    " visited and don't even have to exist.",
+                   action='store_true')
+    p.add_argument('--debug',
+                   help='print the enriched cluster description and exit',
                    action='store_true')
     p.add_argument('-V', '--version', action='version',
                    version='%(prog)s ' + __version__)
@@ -105,26 +109,12 @@ def main(argv=None):
     except KeyboardInterrupt:
         sys.exit(1)
 
-    for host in cluster_desc['hosts']:
-        # The fact names used here correspond to version 2.4.1 of `facter`.
-        # See https://puppet.com/docs/puppet/6.6/core_facts.html#legacy-facts
-        host['facts'] = get_facts(host['name'], opts.mock,
-                                  'hostname', 'processorcount',
-                                  'memorysize_mb', 'ipaddress', 'macaddress')
-        host['facts']['_memsize_MB'] = int(float(
-            host['facts']['memorysize_mb']))
-
-        for m0d in host['m0_servers']:
-            disks = m0d.setdefault('io_disks', {})
-            disks['items'] = get_disks(host['name'], opts.mock,
-                                       disks['path_glob'])
-
+    enrich_cluster_desc(cluster_desc, opts.mock)
     validate_cluster_desc(cluster_desc)
-    # # XXX DELETEME <<<<<<<
-    # from pprint import pprint
-    # pprint(cluster_desc)
-    # sys.exit(9)
-    # # XXX >>>>>>>
+
+    if opts.debug:
+        pprint(cluster_desc)
+        return
 
     m0conf = build_m0conf(cluster_desc)
 
@@ -164,6 +154,23 @@ def validate_schema(input_str: str, schema_path: str) -> None:
     err = proc.communicate(input=input_str.encode(), timeout=15)[1]
     if proc.returncode != 0:
         die('Invalid input\n' + err.decode(), proc.returncode)
+
+
+def enrich_cluster_desc(desc: Dict[str, Any], mock_p: bool) -> None:
+    for host in desc['hosts']:
+        # The fact names used here correspond to version 2.4.1 of `facter`.
+        # See https://puppet.com/docs/puppet/6.6/core_facts.html#legacy-facts
+        host['facts'] = get_facts(host['name'], mock_p,
+                                  'hostname', 'processorcount',
+                                  'memorysize_mb', 'ipaddress', 'macaddress')
+        host['facts']['_memsize_MB'] = int(float(
+            host['facts']['memorysize_mb']))
+
+        for m0d in host['m0_servers']:
+            m0d.setdefault('runs_confd', False)
+            disks = m0d.setdefault('io_disks', {'path_glob': None})
+            disks['items'] = get_disks(host['name'], mock_p,
+                                       disks['path_glob'])
 
 
 def validate_cluster_desc(desc: Dict[str, Any]) -> None:
@@ -457,6 +464,9 @@ class ConfNode(ToDhall):
         return node_id
 
 
+ProcT = Enum('ProcT', 'hax m0_server m0_client')
+
+
 class ConfProcess(ToDhall):
     _objt = ObjT.process
     _downlinks = {Downlink('services', ObjT.service)}
@@ -489,8 +499,8 @@ class ConfProcess(ToDhall):
 
     @classmethod
     def build(cls, m0conf: Dict[Oid, Any], parent: Oid,
-              host_facts: Dict[str, Any],
-              process_desc: Dict[str, Any] = None,
+              host_facts: Dict[str, Any], proc_t: ProcT,
+              proc_desc: Dict[str, Any] = None,
               ctrl: Oid = None) -> Oid:
         assert parent.type is ObjT.node
         assert ctrl is None or ctrl.type is ObjT.controller
@@ -502,11 +512,11 @@ class ConfProcess(ToDhall):
                               endpoint=ep, services=[])
         m0conf[parent].processes.append(proc_id)
 
-        for stype in service_types(process_desc):
+        for stype in service_types(proc_t, proc_desc):
             svc_id = ConfService.build(m0conf, proc_id, stype, ep)
             if stype is SvcT.M0_CST_IOS:  # XXX What about M0_CST_CAS?
-                assert process_desc is not None and ctrl is not None
-                for disk in process_desc['io_disks']['items']:
+                assert proc_desc is not None and ctrl is not None
+                for disk in proc_desc['io_disks']['items']:
                     ConfDrive.build(m0conf, ctrl,
                                     ConfSdev.build(m0conf, svc_id, disk))
         return proc_id
@@ -542,20 +552,16 @@ class SvcT(Enum):
         return f'types.{self}'
 
 
-def service_types(process_desc: Dict[str, Any] = None) -> List[SvcT]:
-    # Every program that uses m0_halon_interface API (ha/halon/interface.h
-    # in `mero` repository) must be represented by at least 3 conf objects
-    # in the Mero conf cache: a process object and two service objects
-    # (HA and RMS).
-    #
-    # See http://gitlab.mero.colo.seagate.com/mero/hare/issues/8
-    ts = [SvcT.M0_CST_HA, SvcT.M0_CST_RMS]
-
-    if process_desc is not None:
-        if process_desc.get('runs_confd'):
+def service_types(proc_t: ProcT,
+                  proc_desc: Dict[str, Any] = None) -> List[SvcT]:
+    ts = [SvcT.M0_CST_RMS]
+    if proc_t is ProcT.hax:
+        ts.append(SvcT.M0_CST_HA)
+    elif proc_t is ProcT.m0_server:
+        assert proc_desc is not None
+        if proc_desc.get('runs_confd'):
             ts.append(SvcT.M0_CST_CONFD)
-
-        if process_desc['io_disks']['items']:
+        if proc_desc['io_disks']['items']:
             ts.extend([SvcT.M0_CST_IOS,
                        SvcT.M0_CST_SNS_REP,
                        SvcT.M0_CST_SNS_REB,
@@ -1160,7 +1166,7 @@ def validate_m0conf(m0conf: Dict[Oid, Any]) -> None:
 def build_m0conf(cluster_desc: Dict[str, Any]) -> Dict[Oid, ToDhall]:
     conf: Dict[Oid, Any] = {}
     root_id = ConfRoot.build(conf)
-    # XXX Move all the logic into ConfRoot.build.
+    # XXX Move all the logic into ConfRoot.build?
 
     rack_id = ConfRack.build(conf, ConfSite.build(conf, root_id))
 
@@ -1174,13 +1180,14 @@ def build_m0conf(cluster_desc: Dict[str, Any]) -> Dict[Oid, ToDhall]:
             if any(m0d['io_disks']['items'] for m0d in host['m0_servers']) \
             else None
 
-        ConfProcess.build(conf, node_id, facts)  # hax
+        ConfProcess.build(conf, node_id, facts, ProcT.hax)
 
         for m0d in host['m0_servers']:
-            ConfProcess.build(conf, node_id, facts, m0d, ctrl_id)
+            ConfProcess.build(conf, node_id, facts, ProcT.m0_server, m0d,
+                              ctrl_id)
 
         for _ in range(host['c0_clients'] + host['m0t1fs_clients']):
-            ConfProcess.build(conf, node_id, facts)
+            ConfProcess.build(conf, node_id, facts, ProcT.m0_client)
 
     # XXX-TODO: support multiple profiles
     prof_id = ConfProfile.build(conf, root_id)
