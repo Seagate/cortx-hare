@@ -279,9 +279,9 @@ print([dict(path=path,
 def fabricate_disks(hostname: str, path_glob: str) -> List[Disk]:
     if path_glob is None:
         return []
-    else:
-        return [Disk(path=f'/mock/disk{i}', size=0, blksize=4096)
-                for i in range(10)]
+
+    return [Disk(path=f'/mock/disk{i}', size=0, blksize=4096)
+            for i in range(10)]
 
 
 def cluster_nodes(cluster_desc: Dict[str, Any]) -> Tuple[List[str], List[str]]:
