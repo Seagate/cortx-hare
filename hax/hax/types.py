@@ -62,9 +62,9 @@ class ConfHaProcess:
 
 # Duplicates mero/fid/fid.h
 class Fid:
-    def __init__(self, container, key):
-        self.container = int(container)
-        self.key = int(key)
+    def __init__(self, container: int, key: int):
+        self.container = container
+        self.key = key
 
     @staticmethod
     def parse(val: str):

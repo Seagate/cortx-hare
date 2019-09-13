@@ -9,8 +9,12 @@ SERVICE_CONTAINER = 0x7300000000000001
 PROCESS_CONTAINER = 0x7200000000000001
 
 
-def _to_process_fid(key: int):
-    return Fid(PROCESS_CONTAINER, key)
+def _to_process_fid(key):
+    return Fid(PROCESS_CONTAINER, int(key))
+
+
+def _to_service_fid(key: int):
+    return Fid(SERVICE_CONTAINER, int(key))
 
 
 class ConsulUtil:
@@ -30,12 +34,14 @@ class ConsulUtil:
         return _to_process_fid(serv['ServiceID'])
 
     def get_ha_fid(self):
-        serv = self.get_local_service_by_name('ha')
-        return _to_process_fid(serv['ServiceID'])
+        serv = self.get_local_service_by_name('hax')
+        fidk = int(serv['ServiceID'])
+        return _to_service_fid(fidk + 1)
 
     def get_rm_fid(self):
-        serv = self.get_local_service_by_name('rm')
-        return _to_process_fid(serv['ServiceID'])
+        serv = self.get_local_service_by_name('hax')
+        fidk = int(serv['ServiceID'])
+        return _to_service_fid(fidk + 2)
 
     def get_my_nodename(self):
         return self.cns.agent.self()['Config']['NodeName']
@@ -54,10 +60,8 @@ class ConsulUtil:
         my_fid = self.get_hax_fid()
         services = self.cns.catalog.service(service='hax')[1]
         data = list(
-            map(
-                self._to_canonical_service_data,
-                filter(lambda x: int(x['ServiceID']) == my_fid.key,
-                       services)))
+            map(self._to_canonical_service_data,
+                filter(lambda x: int(x['ServiceID']) == my_fid.key, services)))
         return data[0]['address']
 
     def get_leader_session(self):
