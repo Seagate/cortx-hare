@@ -2,7 +2,7 @@
 domain: gitlab.mero.colo.seagate.com
 shortname: 4/KV
 name: Consul KV Schema
-status: raw
+status: draft
 editor: Valery V. Vorotyntsev <valery.vorotyntsev@seagate.com>
 contributors:
   - Andriy Tkachuk <andriy.tkachuk@seagate.com>

@@ -4,7 +4,7 @@ original-url: http://hintjens.com/blog:23
 domain: gitlab.mero.colo.seagate.com
 shortname: 9/PC3
 name: Pedantic Code Construction Contract
-status: raw
+status: draft
 editor: Valery V. Vorotyntsev <valery.vorotyntsev@seagate.com>
 ---
 
