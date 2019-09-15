@@ -340,27 +340,31 @@ def oids_to_dhall(oids: List[Oid]) -> str:
 
 
 class Endpoint:
-    _tmids = {}  # type: Dict[str, int]
+    _tmids: Dict[Tuple[str, int], int] = {}
 
-    def __init__(self, ipaddr: str, tmid: int = None):
+    def __init__(self, ipaddr: str, portal: int, tmid: int = None):
         assert ipaddr
         self.ipaddr = ipaddr
+        assert portal > 0
+        self.portal = portal
         if tmid is None:
-            self.tmid = Endpoint._tmids.setdefault(ipaddr, 1)
-            Endpoint._tmids[ipaddr] += 1
+            self.tmid = Endpoint._tmids.setdefault((ipaddr, portal), 1)
+            Endpoint._tmids[(ipaddr, portal)] += 1
         else:
             assert tmid > 0
             self.tmid = tmid
 
     def __repr__(self):
-        args = ', '.join([f'ipaddr={self.ipaddr!r}', f'tmid={self.tmid}'])
+        args = ', '.join([f'ipaddr={self.ipaddr!r}',
+                          f'portal={self.portal}'
+                          f'tmid={self.tmid}'])
         return f'{self.__class__.__name__}({args})'
 
     def to_dhall(self):
-        return f'utils.tcpEndpoint "{self.ipaddr}" 1975 {self.tmid}'
+        return f'utils.tcpEndpoint "{self.ipaddr}" {self.portal} {self.tmid}'
 
     def __str__(self):
-        return f'{self.ipaddr}@tcp:12345:1975:{self.tmid}'
+        return f'{self.ipaddr}@tcp:12345:{self.portal}:{self.tmid}'
 
 
 class ToDhall(metaclass=abc.ABCMeta):
@@ -467,6 +471,7 @@ class ConfNode(ToDhall):
 
 
 ProcT = Enum('ProcT', 'hax m0_server m0_client')
+ProcT.__doc__ = 'Type of the process'
 
 
 class ConfProcess(ToDhall):
@@ -507,7 +512,7 @@ class ConfProcess(ToDhall):
         assert parent.type is ObjT.node
         assert ctrl is None or ctrl.type is ObjT.controller
 
-        ep = Endpoint(ipaddr=host_facts['ipaddress'])
+        ep = Endpoint(ipaddr=host_facts['ipaddress'], portal=proc_t.value)
         proc_id = new_oid(ObjT.process)
         m0conf[proc_id] = cls(nr_cpu=host_facts['processorcount'],
                               memsize_MB=host_facts['_memsize_MB'],
