@@ -105,9 +105,34 @@ specific goals:
    the principal target platform.
 
 6. A patch commit message MUST consist of a single short (less than 50
-   characters ) line stating the problem ("Problem: ...") being solved,
+   characters) line stating the problem ("Problem: ...") being solved,
    followed by a blank line and then the proposed solution
    ("Solution: ...").
+
+<!--
+  -- The strictness of the `Problem: ` prefix requirement is controversial[1].
+  -- ZeroMQ maintainers considered the proposal of reducing the strictness
+  -- (s/MUST/SHOULD/), but decided against[2] it, stating that current style
+  -- is foundational[3].
+  --
+  --   1. https://github.com/zeromq/rfc/issues/117
+  --   2. https://github.com/zeromq/rfc/issues/117#issuecomment-249374914
+  --   3. https://github.com/zeromq/rfc/issues/117#issuecomment-249391434
+  --
+  -- | The `Problem` statement wields enormous power. At first you need to
+  -- | recognize that every bug, every feature, every change and every idea is
+  -- | essentially a problem. Thus having a list of solved problems comes
+  -- | naturally. Using the `Problem` statement also sharpens the awareness
+  -- | whether a feature, bug, change or idea is actually worth solving as it
+  -- | is really easy to see if there is a need. Further it forces developers
+  -- | to consciously fragment their work into a stream of small fixes rather
+  -- | than one big with a rubbish commit message or even a listing.
+  -- |
+  -- | From a maintainers perspective it allows us to quickly examine a pull
+  -- | request and merge it in a manner of seconds or decline it if the
+  -- | problem statement is false. And probably most important it is a
+  -- | powerful tool to identify bad actors as they wont follow rules.
+  -->
 
 7. A "Correct Patch" is one that satisfies the above requirements.
 
@@ -200,8 +225,9 @@ specific goals:
    Stable releases SHALL always be released from the repository
    master.
 
-<!-- XXX http://hintjens.com/blog:23 specifies this differently:
+<!-- XXX http://hintjens.com/blog:23#toc7 specifies this differently:
   --
+  -- ```
   -- ## Creating Stable Releases
   --
   -- * The project SHALL have one branch ("master") that always holds the
@@ -225,6 +251,14 @@ specific goals:
   -- * A stabilization repository SHOULD progress through these phases:
   --   "unstable", "candidate", "stable", and then "legacy". That is, the
   --   default behavior of stabilization repositories is to die.
+  -- ```
+  --
+  -- The same section existed in [16/C4][] (retired) and [22/C4][]
+  -- (deprecated), but not in [42/C4][] (stable).
+  --
+  -- [16/C4]: https://github.com/zeromq/rfc/tree/master/16#creating-stable-releases
+  -- [22/C4]: https://github.com/zeromq/rfc/tree/master/22#creating-stable-releases
+  -- [42/C4]: https://github.com/zeromq/rfc/tree/master/42
   -->
 
 ### 2.6. Evolution of Public Contracts
