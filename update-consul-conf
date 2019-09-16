@@ -69,9 +69,7 @@ append_confd_svc() {
     \"port\": $port,
     \"checks\": [
         {
-          \"args\": [
-            \"/opt/seagate/consul/check-confd\"
-          ],
+          \"args\": [ \"/opt/seagate/consul/check-service\", \"$fid\" ],
           \"interval\": \"10s\"
         }
       ]
@@ -94,7 +92,13 @@ append_ios_svc() {
     \"id\": \"$id\",
     \"name\": \"ios\",
     \"address\": \"$addr\",
-    \"port\": $port
+    \"port\": $port,
+    \"checks\": [
+        {
+          \"args\": [ \"/opt/seagate/consul/check-service\", \"$fid\" ],
+          \"interval\": \"10s\"
+        }
+      ]
   }"
   cat <<. | sudo tee /etc/sysconfig/m0d-$fid > /dev/null
 MERO_M0D_EP='$ep'
