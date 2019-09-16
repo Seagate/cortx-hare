@@ -166,7 +166,7 @@ specific goals:
 17. Maintainers SHOULD close user issues that are left open without
     action for an uncomfortable period of time.
 
-## 2.4. Code Review Process
+### 2.4. Code Review Process
 
 1. The project MAY use a code review process, particularly if it is
    a shipping project with non-trivial complexity.
@@ -227,7 +227,7 @@ specific goals:
   --   default behavior of stabilization repositories is to die.
   -->
 
-## 2.6. Evolution of Public Contracts
+### 2.6. Evolution of Public Contracts
 
 1. All Public Contracts (APIs or protocols) SHALL be documented.
 
@@ -256,7 +256,7 @@ specific goals:
 9. When old names are removed, their implementations MUST provoke an
    exception (assertion) if used by applications.
 
-## 2.7. Issue Format
+### 2.7. Issue Format
 
 1. One issue SHOULD address one single identifiable problem or a small
    set of tightly related problems.
@@ -273,7 +273,7 @@ specific goals:
    solutions to problems that are not explicitly documented and
    provable.
 
-## 2.8. Task and Role Assignment
+### 2.8. Task and Role Assignment
 
 1. All tasks and roles SHALL be self-assigned, based on individual
    judgement of the value of taking on a certain task or role.
