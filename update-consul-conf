@@ -26,9 +26,14 @@ get_service_port() {
   echo $ep | sed 's/.*://'
 }
 
-HAX_IDs=$(get_service_ids 'grep -i ha')
+id2fid() {
+  echo "0x7200000000000001:$(printf '0x%x' $1)"
+}
+
+HAX_ID=$(get_service_ids 'grep -i ha')
 CONFD_IDs=$(get_service_ids 'grep -i confd')
 IOS_IDs=$(get_service_ids 'grep -i ios | grep -iv confd')
+HAX_EP=$(get_service_ep $HAX_ID)
 
 if [[ $CONFD_IDs ]]; then
   CONF_FILE=$SRC_DIR/consul-server-conf.json
@@ -53,6 +58,7 @@ append_hax_svc() {
 
 append_confd_svc() {
   local id=$1
+  local fid=$(id2fid $id)
   local ep=$(get_service_ep $id)
   local addr=$(get_service_addr $ep)
   local port=$(get_service_port $ep)
@@ -70,10 +76,17 @@ append_confd_svc() {
         }
       ]
   }"
+  cat <<. | sudo tee /etc/sysconfig/m0d-$fid > /dev/null
+MERO_M0D_EP='$ep'
+MERO_HA_EP='$HAX_EP'
+MERO_PROCESS_FID='$fid'
+MERO_CONF_XC='/tmp/conf.xc'
+.
 }
 
 append_ios_svc() {
   local id=$1
+  local fid=$(id2fid $id)
   local ep=$(get_service_ep $id)
   local addr=$(get_service_addr $ep)
   local port=$(get_service_port $ep)
@@ -83,9 +96,14 @@ append_ios_svc() {
     \"address\": \"$addr\",
     \"port\": $port
   }"
+  cat <<. | sudo tee /etc/sysconfig/m0d-$fid > /dev/null
+MERO_M0D_EP='$ep'
+MERO_HA_EP='$HAX_EP'
+MERO_PROCESS_FID='$fid'
+.
 }
 
-for id in $HAX_IDs; do
+for id in $HAX_ID; do
   append_hax_svc $id
 done
 
