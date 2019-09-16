@@ -32,7 +32,7 @@ Cluster administrator
 The `bootstrap` script
 
 1. Executes [‘cfgen’ script](rfc/3/README.md#cfgen), which generates
-   `bootstrap.json`, `consul-kv.json`, and `confd.xc` files.
+   `consul-agents.json`, `consul-kv.json`, and `confd.xc` files.
 
 2. Starts `consul` server agent with
    [`--bootstrap-expect=1`](https://www.consul.io/docs/agent/options.html#_bootstrap_expect)
@@ -42,19 +42,13 @@ The `bootstrap` script
    `consul kv import @consul-kv.json` command.
 
 4. Starts `consul` agents on every node of the cluster, knowing from
-   `bootstrap.json` file where the server and the client agents should
-   be running, on which IP addresses and to which agent to join.
-   Consul configuration SHOULD be taken from
-   `consul-config_{server,client}.json` templates.  `bootstrap` script
-   MAY use
-   [`--bind`](https://www.consul.io/docs/agent/options.html#_bind)
-   option to assign IP addresses to consul agents.
+   `consul-agents.json` file where to run server and client agents.
 
 5. Gets fids of Mero services from the Consul KV.  Updates the
-   corresponding fields in `consul-config-{server,client}.json`
+   corresponding fields in `consul-config_{server,client}.json`
    templates on every node of the cluster.  Executes
    [`consul reload`](https://www.consul.io/docs/commands/reload.html)
-   on every node. (See update-consul-conf script.)
+   on every node.
 
 6. Starts `hax` on every node of the cluster.  Each `hax` process
    obtains its [three fids](#8) from the Consul KV.
@@ -70,8 +64,7 @@ The `bootstrap` script
 
 8. Waits for ‘confd’ servers to start.
 
-9. Starts other (non-confd) Mero servers.  For each non-confd Mero
-   server:
+9. Starts other (non-confd) Mero servers.  For each non-confd Mero server:
 
    - obtains host name and process fid from the Consul KV;
    - starts `m0mkfs` process;

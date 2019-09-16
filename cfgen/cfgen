@@ -18,7 +18,7 @@ from typing import Any, Callable, Dict, Iterator, List, NamedTuple, Set, \
 import yaml
 
 
-__version__ = '0.1'
+__version__ = '0.2'
 __author__ = 'Valery V. Vorotyntsev <valery.vorotyntsev@seagate.com>'
 
 
@@ -117,14 +117,12 @@ def main(argv=None):
         pprint(cluster_desc)
         return
 
-    m0conf = build_m0conf(cluster_desc)
+    cluster = build_cluster(cluster_desc)
 
     outs: List[Tuple[str, Callable[..., str], List[Any]]] = [
-        ('bootstrap-env',  # XXX Do we still need this file?
-         generate_bootstrap_env, *cluster_nodes(cluster_desc)),
-        ('confd.dhall', generate_confd, m0conf, opts.dhall_dir),
-        ('consul-kv.json', generate_consul_kv, m0conf, opts.dhall_dir),
-    ]
+        ('consul-agents.json', generate_consul_agents, cluster),
+        ('consul-kv.json', generate_consul_kv, cluster.m0conf, opts.dhall_dir),
+        ('confd.dhall', generate_confd, cluster.m0conf, opts.dhall_dir)]
     for path, generate, *args in outs:
         with open(os.path.join(opts.output_dir, path), 'w') as f:
             f.write(generate(*args))
@@ -282,20 +280,6 @@ def fabricate_disks(hostname: str, path_glob: str) -> List[Disk]:
     # XXX use `path_glob`
     return [Disk(path=f'/mock/disk{i}', size=0, blksize=4096)
             for i in range(10)]
-
-
-def cluster_nodes(cluster_desc: Dict[str, Any]) -> Tuple[List[str], List[str]]:
-    hosts = list((host['facts']['hostname'],
-                  any(m0d['runs_confd'] for m0d in host['m0_servers']))
-                 for host in cluster_desc['hosts'])
-    servers = list(hostname for hostname, confd_p in hosts if confd_p)
-    clients = list(hostname for hostname, confd_p in hosts if not confd_p)
-
-    names = servers + clients
-    assert all_unique(names)
-    assert all(re.search('[",= @]', name) is None for name in names)
-
-    return servers, clients
 
 
 ObjT = Enum('ObjT', 'root fdmi_flt_grp fdmi_filter'
@@ -1089,33 +1073,19 @@ class ConfProfile(ToDhall):
         return prof_id
 
 
-def generate_bootstrap_env(servers: List[str], clients: List[str]) -> str:
-    return """\
-consul_server_nodes={}
-consul_client_nodes={}
-""".format(','.join(servers), ','.join(clients))
+ConsulAgent = NamedTuple('ConsulAgent', [('hostname', str), ('ipaddr', str)])
+
+Cluster = NamedTuple('Cluster', [('consul_servers', List[ConsulAgent]),
+                                 ('consul_clients', List[ConsulAgent]),
+                                 ('m0conf', Dict[Oid, Any])])
 
 
-def generate_confd(m0conf: Dict[Oid, ToDhall], dhall_dir: str) -> str:
-    assert os.path.isabs(dhall_dir)
-
-    def objt(obj: ToDhall) -> str:
-        objt = obj.__class__.__name__
-        assert objt.startswith('Conf')
-        return objt[len('Conf'):]
-
-    objs = '\n  , '.join('types.Obj.{} {}'.format(objt(v), v.to_dhall(k))
-                         for k, v in m0conf.items())
-    return f"""\
-let types = {dhall_dir}/types.dhall
-let utils = {dhall_dir}/utils.dhall
-
-let objs =
-  [ {objs}
-  ]
-
-in {dhall_dir}/toConfGen.dhall objs
-"""
+def generate_consul_agents(cluster: Cluster) -> str:
+    assert cluster.consul_servers
+    return json.dumps(
+        {'servers': [x._asdict() for x in cluster.consul_servers],
+         'clients': [x._asdict() for x in cluster.consul_clients]},
+        indent=2) + '\n'
 
 
 def generate_consul_kv(m0conf: Dict[Oid, Any], dhall_dir: str) -> str:
@@ -1151,7 +1121,29 @@ def generate_consul_kv(m0conf: Dict[Oid, Any], dhall_dir: str) -> str:
            f'{x.svc_types}') for x in services()],
         *[(f'node/{x.node_name}/service/{x.proc_id.fidk}/ep', f'{x.ep}')
           for x in services()])],
-                      indent=2) + "\n"
+                      indent=2) + '\n'
+
+
+def generate_confd(m0conf: Dict[Oid, ToDhall], dhall_dir: str) -> str:
+    assert os.path.isabs(dhall_dir)
+
+    def objt(obj: ToDhall) -> str:
+        objt = obj.__class__.__name__
+        assert objt.startswith('Conf')
+        return objt[len('Conf'):]
+
+    objs = '\n  , '.join('types.Obj.{} {}'.format(objt(v), v.to_dhall(k))
+                         for k, v in m0conf.items())
+    return f"""\
+let types = {dhall_dir}/types.dhall
+let utils = {dhall_dir}/utils.dhall
+
+let objs =
+  [ {objs}
+  ]
+
+in {dhall_dir}/toConfGen.dhall objs
+"""
 
 
 def validate_m0conf(m0conf: Dict[Oid, Any]) -> None:
@@ -1171,8 +1163,9 @@ def validate_m0conf(m0conf: Dict[Oid, Any]) -> None:
                for _rel, children in rel_children.items())
 
 
-def build_m0conf(cluster_desc: Dict[str, Any]) -> Dict[Oid, ToDhall]:
-    conf: Dict[Oid, Any] = {}
+def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
+    cluster = Cluster(consul_servers=[], consul_clients=[], m0conf={})
+    conf = cluster.m0conf
     root_id = ConfRoot.build(conf)
     # XXX Move all the logic into ConfRoot.build?
 
@@ -1190,9 +1183,15 @@ def build_m0conf(cluster_desc: Dict[str, Any]) -> Dict[Oid, ToDhall]:
 
         ConfProcess.build(conf, node_id, facts, ProcT.hax)
 
+        confd_p = False
         for m0d in host['m0_servers']:
             ConfProcess.build(conf, node_id, facts, ProcT.m0_server, m0d,
                               ctrl_id)
+            if m0d['runs_confd']:
+                confd_p = True
+        (cluster.consul_servers if confd_p else cluster.consul_clients).\
+            append(ConsulAgent(hostname=facts['hostname'],
+                               ipaddr=facts['ipaddress']))
 
         for _ in range(host['c0_clients'] + host['m0t1fs_clients']):
             ConfProcess.build(conf, node_id, facts, ProcT.m0_client)
@@ -1248,7 +1247,14 @@ def build_m0conf(cluster_desc: Dict[str, Any]) -> Dict[Oid, ToDhall]:
         conf[root_id].imeta_pver = imeta_pver
 
     validate_m0conf(conf)
-    return conf
+    assert cluster.consul_servers
+    names = [x.hostname
+             for x in cluster.consul_servers + cluster.consul_clients]
+    assert all_unique(names)
+    assert all(re.search('[",= @]', name) is None for name in names)
+    assert all_unique(x.ipaddr
+                      for x in cluster.consul_servers + cluster.consul_clients)
+    return cluster
 
 
 if __name__ == '__main__':

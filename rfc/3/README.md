@@ -92,34 +92,32 @@ information to generate configuration data.
 
 ### Output files
 
-  * `bootstrap.json` -- tells [`bootstrap`](rfc/6/README.md) script
-    where Consul server and client agents should be started, which
-    IP address they should bind to and which Consul agent they should join.
+  * `consul-agents.json` &mdash; tells [`bootstrap`](rfc/6/README.md) script
+    where Consul server and client agents should be started and which
+    IP addresses they should bind to.
 
     Format:
     ```
     {
-        "consul_agent_to_join": "<ip>",
-        "consul_server_nodes": [
-            {
-                "name": "<hostname>",
-                "bind_addr": "<ip>",
-            },
-            ...
-        ],
-        "consul_client_nodes": [
-            {
-                "name": "<hostname>",
-                "bind_addr": "<ip>"
-            },
-            ...
-        ]
+      "servers": [
+        {
+          "hostname": "<str>",
+          "ipaddr": "<str>"
+        }
+      ],
+      "clients": [
+        {
+          "hostname": "<str>",
+          "ipaddr": "<str>"
+        }
+      ]
     }
     ```
+    `"servers"` list MUST NOT be empty.
 
-  * `confd.xc` -- Mero configuration in xcode string format, ready to
-    be used by confd services.
-
-  * `consul-kv.json` -- key/value pairs in JSON format, ready to be
+  * `consul-kv.json` &mdash; key/value pairs in JSON format, ready to be
     consumed by
     [`consul kv import`](https://www.consul.io/docs/commands/kv/import.html).
+
+  * `confd.xc` &mdash; Mero configuration in xcode string format, ready to
+    be used by confd services.
