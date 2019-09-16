@@ -202,18 +202,18 @@ Sprint goal: "bootstrap works"
 - minimal: single-node
 - better: 2 nodes
 
-*** @prasanna: CI install & bootstrap scripts -- issue #33
+*** [[[https://jts.seagate.com/browse/EOS-1940][EOS-1940]]] @prasanna: CI install & bootstrap scripts -- issue #33
 - single-node
 - 2 nodes
 - [optional] it would be nice to test 5-node cluster also
 
-*** @rajanikant: 2-node configuration: test; CI
+*** [[[https://jts.seagate.com/browse/EOS-1949][EOS-1949]]] @rajanikant: 2-node configuration: test; CI
 
-*** @vvv: cfgen modifications and bug fixing
+*** [[[https://jts.seagate.com/browse/EOS-1943][EOS-1943]]] @vvv: cfgen modifications and bug fixing
 
 **** @vvv: issue #42: cfgen to provide Consul IP addresses
 
-*** @andriy: bootstrap script
+*** [[[https://jts.seagate.com/browse/EOS-1929][EOS-1929]]] @andriy: bootstrap script
 Make it conform to the 6/BOOT.
 
 **** @kostya, @mandar: start m0ds + hax
@@ -221,11 +221,11 @@ Make it conform to the 6/BOOT.
 **** m0d depends on ~/etc/sysconfig/m0d*~ file(s)
 We have to provide those somehow.
 
-**** @max Mero modification: support HA states diff
+**** [[[https://jts.seagate.com/browse/EOS-1824][EOS-1824]]] @max Mero modification: support HA states diff
 
-*** @kostya: hax CI: pylint?, flake8, mypy
+*** [[[https://jts.seagate.com/browse/EOS-1937][EOS-1937]]] @kostya: hax CI: pylint?, flake8, mypy
 
-*** @mandar: XXX hax modifications, when needed
+*** [[[https://jts.seagate.com/browse/EOS-1934][EOS-1934]]] @mandar: hax modifications, when needed
 
 *** ? start replacing Halon with Hare
 
