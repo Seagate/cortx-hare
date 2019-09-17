@@ -9,7 +9,7 @@ usage() {
     exit 1
 }
 
-[[ $# < 1 ]] && usage
+(( $# < 1 )) && usage
 
 KEY=$1
 INC=${2:-1}
