@@ -2,7 +2,7 @@ import json
 import logging
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-from hax.types import Fid
+from hax.util import create_process_fid
 
 
 class KVHandler(BaseHTTPRequestHandler):
@@ -58,7 +58,7 @@ class KVHandler(BaseHTTPRequestHandler):
         result = []
         for t in data:
             result.append({
-                'fid': Fid.parse(t['Service']['ID']),
+                'fid': create_process_fid(t['Service']['ID']),
                 'status': get_status(t['Checks'])
             })
         return result

@@ -9,7 +9,11 @@ SERVICE_CONTAINER = 0x7300000000000001
 PROCESS_CONTAINER = 0x7200000000000001
 
 
-def _to_process_fid(key):
+def create_process_fid(key):
+    """
+    Returns a correct Fid instance by the given fidk value. The resulting
+    Fid will correspond to a Mero process.
+    """
     return Fid(PROCESS_CONTAINER, int(key))
 
 
@@ -27,11 +31,13 @@ class ConsulUtil:
             3: "M0_CONF_HA_PROCESS_STOPPED"
         }
 
-    # Returns the fid of the current hax process (in other words, returns
-    # "my" fid)
     def get_hax_fid(self):
+        """
+        Returns the fid of the current hax process (in other words, returns
+        "my own" fid)
+        """
         serv = self.get_local_service_by_name('hax')
-        return _to_process_fid(serv['ServiceID'])
+        return create_process_fid(serv['ServiceID'])
 
     def get_ha_fid(self):
         serv = self.get_local_service_by_name('hax')
@@ -47,6 +53,10 @@ class ConsulUtil:
         return self.cns.agent.self()['Config']['NodeName']
 
     def get_local_service_by_name(self, name):
+        """
+        Returns the service data by its name assuming that it runs at the same
+        node to the current hax process.
+        """
         hostname = self.get_my_nodename()
 
         service = self.cns.catalog.service(service=name)[1]
@@ -84,7 +94,7 @@ class ConsulUtil:
         srv_port = service['ServicePort']
         return {
             'node': node,
-            'fid': _to_process_fid(fidk),
+            'fid': create_process_fid(fidk),
             'address': f'{srv_address}:{srv_port}'
         }
 
