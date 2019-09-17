@@ -1,0 +1,18 @@
+hosts:
+  - name: cmu.local
+    m0_servers:
+      - runs_confd: true
+      - io_disks: { path_glob: "/dev/loop[0-9]*" }
+    c0_clients: 2
+    m0t1fs_clients: 0
+  - name: ssu1.local
+    m0_servers:
+      - io_disks: { path_glob: "/dev/loop[0-9]*" }
+    c0_clients: 2
+    m0t1fs_clients: 0
+pools:
+  - name: the pool
+    disks: all
+    data_units: 1
+    parity_units: 0
+    # allowed_failures: { site: 0, rack: 0, encl: 0, ctrl: 0, disk: 0 }
