@@ -21,7 +21,7 @@ get_service_addr() {
 }
 
 get_service_port() {
-    echo ${1#*:}
+    echo ${1##*:}
 }
 
 id2fid() {
