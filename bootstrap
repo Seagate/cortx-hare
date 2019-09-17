@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 set -eu -o pipefail
 
+######################################################################
 # Helper script to bootstrap singlenode-setup from scratch.
+######################################################################
 
 SRC_DIR="$(dirname $(readlink -f $0))"
 M0_SRC_DIR=${M0_SRC_DIR:-${SRC_DIR%/*}/mero}
@@ -16,20 +18,21 @@ cd $SRC_DIR
 cfgen/cfgen -D cfgen/dhall/ -o /tmp/ < cfgen/_misc/singlenode.yaml
 sudo mkdir -p /etc/mero
 dhall text < /tmp/confd.dhall | $M0_SRC_DIR/utils/m0confgen | \
-  tee /etc/mero/confd.xc > /dev/null
+  sudo tee /etc/mero/confd.xc > /dev/null
 
 # Let Consul some time to finish its internal bootstrap and elect
 # its internal leader, so the KV Store could be accessible.
 sleep 3
 
-cat /tmp/consul-kv.json | jq '[.[] | {key, value: (.value | @base64)}]' | consul kv import -
+jq '[.[] | {key, value: (.value | @base64)}]' < /tmp/consul-kv.json |
+    consul kv import -
 
 . $SRC_DIR/update-consul-conf
 
 sudo systemctl start hax
 
 for id in $CONFD_IDs $IOS_IDs; do
-  fid=$(id2fid $id)
-  sudo systemctl start mero-mkfs@$fid
-  sudo systemctl start m0d@$fid
+    fid=$(id2fid $id)
+    sudo systemctl start mero-mkfs@$fid
+    sudo systemctl start m0d@$fid
 done

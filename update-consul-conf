@@ -5,29 +5,27 @@ SRC_DIR="$(dirname $(readlink -f $0))"
 NODE_NAME=$(hostname)
 
 get_service_ids() {
-  local filter=$1
-  local cmd="consul kv get -recurse node/$NODE_NAME/service/ \
+    local filter=$1
+    local cmd="consul kv get -recurse node/$NODE_NAME/service/ \
                 | grep types | $filter | sed -r 's;.*/(.+)/types:.*;\1;g'"
-  eval $cmd || echo ''
+    eval $cmd || echo ''
 }
 
 get_service_ep() {
-  local id=$1
-  consul kv get node/$NODE_NAME/service/$id/ep
+    local id=$1
+    consul kv get node/$NODE_NAME/service/$id/ep
 }
 
 get_service_addr() {
-  local ep=$1
-  echo $ep | sed -r 's/:[0-9]+$//'
+    sed -r 's/:[0-9]+$//' <<< $1
 }
 
 get_service_port() {
-  local ep=$1
-  echo $ep | sed 's/.*://'
+    echo ${1#*:}
 }
 
 id2fid() {
-  printf '0x7200000000000001:%#x\n' $1
+    printf '0x7200000000000001:%#x\n' $1
 }
 
 HAX_ID=$(get_service_ids 'grep -i ha')
@@ -36,92 +34,92 @@ IOS_IDs=$(get_service_ids 'grep -i ios | grep -iv confd')
 HAX_EP=$(get_service_ep $HAX_ID)
 
 if [[ $CONFD_IDs ]]; then
-  CONF_FILE=$SRC_DIR/consul-server-conf.json
+    CONF_FILE=$SRC_DIR/consul-server-conf.json
 else
-  CONF_FILE=$SRC_DIR/consul-client-conf.json
+    CONF_FILE=$SRC_DIR/consul-client-conf.json
 fi
 
 SVCS_CONF=''
 
 append_hax_svc() {
-  local id=$1
-  local ep=$(get_service_ep $id)
-  local addr=$(get_service_addr $ep)
-  local port=$(get_service_port $ep)
-  SVCS_CONF+="${SVCS_CONF:+,}{
-    \"id\": \"$id\",
-    \"name\": \"hax\",
-    \"address\": \"$addr\",
-    \"port\": $port
-  }"
+    local id=$1
+    local ep=$(get_service_ep $id)
+    local addr=$(get_service_addr $ep)
+    local port=$(get_service_port $ep)
+    SVCS_CONF+="${SVCS_CONF:+,}{
+      \"id\": \"$id\",
+      \"name\": \"hax\",
+      \"address\": \"$addr\",
+      \"port\": $port
+    }"
 }
 
 append_confd_svc() {
-  local id=$1
-  local fid=$(id2fid $id)
-  local ep=$(get_service_ep $id)
-  local addr=$(get_service_addr $ep)
-  local port=$(get_service_port $ep)
-  SVCS_CONF+="${SVCS_CONF:+,}{
-    \"id\": \"$id\",
-    \"name\": \"confd\",
-    \"address\": \"$addr\",
-    \"port\": $port,
-    \"checks\": [
-        {
-          \"args\": [ \"/opt/seagate/consul/check-service\", \"$fid\" ],
-          \"interval\": \"10s\"
-        }
-      ]
-  }"
-  cat <<. | sudo tee /etc/sysconfig/m0d-$fid > /dev/null
+    local id=$1
+    local fid=$(id2fid $id)
+    local ep=$(get_service_ep $id)
+    local addr=$(get_service_addr $ep)
+    local port=$(get_service_port $ep)
+    SVCS_CONF+="${SVCS_CONF:+,}{
+      \"id\": \"$id\",
+      \"name\": \"confd\",
+      \"address\": \"$addr\",
+      \"port\": $port,
+      \"checks\": [
+          {
+            \"args\": [ \"/opt/seagate/consul/check-service\", \"$fid\" ],
+            \"interval\": \"10s\"
+          }
+        ]
+    }"
+    cat <<EOF | sudo tee /etc/sysconfig/m0d-$fid > /dev/null
 MERO_M0D_EP='$ep'
 MERO_HA_EP='$HAX_EP'
 MERO_PROCESS_FID='$fid'
 MERO_CONF_XC='/etc/mero/confd.xc'
-.
+EOF
 }
 
 append_ios_svc() {
-  local id=$1
-  local fid=$(id2fid $id)
-  local ep=$(get_service_ep $id)
-  local addr=$(get_service_addr $ep)
-  local port=$(get_service_port $ep)
-  SVCS_CONF+="${SVCS_CONF:+,}{
-    \"id\": \"$id\",
-    \"name\": \"ios\",
-    \"address\": \"$addr\",
-    \"port\": $port,
-    \"checks\": [
-        {
-          \"args\": [ \"/opt/seagate/consul/check-service\", \"$fid\" ],
-          \"interval\": \"10s\"
-        }
-      ]
-  }"
-  cat <<. | sudo tee /etc/sysconfig/m0d-$fid > /dev/null
+    local id=$1
+    local fid=$(id2fid $id)
+    local ep=$(get_service_ep $id)
+    local addr=$(get_service_addr $ep)
+    local port=$(get_service_port $ep)
+    SVCS_CONF+="${SVCS_CONF:+,}{
+      \"id\": \"$id\",
+      \"name\": \"ios\",
+      \"address\": \"$addr\",
+      \"port\": $port,
+      \"checks\": [
+          {
+            \"args\": [ \"/opt/seagate/consul/check-service\", \"$fid\" ],
+            \"interval\": \"10s\"
+          }
+        ]
+    }"
+    cat <<EOF | sudo tee /etc/sysconfig/m0d-$fid > /dev/null
 MERO_M0D_EP='$ep'
 MERO_HA_EP='$HAX_EP'
 MERO_PROCESS_FID='$fid'
-.
+EOF
 }
 
 for id in $HAX_ID; do
-  append_hax_svc $id
+    append_hax_svc $id
 done
 
 for id in $CONFD_IDs; do
-  append_confd_svc $id
+    append_confd_svc $id
 done
 
 for id in $IOS_IDs; do
-  append_ios_svc $id
+    append_ios_svc $id
 done
 
 tmpfile=$(mktemp /tmp/$(basename $CONF_FILE).XXXXXX)
-trap "rm $tmpfile" EXIT
-cat $CONF_FILE | jq ".services = [$SVCS_CONF]" > $tmpfile
-cat $tmpfile > $CONF_FILE
+trap "rm -f $tmpfile" EXIT
+jq ".services = [$SVCS_CONF]" <$CONF_FILE >$tmpfile
+mv $tmpfile $CONF_FILE
 
 consul reload
