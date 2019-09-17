@@ -14,6 +14,7 @@ variables:
 stages:
   - build
   - test
+  - cleanup
 
 before_script:
   - date -u -Isec
@@ -85,9 +86,10 @@ test-cfgen:
   stage: test
   tags: [ m0vg ]
   except: [ tags ]
+
   script:
-    # can't be defined in the 'variables:' section because it supports only
-    # single level of variable expansion, e.g. A=$VAR; B=$A won't work for B
+    # Cannot be defined in the 'variables:' section because it supports only
+    # single level of variable expansion, e.g. A=$VAR; B=$A won't work for B.
     - export JOB_NAME="${WORKSPACE_NAME}-${CI_JOB_NAME}"
 
     - cd ${WORKSPACE_DIR}
@@ -100,8 +102,8 @@ test-cfgen:
       pip3 install flake8 mypy
 
       download=https://github.com/dhall-lang/dhall-haskell/releases/download
-      for f in $download/1.25.0/dhall-1.25.0-x86_64-linux.tar.bz2 \
-               $download/1.25.0/dhall-json-1.4.0-x86_64-linux.tar.bz2; do
+      for f in $download/1.26.0/dhall-1.26.0-x86_64-linux.tar.bz2 \
+               $download/1.26.0/dhall-json-1.4.1-x86_64-linux.tar.bz2; do
           curl -LO $f
           tar -C /usr/local/ -xf ${f##*/}
       done
@@ -113,5 +115,95 @@ test-cfgen:
                       -v ~+:/data -w /data/hare
                   $DOCKER_REGISTRY/mero/mero:$CENTOS_RELEASE
                       bash -x _test-cfgen.sh
+
+test-bootstrap:
+  stage: test
+  tags: [ m0vg ]
+  except: [ tags ]
+
+  variables:
+    M0VG: ./m0vg-single/scripts/m0vg
+
+  before_script:
+    # can't be defined in the 'variables:' section because it supports only
+    # sinle level of variable expansion, e.g. A=$VAR; B=$A won't work for B
+    - export JOB_NAME="${WORKSPACE_NAME}-${CI_JOB_NAME}-single"
+
+    - cd ${WORKSPACE_DIR}
+
+    - date -u -Isec
+    - printenv
+
+    - |
+      test -d m0vg-single ||
+      git clone --recursive --depth 1 --shallow-submodules \
+                http://gitlab.mero.colo.seagate.com/mero/mero.git \
+                m0vg-single
+
+    # Prepare m0vg singlenode.
+    - |
+      $M0VG env add <<EOF
+      M0_VM_BOX=centos75/dev-halon
+      M0_VM_BOX_URL='http://ci-storage.mero.colo.seagate.com/vagrant/centos75/dev'
+      M0_VM_CMU_MEM_MB=4096
+      M0_VM_NAME_PREFIX=${JOB_NAME}
+      M0_VM_HOSTNAME_PREFIX=${JOB_NAME}
+      EOF
+    - time $M0VG up --no-provision cmu
+    - time $M0VG reload --no-provision cmu
+
+  script:
+    - |
+      cat >hare/_test-bootstrap.sh <<'EOF'
+      set -eu -o pipefail
+
+      sudo yum install -y python36 python36-devel python36-PyYAML
+
+      download=https://github.com/dhall-lang/dhall-haskell/releases/download
+      for f in $download/1.26.0/dhall-1.26.0-x86_64-linux.tar.bz2 \
+               $download/1.26.0/dhall-json-1.4.1-x86_64-linux.tar.bz2; do
+          curl -LO $f
+          sudo tar -C /usr/local/ -xf ${f##*/}
+      done
+
+      curl -LO https://releases.hashicorp.com/consul/1.6.1/consul_1.6.1_linux_amd64.zip
+      unzip -x consul_1.6.1_linux_amd64.zip
+      sudo mv consul /usr/local/bin/
+
+      cd /data/hare/
+      ./install
+      # ./bootstrap  # XXX-UNCOMMENTME
+      EOF
+    - time $M0VG run 'bash -x /data/hare/_test-bootstrap.sh'
+
+  after_script:
+    - cd ${WORKSPACE_DIR}
+
+    # Clean up.  This ensures that VMs are destroyed in case of a manual
+    # job restart, when global 'cleanup' stage is not performed.
+    - $M0VG destroy -f || true
+
+
+# Cleanup ----------------------------------------------------------------- {{{1
+#
+
+cleanup:
+  stage: cleanup
+  tags: [ m0vg ]
+  except: [ tags ]
+  when: always
+  dependencies: []  # empty deps list prevents unneeded artifacts downloading
+
+  variables:
+    # If a branch is updated while CI tests for the older commit are still
+    # being run, the checkout phase of 'cleanup' job will fail (thus cleanup
+    # script will not run) unless GIT_DEPTH is deep enough to include the older
+    # commit. Cloning 30 latest commits seems to be good enough - it's quite
+    # rare for people to push more than 30 new commits in one go.
+    GIT_DEPTH: 30
+
+  script:
+    - cd ${WORKSPACE_DIR}
+    - ./m0vg-single/scripts/m0vg destroy -f || true
 
 # vim: foldmethod=marker shiftwidth=2 tabstop=2 expandtab
