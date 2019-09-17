@@ -43,8 +43,8 @@ class HaLink:
                                remote_rpc_endpoint, process_fid, git_rev, pid,
                                is_first_request):
         logging.debug('Received entrypoint request from remote endpoint'
-                      " '{}', process fid = {}".format(
-                          remote_rpc_endpoint, str(process_fid)) +
+                      " '{}', process fid = {}".format(remote_rpc_endpoint,
+                                                       str(process_fid)) +
                       ' The request will be processed in another thread.')
         self.queue.put(
             EntrypointRequest(reply_context=reply_context,
@@ -104,7 +104,7 @@ class HaLink:
         logging.debug('Entrypoint request has been replied to')
 
     def broadcast_ha_states(self, ha_states):
-        logging.debug(f'Broadcasting HA states {ha_states} over ha_link')
+        logging.debug('Broadcasting HA states %s over ha_link', ha_states)
 
         def ha_obj_state(st):
             return HaNoteStruct.M0_NC_ONLINE if st['status'] == 'online' \
@@ -118,7 +118,7 @@ class HaLink:
                                len(notes))
 
     def _process_event_cb(self, fid, chp_event, chp_type, chp_pid):
-        logging.info('fid={}, chp_event={}'.format(fid, chp_event))
+        logging.info('fid=%s, chp_event=%s', fid, chp_event)
         self.queue.put(
             ProcessEvent(
                 ConfHaProcess(chp_event=chp_event,
