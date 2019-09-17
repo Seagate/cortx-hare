@@ -7,7 +7,7 @@ set -eu -o pipefail
 
 FID=$1
 
-case $(systemctl show -p ActiveState m0d@$FID | cut -d= -f2) in
+case $(systemctl is-active m0d@$FID) in
     'active') exit 0;;
     'failed') exit 2;;
     *) exit 1;;
