@@ -27,7 +27,7 @@ get_service_port() {
 }
 
 id2fid() {
-  echo "0x7200000000000001:$(printf '0x%x' $1)"
+  printf '0x7200000000000001:%#x\n' $1
 }
 
 HAX_ID=$(get_service_ids 'grep -i ha')
@@ -78,7 +78,7 @@ append_confd_svc() {
 MERO_M0D_EP='$ep'
 MERO_HA_EP='$HAX_EP'
 MERO_PROCESS_FID='$fid'
-MERO_CONF_XC='/tmp/conf.xc'
+MERO_CONF_XC='/etc/mero/confd.xc'
 .
 }
 

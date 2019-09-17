@@ -14,7 +14,9 @@ sudo systemctl start consul-agent
 
 cd $SRC_DIR
 cfgen/cfgen -D cfgen/dhall/ -o /tmp/ < cfgen/_misc/singlenode.yaml
-dhall text < /tmp/confd.dhall | $M0_SRC_DIR/utils/m0confgen > /tmp/conf.xc
+sudo mkdir -p /etc/mero
+dhall text < /tmp/confd.dhall | $M0_SRC_DIR/utils/m0confgen | \
+  tee /etc/mero/confd.xc > /dev/null
 
 # Let Consul some time to finish its internal bootstrap and elect
 # its internal leader, so the KV Store could be accessible.
