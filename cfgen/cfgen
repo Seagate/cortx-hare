@@ -11,6 +11,7 @@ from pprint import pprint
 import random
 import re
 import subprocess
+import socket
 import sys
 from typing import Any, Callable, Dict, Iterator, List, NamedTuple, Set, \
     Tuple, Union
@@ -162,7 +163,8 @@ def enrich_cluster_desc(desc: Dict[str, Any], mock_p: bool) -> None:
         # See https://puppet.com/docs/puppet/6.6/core_facts.html#legacy-facts
         host['facts'] = get_facts(host['name'], mock_p,
                                   'hostname', 'processorcount',
-                                  'memorysize_mb', 'ipaddress', 'macaddress')
+                                  'memorysize_mb', 'macaddress')
+        host['facts']['ipaddress'] = socket.gethostbyname(host['name'])
         host['facts']['_memsize_MB'] = int(float(
             host['facts']['memorysize_mb']))
 
