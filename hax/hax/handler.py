@@ -1,9 +1,10 @@
-from threading import Thread
-from queue import Queue, Empty
-from hax.message import EntrypointRequest, ProcessEvent
-from hax.ffi import HaxFFI
-import time
 import logging
+import time
+from queue import Empty, Queue
+from threading import Thread
+
+from hax.ffi import HaxFFI
+from hax.message import EntrypointRequest, ProcessEvent
 from hax.util import ConsulUtil
 
 
@@ -47,4 +48,5 @@ class ConsumerThread(Thread):
                         'Unsupported event type received: {}'.format(item))
         except StopIteration:
             ffi.shun_mero_thread()
+        finally:
             logging.info('Handler thread has exited')
