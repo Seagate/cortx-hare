@@ -20,8 +20,8 @@ sudo mkdir -p /etc/mero
 dhall text < /tmp/confd.dhall | $M0_SRC_DIR/utils/m0confgen |
     sudo tee /etc/mero/confd.xc > /dev/null
 
-# Let Consul some time to finish its internal bootstrap and elect
-# its internal leader, so the KV Store could be accessible.
+# Give Consul some time for its internal bootstrap and leader
+# election. (Until then the KV Store won't be accessible.)
 sleep 3
 
 jq '[.[] | {key, value: (.value | @base64)}]' < /tmp/consul-kv.json |
