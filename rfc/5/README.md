@@ -220,3 +220,13 @@ Mero functions - including FFI callbacks triggered by Mero - _may_ require that 
 
 * `PyThread_start_new_thread` function ([source](https://github.com/python/cpython/blob/3.7/Python/thread_pthread.h#L179))
 * [Coding patterns for Python extensions](https://pythonextensionpatterns.readthedocs.io/en/latest/)
+
+
+## Installation details
+
+### Development mode
+
+In development mode (i.e. when hax is built and installed locally with `bootstrap` and `install` scripts) the directory layout looks as follows.
+
+![directory-layout](hax-build-layout.png)
+
