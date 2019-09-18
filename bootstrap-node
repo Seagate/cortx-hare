@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+set -eu -o pipefail
+
+# Helper script to continue bootstrap the node after
+# the Consul agent is started already.
+
+SRC_DIR="$(dirname $(readlink -f $0))"
+progname=$(basename $0)
+
+err() {
+	echo "$progname: $HOSTNAME: $*"
+}
+
+. $SRC_DIR/update-consul-conf
+
+sudo systemctl start hax
+
+if [[ -n "$CONFD_IDs" ]]; then
+    [[ -f /tmp/confd.xc ]] || {
+        err "Can not bootstrap server node without confd.xc file."
+        exit 1
+    }
+    sudo mv /tmp/confd.xc /etc/mero/
+fi
+
+for id in $CONFD_IDs $IOS_IDs; do
+    fid=$(id2fid $id)
+    sudo systemctl start mero-mkfs@$fid
+    sudo systemctl start m0d@$fid
+done

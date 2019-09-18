@@ -13,6 +13,8 @@ usage() {
 
 (( $# < 3 )) && usage
 
+sudo rm -rf /tmp/consul
+
 mode=$1
 bind_addr=$2
 join_addr=$3
@@ -20,4 +22,4 @@ join_addr=$3
 sed -r -e "s/^(MODE).*/\1=$mode/" \
        -e "s/^(BIND).*/\1=$bind_addr/" \
        -e "s/^(CLIENT).*/\1=127.0.0.1 $bind_addr/" \
-       -e "s/^(JOIN).*/\1=$join_addr/" -i $ENV_FILE
+       -e "s/^(JOIN).*/\1=${join_addr:+-retry-join $join_addr}/" -i $ENV_FILE
