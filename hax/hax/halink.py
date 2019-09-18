@@ -29,14 +29,22 @@ class HaLink:
         self.rm_fid = rm_fid
 
         if not self._ha_ctx:
+            logging.error(
+                'Cannot initialize ha_link. m0_halon_interface::init_halink' +
+                ' returned 0')
             raise RuntimeError('Cannot initialize ha_link')
 
     def start(self, rpc_endpoint: str, process: Fid, ha_service: Fid,
               rm_service: Fid):
-        tname = threading.currentThread().getName()
-        logging.info("'start' method invoked from thread {}".format(tname))
-        self._ffi.start(self._ha_ctx, make_c_str(rpc_endpoint), process.to_c(),
-                        ha_service.to_c(), rm_service.to_c())
+        logging.debug('Starting m0_halon_interface')
+        result = self._ffi.start(self._ha_ctx, make_c_str(rpc_endpoint),
+                                 process.to_c(), ha_service.to_c(),
+                                 rm_service.to_c())
+        if not result:
+            logging.error('Cannot start ha_link. m0_halon_interface::start' +
+                          ' returned 0')
+            raise RuntimeError('Cannot start m0_halon_interface.' +
+                               'Please check mero logs for more details.')
 
     @log_exception
     def _entrypoint_request_cb(self, reply_context, req_id,

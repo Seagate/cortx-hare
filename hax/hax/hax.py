@@ -32,14 +32,13 @@ def main():
     # [KN] The elements in the queue will appear if
     # 1. A callback is invoked from ha_link (this will happen in a mero
     #    thread which must be free ASAP)
-    # 2. TBD: a new HA notification has come form Consul via HTTP
+    # 2. A new HA notification has come form Consul via HTTP
     # [KN] The messages are consumed by Python thread created by
     # _run_qconsumer_thread function.
     #
     # [KN] Note: The server is launched in the main thread.
     q = Queue(maxsize=8)
 
-    # [KN] The fid of the hax service is taken from Consul
     util = ConsulUtil()
     hax_ep = util.get_hax_endpoint()
     hax_fid = util.get_hax_fid()
