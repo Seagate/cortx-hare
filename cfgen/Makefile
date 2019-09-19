@@ -19,7 +19,9 @@ typecheck: $(PYTHON_SCRIPTS)
 test-cfgen:
 	set -eu -o pipefail;\
  out=$$(mktemp -d);\
- ./cfgen --mock -o $$out -D ./dhall <_misc/singlenode.yaml;\
+ if which facter >&/dev/null; then opt_mock=''; else opt_mock='--mock'; fi;\
+ ./cfgen -D ./dhall $$opt_mock --debug <_misc/singlenode.yaml >/dev/null;\
+ ./cfgen -D ./dhall $$opt_mock -o $$out <_misc/singlenode.yaml;\
  dhall text <$$out/confd.dhall | $(M0_SRC_DIR)/utils/m0confgen >/dev/null;\
  jq . <$$out/consul-kv.json >/dev/null;\
  rm -r $$out

@@ -50,8 +50,10 @@ def parse_opts(argv):
     opts = p.parse_args(argv)
 
     # Sanity check.
-    for opt, d, perm in [('--dhall', opts.dhall_dir, os.R_OK),
-                         ('-o', opts.output_dir, os.W_OK)]:
+    dirs = [('--dhall', opts.dhall_dir, os.R_OK)]
+    if not opts.debug:
+        dirs.append(('-o', opts.output_dir, os.W_OK))
+    for opt, d, perm in dirs:
         if not (d and os.path.isdir(d) and os.access(d, os.X_OK | perm)):
             what = 'read' if perm == os.R_OK else 'writ'
             die(f'{opt!r} argument must be a path to {what}able directory')
