@@ -33,6 +33,9 @@ CDF is a YAML file with the following schema:
 ```yaml
 hosts:
   - name: <str>  # [user@]hostname; e.g., localhost, samir@10.22.33.44
+    data_iface: <str>   # ipaddress correspond to this interface to be used for
+                        # data services (mero services). This is optional and
+                        # default ip address will be used if not specified.
     disks:
     m0_servers:
       - runs_confd: <bool>  # optional, defaults to false

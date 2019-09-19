@@ -1,5 +1,6 @@
 hosts:
   - name: localhost
+    data_iface: eth1
     m0_servers:
       - runs_confd: true
       - io_disks: { path_glob: "/dev/loop[0-9]*" }

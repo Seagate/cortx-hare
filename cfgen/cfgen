@@ -11,7 +11,6 @@ from pprint import pprint
 import random
 import re
 import subprocess
-import socket
 import sys
 from typing import Any, Callable, Dict, Iterator, List, NamedTuple, Set, \
     Tuple, Union
@@ -68,6 +67,9 @@ class ShowSchema(argparse.Action):
 ---  # start of the document (optional)
 hosts:
   - name: <str>  # [user@]hostname; e.g., localhost, samir@10.22.33.44
+    data_iface: <str>  # ipaddress correspond to this interface to be used for
+                       # data services (mero services). This is optional and
+                       # default ip address will be used if not specified.
     disks:
     m0_servers:
       - runs_confd: <bool>  # optional, defaults to false
@@ -161,8 +163,9 @@ def enrich_cluster_desc(desc: Dict[str, Any], mock_p: bool) -> None:
         # See https://puppet.com/docs/puppet/6.6/core_facts.html#legacy-facts
         host['facts'] = get_facts(host['name'], mock_p,
                                   'hostname', 'processorcount',
-                                  'memorysize_mb', 'macaddress')
-        host['facts']['ipaddress'] = socket.gethostbyname(host['name'])
+                                  'memorysize_mb', 'ipaddress',
+                                  f"ipaddress_{host['data_iface']}",
+                                  'macaddress')
         host['facts']['_memsize_MB'] = int(float(
             host['facts']['memorysize_mb']))
 
@@ -176,7 +179,8 @@ def enrich_cluster_desc(desc: Dict[str, Any], mock_p: bool) -> None:
 def validate_cluster_desc(desc: Dict[str, Any]) -> None:
     assert all_unique(host['name'] for host in desc['hosts'])
 
-    hosts = [(h['name'], h['facts']['ipaddress']) for h in desc['hosts']]
+    hosts = [(h['name'], h['facts'][f"ipaddress_{h['data_iface']}"])
+             for h in desc['hosts']]
     assert all_unique(ip for _name, ip in hosts), \
         'IP addresses are not unique:\n' + \
         '\n'.join('    ' + name + ' ' + ip for name, ip in hosts)
@@ -237,6 +241,8 @@ def fabricate_facts(hostname: str, *args: str) -> Dict[str, Any]:
         'processorcount': rng(1, 21),
         'memorysize_mb': '{:.2f}'.format(random.uniform(512, 16000)),
         'ipaddress': '.'.join(str(n) for n in [
+            random.choice([10, 172, 191]), rng(256), rng(256), rng(256)]),
+        'ipaddress_eth1': '.'.join(str(n) for n in [
             random.choice([10, 172, 192]), rng(256), rng(256), rng(256)]),
         'macaddress': ':'.join('{:02x}'.format(n) for n in [
             rng(256), rng(256), rng(256), rng(256), rng(256), rng(256)]),
@@ -499,12 +505,13 @@ class ConfProcess(ToDhall):
     @classmethod
     def build(cls, m0conf: Dict[Oid, Any], parent: Oid,
               host_facts: Dict[str, Any], proc_t: ProcT,
-              proc_desc: Dict[str, Any] = None,
+              iface: str = None, proc_desc: Dict[str, Any] = None,
               ctrl: Oid = None) -> Oid:
         assert parent.type is ObjT.node
         assert ctrl is None or ctrl.type is ObjT.controller
 
-        ep = Endpoint(ipaddr=host_facts['ipaddress'], portal=proc_t.value)
+        addr_key = f"ipaddress_{iface}" if iface is not None else 'ipaddress'
+        ep = Endpoint(ipaddr=host_facts[f'{addr_key}'], portal=proc_t.value)
         proc_id = new_oid(ObjT.process)
         m0conf[proc_id] = cls(nr_cpu=host_facts['processorcount'],
                               memsize_MB=host_facts['_memsize_MB'],
@@ -1189,20 +1196,23 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
             if any(m0d['io_disks']['items'] for m0d in host['m0_servers']) \
             else None
 
-        ConfProcess.build(conf, node_id, facts, ProcT.hax)
+        ConfProcess.build(conf, node_id, facts, ProcT.hax, host['data_iface'])
 
         confd_p = False
         for m0d in host['m0_servers']:
-            ConfProcess.build(conf, node_id, facts, ProcT.m0_server, m0d,
-                              ctrl_id)
+            ConfProcess.build(conf, node_id, facts, ProcT.m0_server,
+                              host['data_iface'], m0d, ctrl_id)
             if m0d['runs_confd']:
                 confd_p = True
+        # XXX TODO: need to use mgmt iface for consul
+        addr_key = f"ipaddress_{host['data_iface']}"
         (cluster.consul_servers if confd_p else cluster.consul_clients).\
             append(ConsulAgent(hostname=facts['hostname'],
-                               ipaddr=facts['ipaddress']))
+                               ipaddr=facts[f'{addr_key}']))
 
         for _ in range(host['c0_clients'] + host['m0t1fs_clients']):
-            ConfProcess.build(conf, node_id, facts, ProcT.m0_client)
+            ConfProcess.build(conf, node_id, facts, ProcT.m0_client,
+                              host['data_iface'])
 
     # XXX-TODO: support multiple profiles
     prof_id = ConfProfile.build(conf, root_id)
