@@ -6,10 +6,8 @@ let renderNamedList
  ->
     "${name}=" ++ ./List.dhall a f xs
 
--- -- XXX-UNCOMMENTME dhall 1.25.0 doesn't support equivalence operator (≡) yet.
--- -- https://github.com/dhall-lang/dhall-lang/tree/master/standard#equivalence
--- let example =
---     assert : renderNamedList Natural Natural/show "bits" [ 0, 1 ] ≡
---         "bits=[0, 1]"
+let example =
+    assert : renderNamedList Natural Natural/show "bits" [ 0, 1 ] ===
+        "bits=[0, 1]"
 
 in renderNamedList
