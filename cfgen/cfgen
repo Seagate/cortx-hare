@@ -213,7 +213,10 @@ def validate_cluster_desc(desc: Dict[str, Any]) -> None:
 def run_command(hostname: str, *args: str) -> str:
     assert hostname
 
-    cmd: List[str] = ['ssh', hostname]
+    cmd: List[str] = []
+    if hostname not in ('localhost', '127.0.0.1'):
+        cmd = ['ssh', hostname]
+
     cmd.extend(args)
     return subprocess.check_output(cmd, timeout=15).decode()
 
@@ -255,7 +258,7 @@ def get_disks(hostname: str, mock_p: bool, path_glob: str) -> List[Disk]:
     if not paths:
         return []
 
-    cmd = ['sudo', 'python3', '-c', f"""\"\
+    script = f"""\
 import io
 import os
 
@@ -269,7 +272,12 @@ print([dict(path=path,
             size=blockdev_size(path),
             blksize=os.stat(path).st_blksize)
        for path in {paths!r}])
-\""""]
+"""
+
+    if hostname not in ('localhost', '127.0.0.1'):
+        script = f"\"{script}\""
+
+    cmd = ['sudo', 'python3', '-c', script]
     return [Disk(**kwargs) for kwargs in
             ast.literal_eval(run_command(hostname, *cmd))]
 
