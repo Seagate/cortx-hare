@@ -10,6 +10,7 @@ import os
 from pprint import pprint
 import random
 import re
+from socket import gethostname
 import subprocess
 import sys
 from typing import Any, Callable, Dict, Iterator, List, NamedTuple, Set, \
@@ -69,9 +70,8 @@ class ShowSchema(argparse.Action):
 ---  # start of the document (optional)
 hosts:
   - name: <str>  # [user@]hostname; e.g., localhost, samir@10.22.33.44
-    data_iface: <str>  # ipaddress correspond to this interface to be used for
-                       # data services (mero services). This is optional and
-                       # default ip address will be used if not specified.
+    data_iface: <str>  # Name of the network interface that Mero IO services
+                       # should use; e.g., "eth1".  This field is optional.
     disks:
     m0_servers:
       - runs_confd: <bool>  # optional, defaults to false
@@ -159,8 +159,8 @@ def validate_schema(input_str: str, schema_path: str) -> None:
         die('Invalid input\n' + err.decode(), proc.returncode)
 
 
-def addr_key(iface: str = None) -> str:
-    return f"ipaddress_{iface}" if iface is not None else "ipaddress"
+def ipaddr_key(iface: str = None) -> str:
+    return f'ipaddress_{iface}' if iface else 'ipaddress'
 
 
 def enrich_cluster_desc(desc: Dict[str, Any], mock_p: bool) -> None:
@@ -171,8 +171,7 @@ def enrich_cluster_desc(desc: Dict[str, Any], mock_p: bool) -> None:
         host['facts'] = get_facts(host['name'], mock_p,
                                   'hostname', 'processorcount',
                                   'memorysize_mb', 'ipaddress',
-                                  f"{addr_key(host['data_iface'])}",
-                                  'macaddress')
+                                  ipaddr_key(host['data_iface']), 'macaddress')
         host['facts']['_memsize_MB'] = int(float(
             host['facts']['memorysize_mb']))
 
@@ -186,7 +185,7 @@ def enrich_cluster_desc(desc: Dict[str, Any], mock_p: bool) -> None:
 def validate_cluster_desc(desc: Dict[str, Any]) -> None:
     assert all_unique(host['name'] for host in desc['hosts'])
 
-    hosts = [(h['name'], h['facts'][f"{addr_key(h['data_iface'])}"])
+    hosts = [(h['name'], h['facts'][ipaddr_key(h['data_iface'])])
              for h in desc['hosts']]
     assert all_unique(ip for _name, ip in hosts), \
         'IP addresses are not unique:\n' + \
@@ -221,24 +220,22 @@ def validate_cluster_desc(desc: Dict[str, Any]) -> None:
     assert desc['pools'], 'List of pools must not be empty'
 
 
+def is_localhost(hostname: str) -> bool:
+    name = gethostname()
+    return hostname in ('localhost', '127.0.0.1', name, f'{name}.local')
+
+
 def run_command(hostname: str, *args: str) -> str:
     assert hostname
-
-    cmd: List[str] = []
-    if hostname not in ('localhost', '127.0.0.1'):
-        cmd = ['ssh', hostname]
-
-    cmd.extend(args)
-    return subprocess.check_output(cmd, timeout=15).decode()
+    return subprocess.check_output(args if is_localhost(hostname) else
+                                   ['ssh', hostname, *args],
+                                   timeout=15).decode()
 
 
 def get_facts(hostname: str, mock_p: bool, *args: str) -> Dict[str, Any]:
     if mock_p:
         return fabricate_facts(hostname, *args)
-
-    cmd = ['facter', '--json']
-    cmd.extend(args)
-    return json.loads(run_command(hostname, *cmd))
+    return json.loads(run_command(hostname, 'facter', '--json', *args))
 
 
 def fabricate_facts(hostname: str, *args: str) -> Dict[str, Any]:
@@ -271,7 +268,7 @@ def get_disks(hostname: str, mock_p: bool, path_glob: str) -> List[Disk]:
     if not paths:
         return []
 
-    script = f"""\
+    code = f"""\
 import io
 import os
 
@@ -286,13 +283,12 @@ print([dict(path=path,
             blksize=os.stat(path).st_blksize)
        for path in {paths!r}])
 """
+    if not is_localhost(hostname):
+        code = f'"{code}"'
 
-    if hostname not in ('localhost', '127.0.0.1'):
-        script = f"\"{script}\""
-
-    cmd = ['sudo', 'python3', '-c', script]
     return [Disk(**kwargs) for kwargs in
-            ast.literal_eval(run_command(hostname, *cmd))]
+            ast.literal_eval(run_command(hostname,
+                                         'sudo', 'python3', '-c', code))]
 
 
 def fabricate_disks(hostname: str, path_glob: str) -> List[Disk]:
@@ -511,17 +507,19 @@ class ConfProcess(ToDhall):
 
     @classmethod
     def build(cls, m0conf: Dict[Oid, Any], parent: Oid,
-              host_facts: Dict[str, Any], proc_t: ProcT,
-              iface: str = None, proc_desc: Dict[str, Any] = None,
+              facts: Dict[str, Any],
+              iface: str,
+              proc_t: ProcT,
+              proc_desc: Dict[str, Any] = None,
               ctrl: Oid = None) -> Oid:
         assert parent.type is ObjT.node
+        assert iface
         assert ctrl is None or ctrl.type is ObjT.controller
 
-        key = addr_key(iface)
-        ep = Endpoint(ipaddr=host_facts[f'{key}'], portal=proc_t.value)
+        ep = Endpoint(ipaddr=facts[ipaddr_key(iface)], portal=proc_t.value)
         proc_id = new_oid(ObjT.process)
-        m0conf[proc_id] = cls(nr_cpu=host_facts['processorcount'],
-                              memsize_MB=host_facts['_memsize_MB'],
+        m0conf[proc_id] = cls(nr_cpu=facts['processorcount'],
+                              memsize_MB=facts['_memsize_MB'],
                               endpoint=ep, services=[])
         m0conf[parent].processes.append(proc_id)
 
@@ -1195,6 +1193,7 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
 
     for host in cluster_desc['hosts']:
         facts = host['facts']
+        iface = host['data_iface']
 
         node_id = ConfNode.build(conf, root_id, facts)
         ctrl_id = ConfController.build(conf,
@@ -1203,23 +1202,22 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
             if any(m0d['io_disks']['items'] for m0d in host['m0_servers']) \
             else None
 
-        ConfProcess.build(conf, node_id, facts, ProcT.hax, host['data_iface'])
+        ConfProcess.build(conf, node_id, facts, iface, ProcT.hax)
 
         confd_p = False
         for m0d in host['m0_servers']:
-            ConfProcess.build(conf, node_id, facts, ProcT.m0_server,
-                              host['data_iface'], m0d, ctrl_id)
+            ConfProcess.build(conf, node_id, facts, iface, ProcT.m0_server,
+                              m0d, ctrl_id)
             if m0d['runs_confd']:
                 confd_p = True
-        # XXX TODO: need to use mgmt iface for consul
-        key = f"{addr_key(host['data_iface'])}"
+
         (cluster.consul_servers if confd_p else cluster.consul_clients).\
             append(ConsulAgent(hostname=facts['hostname'],
-                               ipaddr=facts[f"{key}"]))
+                               # XXX use 'mgmt_iface' for consul?
+                               ipaddr=facts[ipaddr_key(iface)]))
 
         for _ in range(host['c0_clients'] + host['m0t1fs_clients']):
-            ConfProcess.build(conf, node_id, facts, ProcT.m0_client,
-                              host['data_iface'])
+            ConfProcess.build(conf, node_id, facts, iface, ProcT.m0_client)
 
     # XXX-TODO: support multiple profiles
     prof_id = ConfProfile.build(conf, root_id)
