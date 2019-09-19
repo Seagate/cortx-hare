@@ -6,7 +6,7 @@ let M0Server =
 
 let Host =
   { name : Text   -- hostname
-  , data_iface : Text  -- data interface
+  , data_iface : Optional Text  -- data interface
   , m0_servers : List M0Server  -- m0d processes
   , c0_clients : Natural        -- max qty of Clovis apps this host may have
   , m0t1fs_clients : Natural    -- max qty of m0t1fs clients

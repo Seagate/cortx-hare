@@ -3,7 +3,7 @@ let types = ../dhall/types.dhall
 in
 { hosts =
     [ { name = "localhost"
-      , data_iface = "eth1"
+      , data_iface = Some "eth1"
       , m0_servers =
           [ { runs_confd = Some True
             , io_disks = None { path_glob : Text }
