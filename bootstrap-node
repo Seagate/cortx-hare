@@ -8,17 +8,17 @@ SRC_DIR="$(dirname $(readlink -f $0))"
 progname=$(basename $0)
 
 err() {
-	echo "$progname: $HOSTNAME: $*"
+    >&2 echo "$progname: $HOSTNAME: $*"
+    exit 1
 }
 
 . $SRC_DIR/update-consul-conf
 
 sudo systemctl start hax
 
-if [[ -n "$CONFD_IDs" ]]; then
+if [[ -n $CONFD_IDs ]]; then
     [[ -f /tmp/confd.xc ]] || {
         err "Can not bootstrap server node without confd.xc file."
-        exit 1
     }
     sudo mv /tmp/confd.xc /etc/mero/
 fi
