@@ -40,7 +40,9 @@ read _ join_ip <<< $(get_server_nodes | grep -w $HOSTNAME)
     exit 1
 }
 
-$SRC_DIR/update-consul-env server $join_ip '' # join_ip is our bind_ip
+# $join_ip is our bind_ip address
+$SRC_DIR/update-consul-env --mode server --bind $join_ip \
+                           --extra-options '-ui -bootstrap-expect 1'
 sudo systemctl start consul-agent
 
 # Give Consul some time for its internal bootstrap and leader
@@ -52,13 +54,15 @@ jq '[.[] | {key, value: (.value | @base64)}]' < /tmp/consul-kv.json |
 
 # Our agent is ready, start all the reset server agents.
 get_server_nodes | { grep -vw $HOSTNAME || true; } | while read node bind_ip; do
-    ssh $node "$SRC_DIR/update-consul-env server $bind_ip $join_ip &&
-                   sudo systemctl start consul-agent"
+    ssh $node "$SRC_DIR/update-consul-env --mode server --bind $bind_ip \
+                                          --join $join_ip &&
+               sudo systemctl start consul-agent"
 done
 
 # Start client agents.
 get_client_nodes | while read node bind_ip; do
-    ssh $node "$SRC_DIR/update-consul-env client $bind_ip $join_ip &&
+    ssh $node "$SRC_DIR/update-consul-env --mode client --bind $bind_ip \
+                                          --join $join_ip &&
                    sudo systemctl start consul-agent"
 done
 

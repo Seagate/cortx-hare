@@ -1,6 +1,5 @@
 {
   "server": true,
-  "bootstrap_expect": 1,
   "watches": [
     {
       "type": "key",
