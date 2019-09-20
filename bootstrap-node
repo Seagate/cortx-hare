@@ -14,7 +14,9 @@ err() {
 
 . $SRC_DIR/update-consul-conf
 
-sudo systemctl start hax
+if [[ -n $CONFD_IDs || -n $IOS_IDs ]]; then
+    sudo systemctl start hax
+fi
 
 if [[ -n $CONFD_IDs ]]; then
     [[ -f /tmp/confd.xc ]] || {
