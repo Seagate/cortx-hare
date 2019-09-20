@@ -3,7 +3,7 @@ set -eu -o pipefail
 
 usage() {
     cat <<EOF
-Usage: $0 <type>
+Usage: ${0##*/} <type>
 
 Generate new fid for the specified Mero conf object type.
 

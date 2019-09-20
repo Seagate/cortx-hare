@@ -5,7 +5,7 @@ SRC_DIR="$(dirname $(readlink -f $0))"
 ENV_FILE=$SRC_DIR/systemd/consul-env
 
 usage() {
-    echo "Usage: $0 <client|server> <bind_address> <join_address>"
+    echo "Usage: ${0##*/} <client|server> <bind_address> <join_address>"
     echo
     echo "Updates Consul agent startup parameters at $ENV_FILE."
     exit 1

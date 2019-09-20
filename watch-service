@@ -9,7 +9,7 @@ set -eu -o pipefail
 #
 
 # Redirect all printouts to the log file with the timestamp prefix:
-exec &>> /tmp/consul-$(basename $0).log
+exec &>> /tmp/consul-${0##*/}.log
 exec &> >(stdbuf -oL gawk '{ print strftime("%Y-%m-%d %H:%M:%S"), $0 }')
 
 jq '[.[] | { "fid": (.Service.ID),

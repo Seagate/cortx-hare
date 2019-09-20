@@ -116,7 +116,7 @@ for id in $IOS_IDs; do
     append_ios_svc $id
 done
 
-tmpfile=$(mktemp /tmp/$(basename $CONF_FILE).XXXXXX)
+tmpfile=$(mktemp /tmp/${CONF_FILE##*/}.XXXXXX)
 trap "rm -f $tmpfile" EXIT
 jq ".services = [$SVCS_CONF]" <$CONF_FILE >$tmpfile
 mv $tmpfile $CONF_FILE

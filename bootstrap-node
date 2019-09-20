@@ -5,10 +5,10 @@ set -eu -o pipefail
 # the Consul agent is started already.
 
 SRC_DIR="$(dirname $(readlink -f $0))"
-progname=$(basename $0)
+prog=${0##*/}
 
 err() {
-    >&2 echo "$progname: $HOSTNAME: $*"
+    >&2 echo "$prog: $HOSTNAME: $*"
     exit 1
 }
 
