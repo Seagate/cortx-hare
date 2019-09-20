@@ -51,7 +51,7 @@ jq '[.[] | {key, value: (.value | @base64)}]' < /tmp/consul-kv.json |
     consul kv import -
 
 # Our agent is ready, start all the reset server agents.
-get_server_nodes | grep -vw $HOSTNAME | while read node bind_ip; do
+get_server_nodes | grep -vw $HOSTNAME || true | while read node bind_ip; do
     ssh $node "$SRC_DIR/update-consul-env server $bind_ip $join_ip &&
                    sudo systemctl start consul-agent"
 done
@@ -65,7 +65,7 @@ done
 # Start Mero.
 $SRC_DIR/bootstrap-node &
 
-get_server_nodes | grep -vw $HOSTNAME | while read node _; do
+get_server_nodes | grep -vw $HOSTNAME || true | while read node _; do
     scp $cfgen_out/confd.xc $node:/tmp/
     ssh $node $SRC_DIR/bootstrap-node &
 done
