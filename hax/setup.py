@@ -22,6 +22,7 @@ setup(
     name='hax',
     version='0.0.1',
     packages=['hax'],
+    setup_requires=['mypy', 'flake8'],
     install_requires=['python-consul>=1.1.0'],
     entry_points={'console_scripts': ['hax=hax.hax:main']},
     ext_modules=[

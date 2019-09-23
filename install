@@ -18,7 +18,7 @@ init_hax() {
 
     pushd $SRC_DIR/hax >/dev/null
     pip3 install wheel
-    python3 setup.py bdist_wheel
+    python3 setup.py flake8 bdist_wheel
     pip3 install dist/hax-0.0.1-cp36-cp36m-linux_x86_64.whl
     popd >/dev/null
 }
