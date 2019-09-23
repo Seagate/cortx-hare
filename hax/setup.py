@@ -4,21 +4,17 @@ from setuptools import Extension, setup
 
 
 def get_mero_dir():
-    m0path = os.environ.get('M0_SRC_DIR')
-    if m0path:
-        return m0path
-
-    dirname = os.path.dirname(os.path.abspath(__file__))
-    m0path = f'{dirname}/../../mero'
-    return m0path
+    d = os.environ.get('M0_SRC_DIR')
+    if d:
+        return d
+    return os.path.normpath(os.path.dirname(os.path.abspath(__file__)) +
+                            '/../../mero')
 
 
 def get_mero_libs_dir():
-    m0path = get_mero_dir()
-    libs_dir = f'{m0path}/mero/.libs'
-    assert os.path.isfile(
-        f'{libs_dir}/libmero.so'
-    ), f'The path {libs_dir} doesn\'t seem to contain mero libraries'
+    libs_dir = get_mero_dir() + '/mero/.libs'
+    libmero = libs_dir + '/libmero.so'
+    assert os.path.isfile(libmero), f'{libmero}: No such file'
     return libs_dir
 
 
