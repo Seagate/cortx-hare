@@ -40,9 +40,10 @@ class HaLink:
         result = self._ffi.start(self._ha_ctx, make_c_str(rpc_endpoint),
                                  process.to_c(), ha_service.to_c(),
                                  rm_service.to_c())
-        if not result:
-            logging.error('Cannot start ha_link. m0_halon_interface::start' +
-                          ' returned 0')
+        if result:
+            logging.error(
+                'Cannot start ha_link. m0_halon_interface::start' +
+                ' returned non-zero code (%s)', result)
             raise RuntimeError('Cannot start m0_halon_interface.' +
                                'Please check mero logs for more details.')
 
