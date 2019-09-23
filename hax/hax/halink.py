@@ -1,6 +1,5 @@
 import ctypes as c
 import logging
-import threading
 from errno import EAGAIN
 
 from hax.ffi import HaxFFI, make_array, make_c_str

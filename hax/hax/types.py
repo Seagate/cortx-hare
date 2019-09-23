@@ -1,5 +1,4 @@
 import ctypes as c
-import logging
 
 
 class FidStruct(c.Structure):
