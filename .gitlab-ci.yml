@@ -69,8 +69,8 @@ build:
       cat >hare/_build-hax.sh <<'EOF'
       set -eu -o pipefail
 
-      yum install -y python36 python36-devel python36-pip
-      make -C hax
+      yum install -y python36 python36-devel python36-pip gettext
+      ./install
       EOF
 
     # Build hax's C extension.
