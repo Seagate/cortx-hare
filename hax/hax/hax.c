@@ -295,7 +295,7 @@ static void __ha_nvec_reply_send(const struct hax_msg *hm,
 	M0_PRE(nvec != NULL);
 
 	m0_ha_msg_nvec_send(nvec, msg->hm_data.u.hed_nvec.hmnv_id_of_get,
-			    M0_HA_NVEC_SET, hl);
+			    true, M0_HA_NVEC_SET, hl);
 }
 
 static void handle_process_event(const struct hax_msg *hm)
