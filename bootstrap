@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 set -eu -o pipefail
+# set -x
+export PS4='+ [${FUNCNAME[0]:+${FUNCNAME[0]}:}${LINENO}] '
 
 # Helper script to bootstrap the cluster.
 
@@ -36,7 +38,7 @@ get_client_nodes() {
 read _ join_ip <<< $(get_server_nodes | grep -w $HOSTNAME)
 
 [[ $join_ip ]] || {
-    echo 'Bootstrap should be run from the server node only.'
+    echo 'Bootstrap should be run from the server node only' >&2
     exit 1
 }
 
@@ -80,3 +82,5 @@ sleep 5
 get_client_nodes | while read node _; do
     ssh $node $SRC_DIR/bootstrap-node &
 done
+
+wait

@@ -157,7 +157,8 @@ test-bootstrap:
       cat >hare/_test-bootstrap.sh <<'EOF'
       set -eu -o pipefail
 
-      sudo yum install -y python36 python36-devel python36-PyYAML
+      sudo yum install -y python36 python36-devel python36-PyYAML python36-pip
+      sudo pip3 install ply
 
       download=https://github.com/dhall-lang/dhall-haskell/releases/download
       for f in $download/1.26.0/dhall-1.26.0-x86_64-linux.tar.bz2 \
@@ -170,9 +171,17 @@ test-bootstrap:
       unzip -x consul_1.6.1_linux_amd64.zip
       sudo mv consul /usr/local/bin/
 
+      cd /data/mero
+      sudo ./utils/m0setup  # create loop devices
+
       cd /data/hare/
-      ./install
-      # ./bootstrap  # XXX-UNCOMMENTME
+      bash -x ./install
+
+      # XXX `systemctl start hax` command, called by `bootstrap-node` script,
+      # will fail unless `mero-kernel` systemd service is installed.
+      sudo /data/mero/scripts/install-mero-service
+
+      bash -x ./bootstrap cfgen/_misc/singlenode.yaml
       EOF
     - time $M0VG run 'bash -x /data/hare/_test-bootstrap.sh'
 
