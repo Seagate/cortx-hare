@@ -3,11 +3,26 @@ set -eu -o pipefail
 # set -x
 export PS4='+ [${FUNCNAME[0]:+${FUNCNAME[0]}:}${LINENO}] '
 
-# Helper script to continue bootstrap the node after
-# the Consul agent is started already.
-
 SRC_DIR="$(dirname $(readlink -f $0))"
 prog=${0##*/}
+
+usage() {
+    >&2 cat <<EOF
+Usage: $prog <phase1|phase2)>
+
+Bootstraps single node after consul agent is started.
+
+  phase1 - starts up confd Mero process(es).
+  phase2 - starts up ios Mero process(es).
+EOF
+    exit 1
+}
+
+(($# == 1)) || usage
+
+phase=$1
+
+[[ $phase =~ phase[12] ]] || usage
 
 die() {
     >&2 echo "$prog: $HOSTNAME: $*"
@@ -16,19 +31,37 @@ die() {
 
 sudo systemctl status mero-kernel || die 'No `mero-kernel` systemd service'
 
-. $SRC_DIR/update-consul-conf
+# If it is a server node - we don't need to update the configuration
+# twice on both phases. But if it is a client node - we should update
+# the configuration on phase2. (There is no phase1 on client nodes -
+# they don't run confd).
+if [[ $phase == phase1 ]]; then
+    . $SRC_DIR/update-consul-conf
+else
+    . $SRC_DIR/update-consul-conf -n # Don't update, just set vars.
+    if [[ -z $CONFD_IDs ]]; then
+        . $SRC_DIR/update-consul-conf # Client node, update.
+    fi
+fi
 
 if [[ -n $CONFD_IDs || -n $IOS_IDs ]]; then
     sudo systemctl start hax
 fi
 
-if [[ -n $CONFD_IDs ]]; then
-    [[ -f /tmp/confd.xc ]] ||
-        die 'Cannot bootstrap server node without confd.xc file'
+if [[ -n $CONFD_IDs && $phase == phase1 ]]; then
+    [[ -f /tmp/confd.xc ]] || {
+        die "Can not bootstrap server node without confd.xc file."
+    }
     sudo mv /tmp/confd.xc /etc/mero/
 fi
 
-for id in $CONFD_IDs $IOS_IDs; do
+if [[ $phase == phase1 ]]; then
+    IDs=$CONFD_IDs
+else
+    IDs=$IOS_IDs
+fi
+
+for id in $IDs; do
     fid=$(id2fid $id)
     sudo systemctl start mero-mkfs@$fid
     sudo systemctl start m0d@$fid

@@ -14,7 +14,7 @@ usage() {
     exit 1
 }
 
-(( $# != 1 )) && usage
+(( $# == 1 )) || usage
 
 cluster_descr=$1
 
@@ -68,19 +68,25 @@ get_client_nodes | while read node bind_ip; do
                    sudo systemctl start consul-agent"
 done
 
-# Start Mero.
-$SRC_DIR/bootstrap-node &
+# Start Mero in two phases: 1st confd-s, then ios-es.
+$SRC_DIR/bootstrap-node phase1 &
 
 get_server_nodes | { grep -vw $HOSTNAME || true; } | while read node _; do
     scp $cfgen_out/confd.xc $node:/tmp/
-    ssh $node $SRC_DIR/bootstrap-node &
+    ssh $node $SRC_DIR/bootstrap-node phase1 &
 done
 
-# Give some time for confd processes to start up.
-sleep 5
+wait
+
+# Now the 2nd phase (ios-es).
+$SRC_DIR/bootstrap-node phase2 &
+
+get_server_nodes | { grep -vw $HOSTNAME || true; } | while read node _; do
+    ssh $node $SRC_DIR/bootstrap-node phase2 &
+done
 
 get_client_nodes | while read node _; do
-    ssh $node $SRC_DIR/bootstrap-node &
+    ssh $node $SRC_DIR/bootstrap-node phase2 &
 done
 
 wait

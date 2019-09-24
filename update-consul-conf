@@ -3,6 +3,17 @@ set -eu -o pipefail
 
 SRC_DIR="$(dirname $(readlink -f $0))"
 
+usage() {
+    >&2 cat <<EOF
+Usage: . ${0##*/} [-n]
+
+Updates consul agent configuration file with the services from KV Store.
+
+  -n Dry run. Do not update anything. (Useful to export some functions
+     and variables, like IOS_IDs, when run as a sourced script.)
+EOF
+}
+
 get_service_ids() {
     local filter=$1
     local cmd="consul kv get -recurse node/$HOSTNAME/service/ \
@@ -31,6 +42,12 @@ HAX_ID=$(get_service_ids 'grep -i ha')
 CONFD_IDs=$(get_service_ids 'grep -i confd')
 IOS_IDs=$(get_service_ids 'grep -i ios | grep -iv confd')
 HAX_EP=$(get_service_ep $HAX_ID)
+
+# -n option has meaning only when this script is sourced,
+# so we `return` here (not `exit`).
+if (( $# == 1 )) && [[ $1 == '-n' ]]; then
+    return 0
+fi
 
 if [[ $CONFD_IDs ]]; then
     CONF_FILE=$SRC_DIR/consul-server-conf.json
