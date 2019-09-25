@@ -29,7 +29,9 @@ die() {
     exit 1
 }
 
-sudo systemctl status mero-kernel || die 'No `mero-kernel` systemd service'
+# Check if Mero is installed.
+sudo systemctl list-units 'mero-kernel*' > /dev/null ||
+    die 'No `mero-kernel` systemd service'
 
 # If it is a server node - we don't need to update the configuration
 # twice on both phases. But if it is a client node - we should update
