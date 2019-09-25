@@ -70,23 +70,34 @@ done
 
 # Start Mero in two phases: 1st confd-s, then ios-es.
 $SRC_DIR/bootstrap-node phase1 &
+pids=($!)
 
 get_server_nodes | { grep -vw $HOSTNAME || true; } | while read node _; do
     scp $cfgen_out/confd.xc $node:/tmp/
     ssh $node $SRC_DIR/bootstrap-node phase1 &
+    pids+=($!)
 done
 
-wait
+# Check the status explicitly from each node.
+for pid in ${pids[@]}; do
+    wait $pid
+done
 
 # Now the 2nd phase (ios-es).
 $SRC_DIR/bootstrap-node phase2 &
+pids=($!)
 
 get_server_nodes | { grep -vw $HOSTNAME || true; } | while read node _; do
     ssh $node $SRC_DIR/bootstrap-node phase2 &
+    pids+=($!)
 done
 
 get_client_nodes | while read node _; do
     ssh $node $SRC_DIR/bootstrap-node phase2 &
+    pids+=($!)
 done
 
-wait
+# Check the status explicitly from each node.
+for pid in ${pids[@]}; do
+    wait $pid
+done
