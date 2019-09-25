@@ -7,14 +7,15 @@ export PS4='+ [${FUNCNAME[0]:+${FUNCNAME[0]}:}${LINENO}] '
 
 SRC_DIR="$(dirname $(readlink -f $0))"
 M0_SRC_DIR=${M0_SRC_DIR:-${SRC_DIR%/*}/mero}
-prog=${0##*/}
 
 usage() {
-    >&2 echo "$prog: <cluster-description.yaml>"
-    exit 1
+    echo "Usage: ${0##*/} /path/to/cluster-description-file.yaml"
 }
 
-(( $# == 1 )) || usage
+(($# == 1)) || {
+    usage >&2
+    exit 1
+}
 
 cluster_descr=$1
 
@@ -24,6 +25,7 @@ say() {
 
 say 'Generating cluster configuration... '
 cfgen_out=/tmp
+
 cd $SRC_DIR
 cfgen/cfgen -D cfgen/dhall/ -o $cfgen_out < $cluster_descr
 
@@ -60,7 +62,7 @@ sleep 3
 echo 'Ok.'
 
 say 'Importing configuration into the KV Store... '
-jq '[.[] | {key, value: (.value | @base64)}]' < /tmp/consul-kv.json |
+jq '[.[] | {key, value: (.value | @base64)}]' < $cfgen_out/consul-kv.json |
     consul kv import - > /dev/null
 echo 'Ok.'
 
@@ -86,7 +88,7 @@ get_session() {
 }
 count=1
 while [[ $(get_session) == '-' ]]; do
-    if (( $count > 5 )); then
+    if (($count > 5)); then
         consul kv put leader elect$RANDOM > /dev/null
         count=1
     fi

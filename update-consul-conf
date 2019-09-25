@@ -1,25 +1,33 @@
 #!/usr/bin/env bash
 set -eu -o pipefail
+# set -x
+export PS4='+ [${FUNCNAME[0]:+${FUNCNAME[0]}:}${LINENO}] '
 
 SRC_DIR="$(dirname $(readlink -f $0))"
 
 usage() {
-    >&2 cat <<EOF
-Usage: . ${0##*/} [-n]
+    cat <<EOF
+Usage: . ${BASH_SOURCE[0]##*/} [-n | --dry-run]
 
-Updates consul agent configuration file with the services from KV Store.
+Updates Consul agent configuration file with the services from the KV store.
 
-  -n Dry run. Do not update anything. (Useful to export some functions
-     and variables, like IOS_IDs, when run as a sourced script.)
+  -n, --dry-run   Do not update Consul configuration, only export variables
+                  and function definitions.
 EOF
 }
+
+case "$*" in
+    '') dry_run=false;;
+    '-n'|'--dry-run') dry_run=true;;
+    *) usage >&2; exit 1;;
+esac
 
 get_service_ids() {
     local filter=$1
     local cmd="consul kv get -recurse node/$HOSTNAME/service/ |
                   grep types | sed 's/.*service.//' | $filter |
                   sed -r 's;(.+)/types:.*;\1;g'"
-    eval $cmd || echo ''
+    eval $cmd || true
 }
 
 get_service_ep() {
@@ -44,10 +52,8 @@ CONFD_IDs=$(get_service_ids 'grep -iw confd')
 IOS_IDs=$(get_service_ids 'grep -iw ios | grep -iwv confd')
 HAX_EP=$(get_service_ep $HAX_ID)
 
-# -n option has meaning only when this script is sourced,
-# so we `return` here (not `exit`).
-if (( $# == 1 )) && [[ $1 == '-n' ]]; then
-    return 0
+if $dry_run; then
+    return 0  # we must not `exit`, because the script is sourced
 fi
 
 if [[ $CONFD_IDs ]]; then

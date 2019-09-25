@@ -7,22 +7,23 @@ SRC_DIR="$(dirname $(readlink -f $0))"
 prog=${0##*/}
 
 usage() {
-    >&2 cat <<EOF
-Usage: $prog <phase1|phase2)>
+    cat <<EOF
+Usage: $prog { phase1 | phase2 }
 
 Bootstraps single node after consul agent is started.
 
-  phase1 - starts up confd Mero process(es).
-  phase2 - starts up ios Mero process(es).
+The required parameter is one of the following:
+
+  phase1 - start confd Mero process(es)
+  phase2 - start ios Mero process(es)
 EOF
-    exit 1
 }
 
-(($# == 1)) || usage
-
+case "$*" in
+    phase[12]) ;;
+    *) usage >&2; exit 1;;
+esac
 phase=$1
-
-[[ $phase =~ phase[12] ]] || usage
 
 die() {
     >&2 echo "$prog: $HOSTNAME: $*"
@@ -40,9 +41,9 @@ sudo systemctl list-units 'mero-kernel*' > /dev/null ||
 if [[ $phase == phase1 ]]; then
     . $SRC_DIR/update-consul-conf
 else
-    . $SRC_DIR/update-consul-conf -n # Don't update, just set vars.
+    . $SRC_DIR/update-consul-conf -n   # do not update, only import variables
     if [[ -z $CONFD_IDs ]]; then
-        . $SRC_DIR/update-consul-conf # Client node, update.
+        . $SRC_DIR/update-consul-conf  # client node, update
     fi
 fi
 
@@ -50,15 +51,15 @@ if [[ -n $CONFD_IDs || -n $IOS_IDs ]]; then
     sudo systemctl start hax
     count=1
     while ! systemctl is-active hax > /dev/null; do
-        (( $count < 5 )) || die "Failed to start hax service."
+        (($count < 5)) || die "Failed to start hax service."
         sleep 1
-        (( count++ ))
+        ((count++))
     done
 fi
 
 if [[ -n $CONFD_IDs && $phase == phase1 ]]; then
     [[ -f /tmp/confd.xc ]] ||
-        die "Can not bootstrap server node without confd.xc file."
+        die 'Cannot bootstrap a server node without /tmp/confd.xc file'
     sudo mv /tmp/confd.xc /etc/mero/
 fi
 

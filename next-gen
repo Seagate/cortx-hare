@@ -2,24 +2,30 @@
 set -eu -o pipefail
 
 usage() {
-    echo "Usage: $0 <key> [inc]"
-    echo
-    echo "Safely generates the next integer value of the given key"
-    echo "in the Consul's KV store using CAS-put operation."
-    exit 1
+    cat <<EOF
+Usage: ${0##*/} KEY [INCREMENT]
+
+Safely generates the next integer value of the given KEY
+in the Consul KV store using CAS-put operation.
+
+Optional INCREMENT defaults to 1.
+EOF
 }
 
-(( $# < 1 )) && usage
+if (($# == 0 || $# > 2)); then
+    usage >&2
+    exit 1
+fi
 
 KEY=$1
-INC=${2:-1}
+INCREMENT=${2:-1}
 
 get_current_value() {
     consul kv get $KEY
 }
 
 get_new_value() {
-    expr $(get_current_value) + $INC
+    expr $(get_current_value) + $INCREMENT
 }
 
 get_current_index() {

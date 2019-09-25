@@ -5,9 +5,9 @@ prog=${0##*/}
 
 usage() {
     cat <<EOF
-Usage: $prog -x|-f fid
+Usage: $prog OPTION...
 
-Checks the health of specified service (hax or Mero).
+Checks health of the specified service (hax or Mero).
 
 Options:
   -x, --hax       Check hax service.
@@ -23,13 +23,13 @@ TEMP=$(getopt --options hxf: \
               --longoptions help,hax,fid: \
               --name "$prog" -- "$@" || true)
 
-(( $? == 0 )) || { usage >&2; exit 1; }
+(($? == 0)) || { usage >&2; exit 1; }
 
 eval set -- "$TEMP"
 
 while true ; do
     case "$1" in
-        -h|--help)   usage >&2; exit 1 ;;
+        -h|--help)   usage; exit ;;
         -x|--hax)    hax=yes; shift 1 ;;
         -f|--fid)    fid=$2; shift 2 ;;
         --)          shift; break ;;
