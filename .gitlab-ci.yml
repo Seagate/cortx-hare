@@ -70,7 +70,7 @@ build:
       set -eu -o pipefail
 
       yum install -y python36 python36-devel python36-pip sudo
-      ./install
+      bash -x ./install
       EOF
 
     # Build hax's C extension.
