@@ -1,6 +1,36 @@
 import os
+from distutils.cmd import Command
+from distutils.errors import DistutilsError
+from distutils.log import ERROR, INFO
+from typing import List, Tuple
 
+from mypy import api
 from setuptools import Extension, setup
+
+
+class MypyCmd(Command):
+    description = 'runs mypy'
+
+    user_options: List[Tuple[str, str, str]] = []
+
+    def initialize_options(self):
+        pass
+
+    def finalize_options(self):
+        pass
+
+    def run(self):
+        report, errors, exit_code = api.run(['hax'])
+
+        if report:
+            self.announce(report, level=INFO)
+        if errors:
+            self.announce(errors, level=ERROR)
+        if exit_code:
+            # According to the source code, such exception is the only way to
+            # mark this build step as failed.
+            raise DistutilsError(
+                f'Mypy returned {exit_code}. Exiting with FAILURE status')
 
 
 def get_mero_dir():
@@ -19,6 +49,7 @@ def get_mero_libs_dir():
 
 
 setup(
+    cmdclass={'mypy': MypyCmd},
     name='hax',
     version='0.0.1',
     packages=['hax'],
