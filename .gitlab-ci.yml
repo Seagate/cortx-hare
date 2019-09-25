@@ -69,7 +69,7 @@ build:
       cat >hare/_build-hax.sh <<'EOF'
       set -eu -o pipefail
 
-      yum install -y python36 python36-devel python36-pip gettext
+      yum install -y python36 python36-devel python36-pip sudo
       ./install
       EOF
 
