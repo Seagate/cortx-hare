@@ -74,19 +74,19 @@ done
 echo ' Ok.'
 
 echo -n 'Starting all the rest Consul server agents... '
-get_server_nodes | { grep -vw $HOSTNAME || true; } | while read node bind_ip; do
+while read node bind_ip; do
     ssh $node "$SRC_DIR/update-consul-env --mode server --bind $bind_ip \
                                           --join $join_ip &&
                sudo systemctl start consul-agent"
-done
+done < <(get_server_nodes | grep -vw $HOSTNAME || true)
 echo 'Ok.'
 
 echo -n 'Starting Consul client agents... '
-get_client_nodes | while read node bind_ip; do
+while read node bind_ip; do
     ssh $node "$SRC_DIR/update-consul-env --mode client --bind $bind_ip \
                                           --join $join_ip &&
                    sudo systemctl start consul-agent"
-done
+done < <(get_client_nodes)
 echo 'Ok.'
 
 # Start Mero in two phases: 1st confd-s, then ios-es.
@@ -94,11 +94,11 @@ echo -n 'Starting Mero (phase1)... '
 $SRC_DIR/bootstrap-node phase1 &
 pids=($!)
 
-get_server_nodes | { grep -vw $HOSTNAME || true; } | while read node _; do
+while read node _; do
     scp $cfgen_out/confd.xc $node:/tmp/
     ssh $node $SRC_DIR/bootstrap-node phase1 &
     pids+=($!)
-done
+done < <(get_server_nodes | grep -vw $HOSTNAME || true)
 
 # Check the status explicitly from each node.
 for pid in ${pids[@]}; do
@@ -111,15 +111,15 @@ echo -n 'Starting Mero (phase2)... '
 $SRC_DIR/bootstrap-node phase2 &
 pids=($!)
 
-get_server_nodes | { grep -vw $HOSTNAME || true; } | while read node _; do
+while read node _; do
     ssh $node $SRC_DIR/bootstrap-node phase2 &
     pids+=($!)
-done
+done < <(get_server_nodes | grep -vw $HOSTNAME || true)
 
-get_client_nodes | while read node _; do
+while read node _; do
     ssh $node $SRC_DIR/bootstrap-node phase2 &
     pids+=($!)
-done
+done < <(get_client_nodes)
 
 # Check the status explicitly from each node.
 for pid in ${pids[@]}; do
