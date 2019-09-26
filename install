@@ -12,12 +12,10 @@ init_hax() {
     local env_dir=$SRC_DIR/.env
 
     python3 -m venv $env_dir
-    set +u
     . $env_dir/bin/activate
-    set -u
 
     pushd $SRC_DIR/hax >/dev/null
-    pip3 install wheel mypy
+    pip3 install wheel flake8 mypy
     python3 setup.py flake8 mypy bdist_wheel
     pip3 install dist/hax-0.0.1-cp36-cp36m-linux_x86_64.whl
     popd >/dev/null

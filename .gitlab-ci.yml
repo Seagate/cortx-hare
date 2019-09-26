@@ -48,6 +48,7 @@ build:
     # Get fresh Mero copy.
     - git clone --recursive --depth 1 --shallow-submodules http://gitlab.mero.colo.seagate.com/mero/mero.git
 
+    # Build Mero.
     - |
       cat >mero/_build-m0.sh <<'EOF'
       set -eu -o pipefail
@@ -58,22 +59,27 @@ build:
       ./configure --with-linux=/lib/modules/${KERNEL}.x86_64/build
       make -j10
       EOF
-
-    # Build Mero.
     - time docker run --rm --name ${JOB_NAME}
                       -v ~+:/data -w /data/mero
                   $DOCKER_REGISTRY/mero/mero:$CENTOS_RELEASE
                       bash -x _build-m0.sh
 
+    # Build hax's C extension.
     - |
       cat >hare/_build-hax.sh <<'EOF'
       set -eu -o pipefail
 
-      yum install -y python36 python36-devel python36-pip sudo
-      bash -x ./install
-      EOF
+      yum install -y python36 python36-devel python36-pip
 
-    # Build hax's C extension.
+      env_dir=.env
+      python3 -m venv $env_dir
+      . $env_dir/bin/activate
+
+      cd hax
+      pip3 install wheel flake8 mypy
+      python3 setup.py flake8 mypy  # sanity check
+      python3 setup.py bdist_wheel
+      EOF
     - time docker run --rm --name ${JOB_NAME}
                       -v ~+:/data -w /data/hare
                   $DOCKER_REGISTRY/mero/mero:$CENTOS_RELEASE
