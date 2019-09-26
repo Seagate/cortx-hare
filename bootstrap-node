@@ -48,12 +48,17 @@ fi
 
 if [[ -n $CONFD_IDs || -n $IOS_IDs ]]; then
     sudo systemctl start hax
+    count=1
+    while ! systemctl is-active hax > /dev/null; do
+        (( $count < 5 )) || die "Failed to start hax service."
+        sleep 1
+        (( count++ ))
+    done
 fi
 
 if [[ -n $CONFD_IDs && $phase == phase1 ]]; then
-    [[ -f /tmp/confd.xc ]] || {
+    [[ -f /tmp/confd.xc ]] ||
         die "Can not bootstrap server node without confd.xc file."
-    }
     sudo mv /tmp/confd.xc /etc/mero/
 fi
 
