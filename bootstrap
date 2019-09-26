@@ -18,7 +18,11 @@ usage() {
 
 cluster_descr=$1
 
-echo -n 'Generating cluster configuration... '
+say() {
+    echo -n "$(date '+%F %T'): $*"
+}
+
+say 'Generating cluster configuration... '
 cfgen_out=/tmp
 cd $SRC_DIR
 cfgen/cfgen -D cfgen/dhall/ -o $cfgen_out < $cluster_descr
@@ -44,7 +48,7 @@ read _ join_ip <<< $(get_server_nodes | grep -w $HOSTNAME)
 }
 echo 'Ok.'
 
-echo -n 'Starting our Consul server agent... '
+say 'Starting our Consul server agent... '
 # $join_ip is our bind_ip address
 $SRC_DIR/update-consul-env --mode server --bind $join_ip \
                            --extra-options '-ui -bootstrap-expect 1'
@@ -55,12 +59,12 @@ sudo systemctl start consul-agent
 sleep 3
 echo 'Ok.'
 
-echo -n 'Importing configuration into the KV Store... '
+say 'Importing configuration into the KV Store... '
 jq '[.[] | {key, value: (.value | @base64)}]' < /tmp/consul-kv.json |
     consul kv import - > /dev/null
 echo 'Ok.'
 
-echo -n 'Waiting for the RC Leader to be elected...'
+say 'Waiting for the RC Leader to be elected...'
 count=1
 while ! pgrep -af 'consul.*watch.*prefix eq' > /dev/null; do
     if (( $count > 5 )); then
@@ -73,7 +77,7 @@ while ! pgrep -af 'consul.*watch.*prefix eq' > /dev/null; do
 done
 echo ' Ok.'
 
-echo -n 'Starting all the rest Consul server agents... '
+say 'Starting all the rest Consul server agents... '
 while read node bind_ip; do
     ssh $node "$SRC_DIR/update-consul-env --mode server --bind $bind_ip \
                                           --join $join_ip &&
@@ -81,7 +85,7 @@ while read node bind_ip; do
 done < <(get_server_nodes | grep -vw $HOSTNAME || true)
 echo 'Ok.'
 
-echo -n 'Starting Consul client agents... '
+say 'Starting Consul client agents... '
 while read node bind_ip; do
     ssh $node "$SRC_DIR/update-consul-env --mode client --bind $bind_ip \
                                           --join $join_ip &&
@@ -90,7 +94,7 @@ done < <(get_client_nodes)
 echo 'Ok.'
 
 # Start Mero in two phases: 1st confd-s, then ios-es.
-echo -n 'Starting Mero (phase1)... '
+say 'Starting Mero (phase1)... '
 $SRC_DIR/bootstrap-node phase1 &
 pids=($!)
 
@@ -107,7 +111,7 @@ done
 echo 'Ok.'
 
 # Now the 2nd phase (ios-es).
-echo -n 'Starting Mero (phase2)... '
+say 'Starting Mero (phase2)... '
 $SRC_DIR/bootstrap-node phase2 &
 pids=($!)
 
