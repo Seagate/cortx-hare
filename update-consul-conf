@@ -16,8 +16,9 @@ EOF
 
 get_service_ids() {
     local filter=$1
-    local cmd="consul kv get -recurse node/$HOSTNAME/service/ \
-                | grep types | $filter | sed -r 's;.*/(.+)/types:.*;\1;g'"
+    local cmd="consul kv get -recurse node/$HOSTNAME/service/ |
+                  grep types | sed 's/.*service.//' | $filter |
+                  sed -r 's;(.+)/types:.*;\1;g'"
     eval $cmd || echo ''
 }
 
@@ -38,9 +39,9 @@ id2fid() {
     printf '0x7200000000000001:%#x\n' $1
 }
 
-HAX_ID=$(get_service_ids 'grep -i ha')
-CONFD_IDs=$(get_service_ids 'grep -i confd')
-IOS_IDs=$(get_service_ids 'grep -i ios | grep -iv confd')
+HAX_ID=$(get_service_ids 'grep -iw ha')
+CONFD_IDs=$(get_service_ids 'grep -iw confd')
+IOS_IDs=$(get_service_ids 'grep -iw ios | grep -iwv confd')
 HAX_EP=$(get_service_ep $HAX_ID)
 
 # -n option has meaning only when this script is sourced,
