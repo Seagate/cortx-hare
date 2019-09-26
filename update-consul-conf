@@ -138,4 +138,4 @@ trap "rm -f $tmpfile" EXIT
 jq ".services = [$SVCS_CONF]" <$CONF_FILE >$tmpfile
 mv $tmpfile $CONF_FILE
 
-consul reload
+consul reload > /dev/null
