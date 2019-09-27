@@ -1,13 +1,51 @@
 #!/usr/bin/env bash
 set -eu -o pipefail
 
-#
-# Health check for the Mero confd service.
-#
+prog=${0##*/}
 
-FID=$1
+usage() {
+    cat <<EOF
+Usage: $prog -x|-f fid
 
-case $(systemctl is-active m0d@$FID) in
+Checks the health of specified service (hax or Mero).
+
+Options:
+  -x, --hax       Check hax service.
+  -f, --fid fid   Check Mero service of the specified fid.
+  -h, --help      Show this help.
+EOF
+}
+
+fid=
+hax=
+
+TEMP=$(getopt --options hxf: \
+              --longoptions help,hax,fid: \
+              --name "$prog" -- "$@" || true)
+
+(( $? == 0 )) || { usage >&2; exit 1; }
+
+eval set -- "$TEMP"
+
+while true ; do
+    case "$1" in
+        -h|--help)   usage >&2; exit 1 ;;
+        -x|--hax)    hax=yes; shift 1 ;;
+        -f|--fid)    fid=$2; shift 2 ;;
+        --)          shift; break ;;
+        *)           echo 'getopt: internal error...'; exit 1 ;;
+    esac
+done
+
+[[ -n $fid || -n $hax ]] || { usage >&2; exit 1; }
+
+if [[ $hax ]]; then
+    service=hax
+else
+    service=m0d@$fid
+fi
+
+case $(systemctl is-active $service) in
     'active') exit 0;;
     'failed') exit 2;;
     *) exit 1;;
