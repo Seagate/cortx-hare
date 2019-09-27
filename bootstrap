@@ -133,3 +133,15 @@ for pid in ${pids[@]}; do
     wait $pid
 done
 echo 'Ok.'
+
+say 'Checking the health of the services... '
+sleep 5 # Give Consul some time to pick up the statuses
+for svc in confd ios; do
+    curl -s http://127.0.0.1:8500/v1/health/service/$svc |
+        jq -r '.[] | "\(.Node.Node) \([.Checks[].Status]|unique)"' |
+        fgrep -v '["passing"]' && {
+            echo "Check '$svc' service on the node(s) listed above."
+            exit 1
+        } || true
+done
+echo 'Ok.'
