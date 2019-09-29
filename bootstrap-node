@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -eu -o pipefail
 # set -x
-export PS4='+ [${FUNCNAME[0]:+${FUNCNAME[0]}:}${LINENO}] '
+export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
 
 SRC_DIR="$(dirname $(readlink -f $0))"
 prog=${0##*/}
