@@ -1,0 +1,104 @@
+#!/usr/bin/env python3
+
+import consul
+from typing import List, NamedTuple
+from socket import gethostname
+import os
+
+
+__all__ = ['main']
+
+Process = NamedTuple('Process', [('name', str), ('fid', str),
+                                 ('ep', str)])
+
+
+def processfid2str(fidk: int) -> str:
+    process_type = 'r'
+    return f'{hex((ord(process_type) << 56)+1)}:{hex(fidk)}'
+
+
+def get_kv(c: consul, key: str) -> str:
+    kv = c.kv.get(key)[1]
+    return kv['Value'].decode()
+
+
+def leader_tag(c: consul, host: str) -> str:
+    return ' (RC)' if get_kv(c, 'leader') == host else ''
+
+
+def profile(c: consul) -> str:
+    return get_kv(c, 'profile')
+
+
+def sns_pools(c: consul) -> [str]:
+    def fid_get(t: tuple) -> str:
+        keys = t['Key'].split("/")
+        return get_kv(c, f'profile/pool/{keys[2]}')
+
+    return map(fid_get, c.kv.get('profile/pool', recurse=True)[1])
+
+
+def hosts(c: consul) -> List:
+    data = c.kv.get('node', recurse=True)[1]
+    host_names = set([(x['Key'].split("/"))[1] for x in data])
+
+    return host_names
+
+
+def svc2name(types: str) -> str:
+    if 'ios' in types.split(" "):
+        return 'ioservice'
+    elif 'ha' in types.split(" "):
+        return 'hax'
+    elif 'confd' in types.split(" "):
+        return 'confd'
+    else:
+        return 'c0_client'
+
+
+def processes(c: consul, host: str) -> List:
+    data = c.kv.get(f'node/{host}/service', recurse=True)[1]
+    fidk_list = list(set([(x['Key'].split("/"))[3] for x in data]))
+    fidk_list.sort(key=int, reverse=False)
+
+    return [Process(name=svc2name(get_kv(c, f'node/{host}/service/{x}/types')),
+                    fid=processfid2str(int(x)),
+                    ep=get_kv(c, f'node/{host}/service/{x}/ep'))
+            for x in fidk_list]
+
+
+def is_localhost(hostname: str) -> bool:
+    name = gethostname()
+    return hostname in ('localhost', '127.0.0.1', name, f'{name}.local')
+
+
+def process_status(host: str, ps: Process) -> str:
+    cmd = f'sudo systemctl is-active --quiet'
+    cmd = f'{cmd} {ps.name}' if ps.name == 'hax' else f'{cmd} m0d@{ps.fid}'
+
+    if not is_localhost(host):
+        cmd = f'ssh {host} {cmd}'
+
+    return 'online' if os.system(cmd) == 0 else 'offline'
+
+
+def main():
+    c = consul.Consul()
+    cluster_status = '[FIXME]'
+    print(f'Cluster Status: {cluster_status}')
+    print(f'Data Pools:')
+    for x in sns_pools(c):
+        print(f'    {x}')
+    print(f'Profile : {profile(c)}')
+    print(f'Services:')
+    host_list = hosts(c)
+    for h in host_list:
+        print(f'    {h} {leader_tag(c, h)}')
+        process_list = processes(c, h)
+        for p in process_list:
+            print(f'    [{process_status(h, p):<10}] {p.name:<20}\
+ {p.fid:<30} {p.ep:<30}')
+
+
+if __name__ == '__main__':
+    main()

@@ -1108,6 +1108,15 @@ def generate_consul_agents(cluster: Cluster) -> str:
         indent=2) + '\n'
 
 
+def fid2str(id: Oid) -> str:
+    types = {ObjT.root: 't', ObjT.fdmi_flt_grp: 'g', ObjT.fdmi_filter: 'l',
+             ObjT.node: 'n', ObjT.process: 'r', ObjT.service: 's',
+             ObjT.sdev: 'd', ObjT.pool: 'o', ObjT.pver: 'v', ObjT.objv: 'j',
+             ObjT.site: 'S', ObjT.rack: 'a', ObjT.enclosure: 'e',
+             ObjT.controller: 'c', ObjT.drive: 'k', ObjT.profile: 'p'}
+    return f'{hex((ord(types[id.type]) << 56)+1)}:{hex(id.fidk)}'
+
+
 def generate_consul_kv(m0conf: Dict[Oid, Any], dhall_dir: str) -> str:
     assert os.path.isabs(dhall_dir)
 
@@ -1118,6 +1127,20 @@ def generate_consul_kv(m0conf: Dict[Oid, Any], dhall_dir: str) -> str:
 
     ConsulService = NamedTuple('ConsulService', [
         ('node_name', str), ('proc_id', Oid), ('svc_types', str), ('ep', str)])
+
+    def profile() -> str:
+        for profile_id, profile in m0conf.items():
+            if profile_id.type is ObjT.profile:
+                return fid2str(profile_id)
+        return ''
+
+    def sns_pools() -> List[Oid]:
+        for root_id, root in m0conf.items():
+            if root_id.type is ObjT.root:
+                return [x for x in root.pools
+                        if x is not root.mdpool and
+                        root.imeta_pver not in m0conf[x].pvers]
+        return []
 
     def services() -> Iterator[ConsulService]:
         for node_id, node in m0conf.items():
@@ -1137,6 +1160,8 @@ def generate_consul_kv(m0conf: Dict[Oid, Any], dhall_dir: str) -> str:
         ('leader', ''),
         ('epoch', 1),
         ('last_fidk', _fidk_gen),
+        ('profile', profile()),
+        *[(f'profile/pool/{x.fidk}', f'{fid2str(x)}') for x in sns_pools()],
         *[(f'node/{x.node_name}/service/{x.proc_id.fidk}/types',
            f'{x.svc_types}') for x in services()],
         *[(f'node/{x.node_name}/service/{x.proc_id.fidk}/ep', f'{x.ep}')
