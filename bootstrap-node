@@ -39,11 +39,14 @@ sudo systemctl list-units 'mero-kernel*' > /dev/null ||
 # the configuration on phase2. (There is no phase1 on client nodes -
 # they don't run confd).
 if [[ $phase == phase1 ]]; then
-    . $SRC_DIR/update-consul-conf
+    # XXX We need to pass an empty string (actually, any argument) explicitly,
+    # otherwise the sourced file will inherit the value of `$*` from current
+    # script and its CLI arguments validation will fail.
+    . $SRC_DIR/update-consul-conf ''
 else
     . $SRC_DIR/update-consul-conf -n   # do not update, only import variables
     if [[ -z $CONFD_IDs ]]; then
-        . $SRC_DIR/update-consul-conf  # client node, update
+        . $SRC_DIR/update-consul-conf ''  # client node, update
     fi
 fi
 

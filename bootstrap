@@ -66,7 +66,7 @@ jq '[.[] | {key, value: (.value | @base64)}]' < $cfgen_out/consul-kv.json |
     consul kv import - > /dev/null
 echo 'Ok.'
 
-say 'Starting all the rest Consul server agents... '
+say 'Starting other Consul server agents... '
 while read node bind_ip; do
     ssh $node "$SRC_DIR/update-consul-env --mode server --bind $bind_ip \
                                           --join $join_ip &&
