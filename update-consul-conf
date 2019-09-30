@@ -71,7 +71,8 @@ append_hax_svc() {
       \"checks\": [
           {
             \"args\": [ \"/opt/seagate/consul/check-service\", \"--hax\" ],
-            \"interval\": \"10s\"
+            \"interval\": \"10s\",
+            \"status\": \"warning\"
           }
         ]
     }"
@@ -92,7 +93,8 @@ append_confd_svc() {
           {
             \"args\": [ \"/opt/seagate/consul/check-service\",
                         \"--fid\", \"$fid\" ],
-            \"interval\": \"10s\"
+            \"interval\": \"10s\",
+            \"status\": \"warning\"
           }
         ]
     }"
@@ -119,7 +121,8 @@ append_ios_svc() {
           {
             \"args\": [ \"/opt/seagate/consul/check-service\",
                         \"--fid\", \"$fid\" ],
-            \"interval\": \"10s\"
+            \"interval\": \"10s\",
+            \"status\": \"warning\"
           }
         ]
     }"
