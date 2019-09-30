@@ -87,7 +87,7 @@ get_session() {
 count=1
 while [[ $(get_session) == '-' ]]; do
     if (( $count > 5 )); then
-        consul kv put leader elect > /dev/null
+        consul kv put leader elect$RANDOM > /dev/null
         count=1
     fi
     sleep 1
