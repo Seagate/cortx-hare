@@ -51,6 +51,7 @@ else
 fi
 
 if [[ -n $CONFD_IDs || -n $IOS_IDs ]]; then
+    sudo mkdir -p /var/mero/hax
     sudo systemctl start hax
     count=1
     while ! systemctl is-active hax > /dev/null; do
@@ -75,5 +76,6 @@ fi
 for id in $IDs; do
     fid=$(id2fid $id)
     sudo systemctl start mero-mkfs@$fid
+    touch /tmp/mero-mkfs-pass-$fid
     sudo systemctl start m0d@$fid
 done
