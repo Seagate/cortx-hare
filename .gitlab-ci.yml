@@ -108,8 +108,8 @@ test-cfgen:
       pip3 install flake8 mypy
 
       download=https://github.com/dhall-lang/dhall-haskell/releases/download
-      for f in $download/1.26.0/dhall-1.26.0-x86_64-linux.tar.bz2 \
-               $download/1.26.0/dhall-json-1.4.1-x86_64-linux.tar.bz2; do
+      for f in $download/1.26.1/dhall-1.26.1-x86_64-linux.tar.bz2 \
+               $download/1.26.1/dhall-json-1.4.1-x86_64-linux.tar.bz2; do
           curl -LO $f
           tar -C /usr/local/ -xf ${f##*/}
       done
@@ -167,8 +167,8 @@ test-bootstrap:
       sudo pip3 install ply
 
       download=https://github.com/dhall-lang/dhall-haskell/releases/download
-      for f in $download/1.26.0/dhall-1.26.0-x86_64-linux.tar.bz2 \
-               $download/1.26.0/dhall-json-1.4.1-x86_64-linux.tar.bz2; do
+      for f in $download/1.26.1/dhall-1.26.1-x86_64-linux.tar.bz2 \
+               $download/1.26.1/dhall-json-1.4.1-x86_64-linux.tar.bz2; do
           curl -LO $f
           sudo tar -C /usr/local/ -xf ${f##*/}
       done
