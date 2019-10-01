@@ -36,7 +36,7 @@ The scripts in this repository constitute a middleware layer between [Consul](ht
 2. Edit `./cfgen/_misc/singlenode.yaml` file
   1. Ensure that `data_iface` value corresponds to a real network interface (see output of `ifconfig` command)
 
-3. Start Consul server agent and `hax`:
+3. Start Hare cluster:
    ```sh
    ./bootstrap ./cfgen/_misc/singlenode.yaml
    ```
@@ -70,7 +70,7 @@ Session          d5f3f364-6f79-48cd-b452-913321b2c743
 Value            sage75
 ```
 
-***Note:*** The presence of the `Session` ID indicates that the leader has been elected. The advantage of this command is that it can be run on any node.
+***Note:*** The presence of the `Session` ID indicates that the leader has been elected.
 
 ### Consul web UI
 
