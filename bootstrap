@@ -104,7 +104,7 @@ $SRC_DIR/bootstrap-node phase1 &
 pids=($!)
 
 while read node _; do
-    scp $cfgen_out/confd.xc $node:/tmp/
+    scp -q $cfgen_out/confd.xc $node:/tmp/
     ssh $node $SRC_DIR/bootstrap-node phase1 &
     pids+=($!)
 done < <(get_server_nodes | grep -vw $HOSTNAME || true)
