@@ -33,10 +33,12 @@ The scripts in this repository constitute a middleware layer between [Consul](ht
    cd hare
    ./install
    ```
+2. Edit `singlenode.yaml` file: `vim ./cfgen/_misc/singlenode.yaml`
+  1. Ensure that `data_iface` value corresponds to a real Ethernet interface (see output of `ifconfig` command)
 
-2. Start Consul server agent and `hax`:
+3. Start Consul server agent and `hax`:
    ```sh
-   ./bootstrap
+   ./bootstrap ./cfgen/_misc/singlenode.yaml
    ```
 
 ## Observe
