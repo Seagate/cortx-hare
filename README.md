@@ -24,7 +24,7 @@ The scripts in this repository constitute a middleware layer between [Consul](ht
   ```
   <!-- XXX TODO: Hare should be able to work with Mero installed from rpm. -->
 
-### Single node
+### Single-node setup
 
 1. Prepare the node:
    ```sh
@@ -33,13 +33,17 @@ The scripts in this repository constitute a middleware layer between [Consul](ht
    cd hare
    ./install
    ```
-2. Edit `singlenode.yaml` file: `vim ./cfgen/_misc/singlenode.yaml`
-  1. Ensure that `data_iface` value corresponds to a real Ethernet interface (see output of `ifconfig` command)
+2. Edit `./cfgen/_misc/singlenode.yaml` file
+  1. Ensure that `data_iface` value corresponds to a real network interface (see output of `ifconfig` command)
 
 3. Start Consul server agent and `hax`:
    ```sh
    ./bootstrap ./cfgen/_misc/singlenode.yaml
    ```
+
+### Multi-node setup
+
+For multi-node cluster the steps are the same as for single-node. Installation and node preparation steps should be done on each node. The cluster descripion file preparation and bootstrap command run can be done on any server node (the one which is configured to run confd).
 
 ## Observe
 
@@ -54,13 +58,19 @@ The scripts in this repository constitute a middleware layer between [Consul](ht
   ```
 
 * Check if the RC leader has been elected:
-  ```sh
-  $ pgrep -a consul
-  9100 consul agent -bind={{GetPrivateIP}} -server -config-dir=/home/ant/hare -data-dir=/tmp/consul/ -bootstrap-expect=1 -client=127.0.0.1 {{GetPrivateIP}} -ui
-  9656 consul watch -type=keyprefix -prefix eq/ /home/ant/hare/proto-rc
-  ```
 
-  The `consul watch [...] -prefix eq/` line indicates that the leader has been elected.  If there is no such line, try `consul reload`.
+```sh
+$ consul kv get -detailed leader
+CreateIndex      6
+Flags            0
+Key              leader
+LockIndex        1
+ModifyIndex      25
+Session          d5f3f364-6f79-48cd-b452-913321b2c743
+Value            sage75
+```
+
+***Note:*** The presence of the `Session` ID indicates that the leader has been elected. The advantage of this command is that it can be run on any node.
 
 ### Consul web UI
 
