@@ -5,7 +5,7 @@ variables:
   GIT_DEPTH: 1  # clone only the current commit
   GIT_STRATEGY: clone  # make a fresh `git clone` of the repo for every new CI job
   GIT_SUBMODULE_STRATEGY: normal  # init and check out submodules
-  CENTOS_RELEASE: '7.5'
+  CENTOS_RELEASE: eos
   DOCKER_REGISTRY: registry.gitlab.mero.colo.seagate.com
   M0_VG_NO_SYMLINKS: "true"
   WORKSPACE_NAME: "${CI_PROJECT_NAME}${CI_PIPELINE_ID}"
@@ -43,7 +43,7 @@ build:
     - cd ${WORKSPACE_DIR}
 
     # make sure that build image is up to date
-    - docker pull $DOCKER_REGISTRY/mero/mero:$CENTOS_RELEASE
+    - docker pull $DOCKER_REGISTRY/mero/hare:$CENTOS_RELEASE
 
     # Get fresh Mero copy.
     - git clone --recursive --depth 1 --shallow-submodules http://gitlab.mero.colo.seagate.com/mero/mero.git
@@ -61,7 +61,7 @@ build:
       EOF
     - time docker run --rm --name ${JOB_NAME}
                       -v ~+:/data -w /data/mero
-                  $DOCKER_REGISTRY/mero/mero:$CENTOS_RELEASE
+                  $DOCKER_REGISTRY/mero/hare:$CENTOS_RELEASE
                       bash -x _build-m0.sh
 
     # Build hax's C extension.
@@ -69,20 +69,13 @@ build:
       cat >hare/_build-hax.sh <<'EOF'
       set -eu -o pipefail
 
-      yum install -y python36 python36-devel python36-pip
-
-      env_dir=.env
-      python3 -m venv $env_dir
-      . $env_dir/bin/activate
-
       cd hax
-      pip3 install wheel flake8 mypy
       python3 setup.py flake8 mypy  # sanity check
       python3 setup.py bdist_wheel
       EOF
     - time docker run --rm --name ${JOB_NAME}
                       -v ~+:/data -w /data/hare
-                  $DOCKER_REGISTRY/mero/mero:$CENTOS_RELEASE
+                  $DOCKER_REGISTRY/mero/hare:$CENTOS_RELEASE
                       bash -x _build-hax.sh
 
     # containers run commands as 'root' user, seize ownership back
@@ -99,28 +92,10 @@ test-cfgen:
     - export JOB_NAME="${WORKSPACE_NAME}-${CI_JOB_NAME}"
 
     - cd ${WORKSPACE_DIR}
-
-    - |
-      cat >hare/_test-cfgen.sh <<'EOF'
-      set -eu -o pipefail
-
-      yum install -y python36 python36-pip python36-PyYAML
-      pip3 install flake8 mypy
-
-      download=https://github.com/dhall-lang/dhall-haskell/releases/download
-      for f in $download/1.26.1/dhall-1.26.1-x86_64-linux.tar.bz2 \
-               $download/1.26.1/dhall-json-1.4.1-x86_64-linux.tar.bz2; do
-          curl -LO $f
-          tar -C /usr/local/ -xf ${f##*/}
-      done
-
-      make -C cfgen
-      EOF
-
     - time docker run --rm --name ${JOB_NAME}
                       -v ~+:/data -w /data/hare
-                  $DOCKER_REGISTRY/mero/mero:$CENTOS_RELEASE
-                      bash -x _test-cfgen.sh
+                  $DOCKER_REGISTRY/mero/hare:$CENTOS_RELEASE
+                      make -C cfgen
 
 test-bootstrap:
   stage: test

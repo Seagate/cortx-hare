@@ -1,0 +1,5 @@
+#!/bin/bash
+set -eu -o pipefail
+
+source $HARE_VENV_DIR/bin/activate
+exec "${@:-bash}"
