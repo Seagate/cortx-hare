@@ -141,13 +141,24 @@ done
 echo 'Ok.'
 
 say 'Checking the health of the services... '
-sleep 5 # Give Consul some time to pick up the statuses
-for svc in confd ios; do
+check_service() {
+    local svc=$1
     curl -s http://127.0.0.1:8500/v1/health/service/$svc |
         jq -r '.[] | "\(.Node.Node) \([.Checks[].Status]|unique)"' |
-        fgrep -v '["passing"]' && {
-            echo "Check '$svc' service on the node(s) listed above."
+        fgrep -v '["passing"]' || true
+}
+count=1
+for svc in confd ios; do
+    svc_not_ready=$(check_service $svc)
+    while [[ $svc_not_ready ]]; do
+        if (($count > 5)); then
+            echo $svc_not_ready >&2
+            echo "Check '$svc' service on the node(s) listed above." >&2
             exit 1
-        } || true
+        fi
+        ((count++))
+        sleep 1
+        svc_not_ready=$(check_service $svc)
+    done
 done
 echo 'Ok.'
