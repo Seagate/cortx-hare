@@ -195,39 +195,154 @@ The function blocks until the epoch is returned or an error occurs.
 
 See the [[https://docs.google.com/document/d/1cR-BbxtMjGuZPj8NOc95RyFjqmeFsYf4JJ5Hw_tL1zA/edit#bookmark=id.whq5d31z34][prototype]].
 
-** _sprint-8
+** _sprint-9
 
-Sprint goal: "bootstrap works"
+Sprint goal: "Halon is replaced with Hare"
 
-- minimal: single-node
-- better: 2 nodes
+*** @andriy: XXX ? experiment with consul server-server vs. service-client
 
-*** [[[https://jts.seagate.com/browse/EOS-1940][EOS-1940]]] @prasanna: CI install & bootstrap scripts -- issue #33
-- single-node
-- 2 nodes
-- [optional] it would be nice to test 5-node cluster also
+*** @rajanikant: 2 ios per node -- EOS-2054 (XXX split)
 
-*** [[[https://jts.seagate.com/browse/EOS-1949][EOS-1949]]] @rajanikant: 2-node configuration: test; CI
+*** [[[https://jts.seagate.com/browse/EOS-2049][EOS-2049]]] @mandar: hax HA states request
 
-*** [[[https://jts.seagate.com/browse/EOS-1943][EOS-1943]]] @vvv: cfgen modifications and bug fixing
+*** [[[http://jts.seagate.com/browse/EOS-2057][EOS-2057]]] @prasanna: EES cluster bootstrap on CI
 
-**** @vvv: issue #42: cfgen to provide Consul IP addresses
+*** @max, @kostya, @vvv: Pacemaker integration -- EOS-2059 (XXX split)
 
-*** [[[https://jts.seagate.com/browse/EOS-1929][EOS-1929]]] @andriy: bootstrap script
-Make it conform to the 6/BOOT.
+***** How do we handle failures for EES?
+- mero process fails
+- node failure
 
-**** @kostya, @mandar: start m0ds + hax
+*** @dima.c
 
-**** m0d depends on ~/etc/sysconfig/m0d*~ file(s)
-We have to provide those somehow.
+**** TODO outline of +Sprint-9 and+ PI-3 tasks
 
-**** [[[https://jts.seagate.com/browse/EOS-1824][EOS-1824]]] @max Mero modification: support HA states diff
+**** ~/opt/seagate/hare/bin/~ (part of rpm) -- EOS-2056 (XXX reestimate or split)
+- bootstrap
+- bootstrap-node
+- cfgen
+- hax
 
-*** [[[https://jts.seagate.com/browse/EOS-1937][EOS-1937]]] @kostya: hax CI: pylint?, flake8, mypy
+***** Docker image
+***** CI
+***** RE
 
-*** [[[https://jts.seagate.com/browse/EOS-1934][EOS-1934]]] @mandar: hax modifications, when needed
+** _future sprint
 
-*** ? start replacing Halon with Hare
+*** @vvv, @dima.c: hare CLI tool
+
+**** hare build --release
+Builds RPMs.
+
+**** _test-build
+#+BEGIN_SRC
+$ cl
+Would skip repository .env/
+Would remove _test-build
+Would remove hax/build/
+Would remove hax/hax.egg-info/
+Would remove hax/libhax.cpython-36m-x86_64-linux-gnu.so
+$ find hax/build
+hax/build
+hax/build/temp.linux-x86_64-3.6
+hax/build/temp.linux-x86_64-3.6/hax
+hax/build/temp.linux-x86_64-3.6/hax/hax.o
+hax/build/lib.linux-x86_64-3.6
+hax/build/lib.linux-x86_64-3.6/libhax.cpython-36m-x86_64-linux-gnu.so
+$ find hax/hax.egg-info
+hax/hax.egg-info
+hax/hax.egg-info/PKG-INFO
+hax/hax.egg-info/SOURCES.txt
+hax/hax.egg-info/entry_points.txt
+hax/hax.egg-info/requires.txt
+hax/hax.egg-info/top_level.txt
+hax/hax.egg-info/dependency_links.txt
+$
+$ (cd .env; git status)
+[...]
+        bin/chardetect
+        bin/hax
+        bin/wheel
+        lib/python3.6/site-packages/certifi-2019.9.11-py3.6.egg/
+        lib/python3.6/site-packages/chardet-3.0.4-py3.6.egg/
+        lib/python3.6/site-packages/easy-install.pth
+        lib/python3.6/site-packages/hax.egg-link
+        lib/python3.6/site-packages/idna-2.8-py3.6.egg/
+        lib/python3.6/site-packages/python_consul-1.1.0-py3.6.egg/
+        lib/python3.6/site-packages/requests-2.22.0-py3.6.egg/
+        lib/python3.6/site-packages/six-1.12.0-py3.6.egg/
+        lib/python3.6/site-packages/urllib3-1.25.6-py3.6.egg/
+        lib/python3.6/site-packages/wheel-0.33.6.dist-info/
+        lib/python3.6/site-packages/wheel/
+        pip-selfcheck.json
+#+END_SRC
+**** _test-build wheel
+#+BEGIN_SRC
+$ cl
+Would skip repository .env/
+Would remove hax/build/
+Would remove hax/dist/
+Would remove hax/hax.egg-info/
+$ find hax/build
+hax/build
+hax/build/temp.linux-x86_64-3.6
+hax/build/temp.linux-x86_64-3.6/hax
+hax/build/temp.linux-x86_64-3.6/hax/hax.o
+hax/build/bdist.linux-x86_64
+hax/build/lib.linux-x86_64-3.6
+hax/build/lib.linux-x86_64-3.6/libhax.cpython-36m-x86_64-linux-gnu.so
+hax/build/lib.linux-x86_64-3.6/hax
+hax/build/lib.linux-x86_64-3.6/hax/exception.py
+hax/build/lib.linux-x86_64-3.6/hax/server.py
+hax/build/lib.linux-x86_64-3.6/hax/handler.py
+hax/build/lib.linux-x86_64-3.6/hax/halink.py
+hax/build/lib.linux-x86_64-3.6/hax/util.py
+hax/build/lib.linux-x86_64-3.6/hax/__init__.py
+hax/build/lib.linux-x86_64-3.6/hax/message.py
+hax/build/lib.linux-x86_64-3.6/hax/types.py
+hax/build/lib.linux-x86_64-3.6/hax/hax.py
+hax/build/lib.linux-x86_64-3.6/hax/ffi.py
+$ find hax/dist
+hax/dist
+hax/dist/hax-0.0.1-cp36-cp36m-linux_x86_64.whl
+$ find hax/hax.egg-info
+hax/hax.egg-info
+hax/hax.egg-info/PKG-INFO
+hax/hax.egg-info/SOURCES.txt
+hax/hax.egg-info/entry_points.txt
+hax/hax.egg-info/requires.txt
+hax/hax.egg-info/top_level.txt
+hax/hax.egg-info/dependency_links.txt
+$
+$ (cd .env; git status)
+[...]
+        bin/chardetect
+        bin/hax
+        bin/wheel
+        lib/python3.6/site-packages/__pycache__/six.cpython-36.pyc
+        lib/python3.6/site-packages/certifi-2019.9.11.dist-info/
+        lib/python3.6/site-packages/certifi/
+        lib/python3.6/site-packages/chardet-3.0.4.dist-info/
+        lib/python3.6/site-packages/chardet/
+        lib/python3.6/site-packages/consul/
+        lib/python3.6/site-packages/hax-0.0.1.dist-info/
+        lib/python3.6/site-packages/hax/
+        lib/python3.6/site-packages/idna-2.8.dist-info/
+        lib/python3.6/site-packages/idna/
+        lib/python3.6/site-packages/libhax.cpython-36m-x86_64-linux-gnu.so
+        lib/python3.6/site-packages/python_consul-1.1.0.dist-info/
+        lib/python3.6/site-packages/requests-2.22.0.dist-info/
+        lib/python3.6/site-packages/requests/
+        lib/python3.6/site-packages/six-1.12.0.dist-info/
+        lib/python3.6/site-packages/six.py
+        lib/python3.6/site-packages/urllib3-1.25.6.dist-info/
+        lib/python3.6/site-packages/urllib3/
+        lib/python3.6/site-packages/wheel-0.33.6.dist-info/
+        lib/python3.6/site-packages/wheel/
+        pip-selfcheck.json
+#+END_SRC
+
+*** @dima.c: m0vg image
 
 ** scoping
 
