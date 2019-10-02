@@ -34,19 +34,19 @@ die() {
 sudo systemctl list-units 'mero-kernel*' > /dev/null ||
     die 'No `mero-kernel` systemd service'
 
-# If it is a server node - we don't need to update the configuration
-# twice on both phases. But if it is a client node - we should update
-# the configuration on phase2. (There is no phase1 on client nodes -
-# they don't run confd).
+# If it is a server node, we don't need to create Consul configuration
+# two times (once for each phase).  If it is a client node, we should
+# create the configuration file on phase2. (There is no phase1 on client
+# nodes --- they don't run confd.)
 if [[ $phase == phase1 ]]; then
     # XXX We need to pass an empty string (actually, any argument) explicitly,
     # otherwise the sourced file will inherit the value of `$*` from current
     # script and its CLI arguments validation will fail.
-    . $SRC_DIR/update-consul-conf ''
+    . $SRC_DIR/mk-consul-conf ''
 else
-    . $SRC_DIR/update-consul-conf -n   # do not update, only import variables
+    . $SRC_DIR/mk-consul-conf -n  # do not update, only import variables
     if [[ -z $CONFD_IDs ]]; then
-        . $SRC_DIR/update-consul-conf ''  # client node, update
+        . $SRC_DIR/mk-consul-conf ''  # client node, update
     fi
 fi
 

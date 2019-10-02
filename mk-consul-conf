@@ -9,9 +9,9 @@ usage() {
     cat <<EOF
 Usage: . ${BASH_SOURCE[0]##*/} [-n | --dry-run]
 
-Updates Consul agent configuration file with the services from the KV store.
+Create Consul agent configuration file.
 
-  -n, --dry-run   Do not update Consul configuration, only export variables
+  -n, --dry-run   Do not create configuration file, only export variables
                   and function definitions.
 EOF
 }
@@ -55,11 +55,12 @@ HAX_EP=$(get_service_ep $HAX_ID)
 if $dry_run; then
     return 0  # we must not `exit`, because the script is sourced
 fi
+# --------------------------------------------------------------------
 
 if [[ $CONFD_IDs ]]; then
-    CONF_FILE=$SRC_DIR/consul-server-conf.json
+    CONF_TEMPLATE=$SRC_DIR/consul-server-conf.json.in
 else
-    CONF_FILE=$SRC_DIR/consul-client-conf.json
+    CONF_TEMPLATE=$SRC_DIR/consul-client-conf.json.in
 fi
 
 SVCS_CONF=''
@@ -151,9 +152,6 @@ for id in $IOS_IDs; do
     append_ios_svc $id
 done
 
-tmpfile=$(mktemp /tmp/${CONF_FILE##*/}.XXXXXX)
-trap "rm -f $tmpfile" EXIT
-jq ".services = [$SVCS_CONF]" <$CONF_FILE >$tmpfile
-mv $tmpfile $CONF_FILE
+jq ".services = [$SVCS_CONF]" <$CONF_TEMPLATE >${CONF_TEMPLATE%.in}
 
 consul reload > /dev/null

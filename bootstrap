@@ -52,8 +52,12 @@ echo 'Ok.'
 
 say 'Starting our Consul server agent... '
 # $join_ip is our bind_ip address
-$SRC_DIR/update-consul-env --mode server --bind $join_ip \
-                           --extra-options '-ui -bootstrap-expect 1'
+$SRC_DIR/mk-consul-env --mode server --bind $join_ip \
+                       --extra-options '-ui -bootstrap-expect 1'
+
+# `consul-agent` service won't start without this configuration file.
+cp $SRC_DIR/consul-server-conf.json.in $SRC_DIR/consul-server-conf.json
+
 sudo systemctl start consul-agent
 
 # Give Consul some time for its internal bootstrap and leader
@@ -68,16 +72,16 @@ echo 'Ok.'
 
 say 'Starting other Consul server agents... '
 while read node bind_ip; do
-    ssh $node "$SRC_DIR/update-consul-env --mode server --bind $bind_ip \
-                                          --join $join_ip &&
+    ssh $node "$SRC_DIR/mk-consul-env --mode server --bind $bind_ip \
+                                      --join $join_ip &&
                sudo systemctl start consul-agent"
 done < <(get_server_nodes | grep -vw $HOSTNAME || true)
 echo 'Ok.'
 
 say 'Starting Consul client agents... '
 while read node bind_ip; do
-    ssh $node "$SRC_DIR/update-consul-env --mode client --bind $bind_ip \
-                                          --join $join_ip &&
+    ssh $node "$SRC_DIR/mk-consul-env --mode client --bind $bind_ip \
+                                      --join $join_ip &&
                    sudo systemctl start consul-agent"
 done < <(get_client_nodes)
 echo 'Ok.'
