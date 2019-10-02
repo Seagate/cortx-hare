@@ -77,5 +77,8 @@ for id in $IDs; do
     fid=$(id2fid $id)
     sudo systemctl start mero-mkfs@$fid
     touch /tmp/mero-mkfs-pass-$fid
+    # Give time for service checker to reset m0mkfs' HA state:
+    # (1s * 2) - time of two checks + 1s. (See check-service.)
+    sleep 3
     sudo systemctl start m0d@$fid
 done
