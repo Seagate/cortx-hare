@@ -3,13 +3,14 @@ hosts:
     data_iface: ens33
     m0_servers:
       - runs_confd: true
-      - io_disks: { path_glob: "/dev/loop[0-9]*" }
+      - io_disks: { path_glob: "/dev/sd[b-i]" }
     c0_clients: 2
     m0t1fs_clients: 0
   - name: sage75c1
     data_iface: ens33
     m0_servers:
-      - io_disks: { path_glob: "/dev/loop[0-9]*" }
+      - runs_confd: true
+      - io_disks: { path_glob: "/dev/sd[b-i]" }
     c0_clients: 2
     m0t1fs_clients: 0
 pools:

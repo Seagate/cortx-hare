@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+set -eu -o pipefail
+# set -x
+export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
+
+SRC_DIR="$(dirname $(readlink -f ${BASH_SOURCE[0]}))"
+M0_SRC_DIR=${M0_SRC_DIR:-${SRC_DIR%/*}/mero}
+
+usage() {
+    cat <<EOF
+
+Usage: ${0##*/} <test-conf-file.yaml>
+
+Update m0crate test configuration file.
+
+EOF
+}
+
+(( $# == 1 )) || { usage >&2; exit 1; }
+conf_file=$1
+
+[[ -f $conf_file ]] || {
+    echo "Error: there is no such file: $conf_file" >&2
+    usage >&2; exit 1
+}
+
+# XXX this should be updated after we have profile fid in the KV Store.
+get_profile() {
+    cat /etc/mero/confd.xc |
+        $M0_SRC_DIR/utils/m0confgen --from xcode --to confgen |
+        awk '/^.profile/ {sub(/.profile-/, "", $1);
+                          printf("0x7000000000000001:0x%x\n", $1)}'
+}
+
+get_fids() {
+    consul kv get -recurse node |
+        awk -F/ '/ep:/ {ep=$5; sub(/^ep:/, "", ep)}
+                 /types:rms$/ {printf("0x7200000000000001:0x%x\t%s\n", $4, ep)}'
+}
+
+while read fid ep; do
+    ip=${ep%@*}
+    hax_ep=${ep%:*:*}:1:1
+    echo "fid=$fid ep=$ep hax=$hax_ep ip=$ip"
+    if ip a | grep $ip > /dev/null; then # our IP
+        sed -r -e 's/(MERO_LOCAL_ADDR:).*/\1 '$ep'/' \
+               -e 's/(MERO_HA_ADDR:).*/\1 '$hax_ep'/' \
+               -e 's/(CLOVIS_PROCESS_FID:.*<).*(>.*)/\1'$fid'\2/' \
+               -e 's/(CLOVIS_PROF:.*<).*(>.*)/\1'$(get_profile)'\2/' \
+               -i $conf_file
+        break
+    fi
+done < <(get_fids)
