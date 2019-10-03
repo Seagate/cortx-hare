@@ -18,7 +18,7 @@ from typing import Any, Callable, Dict, Iterator, List, NamedTuple, Set, \
 import yaml
 
 
-__version__ = '0.2'
+__version__ = '0.2.1'
 __author__ = 'Valery V. Vorotyntsev <valery.vorotyntsev@seagate.com>'
 
 
@@ -1242,6 +1242,7 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
                        drives=first_drives,
                        tolerance=Failures(0, 0, 0, 1, 0))
         conf[root_id].mdpool = pool_id
+        conf[prof_id].pools.append(pool_id)
 
     # DIX pool.
     cas = [(svc_id, ctrl_id)
@@ -1256,9 +1257,10 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
                                                       size=1024,
                                                       blksize=1)))
                   for (svc_id, ctrl_id) in cas]
+        pool_id = ConfPool.build(conf, root_id)
         imeta_pver = ConfPver.build(
             conf,
-            ConfPool.build(conf, root_id),
+            pool_id,
             PDClustAttrs0(
                 # For CAS service N must always be equal to 1
                 # as CAS records are indivisible pieces of data:
@@ -1268,6 +1270,7 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
             drives=drives,
             tolerance=Failures(0, 0, 0, 1, 0))
         conf[root_id].imeta_pver = imeta_pver
+        conf[prof_id].pools.append(pool_id)
 
     validate_m0conf(conf)
     assert cluster.consul_servers
