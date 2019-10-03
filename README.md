@@ -35,8 +35,15 @@ The scripts in this repository constitute a middleware layer between [Consul](ht
    ```
 2. Edit `./cfgen/_misc/singlenode.yaml` file
   1. Ensure that `data_iface` value corresponds to a real network interface (see output of `ifconfig` command)
+  2. Ensure that the `io_disks` section is valid as well. In case of single-node the drives can be created like this:
+     ```sh
+     for i in {0..9}; do
+       sudo dd if=/dev/zero of=/var/mero/loop$i.img bs=1M seek=9999 count=1 &&
+       sudo losetup /dev/loop$i /var/mero/loop$i.img
+     done
+     ```
 
-3. Start Hare cluster:
+3. Start the cluster:
    ```sh
    ./bootstrap ./cfgen/_misc/singlenode.yaml
    ```
@@ -59,7 +66,7 @@ For multi-node cluster the steps are the same as for single-node. Installation a
 
 * Check if the RC leader has been elected:
 
-```sh
+```
 $ consul kv get -detailed leader
 CreateIndex      6
 Flags            0
