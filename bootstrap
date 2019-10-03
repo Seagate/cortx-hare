@@ -55,9 +55,6 @@ say 'Starting our Consul server agent... '
 $SRC_DIR/mk-consul-env --mode server --bind $join_ip \
                        --extra-options '-ui -bootstrap-expect 1'
 
-# `consul-agent` service won't start without this configuration file.
-cp $SRC_DIR/consul-server-conf.json.in $SRC_DIR/consul-server-conf.json
-
 sudo systemctl start consul-agent
 
 # Give Consul some time for its internal bootstrap and leader

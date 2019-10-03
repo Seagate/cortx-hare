@@ -58,9 +58,9 @@ fi
 # --------------------------------------------------------------------
 
 if [[ $CONFD_IDs ]]; then
-    CONF_TEMPLATE=$SRC_DIR/consul-server-conf.json.in
+    CONF_FILE=$SRC_DIR/consul-server-conf.json
 else
-    CONF_TEMPLATE=$SRC_DIR/consul-client-conf.json.in
+    CONF_FILE=$SRC_DIR/consul-client-conf.json
 fi
 
 SVCS_CONF=''
@@ -152,6 +152,9 @@ for id in $IOS_IDs; do
     append_ios_svc $id
 done
 
-jq ".services = [$SVCS_CONF]" <$CONF_TEMPLATE >${CONF_TEMPLATE%.in}
+tmpfile=$(mktemp /tmp/${CONF_FILE##*/}.XXXXXX)
+trap "rm -f $tmpfile" EXIT # delete automatically on exit
+jq ".services = [$SVCS_CONF]" <$CONF_FILE >$tmpfile
+cat $tmpfile >$CONF_FILE
 
 consul reload > /dev/null
