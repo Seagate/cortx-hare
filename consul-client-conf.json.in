@@ -1,7 +1,7 @@
 {
   "enable_local_script_checks": true,
   "watches": [
-     {
+    {
       "type": "service",
       "service": "ios",
       "handler_type": "http",
