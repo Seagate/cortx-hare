@@ -30,9 +30,16 @@ die() {
     exit 1
 }
 
-# Check if Mero is installed.
-sudo systemctl list-units 'mero-kernel*' > /dev/null ||
-    die 'No `mero-kernel` systemd service'
+# If mero-kernel.service is not installed, the script will fail
+# anyway, with or without this check.  The purpose of the check is to
+# provide proper error message.
+#
+# Without this check `sudo systemctl start hax` fails with "Failed to
+# start hax.service: Unit not found" error message.  That error
+# message is misleading, because hax.service _is_ installed, it is
+# one of its dependencies - mero-kernel.service - which isn't.
+systemctl list-unit-files | grep -qE '^mero-kernel\.service\>' ||
+    die "'mero-kernel' systemd service is not installed"
 
 # If it is a server node, we don't need to update Consul configuration
 # two times (once for each phase).  If it is a client node, we should
