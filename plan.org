@@ -199,33 +199,35 @@ See the [[https://docs.google.com/document/d/1cR-BbxtMjGuZPj8NOc95RyFjqmeFsYf4JJ
 
 Sprint goal: "Halon is replaced with Hare"
 
-*** @andriy: XXX ? experiment with consul server-server vs. service-client
+*** [[[https://jts.seagate.com/browse/EOS-2164][EOS-2164]]] @andriy: m0crate I/O on CI (XXX 1d only; another ticket needed)
 
-*** @rajanikant: 2 ios per node -- EOS-2054 (XXX split)
+*** [[[https://jts.seagate.com/browse/EOS-2054][EOS-2054]]] @rajanikant: 2 ios per node
 
 *** [[[https://jts.seagate.com/browse/EOS-2049][EOS-2049]]] @mandar: hax HA states request
 
 *** [[[http://jts.seagate.com/browse/EOS-2057][EOS-2057]]] @prasanna: EES cluster bootstrap on CI
 
 *** @max, @kostya, @vvv: Pacemaker integration -- EOS-2059 (XXX split)
+- [[[https://jts.seagate.com/browse/EOS-2120][EOS-2120]]] @max
+- [[[https://jts.seagate.com/browse/EOS-2237][EOS-2237]]] @kostya
+- [[[https://jts.seagate.com/browse/EOS-2236][EOS-2236]]] @vvv
 
 ***** How do we handle failures for EES?
 - mero process fails
 - node failure
 
-*** @dima.c
-
-**** TODO outline of +Sprint-9 and+ PI-3 tasks
-
-**** ~/opt/seagate/hare/bin/~ (part of rpm) -- EOS-2056 (XXX reestimate or split)
+*** [[[https://jts.seagate.com/browse/EOS-2056][EOS-2056]]] @dima.c: Hare rpm
+~/opt/seagate/hare/bin/~:
 - bootstrap
 - bootstrap-node
 - cfgen
 - hax
 
-***** Docker image
-***** CI
-***** RE
+**** Docker image
+**** CI
+**** RE
+
+*** TODO @dima.c: outline of +Sprint-9 and+ PI-3 tasks
 
 ** _future sprint
 
