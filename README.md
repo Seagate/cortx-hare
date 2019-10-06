@@ -83,6 +83,15 @@ Value            sage75
 
 To view the [Consul UI](https://learn.hashicorp.com/consul/getting-started/ui#set-up-access-to-the-ui), open `http://<vm-ip-address>:8500/ui` URL in your browser.
 
+## Test I/O
+
+```sh
+cp $M0_SRC_DIR/clovis/m0crate/tests/test1_io.yaml .
+./update-m0crate-io-test-conf test1_io.yaml
+dd if=/dev/urandom of=/tmp/128M bs=1M count=100
+sudo $M0_SRC_DIR/clovis/m0crate/m0crate -S test1_io.yaml
+```
+
 ## Miscellanea
 
 * Get an entrypoint:
@@ -98,7 +107,7 @@ To view the [Consul UI](https://learn.hashicorp.com/consul/getting-started/ui#se
 
 * Add a timeout and monitor it via the log:
 
-  ```sh
+  ```
   $ tail -f /tmp/consul-proto-rc.log &
   [2] 10457
   $
@@ -117,7 +126,8 @@ To view the [Consul UI](https://learn.hashicorp.com/consul/getting-started/ui#se
   [...]
   ```
 
-  The timeout resets automatically (for demo purposes), so you will see it in the log file every other minute.
+  The timeout resets automatically (for demo purposes), so you will
+  see it in the log file every other minute.
 
 ## Roadmap
 
