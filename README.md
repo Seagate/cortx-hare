@@ -13,11 +13,9 @@ The scripts in this repository constitute a middleware layer between [Consul](ht
 
 ## Installation
 
-* Copy `consul` executable to a `$PATH` directory (e.g., `/usr/local/bin/`) on each node of the cluster.
-* Install Python dependencies:
-  ```sh
-  pip3 install -r hax/requirements.txt
-  ```
+* Copy `consul` executable to a `$PATH` directory (e.g.,
+  `/usr/local/bin/`) on each node of the cluster.
+
 * Ensure that Mero sources are built.
   ```sh
   $M0_SRC_DIR/scripts/m0 make
