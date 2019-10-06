@@ -21,5 +21,5 @@ processes.
   * [3/CFGEN](3/README.md) — Configuration Generation
   * [4/KV](4/README.md) — Consul KV Schema
   * [6/BOOT](6/README.md) — Mero Cluster Bootstrap
-  * [8/COSTY](8/README.md) — Coding Style Guidelines
+  * [8/STYLE](8/README.md) — Coding Style Guidelines
   * [9/PC3](9/README.md) — Pedantic Code Construction Contract

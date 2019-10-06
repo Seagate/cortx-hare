@@ -1,6 +1,6 @@
 ---
 domain: gitlab.mero.colo.seagate.com
-shortname: 8/COSTY
+shortname: 8/STYLE
 name: Coding Style Guidelines
 status: draft
 editor: Valery V. Vorotyntsev <valery.vorotyntsev@seagate.com>
