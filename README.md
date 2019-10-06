@@ -28,29 +28,46 @@ The scripts in this repository constitute a middleware layer between [Consul](ht
 
 1. Prepare the node:
    ```sh
-   cd
    git clone ssh://git@gitlab.mero.colo.seagate.com:6022/mero/hare.git
    cd hare
    ./install
    ```
-2. Edit `./cfgen/_misc/singlenode.yaml` file
-  1. Ensure that `data_iface` value corresponds to a real network interface (see output of `ifconfig` command)
-  2. Ensure that the `io_disks` section is valid as well. In case of single-node the drives can be created like this:
-     ```sh
+
+2. Edit `cfgen/_misc/singlenode.yaml` file or create a cluster description
+   file of your own.
+
+   * Ensure that the disks referred to by `io_disks.path_glob` pattern
+     exist.  Create loop devices, if necessary:
+     ```bash
+     sudo mkdir -p /var/mero
      for i in {0..9}; do
-       sudo dd if=/dev/zero of=/var/mero/loop$i.img bs=1M seek=9999 count=1 &&
-       sudo losetup /dev/loop$i /var/mero/loop$i.img
+         sudo dd if=/dev/zero of=/var/mero/disk$i.img bs=1M seek=9999 count=1
+         sudo losetup /dev/loop$i /var/mero/disk$i.img
      done
      ```
 
+   * If `data_iface` field is specified, make sure that it refers to
+     an existing network interface (it should be present in the output
+     of `ifconfig` command).
+
 3. Start the cluster:
    ```sh
-   ./bootstrap ./cfgen/_misc/singlenode.yaml
+   ./bootstrap cfgen/_misc/singlenode.yaml
    ```
 
 ### Multi-node setup
 
-For multi-node cluster the steps are the same as for single-node. Installation and node preparation steps should be done on each node. The cluster descripion file preparation and bootstrap command run can be done on any server node (the one which is configured to run confd).
+For multi-node cluster the steps are similar to those of single-node.
+Steps 1 and 2 should be done on each of the nodes.  The bootstrap
+command may be executed on any server node (i.e., on any of the nodes
+configured to run confd).
+
+Consider using `cfgen/_misc/ees-cluster.yaml`, which describes a
+two-node cluster.
+
+```sh
+./bootstrap cfgen/_misc/ees-cluster.yaml
+```
 
 ## Observe
 
