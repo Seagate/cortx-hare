@@ -58,16 +58,12 @@ The scripts in this repository constitute a middleware layer between [Consul](ht
 ### Multi-node setup
 
 For multi-node cluster the steps are similar to those of single-node.
-Steps 1 and 2 should be done on each of the nodes.  The bootstrap
+Steps 1 and 2 should be done for each of the nodes.  The bootstrap
 command may be executed on any server node (i.e., on any of the nodes
 configured to run confd).
 
-Consider using `cfgen/_misc/ees-cluster.yaml`, which describes a
-two-node cluster.
-
-```sh
-./bootstrap cfgen/_misc/ees-cluster.yaml
-```
+Use `cfgen/_misc/ees-cluster.yaml` (which describes a two-node cluster)
+as an example.
 
 ## Observe
 
