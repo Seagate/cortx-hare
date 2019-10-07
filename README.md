@@ -65,19 +65,23 @@ configured to run confd).
 Use `cfgen/_misc/ees-cluster.yaml` (which describes a two-node cluster)
 as an example.
 
+## Test I/O
+
+```sh
+cp $M0_SRC_DIR/clovis/m0crate/tests/test1_io.yaml .
+./update-m0crate-io-test-conf test1_io.yaml
+dd if=/dev/urandom of=/tmp/128M bs=1M count=100
+sudo $M0_SRC_DIR/clovis/m0crate/m0crate -S test1_io.yaml
+```
+
 ## Observe
 
-* RC leader election log:
-  ```sh
-  tail -f /tmp/consul-elect-rc-leader.log
-  ```
+### Consul web UI
 
-* RC log:
-  ```sh
-  tail -f /tmp/consul-proto-rc.log
-  ```
+To view the [Consul UI](https://learn.hashicorp.com/consul/getting-started/ui#set-up-access-to-the-ui),
+open `http://<vm-ip-address>:8500/ui` URL in your browser.
 
-* Check if the RC leader has been elected:
+### The RC leader
 
 ```
 $ consul kv get -detailed leader
@@ -90,20 +94,25 @@ Session          d5f3f364-6f79-48cd-b452-913321b2c743
 Value            sage75
 ```
 
-***Note:*** The presence of the `Session` ID indicates that the leader has been elected.
+***Note:*** The presence of the `Session` line indicates that the leader
+has been elected.
 
-### Consul web UI
+### Logs
 
-To view the [Consul UI](https://learn.hashicorp.com/consul/getting-started/ui#set-up-access-to-the-ui), open `http://<vm-ip-address>:8500/ui` URL in your browser.
+* RC leader election log:
+  ```sh
+  tail -f /tmp/consul-elect-rc-leader.log
+  ```
 
-## Test I/O
+* RC log:
+  ```sh
+  tail -f /tmp/consul-proto-rc.log
+  ```
 
-```sh
-cp $M0_SRC_DIR/clovis/m0crate/tests/test1_io.yaml .
-./update-m0crate-io-test-conf test1_io.yaml
-dd if=/dev/urandom of=/tmp/128M bs=1M count=100
-sudo $M0_SRC_DIR/clovis/m0crate/m0crate -S test1_io.yaml
-```
+* System log:
+  ```sh
+  journalctl --since <HH:MM> # bootstrap time
+  ```
 
 ## Miscellanea
 
