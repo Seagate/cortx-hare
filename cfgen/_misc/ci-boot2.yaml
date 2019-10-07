@@ -1,0 +1,26 @@
+# This file is used by "test-boot2" CI job; see `.gitlab-ci.yml`.
+hosts:
+  - name: ssu1
+    data_iface: eth1
+    m0_servers:
+      - runs_confd: true
+      - io_disks: { path_glob: "/dev/vd[b-g]*" }
+    c0_clients: 2
+    m0t1fs_clients: 0
+  - name: ssu2
+    data_iface: eth1
+    m0_servers:
+      # XXX Currently the bootstrap fails unless both nodes run confd ---
+      # IOS' m0d-mkfs fails on ssu1 with the error message shown in issue #102.
+      #
+      # TODO: Remove this `runs_confd` line once issue #102 is resolved.
+      - runs_confd: true
+      - io_disks: { path_glob: "/dev/vd[b-g]*" }
+    c0_clients: 2
+    m0t1fs_clients: 0
+pools:
+  - name: the pool
+    disks: all
+    data_units: 1
+    parity_units: 0
+    # allowed_failures: { site: 0, rack: 0, encl: 0, ctrl: 0, disk: 0 }

@@ -24,7 +24,6 @@ before_script:
 after_script:
   - date -u -Isec
 
-
 # Build ------------------------------------------------------------------- {{{1
 #
 
@@ -78,8 +77,44 @@ build:
                   $DOCKER_REGISTRY/mero/hare:$CENTOS_RELEASE
                       bash -x _build-hax.sh
 
-    # containers run commands as 'root' user, seize ownership back
+    # Containers run commands as 'root' user.  Restore the ownership.
     - sudo chown -R $(id -u):$(id -g) .
+
+    # Prepare a script that will be used by `test-boot*` jobs.
+    - |
+      cat >hare/_init-node.sh <<'EOF'
+      set -eu -o pipefail
+
+      sudo yum install -y python36 python36-devel python36-PyYAML python36-pip
+      sudo pip3 install ply
+
+      cd /tmp
+      download=https://github.com/dhall-lang/dhall-haskell/releases/download
+      for f in $download/1.26.1/dhall-1.26.1-x86_64-linux.tar.bz2 \
+               $download/1.26.1/dhall-json-1.4.1-x86_64-linux.tar.bz2; do
+          curl -LO $f
+          sudo tar -C /usr/local/ -xf ${f##*/}
+      done
+
+      curl -LO https://releases.hashicorp.com/consul/1.6.1/consul_1.6.1_linux_amd64.zip
+      unzip -x consul_1.6.1_linux_amd64.zip
+      sudo mv consul /usr/local/bin/
+
+      sudo mkdir -p /var/mero
+      for i in {0..9}; do
+          sudo dd if=/dev/zero of=/var/mero/disk$i.img bs=1M seek=9999 count=1
+          sudo losetup /dev/loop$i /var/mero/disk$i.img
+      done
+
+      # XXX `systemctl start hax` command, called by `bootstrap-node` script,
+      # will fail unless `mero-kernel` systemd service is installed.
+      sudo /data/mero/scripts/install-mero-service
+
+      bash -x /data/hare/install
+      EOF
+
+# Test ----------------------------------------------------------------- {{{1
+#
 
 test-cfgen:
   stage: test
@@ -97,18 +132,19 @@ test-cfgen:
                   $DOCKER_REGISTRY/mero/hare:$CENTOS_RELEASE
                       make -C cfgen
 
-test-bootstrap:
+
+test-boot1:
   stage: test
   tags: [ m0vg ]
   except: [ tags ]
 
   variables:
-    M0VG: ./m0vg-single/scripts/m0vg
+    M0VG: m0vg-1node/scripts/m0vg
 
   before_script:
-    # can't be defined in the 'variables:' section because it supports only
-    # sinle level of variable expansion, e.g. A=$VAR; B=$A won't work for B
-    - export JOB_NAME="${WORKSPACE_NAME}-${CI_JOB_NAME}-single"
+    # Cannot be defined in the 'variables:' section because it supports only
+    # sinle level of variable expansion, i.e., A=$VAR; B=$A won't work for B.
+    - export JOB_NAME="${WORKSPACE_NAME}-${CI_JOB_NAME}"
 
     - cd ${WORKSPACE_DIR}
 
@@ -116,12 +152,11 @@ test-bootstrap:
     - printenv
 
     - |
-      test -d m0vg-single ||
-      git clone --recursive --depth 1 --shallow-submodules \
-                http://gitlab.mero.colo.seagate.com/mero/mero.git \
-                m0vg-single
+      d=${M0VG%%/*}
+      [[ -d $d ]] || git clone --recursive --depth 1 --shallow-submodules \
+          http://gitlab.mero.colo.seagate.com/mero/mero.git $d
 
-    # Prepare m0vg singlenode.
+    # Prepare m0vg (singlenode).
     - |
       $M0VG env add <<EOF
       M0_VM_BOX=centos75/dev-halon
@@ -134,43 +169,21 @@ test-bootstrap:
     - time $M0VG reload --no-provision cmu
 
   script:
+    - time $M0VG run 'bash -x /data/hare/_init-node.sh'
     - |
-      cat >hare/_test-bootstrap.sh <<'EOF'
+      cat >hare/_test-boot1.sh <<'EOF'
       set -eu -o pipefail
 
-      sudo yum install -y python36 python36-devel python36-PyYAML python36-pip
-      sudo pip3 install ply
-
-      download=https://github.com/dhall-lang/dhall-haskell/releases/download
-      for f in $download/1.26.1/dhall-1.26.1-x86_64-linux.tar.bz2 \
-               $download/1.26.1/dhall-json-1.4.1-x86_64-linux.tar.bz2; do
-          curl -LO $f
-          sudo tar -C /usr/local/ -xf ${f##*/}
-      done
-
-      curl -LO https://releases.hashicorp.com/consul/1.6.1/consul_1.6.1_linux_amd64.zip
-      unzip -x consul_1.6.1_linux_amd64.zip
-      sudo mv consul /usr/local/bin/
-
-      cd /data/mero
-      sudo ./utils/m0setup  # create loop devices
-
       cd /data/hare/
-      bash -x ./install
-
-      # XXX `systemctl start hax` command, called by `bootstrap-node` script,
-      # will fail unless `mero-kernel` systemd service is installed.
-      sudo /data/mero/scripts/install-mero-service
-
       bash -x ./bootstrap cfgen/_misc/singlenode.yaml
 
-      # Run a smoke I/O test.
-      cp /data/mero/clovis/m0crate/tests/test1_io.yaml ./
+      # Run an I/O test.
+      cp /data/mero/clovis/m0crate/tests/test1_io.yaml .
       ./update-m0crate-io-test-conf test1_io.yaml
       dd if=/dev/urandom of=/tmp/128M bs=1M count=100
       sudo /data/mero/clovis/m0crate/m0crate -S test1_io.yaml
       EOF
-    - time $M0VG run 'bash -x /data/hare/_test-bootstrap.sh'
+    - time $M0VG run 'bash -x /data/hare/_test-boot1.sh'
 
   after_script:
     - cd ${WORKSPACE_DIR}
@@ -179,6 +192,70 @@ test-bootstrap:
     # job restart, when global 'cleanup' stage is not performed.
     - $M0VG destroy -f || true
 
+
+test-boot2:
+  stage: test
+  tags: [ m0vg ]
+  except: [ tags ]
+
+  variables:
+    M0VG: m0vg-2nodes/scripts/m0vg
+
+  before_script:
+    # Cannot be defined in the 'variables:' section because it supports only
+    # sinle level of variable expansion, i.e., A=$VAR; B=$A won't work for B.
+    - export JOB_NAME="${WORKSPACE_NAME}-${CI_JOB_NAME}"
+
+    - cd ${WORKSPACE_DIR}
+
+    - date -u -Isec
+    - printenv
+
+    - |
+      d=${M0VG%%/*}
+      [[ -d $d ]] || git clone --recursive --depth 1 --shallow-submodules \
+          http://gitlab.mero.colo.seagate.com/mero/mero.git $d
+
+    # Prepare m0vg (two nodes).
+    - |
+      $M0VG env add <<EOF
+      M0_VM_BOX=centos75/dev-halon
+      M0_VM_BOX_URL='http://ci-storage.mero.colo.seagate.com/vagrant/centos75/dev'
+      M0_VM_CMU_MEM_MB=4096
+      M0_VM_NAME_PREFIX=${JOB_NAME}
+      M0_VM_HOSTNAME_PREFIX=${JOB_NAME}
+      EOF
+    - time $M0VG up --no-provision ssu1
+    - time $M0VG reload --no-provision ssu1
+    - time $M0VG up --no-provision ssu2
+    - time $M0VG reload --no-provision ssu2
+
+  script:
+    - time $M0VG run --vm ssu1 'bash -x /data/hare/_init-node.sh'
+    - time $M0VG run --vm ssu2 'bash -x /data/hare/_init-node.sh'
+    - sed -ri "s/(ssu[12])/${JOB_NAME}-\\1/" hare/cfgen/_misc/ci-boot2.yaml
+    - |
+      cat >hare/_test-boot2.sh <<'EOF'
+      set -eu -o pipefail
+
+      # Don't require passphrase to ssh $OTHER_HOST.
+      kh=~/.ssh/known_hosts
+      ssh-keyscan -t rsa $OTHER_HOST >$kh
+      chmod 0600 $kh
+
+      cd /data/hare/
+      bash -x ./bootstrap cfgen/_misc/ci-boot2.yaml
+      EOF
+    - |
+      time $M0VG run --vm ssu1 \
+          "OTHER_HOST=${JOB_NAME}-ssu2 bash -x /data/hare/_test-boot2.sh"
+
+  after_script:
+    - cd ${WORKSPACE_DIR}
+
+    # Clean up.  This ensures that VMs are destroyed in case of a manual
+    # job restart, when global 'cleanup' stage is not performed.
+    - $M0VG destroy -f || true
 
 # Cleanup ----------------------------------------------------------------- {{{1
 #
