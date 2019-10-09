@@ -23,6 +23,48 @@ say() {
     echo -n "$(date '+%F %T'): $*"
 }
 
+get_server_nodes() {
+    jq -r '.servers[] | "\(.hostname) \(.ipaddr)"' $cfgen_out/consul-agents.json
+}
+
+get_client_nodes() {
+    jq -r '.clients[] | "\(.hostname) \(.ipaddr)"' $cfgen_out/consul-agents.json
+}
+
+get_all_nodes() {
+    jq -r '(.servers + .clients)[] | "\(.hostname) \(.ipaddr)"' \
+        $cfgen_out/consul-agents.json
+}
+
+get_session() {
+    consul kv get -detailed leader | awk '/Session/ {print $2}'
+}
+
+get_session_checks_nr() {
+    local sid=$1
+    curl -sX GET http://localhost:8500/v1/session/info/$sid |
+        jq -r '.[].Checks|length'
+}
+
+wait_rc_leader() {
+    local count=1
+    while [[ $(get_session) == '-' ]]; do
+        if (($count > 5)); then
+            consul kv put leader elect$RANDOM > /dev/null
+            count=1
+        fi
+        sleep 1
+        echo -n '.'
+        ((count++))
+    done
+}
+
+wait4() {
+    for pid in $*; do
+        wait $pid
+    done
+}
+
 say 'Generating cluster configuration... '
 cfgen_out=/tmp
 
@@ -33,14 +75,6 @@ sudo mkdir -p /etc/mero
 dhall text < $cfgen_out/confd.dhall |
     $M0_SRC_DIR/utils/m0confgen > $cfgen_out/confd.xc
 
-get_server_nodes() {
-    jq -r '.servers[] | "\(.hostname) \(.ipaddr)"' $cfgen_out/consul-agents.json
-}
-
-get_client_nodes() {
-    jq -r '.clients[] | "\(.hostname) \(.ipaddr)"' $cfgen_out/consul-agents.json
-}
-
 # Get my IP address (the one that the other agents will join to).
 read _ join_ip <<< $(get_server_nodes | grep -w $HOSTNAME)
 
@@ -50,7 +84,7 @@ read _ join_ip <<< $(get_server_nodes | grep -w $HOSTNAME)
 }
 echo 'Ok.'
 
-say 'Starting our Consul server agent... '
+say 'Starting Consul server agent on this node... '
 # $join_ip is our bind_ip address
 $SRC_DIR/mk-consul-env --mode server --bind $join_ip \
                        --extra-options '-ui -bootstrap-expect 1'
@@ -67,35 +101,45 @@ jq '[.[] | {key, value: (.value | @base64)}]' < $cfgen_out/consul-kv.json |
     consul kv import - > /dev/null
 echo 'Ok.'
 
-say 'Starting other Consul server agents... '
+say 'Starting Consul agents on remaining cluster nodes... '
+pids=()
 while read node bind_ip; do
     ssh $node "$SRC_DIR/mk-consul-env --mode server --bind $bind_ip \
                                       --join $join_ip &&
-               sudo systemctl start consul-agent"
+               sudo systemctl start consul-agent" &
+    pids+=($!)
 done < <(get_server_nodes | grep -vw $HOSTNAME || true)
-echo 'Ok.'
 
-say 'Starting Consul client agents... '
 while read node bind_ip; do
     ssh $node "$SRC_DIR/mk-consul-env --mode client --bind $bind_ip \
                                       --join $join_ip &&
-                   sudo systemctl start consul-agent"
+                   sudo systemctl start consul-agent" &
+    pids+=($!)
 done < <(get_client_nodes)
+wait4 ${pids[@]-}
+echo 'Ok.'
+
+say 'Update Consul agents configs from the KV Store... '
+$SRC_DIR/update-consul-conf &
+pids=($!)
+while read node _; do
+    ssh $node "$SRC_DIR/update-consul-conf" &
+    pids+=($!)
+done < <(get_all_nodes | grep -vw $HOSTNAME || true)
+wait4 ${pids[@]}
 echo 'Ok.'
 
 say 'Waiting for the RC Leader to be elected...'
-get_session() {
-    consul kv get -detailed leader | awk '/Session/ {print $2}'
-}
-count=1
-while [[ $(get_session) == '-' ]]; do
-    if (($count > 5)); then
-        consul kv put leader elect$RANDOM > /dev/null
-        count=1
-    fi
-    sleep 1
-    echo -n '.'
-    ((count++))
+wait_rc_leader
+sid=$(get_session)
+# There is always the serfHealth check in the session. But
+# if it is the only one - we should destroy the current session
+# (and wait for re-election to happen) to make sure that the new
+# session will be bound to the Mero services checks also.
+while (( $(get_session_checks_nr $sid) == 1 )); do
+    curl -sX PUT http://localhost:8500/v1/session/destroy/$sid &>/dev/null
+    wait_rc_leader
+    sid=$(get_session)
 done
 echo ' Ok.'
 
@@ -108,12 +152,9 @@ while read node _; do
     scp -q $cfgen_out/confd.xc $node:/tmp/
     ssh $node $SRC_DIR/bootstrap-node phase1 &
     pids+=($!)
+# Note: confd-s are running on server nodes only.
 done < <(get_server_nodes | grep -vw $HOSTNAME || true)
-
-# Check the status explicitly from each node.
-for pid in ${pids[@]}; do
-    wait $pid
-done
+wait4 ${pids[@]}
 echo 'Ok.'
 
 # Now the 2nd phase (ios-es).
@@ -124,17 +165,8 @@ pids=($!)
 while read node _; do
     ssh $node $SRC_DIR/bootstrap-node phase2 &
     pids+=($!)
-done < <(get_server_nodes | grep -vw $HOSTNAME || true)
-
-while read node _; do
-    ssh $node $SRC_DIR/bootstrap-node phase2 &
-    pids+=($!)
-done < <(get_client_nodes)
-
-# Check the status explicitly from each node.
-for pid in ${pids[@]}; do
-    wait $pid
-done
+done < <(get_all_nodes | grep -vw $HOSTNAME || true)
+wait4 ${pids[@]}
 echo 'Ok.'
 
 say 'Checking the health of the services... '

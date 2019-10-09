@@ -41,21 +41,7 @@ die() {
 systemctl list-unit-files | grep -qE '^mero-kernel\.service\>' ||
     die "'mero-kernel' systemd service is not installed"
 
-# If it is a server node, we don't need to update Consul configuration
-# two times (once for each phase).  If it is a client node, we should
-# update the configuration file on phase2. (There is no phase1 on client
-# nodes --- they don't run confd.)
-if [[ $phase == phase1 ]]; then
-    # XXX We need to pass an empty string (actually, any argument) explicitly,
-    # otherwise the sourced file will inherit the value of `$*` from current
-    # script and its CLI arguments validation will fail.
-    . $SRC_DIR/update-consul-conf ''
-else
-    . $SRC_DIR/update-consul-conf -n  # do not update, only import variables
-    if [[ -z $CONFD_IDs ]]; then
-        . $SRC_DIR/update-consul-conf ''  # client node, update
-    fi
-fi
+. $SRC_DIR/update-consul-conf --dry-run  # import CONFD_IDs, IOS_IDs, id2fid()
 
 if [[ -n $CONFD_IDs || -n $IOS_IDs ]]; then
     sudo mkdir -p /var/mero/hax
@@ -84,7 +70,7 @@ for id in $IDs; do
     fid=$(id2fid $id)
     sudo systemctl start mero-mkfs@$fid
     touch /tmp/mero-mkfs-pass-$fid
-    # Give time for service checker to reset m0mkfs' HA state:
+    # Give time for service check to reset m0mkfs' HA state:
     # (1s * 2) - time of two checks + 1s. (See check-service.)
     sleep 3
     sudo systemctl start m0d@$fid

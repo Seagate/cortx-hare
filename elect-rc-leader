@@ -4,7 +4,7 @@ set -eu -o pipefail
 #
 # This is the handler for RC Leader election.
 #
-# It creates the session with confd health checker and
+# It creates the session with confd health check and
 # tries to acquire the leader lock with this session.
 #
 # Use it like this:
@@ -33,7 +33,7 @@ pkill -f 'sh.*proto-rc' || true
 
 # Create session with the service:confd Health Checker:
 CHECKS=$(curl -s http://127.0.0.1:8500/v1/health/node/`hostname` | jq '[.[].CheckID]')
-PAYLD="{\"Name\": \"leader\", \"Checks\": $CHECKS}"
+PAYLD="{\"Name\": \"leader\", \"Checks\": $CHECKS, \"LockDelay\": \"2s\"}"
 RES=$(curl -sX PUT -d "$PAYLD" http://localhost:8500/v1/session/create)
 SID=$(echo "$RES" | jq -r '.ID' 2>/dev/null || true)
 
