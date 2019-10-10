@@ -1129,18 +1129,19 @@ def generate_consul_kv(m0conf: Dict[Oid, Any], dhall_dir: str) -> str:
         ('node_name', str), ('proc_id', Oid), ('svc_types', str), ('ep', str)])
 
     def profile() -> str:
-        for profile_id, profile in m0conf.items():
-            if profile_id.type is ObjT.profile:
-                return fid2str(profile_id)
-        return ''
+        profiles = [x for x in m0conf.keys() if x.type is ObjT.profile]
+        assert len(profiles) != 0
+        # Need to return all when it support multiple profiles
+        return fid2str(profiles[0])
 
-    def sns_pools() -> List[Oid]:
+    def sns_pools() -> str:
         for root_id, root in m0conf.items():
             if root_id.type is ObjT.root:
-                return [x for x in root.pools
-                        if x is not root.mdpool and
-                        root.imeta_pver not in m0conf[x].pvers]
-        return []
+                return ' '.join([fid2str(x) for x in root.pools
+                                 if x is not root.mdpool and
+                                 root.imeta_pver not in m0conf[x].pvers])
+        assert len([])
+        return ''
 
     def services() -> Iterator[ConsulService]:
         for node_id, node in m0conf.items():
@@ -1161,7 +1162,7 @@ def generate_consul_kv(m0conf: Dict[Oid, Any], dhall_dir: str) -> str:
         ('epoch', 1),
         ('last_fidk', _fidk_gen),
         ('profile', profile()),
-        *[(f'profile/pool/{x.fidk}', f'{fid2str(x)}') for x in sns_pools()],
+        ('profile/pools', sns_pools()),
         *[(f'node/{x.node_name}/service/{x.proc_id.fidk}/types',
            f'{x.svc_types}') for x in services()],
         *[(f'node/{x.node_name}/service/{x.proc_id.fidk}/ep', f'{x.ep}')
