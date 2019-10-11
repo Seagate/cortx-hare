@@ -49,13 +49,13 @@ get_session_checks_nr() {
 wait_rc_leader() {
     local count=1
     while [[ $(get_session) == '-' ]]; do
-        if (($count > 5)); then
+        if (( $count > 5 )); then
             consul kv put leader elect$RANDOM > /dev/null
             count=1
         fi
         sleep 1
         echo -n '.'
-        ((count++))
+        (( count++ ))
     done
 }
 
@@ -63,6 +63,14 @@ wait4() {
     for pid in $*; do
         wait $pid
     done
+}
+
+get_ready_agents() {
+    consul members | sed 1d | awk '{print $1}'
+}
+
+get_ready_agents_nr() {
+    consul members | sed 1d | wc -l
 }
 
 say 'Generating cluster configuration... '
@@ -101,7 +109,7 @@ jq '[.[] | {key, value: (.value | @base64)}]' < $cfgen_out/consul-kv.json |
     consul kv import - > /dev/null
 echo 'Ok.'
 
-say 'Starting Consul agents on remaining cluster nodes... '
+say 'Starting Consul agents on remaining cluster nodes...'
 pids=()
 while read node bind_ip; do
     ssh $node "$SRC_DIR/mk-consul-env --mode server --bind $bind_ip \
@@ -117,7 +125,22 @@ while read node bind_ip; do
     pids+=($!)
 done < <(get_client_nodes)
 wait4 ${pids[@]-}
-echo 'Ok.'
+agents_nr=$(( ${#pids[@]} + 1 ))
+
+# Waiting for the agents to get ready...
+count=1
+while (( $(get_ready_agents_nr) != $agents_nr )); do
+    if (( $count > 5 )); then
+        echo 'Some agent(s) failed to start in a due time:' >&2
+        diff <(get_ready_agents | sort) \
+             <(get_all_nodes | awk '{print $1}' | sort) | sed 1d >&2
+        exit 1
+    fi
+    echo -n '.'
+    sleep 1
+    (( count++ ))
+done
+echo ' Ok.'
 
 say 'Update Consul agents configs from the KV Store... '
 $SRC_DIR/update-consul-conf &
@@ -180,12 +203,12 @@ count=1
 for svc in confd ios; do
     svc_not_ready=$(check_service $svc)
     while [[ $svc_not_ready ]]; do
-        if (($count > 5)); then
+        if (( $count > 5 )); then
             echo $svc_not_ready >&2
             echo "Check '$svc' service on the node(s) listed above." >&2
             exit 1
         fi
-        ((count++))
+        (( count++ ))
         sleep 1
         svc_not_ready=$(check_service $svc)
     done
