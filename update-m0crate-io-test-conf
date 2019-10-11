@@ -24,12 +24,8 @@ conf_file=$1
     usage >&2; exit 1
 }
 
-# XXX this should be updated after we have profile fid in the KV Store.
 get_profile() {
-    cat /etc/mero/confd.xc |
-        $M0_SRC_DIR/utils/m0confgen --from xcode --to confgen |
-        awk '/^.profile/ {sub(/.profile-/, "", $1);
-                          printf("0x7000000000000001:0x%x\n", $1)}'
+    consul kv get profile
 }
 
 get_fids() {
