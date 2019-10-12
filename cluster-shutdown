@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 
 import consul
-import json
 from typing import List, NamedTuple
 from socket import gethostname
 import os
 
 
-Process = NamedTuple('Process', [('name', str), ('fidk', int), ('ep', str)])
+other_p = ['hax', 'consul-agent']
+mero_p = ['ios', 'confd']
+Process = NamedTuple('Process', [('node', str), ('name', str),
+                                 ('fidk', int), ('status', str)])
 
 
 def processfid2str(fidk: int) -> str:
@@ -19,32 +21,19 @@ def get_kv(c: consul, key: str) -> str:
     return kv['Value'].decode() if kv is not None else ''
 
 
-def hosts(c: consul) -> List:
-    data = c.kv.get('node', recurse=True)[1]
-    host_names = set([(x['Key'].split("/"))[1] for x in data])
+def processes_get(c: consul) -> List[Process]:
+    processes = []
+    c = consul.Consul()
+    for node in c.catalog.nodes()[1]:
+        svcs_status = c.health.node(node['Node'])
+        processes.extend([Process(node=node['Node'], name=svc['ServiceName'],
+                                  fidk=svc['ServiceID'], status=svc['Status'])
+                         for svc in svcs_status[1]
+                         if svc['ServiceName'] != ''])
 
-    return host_names
-
-
-def svc2name(types: str) -> str:
-    if 'ios' in types.split(" "):
-        return 'ioservice'
-    elif 'ha' in types.split(" "):
-        return 'hax'
-    elif 'confd' in types.split(" "):
-        return 'confd'
-    else:
-        return 'c0_client'
-
-
-def processes(c: consul, host: str) -> List:
-    data = c.kv.get(f'node/{host}/service', recurse=True)[1]
-    fidk_list = list(set([(x['Key'].split("/"))[3] for x in data]))
-    fidk_list.sort(key=int, reverse=False)
-
-    return [Process(name=svc2name(get_kv(c, f'node/{host}/service/{x}/types')),
-                    fidk=int(x), ep=get_kv(c, f'node/{host}/service/{x}/ep'))
-            for x in fidk_list]
+        processes.append(Process(node=node['Node'], name='consul-agent',
+                                 fidk=0, status=consul_status(node['Node'])))
+    return processes
 
 
 def is_localhost(hostname: str) -> bool:
@@ -52,64 +41,57 @@ def is_localhost(hostname: str) -> bool:
     return hostname in ('localhost', '127.0.0.1', name, f'{name}.local')
 
 
-def process_status(c: consul, host: str, ps: Process) -> str:
-    attr_str = get_kv(c, f'processes/{processfid2str(ps.fidk)}')
-    if attr_str != '':
-        attr = json.loads(attr_str)
-        return attr['state'][len('M0_CONF_HA_PROCESS_'):].lower()
-    else:
-        return 'unknown'
-
-
 def consul_status(host: str) -> str:
     cmd = '{}sudo systemctl is-active --quiet consul-agent'.format(
         '' if is_localhost(host) else f'ssh {host} ')
-    return 'started' if os.system(cmd) == 0 else 'offline'
+    return 'passing' if os.system(cmd) == 0 else 'offline'
 
 
-other_p = ['hax', 'consul-agent']
-mero_p = ['c0_client', 'ioservice', 'confd']
-def process_stop(c: consul, h: str, ps: Process):
+def exec(cmd) -> str:
+    return 'done' if os.system(cmd) == 0 else 'failed'
 
-    def exec_stop(cmd) -> str:
-        return 'done' if os.system(cmd) == 0 else 'failed'
 
-    state = (consul_status(h) if ps.name == 'consul-agent'
-                              else process_status(c, h, ps))
-    if state == 'started':
+def process_stop(h: str, ps: Process):
+    if ps.status == 'passing':
         sname = (ps.name if ps.name in other_p
-                         else f'm0d@{processfid2str(ps.fidk)}')
+                 else f'm0d@{processfid2str(int(ps.fidk))}')
         cmd = '{}sudo systemctl stop --force {}'.format(
             '' if is_localhost(h) else f'ssh {h} ', sname)
-        print(f'Stopping {ps.name} ({sname}) on {h}...{exec_stop(cmd)}')
+        print(f'Stopping {ps.name} ({sname}) on {h}...{exec(cmd)}')
 
 
-def processbyname(ps: List[Process], pname: str) -> List[Process]:
-    return [x for x in ps if x.name == pname]
+def stop_watcher(host: str):
+    cmd = '{}sudo pkill -9 consul'.format(
+        '' if is_localhost(host) else f'ssh {host} ')
+    print(f'Stopping consul watcher on {host}...{exec(cmd)}')
 
 
-def node_stop(c: consul, node: str):
-    ps = processes(c, node)
-    ps.append(Process(name='consul-agent', fidk=0, ep=''))
+def node_stop(node: str, ps: List):
+
+    def processbyname(ps: List[Process], pname: str) -> List[Process]:
+        return [p for p in ps if p.name == pname]
+
     for t in mero_p + other_p:
         for p in processbyname(ps, t):
-            process_stop(c, node, p)
+            if p.node == node:
+                process_stop(node, p)
 
 
 def main():
-    if consul_status(gethostname()) != 'started':
+    if consul_status(gethostname()) != 'passing':
         print('Cluster is not running.')
         return -1
 
     c = consul.Consul()
-
+    processes = processes_get(c)
     leader = get_kv(c, 'leader')
-    for h in hosts(c):
-        if h != leader:
-            node_stop(c, h)
 
-    # leader stops at the end
-    node_stop(c, leader)
+    for node in set(p.node for p in processes):
+        if node != leader:
+            node_stop(node, processes)
+
+    node_stop(leader, processes)
+    stop_watcher(leader)
 
 
 if __name__ == '__main__':
