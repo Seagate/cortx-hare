@@ -7,7 +7,6 @@ from enum import Enum, auto
 from glob import glob
 import json
 import os
-from packaging.version import Version
 from pprint import pprint
 import random
 import re
@@ -108,7 +107,7 @@ pools:
 def main(argv=None):
     opts = parse_opts(argv)
     try:
-        check_dhall_version()
+        check_dhall_versions()
         input_str = sys.stdin.read()
         validate_schema(input_str, os.path.join(opts.dhall_dir, 'types',
                                                 'ClusterDesc.dhall'))
@@ -134,29 +133,6 @@ def main(argv=None):
             f.write(generate(*args))
 
 
-def check_dhall_version():
-    try:
-        # check if yaml-to-dhall is properly installed.
-        proc = subprocess.Popen(['yaml-to-dhall', '--version'],
-                                stdout=subprocess.PIPE)
-        out, err = proc.communicate(timeout=15)
-        ver = out.strip().decode()
-        if Version(ver) < Version('1.4.1'):
-            die('Package yaml-to-dhall >= 1.4.1 is required but {} is \
-                installed.'.format(ver))
-
-        # check if dhall is properly installed.
-        proc = subprocess.Popen(['dhall', '--version'],
-                                stdout=subprocess.PIPE)
-        out, err = proc.communicate(timeout=15)
-        ver = out.strip().decode()
-        if Version(ver) < Version('1.26.1'):
-            die('Package dhall >= 1.26.1 is required but {} is installed.'
-                .format(ver))
-    except FileNotFoundError:
-        die('Install yaml-to-dhall >= 1.4.1 and dhall >= 1.26.1.')
-
-
 def die(msg: str, status: int = 1):
     assert msg
     assert status != 0
@@ -171,6 +147,22 @@ def all_unique(xs) -> bool:
         # `xs` is a generator.  We should not consume it twice.
         xs = list(xs)
     return len(xs) == len(set(xs))
+
+
+def check_dhall_versions() -> None:
+    # See https://github.com/dhall-lang/dhall-haskell/releases
+    versions = {'dhall': '1.26.1', 'yaml-to-dhall': '1.4.1'}
+
+    for exe, ver in versions.items():
+        try:
+            proc = subprocess.Popen([exe, '--version'], stdout=subprocess.PIPE)
+        except FileNotFoundError as err:
+            print(str(err), file=sys.stderr)
+            die(f'{exe} >= {ver} required')
+
+        out = proc.communicate(timeout=15)[0]
+        if out.strip().decode() < ver:
+            die(f'{exe} >= {ver} required')
 
 
 def validate_schema(input_str: str, schema_path: str) -> None:
