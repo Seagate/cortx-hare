@@ -7,6 +7,7 @@ from enum import Enum, auto
 from glob import glob
 import json
 import os
+from packaging.version import Version
 from pprint import pprint
 import random
 import re
@@ -107,6 +108,7 @@ pools:
 def main(argv=None):
     opts = parse_opts(argv)
     try:
+        check_dhall_version()
         input_str = sys.stdin.read()
         validate_schema(input_str, os.path.join(opts.dhall_dir, 'types',
                                                 'ClusterDesc.dhall'))
@@ -130,6 +132,29 @@ def main(argv=None):
     for path, generate, *args in outs:
         with open(os.path.join(opts.output_dir, path), 'w') as f:
             f.write(generate(*args))
+
+
+def check_dhall_version():
+    try:
+        # check if yaml-to-dhall is properly installed.
+        proc = subprocess.Popen(['yaml-to-dhall', '--version'],
+                                stdout=subprocess.PIPE)
+        out, err = proc.communicate(timeout=15)
+        ver = out.strip().decode()
+        if Version(ver) < Version('1.4.1'):
+            die('Package yaml-to-dhall >= 1.4.1 is required but {} is \
+                installed.'.format(ver))
+
+        # check if dhall is properly installed.
+        proc = subprocess.Popen(['dhall', '--version'],
+                                stdout=subprocess.PIPE)
+        out, err = proc.communicate(timeout=15)
+        ver = out.strip().decode()
+        if Version(ver) < Version('1.26.1'):
+            die('Package dhall >= 1.26.1 is required but {} is installed.'
+                .format(ver))
+    except FileNotFoundError:
+        die('Install yaml-to-dhall >= 1.4.1 and dhall >= 1.26.1.')
 
 
 def die(msg: str, status: int = 1):
