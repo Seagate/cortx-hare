@@ -2,7 +2,7 @@
 
 import os
 from socket import gethostname
-from typing import List, NamedTuple
+from typing import Dict, List, NamedTuple
 
 import consul
 
@@ -17,7 +17,7 @@ def processfid2str(fidk: int) -> str:
 
 
 def get_kv(c: consul, key: str) -> str:
-    kv = c.kv.get(key)[1]
+    kv: Dict[str, bytes] = c.kv.get(key)[1]
     return kv['Value'].decode() if kv is not None else ''
 
 
