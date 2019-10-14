@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 
-import consul
-from typing import List, NamedTuple
-from socket import gethostname
 import os
+from socket import gethostname
+from typing import List, NamedTuple
 
+import consul
 
 other_p = ['hax', 'consul-agent']
 mero_p = ['ios', 'confd']
-Process = NamedTuple('Process', [('node', str), ('name', str),
-                                 ('fidk', int), ('status', str)])
+Process = NamedTuple('Process', [('node', str), ('name', str), ('fidk', int),
+                                 ('status', str)])
 
 
 def processfid2str(fidk: int) -> str:
@@ -26,13 +26,19 @@ def processes_get(c: consul) -> List[Process]:
     c = consul.Consul()
     for node in c.catalog.nodes()[1]:
         svcs_status = c.health.node(node['Node'])
-        processes.extend([Process(node=node['Node'], name=svc['ServiceName'],
-                                  fidk=svc['ServiceID'], status=svc['Status'])
-                         for svc in svcs_status[1]
-                         if svc['ServiceName'] != ''])
+        processes.extend([
+            Process(node=node['Node'],
+                    name=svc['ServiceName'],
+                    fidk=svc['ServiceID'],
+                    status=svc['Status']) for svc in svcs_status[1]
+            if svc['ServiceName'] != ''
+        ])
 
-        processes.append(Process(node=node['Node'], name='consul-agent',
-                                 fidk=0, status=consul_status(node['Node'])))
+        processes.append(
+            Process(node=node['Node'],
+                    name='consul-agent',
+                    fidk=0,
+                    status=consul_status(node['Node'])))
     return processes
 
 
@@ -53,8 +59,8 @@ def exec(cmd) -> str:
 
 def process_stop(h: str, ps: Process):
     if ps.status == 'passing':
-        sname = (ps.name if ps.name in other_p
-                 else f'm0d@{processfid2str(int(ps.fidk))}')
+        sname = (ps.name if ps.name in other_p else
+                 f'm0d@{processfid2str(int(ps.fidk))}')
         cmd = '{}sudo systemctl stop --force {}'.format(
             '' if is_localhost(h) else f'ssh {h} ', sname)
         print(f'Stopping {ps.name} ({sname}) on {h}...{exec(cmd)}')
@@ -67,7 +73,6 @@ def stop_watcher(host: str):
 
 
 def node_stop(node: str, ps: List):
-
     def processbyname(ps: List[Process], pname: str) -> List[Process]:
         return [p for p in ps if p.name == pname]
 
