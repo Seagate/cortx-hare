@@ -256,6 +256,7 @@ test-boot2:
     - time $M0VG run --vm ssu1 'bash -x /data/hare/_init-node.sh'
     - time $M0VG run --vm ssu2 'bash -x /data/hare/_init-node.sh'
     - sed -ri "s/(ssu[12])/${JOB_NAME}-\\1/" hare/cfgen/_misc/ci-boot2.yaml
+    - sed -ri "s/(ssu[12])/${JOB_NAME}-\\1/" hare/cfgen/_misc/ci-boot2-1confd.yaml
     - |
       cat >hare/_test-boot2.sh <<'EOF'
       set -eu -o pipefail
@@ -266,7 +267,12 @@ test-boot2:
       chmod 0600 $kh
 
       cd /data/hare/
+      # Server-server Consul agents configuration.
       time ./bootstrap --mkfs cfgen/_misc/ci-boot2.yaml
+
+      # Server-client Consul agents configuration.
+      ./cluster-shutdown
+      time ./bootstrap --mkfs cfgen/_misc/ci-boot2-1confd.yaml
       EOF
     - |
       time $M0VG run --vm ssu1 \
