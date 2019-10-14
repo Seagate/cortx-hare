@@ -5,19 +5,21 @@ export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
 
 # Helper script to bootstrap the cluster.
 
+PROG=${0##*/}
 SRC_DIR="$(dirname $(readlink -f $0))"
 M0_SRC_DIR=${M0_SRC_DIR:-${SRC_DIR%/*}/mero}
 
 usage() {
-    echo "Usage: ${0##*/} /path/to/cluster-description-file.yaml"
-}
+    cat <<EOF
+Usage: $PROG [--mkfs] cluster-description-file.yaml
 
-(($# == 1)) || {
-    usage >&2
-    exit 1
-}
+Bootstrap cluster described by the description file.
 
-cluster_descr=$1
+Options:
+  --mkfs                    Do m0mkfs (WARNING: wipes Mero data).
+  -h, --help                Show this help and exit.
+EOF
+}
 
 say() {
     echo -n "$(date '+%F %T'): $*"
@@ -72,6 +74,29 @@ get_ready_agents() {
 get_ready_agents_nr() {
     consul members | sed 1d | wc -l
 }
+
+TEMP=$(getopt --options h \
+              --longoptions help,mkfs \
+              --name "$PROG" -- "$@" || true)
+
+(($? == 0)) || { usage >&2; exit 1; }
+
+eval set -- "$TEMP"
+while true; do
+    case "$1" in
+        -h|--help)           usage; exit ;;
+        --mkfs)              opt_mkfs=--mkfs; shift ;;
+        --)                  shift; break ;;
+        *)                   break ;;
+    esac
+done
+
+(($# == 1)) || {
+    usage >&2
+    exit 1
+}
+
+cluster_descr=$1
 
 say 'Generating cluster configuration... '
 cfgen_out=/tmp
@@ -168,12 +193,12 @@ echo ' Ok.'
 
 # Start Mero in two phases: 1st confd-s, then ios-es.
 say 'Starting Mero (phase1)... '
-$SRC_DIR/bootstrap-node phase1 &
+$SRC_DIR/bootstrap-node ${opt_mkfs:-} --phase 1 &
 pids=($!)
 
 while read node _; do
     scp -q $cfgen_out/confd.xc $node:/tmp/
-    ssh $node $SRC_DIR/bootstrap-node phase1 &
+    ssh $node $SRC_DIR/bootstrap-node ${opt_mkfs:-} --phase 1 &
     pids+=($!)
 # Note: confd-s are running on server nodes only.
 done < <(get_server_nodes | grep -vw $HOSTNAME || true)
@@ -182,11 +207,11 @@ echo 'Ok.'
 
 # Now the 2nd phase (ios-es).
 say 'Starting Mero (phase2)... '
-$SRC_DIR/bootstrap-node phase2 &
+$SRC_DIR/bootstrap-node ${opt_mkfs:-} --phase 2 &
 pids=($!)
 
 while read node _; do
-    ssh $node $SRC_DIR/bootstrap-node phase2 &
+    ssh $node $SRC_DIR/bootstrap-node ${opt_mkfs:-} --phase 2 &
     pids+=($!)
 done < <(get_all_nodes | grep -vw $HOSTNAME || true)
 wait4 ${pids[@]}

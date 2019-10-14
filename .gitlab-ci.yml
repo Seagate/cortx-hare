@@ -131,7 +131,7 @@ build:
 
       cdf=$1
       cd /data/hare/
-      bash -x ./bootstrap $cdf
+      bash -x ./bootstrap --mkfs $cdf
 
       # Run an I/O test.
       cp /data/mero/clovis/m0crate/tests/test1_io.yaml .
@@ -258,7 +258,7 @@ test-boot2:
       chmod 0600 $kh
 
       cd /data/hare/
-      bash -x ./bootstrap cfgen/_misc/ci-boot2.yaml
+      bash -x ./bootstrap --mkfs cfgen/_misc/ci-boot2.yaml
       EOF
     - |
       time $M0VG run --vm ssu1 \
