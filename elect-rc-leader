@@ -22,17 +22,32 @@ get_session_id() {
     consul kv get -detailed leader | awk '/Session/ {print $2}'
 }
 
-# If the session is already set - the leader is elected, so
-# there is nothing for us to do.
-get_session_id | grep -q ^- || exit 0
+get_leader_node() {
+    curl -sX GET http://localhost:8500/v1/session/info/$(get_session_id) |
+        jq -r '.[] | .Node'
+}
 
-# Stop the EQ watch (if any):
-pkill -9 -f 'consul watch.*prefix eq' || true
-# Nicely stop currently running RC handler (if any):
-pkill -f 'sh.*proto-rc' || true
+cleanup() {
+    # Nicely stop currently running RC handler (if any):
+    pkill -9 -f 'consul watch.*prefix eq' || true
+    # Nicely stop currently running RC handler (if any):
+    pkill -f 'sh.*proto-rc' || true
+}
+
+# If the session is already set - the leader is elected, so
+# there is nothing to do (except cleanup after ourself).
+get_session_id | grep -q ^- || {
+    if [[ $(get_leader_node) != $HOSTNAME ]]; then
+        cleanup
+    fi
+    exit 0
+}
+
+cleanup
 
 # Create session with the service:confd Health Checker:
-CHECKS=$(curl -s http://127.0.0.1:8500/v1/health/node/`hostname` | jq '[.[].CheckID]')
+CHECKS=$(curl -s http://127.0.0.1:8500/v1/health/node/$HOSTNAME |
+         jq '[.[].CheckID]')
 PAYLD="{\"Name\": \"leader\", \"Checks\": $CHECKS, \"LockDelay\": \"2s\"}"
 RES=$(curl -sX PUT -d "$PAYLD" http://localhost:8500/v1/session/create)
 SID=$(echo "$RES" | jq -r '.ID' 2>/dev/null || true)
