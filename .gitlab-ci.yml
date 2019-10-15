@@ -147,7 +147,7 @@ build:
 # Test ----------------------------------------------------------------- {{{1
 #
 
-test-utility-scripts:
+test-utils:
   stage: test
   tags: [ m0vg ]
   except: [ tags ]
@@ -158,11 +158,14 @@ test-utility-scripts:
     - export JOB_NAME="${WORKSPACE_NAME}-${CI_JOB_NAME}"
 
     - cd ${WORKSPACE_DIR}
-    - time docker run --rm --name ${JOB_NAME}
+    - time docker run --rm --name ${JOB_NAME}-cfgen
                       -v ~+:/data -w /data/hare
                   $DOCKER_REGISTRY/mero/hare:$CENTOS_RELEASE
                       make -C cfgen
-    - make
+    - time docker run --rm --name ${JOB_NAME}-cluster-scripts
+                      -v ~+:/data -w /data/hare
+                  $DOCKER_REGISTRY/mero/hare:$CENTOS_RELEASE
+                      make
 
 
 test-boot1:
