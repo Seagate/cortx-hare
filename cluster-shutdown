@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 
 import os
+import sys
 from socket import gethostname
 from typing import Dict, List, NamedTuple
 
-import consul
+from consul import Consul
 
 other_p = ['hax', 'consul-agent']
 mero_p = ['ios', 'confd']
@@ -16,23 +17,22 @@ def processfid2str(fidk: int) -> str:
     return '{:#x}:{:#x}'.format(ord('r') << 56 | 1, fidk)
 
 
-def get_kv(c: consul, key: str) -> str:
+def get_kv(c: Consul, key: str) -> str:
     kv: Dict[str, bytes] = c.kv.get(key)[1]
     return kv['Value'].decode() if kv is not None else ''
 
 
-def processes_get(c: consul) -> List[Process]:
-    processes = []
-    c = consul.Consul()
+def processes_get(c: Consul) -> List[Process]:
+    processes: List[Process] = []
+    c = Consul()
     for node in c.catalog.nodes()[1]:
         svcs_status = c.health.node(node['Node'])
-        processes.extend([
+        processes.extend(
             Process(node=node['Node'],
                     name=svc['ServiceName'],
                     fidk=svc['ServiceID'],
                     status=svc['Status']) for svc in svcs_status[1]
-            if svc['ServiceName'] != ''
-        ])
+            if svc['ServiceName'])
 
         processes.append(
             Process(node=node['Node'],
@@ -87,7 +87,7 @@ def main():
         print('Cluster is not running.')
         return -1
 
-    c = consul.Consul()
+    c = Consul()
     processes = processes_get(c)
     leader = get_kv(c, 'leader')
 
@@ -97,7 +97,8 @@ def main():
 
     node_stop(leader, processes)
     stop_watcher(leader)
+    return 0
 
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())

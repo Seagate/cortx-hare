@@ -4,7 +4,7 @@ import json
 from socket import gethostname
 from typing import Dict, List, NamedTuple, Set
 
-import consul
+from consul import Consul
 
 Process = NamedTuple('Process', [('name', str), ('fidk', int), ('ep', str)])
 
@@ -13,24 +13,24 @@ def processfid2str(fidk: int) -> str:
     return '{:#x}:{:#x}'.format(ord('r') << 56 | 1, fidk)
 
 
-def get_kv(c: consul.Consul, key: str) -> str:
+def get_kv(c: Consul, key: str) -> str:
     kv: Dict[str, bytes] = c.kv.get(key)[1]
     return kv['Value'].decode() if kv is not None else ''
 
 
-def leader_tag(c: consul.Consul, host: str) -> str:
+def leader_tag(c: Consul, host: str) -> str:
     return ' (RC)' if get_kv(c, 'leader') == host else ''
 
 
-def profile(c: consul.Consul) -> str:
+def profile(c: Consul) -> str:
     return get_kv(c, 'profile')
 
 
-def sns_pools(c: consul.Consul) -> List[str]:
+def sns_pools(c: Consul) -> List[str]:
     return get_kv(c, 'profile/pools').split(' ')
 
 
-def hosts(c: consul.Consul) -> Set[str]:
+def hosts(c: Consul) -> Set[str]:
     data = c.kv.get('node', recurse=True)[1]
     host_names = {(x['Key'].split('/'))[1] for x in data}
 
@@ -48,7 +48,7 @@ def svc2name(types: str) -> str:
         return 'c0_client'
 
 
-def processes(c: consul.Consul, host: str) -> List:
+def processes(c: Consul, host: str) -> List:
     data = c.kv.get(f'node/{host}/service', recurse=True)[1]
     fidk_list = list({(x['Key'].split('/'))[3] for x in data})
     fidk_list.sort(key=int, reverse=False)
@@ -65,7 +65,7 @@ def is_localhost(hostname: str) -> bool:
     return hostname in ('localhost', '127.0.0.1', name, f'{name}.local')
 
 
-def process_status(c: consul, host: str, ps: Process) -> str:
+def process_status(c: Consul, host: str, ps: Process) -> str:
     attr_str = get_kv(c, f'processes/{processfid2str(ps.fidk)}')
     if attr_str != '':
         attr = json.loads(attr_str)
@@ -75,7 +75,7 @@ def process_status(c: consul, host: str, ps: Process) -> str:
 
 
 def main():
-    c = consul.Consul()
+    c = Consul()
     print(f'Profile   : {profile(c)}')
     print('Data Pools:')
     for x in sns_pools(c):
