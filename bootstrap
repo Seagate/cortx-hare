@@ -11,13 +11,16 @@ M0_SRC_DIR=${M0_SRC_DIR:-${SRC_DIR%/*}/mero}
 
 usage() {
     cat <<EOF
-Usage: $PROG [--mkfs] cluster-description-file.yaml
+Usage: $PROG [OPTIONS...] --conf-dir DIR|cluster-description-file.yaml
 
-Bootstrap cluster described by the description file.
+Bootstrap cluster described by the description file or
+using the ready configuration at the specified directory.
 
 Options:
-  --mkfs                    Do m0mkfs (WARNING: wipes Mero data).
-  -h, --help                Show this help and exit.
+  --mkfs               Do m0mkfs (WARNING: wipes all Mero data).
+  -c, --conf-dir DIR   Don't generate configuration files, use
+                       existing ones at the specified DIR(ectory).
+  -h, --help           Show this help and exit.
 EOF
 }
 
@@ -75,38 +78,45 @@ get_ready_agents_nr() {
     consul members | sed 1d | wc -l
 }
 
-TEMP=$(getopt --options h \
-              --longoptions help,mkfs \
+TEMP=$(getopt --options hc: \
+              --longoptions help,mkfs,conf-dir: \
               --name "$PROG" -- "$@" || true)
 
 (($? == 0)) || { usage >&2; exit 1; }
 
 eval set -- "$TEMP"
+
+conf_dir=
+
 while true; do
     case "$1" in
         -h|--help)           usage; exit ;;
         --mkfs)              opt_mkfs=--mkfs; shift ;;
+        -c|--conf-dir)       conf_dir=$2; shift ;;
         --)                  shift; break ;;
         *)                   break ;;
     esac
 done
 
-(($# == 1)) || {
+[[ $conf_dir ]] || (($# == 1)) || {
     usage >&2
     exit 1
 }
 
 cluster_descr=$1
+cfgen_out=${conf_dir:-'/tmp'}
 
-say 'Generating cluster configuration... '
-cfgen_out=/tmp
+if ! [[ $conf_dir ]]; then
+    say 'Generating cluster configuration... '
 
-cd $SRC_DIR
-cfgen/cfgen -D cfgen/dhall/ -o $cfgen_out < $cluster_descr
+    cd $SRC_DIR
+    cfgen/cfgen -D cfgen/dhall/ -o $cfgen_out < $cluster_descr
 
-sudo mkdir -p /etc/mero
-dhall text < $cfgen_out/confd.dhall |
-    $M0_SRC_DIR/utils/m0confgen > $cfgen_out/confd.xc
+    sudo mkdir -p /etc/mero
+    dhall text < $cfgen_out/confd.dhall |
+        $M0_SRC_DIR/utils/m0confgen > $cfgen_out/confd.xc
+    echo 'Ok.'
+fi
 
 # Get my IP address (the one that the other agents will join to).
 read _ join_ip <<< $(get_server_nodes | grep -w $HOSTNAME)
@@ -115,7 +125,6 @@ read _ join_ip <<< $(get_server_nodes | grep -w $HOSTNAME)
     echo 'Bootstrap should be run from the server node only' >&2
     exit 1
 }
-echo 'Ok.'
 
 say 'Starting Consul server agent on this node... '
 # $join_ip is our bind_ip address

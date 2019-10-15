@@ -80,7 +80,7 @@ fi
 if [[ -n $CONFD_IDs && $phase == 1 ]]; then
     [[ -f /tmp/confd.xc ]] ||
         die 'Cannot bootstrap a server node without /tmp/confd.xc file'
-    sudo mv /tmp/confd.xc /etc/mero/
+    sudo cp /tmp/confd.xc /etc/mero/
 fi
 
 if [[ $phase == 1 ]]; then

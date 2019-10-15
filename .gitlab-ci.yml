@@ -92,7 +92,7 @@ build:
       sudo yum-config-manager --add-repo=$alt_epel
 
       sudo yum install -y python36 python36-devel python36-PyYAML python36-pip
-      sudo pip3 install ply
+      sudo pip3 install ply python-consul
 
       cd /tmp
       download=https://github.com/dhall-lang/dhall-haskell/releases/download
@@ -131,13 +131,17 @@ build:
 
       cdf=$1
       cd /data/hare/
-      bash -x ./bootstrap --mkfs $cdf
+      time ./bootstrap --mkfs $cdf
 
       # Run an I/O test.
       cp /data/mero/clovis/m0crate/tests/test1_io.yaml .
       ./update-m0crate-io-test-conf test1_io.yaml
       dd if=/dev/urandom of=/tmp/128M bs=1M count=100
       sudo /data/mero/clovis/m0crate/m0crate -S test1_io.yaml
+
+      # Make sure we can bootstrap on the ready configuration.
+      ./cluster-shutdown
+      time ./bootstrap --conf-dir /tmp
       EOF
 
 # Test ----------------------------------------------------------------- {{{1
@@ -258,7 +262,7 @@ test-boot2:
       chmod 0600 $kh
 
       cd /data/hare/
-      bash -x ./bootstrap --mkfs cfgen/_misc/ci-boot2.yaml
+      time ./bootstrap --mkfs cfgen/_misc/ci-boot2.yaml
       EOF
     - |
       time $M0VG run --vm ssu1 \
