@@ -18,7 +18,7 @@ from typing import Any, Callable, Dict, Iterator, List, NamedTuple, Set, \
 import yaml
 
 
-__version__ = '0.2.1'
+__version__ = '0.2.2'
 __author__ = 'Valery V. Vorotyntsev <valery.vorotyntsev@seagate.com>'
 
 
@@ -149,9 +149,19 @@ def all_unique(xs) -> bool:
     return len(xs) == len(set(xs))
 
 
+Version = NamedTuple('Version',
+                     [('major', int), ('minor', int), ('patch', int)])
+
+
+def version(s: str) -> Version:
+    # We could have used `packaging.version` module, but it's not
+    # worth to add an external dependency.
+    return Version(*map(int, s.split('.', 2)))
+
+
 def check_dhall_versions() -> None:
     # See https://github.com/dhall-lang/dhall-haskell/releases
-    versions = {'dhall': '1.26.1', 'yaml-to-dhall': '1.4.1'}
+    versions = {'dhall': version('1.26.1'), 'yaml-to-dhall': version('1.4.1')}
 
     for exe, ver in versions.items():
         try:
@@ -161,7 +171,7 @@ def check_dhall_versions() -> None:
             die(f'{exe} >= {ver} required')
 
         out = proc.communicate(timeout=15)[0]
-        if out.strip().decode() < ver:
+        if version(out.strip().decode()) < ver:
             die(f'{exe} >= {ver} required')
 
 
