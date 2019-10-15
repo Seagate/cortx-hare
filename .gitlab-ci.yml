@@ -147,7 +147,7 @@ build:
 # Test ----------------------------------------------------------------- {{{1
 #
 
-test-cfgen:
+test-utility-scripts:
   stage: test
   tags: [ m0vg ]
   except: [ tags ]
@@ -162,6 +162,7 @@ test-cfgen:
                       -v ~+:/data -w /data/hare
                   $DOCKER_REGISTRY/mero/hare:$CENTOS_RELEASE
                       make -C cfgen
+    - make
 
 
 test-boot1:
