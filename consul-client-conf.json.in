@@ -15,7 +15,7 @@
       "type": "service",
       "service": "ios",
       "args": [
-        "/opt/seagate/consul/watch-service"
+        "/opt/seagate/hare/watch-service"
       ]
     }
   ],

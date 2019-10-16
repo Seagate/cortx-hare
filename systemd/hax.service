@@ -4,8 +4,8 @@ Requires=consul-agent.service mero-kernel.service
 After=consul-agent.service mero-kernel.service
 
 [Service]
-EnvironmentFile=/opt/seagate/consul/systemd/hax-environment
+EnvironmentFile=/opt/seagate/hare/systemd/hax-environment
 WorkingDirectory=/var/mero/hax
-ExecStart=/opt/seagate/consul/systemd/hax
+ExecStart=/opt/seagate/hare/systemd/hax
 KillMode=process
 Restart=on-failure

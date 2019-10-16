@@ -36,7 +36,7 @@ create_env_file() {
 install_systemd() {
     sudo mkdir -p /opt/seagate
     sudo mkdir -p /var/mero/hax
-    sudo ln -sfn $SRC_DIR /opt/seagate/consul  # XXX s/consul/hare/
+    sudo ln -sfn $SRC_DIR /opt/seagate/hare
     sudo cp $SRC_DIR/systemd/*.service /usr/lib/systemd/system/
 }
 

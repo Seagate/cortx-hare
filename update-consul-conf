@@ -77,7 +77,7 @@ append_hax_svc() {
       \"port\": $port,
       \"checks\": [
           {
-            \"args\": [ \"/opt/seagate/consul/check-service\", \"--hax\" ],
+            \"args\": [ \"/opt/seagate/hare/check-service\", \"--hax\" ],
             \"interval\": \"1s\",
             \"status\": \"warning\"
           }
@@ -98,7 +98,7 @@ append_confd_svc() {
       \"port\": $port,
       \"checks\": [
           {
-            \"args\": [ \"/opt/seagate/consul/check-service\",
+            \"args\": [ \"/opt/seagate/hare/check-service\",
                         \"--fid\", \"$fid\" ],
             \"interval\": \"1s\",
             \"status\": \"warning\"
@@ -126,7 +126,7 @@ append_ios_svc() {
       \"port\": $port,
       \"checks\": [
           {
-            \"args\": [ \"/opt/seagate/consul/check-service\",
+            \"args\": [ \"/opt/seagate/hare/check-service\",
                         \"--fid\", \"$fid\" ],
             \"interval\": \"1s\",
             \"status\": \"warning\"
