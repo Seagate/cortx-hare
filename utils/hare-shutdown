@@ -32,7 +32,7 @@ def processes_get(c: Consul) -> List[Process]:
         processes.extend(
             Process(node=node['Node'],
                     name=svc['ServiceName'],
-                    fidk=svc['ServiceID'],
+                    fidk=int(svc['ServiceID']),
                     status=svc['Status']) for svc in svcs_status[1]
             if svc['ServiceName'])
 
