@@ -16,10 +16,11 @@ Key | Value | Description
 `bq/<epoch>` | (conf object fid, HA state) | `bq/*` items are collectively referred to as the BQ (Broadcast Queue).  The items - HA state updates - are produced by the RC (Recovery Coordinator) script.
 `epoch` | current epoch | Atomically incremented counter, which is used to generate unique ordered identifiers for EQ and BQ entries.  Natural number.
 `eq/<epoch>` | event | `eq/*` items are collectively referred to as the EQ (Event Queue).  Events are consumed and dequeued by the RC script.
-`last_fidk` | last generated fid key | Atomically incremented counter that is used to generate fids.  Natural number.
+`last_fidk` | last genarated fid key | Atomically incremented counter that is used to generate fids.  Natural number.
 `leader` | node name | This key is used for RC leader election.  Created with [`consul lock`](https://www.consul.io/docs/commands/lock.html) command.
-`node/<node_name>/process/<process_fidk>/ep` | endpoint address | Endpoint address of the Mero process (Consul service) with fid key `<process_fidk>`.  Example: `192.168.180.162@tcp:12345:44:101`.
-`node/<node_name>/process/<process_fidk>/service/<svc_type>` | Fid key | Fid key of the Mero service, specified by its type, parent process, and node.
+`m0conf/nodes/<name>/processes/<process_fidk>/endpoint` | endpoint address | Endpoint address of the Mero process (Consul service) with fid key `<process_fidk>`.  Example: `192.168.180.162@tcp:12345:44:101`.
+`m0conf/nodes/<name>/processes/<process_fidk>/services/<svc_type>` | Fid key | Fid key of the Mero service, specified by its type, parent process, and node.
+`m0conf/profiles/<profile_fidk>` | `[ <pool_fidk> ]` | Array of fid keys of the SNS pools associated with this profile.
 `processes/<fid>` | `{ "state": "<HA state>" }` | The items are created and updated by `hax` processes.  Supported values of \<HA state\>: `M0_CONF_HA_PROCESS_STARTING`, `M0_CONF_HA_PROCESS_STARTED`, `M0_CONF_HA_PROCESS_STOPPING`, `M0_CONF_HA_PROCESS_STOPPED`.
 `profile` | fid | Profile fid in string format.  Example: `"0x7000000000000001:0x4"`.
 `profile/pools` | fids | Space-separated list of fids of SNS pools.
@@ -43,4 +44,11 @@ Key | Value | Description
   Right now we don't know for sure if this will actually be a problem.
   The [specification of `bootstrap` script](rfc/6/README.md) should
   cover this topic.
+-->
+<!--
+  XXX Human-readable pool names (e.g., "tier1-nvme", "tier2-ssd", "tier3-hdd")
+  proved to be quite useful in multi-pool setups.  If pool information is
+  ever needed, consider the following format of pool entries:
+
+  `m0conf/pools/<pool_fidk>` | `{ "name": <pool name>, ...N K failvec... }`
 -->
