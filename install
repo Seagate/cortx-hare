@@ -18,10 +18,8 @@ init_hax() {
     cd $SRC_DIR/hax
     local wheel_file=dist/hax-0.0.1-cp36-cp36m-linux_x86_64.whl
     if ! [[ -f $wheel_file ]] || $rebuild_hax; then
-        pip3 install flake8 mypy
+        pip3 install -r requirements.txt
         python3 setup.py flake8 mypy
-
-        pip3 install wheel
         python3 setup.py bdist_wheel
     fi
     pip3 install $wheel_file

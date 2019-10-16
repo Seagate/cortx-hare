@@ -1,4 +1,7 @@
+flake8
 mypy
+pkgconfig
 pylint
 python-consul
 setuptools
+wheel
