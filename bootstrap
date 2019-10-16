@@ -92,7 +92,7 @@ while true; do
     case "$1" in
         -h|--help)           usage; exit ;;
         --mkfs)              opt_mkfs=--mkfs; shift ;;
-        -c|--conf-dir)       conf_dir=$2; shift ;;
+        -c|--conf-dir)       conf_dir=$2; shift 2 ;;
         --)                  shift; break ;;
         *)                   break ;;
     esac
@@ -103,7 +103,7 @@ done
     exit 1
 }
 
-cluster_descr=$1
+cluster_descr=${1:-}
 cfgen_out=${conf_dir:-'/tmp'}
 
 if ! [[ $conf_dir ]]; then
