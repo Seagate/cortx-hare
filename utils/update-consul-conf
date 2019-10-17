@@ -22,15 +22,14 @@ esac
 
 get_service_ids() {
     local filter=$1
-    local cmd="consul kv get -recurse node/$HOSTNAME/service/ |
-                  grep types | sed 's/.*service.//' | $filter |
-                  sed -r 's;(.+)/types:.*;\1;g'"
+    local cmd="consul kv get -recurse node/$HOSTNAME/process/ |
+                  $filter | sed 's/.*process.//' | cut -d/ -f1"
     eval $cmd || true
 }
 
 get_service_ep() {
     local id=$1
-    consul kv get node/$HOSTNAME/service/$id/ep
+    consul kv get node/$HOSTNAME/process/$id/ep
 }
 
 get_service_addr() {

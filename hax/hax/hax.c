@@ -158,7 +158,8 @@ M0_INTERNAL void m0_ha_entrypoint_reply_send(unsigned long long        epr,
 					     const struct m0_fid      *rm_fid,
 					     const char               *rm_eps)
 {
-	struct hax_entrypoint_request *hep = (struct hax_entrypoint_request *)epr;
+	struct hax_entrypoint_request *hep =
+				(struct hax_entrypoint_request *)epr;
 
 	m0_halon_interface_entrypoint_reply(hep->hep_hc->hc_hi, req_id, rc,
 					    confd_nr, confd_fid_data,

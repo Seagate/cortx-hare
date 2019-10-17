@@ -45,12 +45,23 @@ class ConsulUtil:
         return _to_service_fid(fidk + 1)
 
     def get_rm_fid(self):
-        serv = self.get_local_service_by_name('hax')
-        fidk = int(serv['ServiceID'])
-        return _to_service_fid(fidk + 2)
+        lsess = self.get_leader_session()
+        p_rm_node = self.get_session_node(lsess)
+        serv = self.get_node_service_by_name(p_rm_node, 'confd')
+        pfidk = int(serv['ServiceID'])
+        key = f'node/{p_rm_node}/process/{pfidk}/service/rms'
+        sfidk = self.cns.kv.get(key)[1]
+        return _to_service_fid(int(sfidk['Value']))
 
     def get_my_nodename(self):
         return self.cns.agent.self()['Config']['NodeName']
+
+    def get_node_service_by_name(self, hostname, svc_name):
+        for svc in self.cns.catalog.service(service=svc_name)[1]:
+            if svc['Node'] == hostname:
+                return svc
+        raise HAConsistencyException(
+            f'No {svc_name!r} Consul service found at node {hostname!r}')
 
     def get_local_service_by_name(self, name):
         """
@@ -58,13 +69,7 @@ class ConsulUtil:
         node to the current hax process.
         """
         hostname = self.get_my_nodename()
-
-        service = self.cns.catalog.service(service=name)[1]
-        srv = list(filter(lambda x: x['Node'] == hostname, service))
-        if not srv:
-            raise HAConsistencyException(
-                f'No {name} service found in Consul at Node={hostname}')
-        return srv[0]
+        return self.get_node_service_by_name(hostname, name)
 
     def get_hax_endpoint(self):
         my_fid = self.get_hax_fid()

@@ -126,7 +126,8 @@ def main(argv=None):
 
     outs: List[Tuple[str, Callable[..., str], List[Any]]] = [
         ('consul-agents.json', generate_consul_agents, cluster),
-        ('consul-kv.json', generate_consul_kv, cluster.m0conf, opts.dhall_dir),
+        ('consul-kv.json', generate_consul_kv, cluster.m0conf,
+         cluster.m0clients, opts.dhall_dir),
         ('confd.dhall', generate_confd, cluster.m0conf, opts.dhall_dir)]
     for path, generate, *args in outs:
         with open(os.path.join(opts.output_dir, path), 'w') as f:
@@ -1124,7 +1125,8 @@ ConsulAgent = NamedTuple('ConsulAgent', [('hostname', str), ('ipaddr', str)])
 
 Cluster = NamedTuple('Cluster', [('consul_servers', List[ConsulAgent]),
                                  ('consul_clients', List[ConsulAgent]),
-                                 ('m0conf', Dict[Oid, Any])])
+                                 ('m0conf', Dict[Oid, Any]),
+                                 ('m0clients', List[int])])
 
 
 def generate_consul_agents(cluster: Cluster) -> str:
@@ -1144,7 +1146,8 @@ def fid2str(id: Oid) -> str:
     return f'{hex((ord(types[id.type]) << 56)+1)}:{hex(id.fidk)}'
 
 
-def generate_consul_kv(m0conf: Dict[Oid, Any], dhall_dir: str) -> str:
+def generate_consul_kv(m0conf: Dict[Oid, Any], m0clients: List[int],
+                       dhall_dir: str) -> str:
     assert os.path.isabs(dhall_dir)
 
     global fidk_gen
@@ -1153,7 +1156,8 @@ def generate_consul_kv(m0conf: Dict[Oid, Any], dhall_dir: str) -> str:
     del fidk_gen
 
     ConsulService = NamedTuple('ConsulService', [
-        ('node_name', str), ('proc_id', Oid), ('svc_types', str), ('ep', str)])
+        ('node_name', str), ('proc_id', Oid), ('ep', str),
+        ('svc_id', Oid), ('stype', str)])
 
     def profile() -> str:
         profiles = [x for x in m0conf.keys() if x.type is ObjT.profile]
@@ -1170,19 +1174,26 @@ def generate_consul_kv(m0conf: Dict[Oid, Any], dhall_dir: str) -> str:
         assert len([])
         return ''
 
-    def services() -> Iterator[ConsulService]:
+    def processes() -> Iterator[ConsulService]:
         for node_id, node in m0conf.items():
             if node_id.type is not ObjT.node:
                 continue
             for proc_id in node.processes:
                 assert proc_id.type is ObjT.process
-                stypes = ' '.join(
-                    m0conf[svc_id].type.name[len('M0_CST_'):].lower()
-                    for svc_id in m0conf[proc_id].services)
-                yield ConsulService(node_name=node.hostname,
-                                    proc_id=proc_id,
-                                    svc_types=stypes,
-                                    ep=str(m0conf[proc_id].endpoint))
+                for svc_id in m0conf[proc_id].services:
+                    stype = m0conf[svc_id].type.name[len('M0_CST_'):].lower()
+                    yield ConsulService(node_name=node.hostname,
+                                        proc_id=proc_id,
+                                        ep=str(m0conf[proc_id].endpoint),
+                                        svc_id=svc_id, stype=stype)
+                # Add clovis clients to consul kv
+                if proc_id.fidk in m0clients:
+                    yield ConsulService(node_name=node.hostname,
+                                        proc_id=proc_id,
+                                        ep=str(m0conf[proc_id].endpoint),
+                                        svc_id=Oid(ObjT.service,
+                                                   svc_id.fidk + 1),
+                                        stype='clovis')
 
     return json.dumps([dict(key=k, value=v) for k, v in (
         ('leader', ''),
@@ -1190,10 +1201,10 @@ def generate_consul_kv(m0conf: Dict[Oid, Any], dhall_dir: str) -> str:
         ('last_fidk', _fidk_gen),
         ('profile', profile()),
         ('profile/pools', sns_pools()),
-        *[(f'node/{x.node_name}/service/{x.proc_id.fidk}/types',
-           f'{x.svc_types}') for x in services()],
-        *[(f'node/{x.node_name}/service/{x.proc_id.fidk}/ep', f'{x.ep}')
-          for x in services()])],
+        *[(f'node/{x.node_name}/process/{x.proc_id.fidk}/service/{x.stype}',
+           f'{x.svc_id.fidk}') for x in processes()],
+        *[(f'node/{x.node_name}/process/{x.proc_id.fidk}/ep', f'{x.ep}')
+          for x in processes()])],
                       indent=2) + '\n'
 
 
@@ -1237,8 +1248,10 @@ def validate_m0conf(m0conf: Dict[Oid, Any]) -> None:
 
 
 def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
-    cluster = Cluster(consul_servers=[], consul_clients=[], m0conf={})
+    cluster = Cluster(consul_servers=[], consul_clients=[], m0conf={},
+                      m0clients=[])
     conf = cluster.m0conf
+    clients = cluster.m0clients
     root_id = ConfRoot.build(conf)
     # XXX Move all the logic into ConfRoot.build?
 
@@ -1270,7 +1283,9 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
                                ipaddr=facts[ipaddr_key(iface)]))
 
         for _ in range(host['c0_clients'] + host['m0t1fs_clients']):
-            ConfProcess.build(conf, node_id, facts, iface, ProcT.m0_client)
+            proc_id = ConfProcess.build(conf, node_id, facts, iface,
+                                        ProcT.m0_client)
+            clients.append(proc_id.fidk)
 
     # XXX-TODO: support multiple profiles
     prof_id = ConfProfile.build(conf, root_id)

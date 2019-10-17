@@ -27,7 +27,7 @@ get_profile() {
 get_fids() {
     consul kv get -recurse node |
         awk -F/ '/ep:/ {ep=$5; sub(/^ep:/, "", ep)}
-                 /types:rms$/ {printf("0x7200000000000001:0x%x\t%s\n", $4, ep)}'
+                 /clovis/ {printf("0x7200000000000001:0x%x\t%s\n", $4, ep)}'
 }
 
 while read fid ep; do

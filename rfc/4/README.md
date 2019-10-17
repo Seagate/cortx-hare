@@ -20,8 +20,8 @@ Key | Value | Description
 `last_fidk` | last genarated FID key | Atomically incremented counter that is used to generate fids.  Natural number.
 `profile` | profile fid
 `profile/pools` | data pools | Space-separated fid list of Mero sns(data) pools.
-`node/<node_name>/service/<process_fidk>/types` | Mero service types | Space-separated list of Mero service types running on the Mero process (Consul service) with fid key `<process_fidk>`.  Example: `rms confd`.
-`node/<node_name>/service/<process_fidk>/ep` | endpoint address | Endpoint address of the Mero process (Consul service) with fid key `<process_fidk>`.  Example: `192.168.180.162@tcp:12345:44:101`.
+`node/<node_name>/process/<process_fidk>/service/type` | Mero service fid | Fid of the Mero service corresponding to the given type that is hosted by the Mero process (Consul service) with the fid key on the given node, e.g. rms.
+`node/<node_name>/process/<process_fidk>/ep` | endpoint address | Endpoint address of the Mero process (Consul service) with fid key `<process_fidk>`.  Example: `192.168.180.162@tcp:12345:44:101`.
 `processes/<fid>` | `{ "state": "<HA state>" }` | The items are created and updated by `hax` processes.  Supported values of \<HA state\>: `M0_CONF_HA_PROCESS_STARTING`, `M0_CONF_HA_PROCESS_STARTED`, `M0_CONF_HA_PROCESS_STOPPING`, `M0_CONF_HA_PROCESS_STOPPED`.
 `timeout` | YYYYmmddHHMM.SS | This value is used by the RC timeout mechanism.
 
