@@ -352,6 +352,7 @@ cleanup:
 
   script:
     - cd ${WORKSPACE_DIR}
-    - ./m0vg-single/scripts/m0vg destroy -f || true
+    - ./m0vg-1node/scripts/m0vg destroy -f || true
+    - ./m0vg-2nodes/scripts/m0vg destroy -f || true
 
 # vim: foldmethod=marker shiftwidth=2 tabstop=2 expandtab
