@@ -4,10 +4,10 @@ set -eu -o pipefail
 export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
 
 PROG=${BASH_SOURCE[0]##*/}
-SRC_DIR="$(dirname $(readlink -f ${BASH_SOURCE[0]}))"
 
-ENV_TEMPLATE=$SRC_DIR/systemd/consul-env.in
-ENV_FILE=${ENV_TEMPLATE%.in}
+# TODO: '/opt/seagate/hare' prefix can be different
+ENV_TEMPLATE=/opt/seagate/hare/share/consul/consul-env.in
+ENV_FILE=/var/lib/hare/consul-env
 
 usage() {
     cat <<EOF
@@ -68,4 +68,5 @@ fi
 
 # Prepare for consul-agent startup:
 sudo rm -rf /tmp/consul
-cp $SRC_DIR/consul-$mode-conf.json.in $SRC_DIR/consul-$mode-conf.json
+# TODO: '/opt/seagate/hare' prefix can be different
+cp /opt/seagate/hare/share/consul/consul-$mode-conf.json.in /var/lib/hare/consul-$mode-conf.json

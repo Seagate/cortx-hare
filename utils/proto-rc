@@ -20,8 +20,6 @@ set -eu -o pipefail
 exec &>> /tmp/consul-${0##*/}.log
 exec &> >(stdbuf -oL gawk '{ print strftime("%Y-%m-%d %H:%M:%S"), $0 }')
 
-SRC_DIR="$(dirname $(readlink -f $0))"
-
 STOP=0
 sig_handler() {
     echo 'Signal caught! Exiting...'
@@ -104,7 +102,7 @@ consul kv get -recurse timeout | {
         fi
         IFS=','
         for ev in $EVENT; do
-            consul kv put eq/$($SRC_DIR/epoch-gen) $ev
+            consul kv put eq/$(epoch-gen) $ev
         done
         IFS=':'
         consul kv delete $TMO

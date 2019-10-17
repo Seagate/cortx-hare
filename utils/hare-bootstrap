@@ -3,11 +3,9 @@ set -eu -o pipefail
 # set -x
 export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
 
-# Helper script to bootstrap the cluster.
+### bootstrap the cluster
 
 PROG=${0##*/}
-SRC_DIR="$(dirname $(readlink -f $0))"
-M0_SRC_DIR=${M0_SRC_DIR:-${SRC_DIR%/*}/mero}
 
 usage() {
     cat <<EOF
@@ -108,13 +106,9 @@ cfgen_out=${conf_dir:-'/tmp'}
 
 if ! [[ $conf_dir ]]; then
     say 'Generating cluster configuration... '
-
-    cd $SRC_DIR
-    cfgen/cfgen -D cfgen/dhall/ -o $cfgen_out < $cluster_descr
-
+    cfgen -o $cfgen_out < $cluster_descr
     sudo mkdir -p /etc/mero
-    dhall text < $cfgen_out/confd.dhall |
-        $M0_SRC_DIR/utils/m0confgen > $cfgen_out/confd.xc
+    dhall text < $cfgen_out/confd.dhall | m0confgen > $cfgen_out/confd.xc
     echo 'Ok.'
 fi
 
@@ -128,10 +122,10 @@ read _ join_ip <<< $(get_server_nodes | grep -w $HOSTNAME)
 
 say 'Starting Consul server agent on this node... '
 # $join_ip is our bind_ip address
-$SRC_DIR/mk-consul-env --mode server --bind $join_ip \
-                       --extra-options '-ui -bootstrap-expect 1'
+mk-consul-env --mode server --bind $join_ip \
+              --extra-options '-ui -bootstrap-expect 1'
 
-sudo systemctl start consul-agent
+sudo systemctl start hare-consul-agent
 
 # Give Consul some time for its internal bootstrap and leader
 # election. (Until then the KV Store won't be accessible.)
@@ -146,16 +140,14 @@ echo 'Ok.'
 say 'Starting Consul agents on remaining cluster nodes...'
 pids=()
 while read node bind_ip; do
-    ssh $node "$SRC_DIR/mk-consul-env --mode server --bind $bind_ip \
-                                      --join $join_ip &&
-               sudo systemctl start consul-agent" &
+    ssh $node "$(which mk-consul-env) --mode server --bind $bind_ip --join $join_ip &&
+               sudo systemctl start hare-consul-agent" &
     pids+=($!)
 done < <(get_server_nodes | grep -vw $HOSTNAME || true)
 
 while read node bind_ip; do
-    ssh $node "$SRC_DIR/mk-consul-env --mode client --bind $bind_ip \
-                                      --join $join_ip &&
-                   sudo systemctl start consul-agent" &
+    ssh $node "$(which mk-consul-env) --mode client --bind $bind_ip --join $join_ip &&
+               sudo systemctl start hare-consul-agent" &
     pids+=($!)
 done < <(get_client_nodes)
 wait4 ${pids[@]-}
@@ -177,10 +169,10 @@ done
 echo ' Ok.'
 
 say 'Update Consul agents configs from the KV Store... '
-$SRC_DIR/update-consul-conf &
+update-consul-conf &
 pids=($!)
 while read node _; do
-    ssh $node "$SRC_DIR/update-consul-conf" &
+    ssh $node "$(which update-consul-conf)" &
     pids+=($!)
 done < <(get_all_nodes | grep -vw $HOSTNAME || true)
 wait4 ${pids[@]}
@@ -202,12 +194,12 @@ echo ' Ok.'
 
 # Start Mero in two phases: 1st confd-s, then ios-es.
 say 'Starting Mero (phase1)... '
-$SRC_DIR/bootstrap-node ${opt_mkfs:-} --phase 1 &
+bootstrap-node ${opt_mkfs:-} --phase 1 &
 pids=($!)
 
 while read node _; do
     scp -q $cfgen_out/confd.xc $node:/tmp/
-    ssh $node $SRC_DIR/bootstrap-node ${opt_mkfs:-} --phase 1 &
+    ssh $node "PATH=$PATH $(which bootstrap-node) ${opt_mkfs:-} --phase 1" &
     pids+=($!)
 # Note: confd-s are running on server nodes only.
 done < <(get_server_nodes | grep -vw $HOSTNAME || true)
@@ -216,11 +208,11 @@ echo 'Ok.'
 
 # Now the 2nd phase (ios-es).
 say 'Starting Mero (phase2)... '
-$SRC_DIR/bootstrap-node ${opt_mkfs:-} --phase 2 &
+bootstrap-node ${opt_mkfs:-} --phase 2 &
 pids=($!)
 
 while read node _; do
-    ssh $node $SRC_DIR/bootstrap-node ${opt_mkfs:-} --phase 2 &
+    ssh $node "PATH=$PATH $(which bootstrap-node) ${opt_mkfs:-} --phase 2" &
     pids+=($!)
 done < <(get_all_nodes | grep -vw $HOSTNAME || true)
 wait4 ${pids[@]}

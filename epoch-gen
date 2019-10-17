@@ -1,6 +1,0 @@
-#!/usr/bin/env bash
-set -eu -o pipefail
-
-export SRC_DIR="$(dirname $(readlink -f $0))"
-
-printf "%09d\n" $($SRC_DIR/next-gen epoch)

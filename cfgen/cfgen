@@ -31,7 +31,7 @@ def parse_opts(argv):
         " standard input; '--help-schema' option shows the schema.")
     p.add_argument('--help-schema', nargs=0, help='show cluster description'
                    ' file schema', action=ShowSchema)
-    default_dhall_dir = '/opt/cfgen/dhall'
+    default_dhall_dir = '/opt/seagate/hare/share/cfgen/dhall'
     p.add_argument('-D', '--dhall', metavar='dir',
                    help='directory with auxiliary Dhall expressions'
                    f' (defaults to {default_dhall_dir!r})',

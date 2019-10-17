@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
 set -eu -o pipefail
 
-exec "${HAX_EXE}"
+printf "%09d\n" $(next-gen epoch)

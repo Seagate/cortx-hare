@@ -2,11 +2,11 @@
 Description=Consul agent for Hare
 Requires=network-online.target
 After=network-online.target
-ConditionFileNotEmpty=/opt/seagate/hare/systemd/consul-env
+ConditionFileNotEmpty=/var/lib/hare/consul-env
 
 [Service]
-EnvironmentFile=/opt/seagate/hare/systemd/consul-env
-ExecStart=/opt/seagate/hare/systemd/consul
+EnvironmentFile=/var/lib/hare/consul-env
+ExecStart=/opt/seagate/hare/libexec/consul/hare-consul
 ExecReload=/usr/local/bin/consul reload
 KillMode=process
 Restart=on-failure

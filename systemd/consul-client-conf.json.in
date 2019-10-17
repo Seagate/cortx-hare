@@ -15,7 +15,7 @@
       "type": "service",
       "service": "ios",
       "args": [
-        "/opt/seagate/hare/watch-service"
+        "/opt/seagate/hare/libexec/hare/watch-service"
       ]
     }
   ],

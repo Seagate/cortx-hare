@@ -34,6 +34,19 @@ class MypyCmd(Command):
                 f'Mypy returned {exit_code}. Exiting with FAILURE status')
 
 
+def read(fname):
+    return open(os.path.join(os.path.dirname(__file__), fname)) \
+           .read().rstrip('\n')
+
+
+def get_hax_version():
+    v = os.environ.get('HAX_VERSION')
+    if v:
+        return v
+    else:
+        return read('../VERSION')
+
+
 def get_mero_dir():
     try:
         # Mero devel rpm takes precedence over M0_SRC_DIR
@@ -84,7 +97,7 @@ def get_mero_cflags():
 setup(
     cmdclass={'mypy': MypyCmd},
     name='hax',
-    version='0.0.1',
+    version=get_hax_version(),
     packages=['hax'],
     setup_requires=['flake8', 'mypy', 'pkgconfig'],
     install_requires=['python-consul>=1.1.0'],

@@ -8,6 +8,7 @@ variables:
   CENTOS_RELEASE: eos
   DOCKER_REGISTRY: registry.gitlab.mero.colo.seagate.com
   M0_VG_NO_SYMLINKS: "true"
+  RPMSYNC_DIR:    "/releases/dev/$CI_PROJECT_PATH/$CI_COMMIT_REF_SLUG/B$CI_PIPELINE_ID"
   WORKSPACE_NAME: "${CI_PROJECT_NAME}${CI_PIPELINE_ID}"
   WORKSPACE_DIR:  "/home/gitlab-runner/workspaces/${CI_PROJECT_NAME}${CI_PIPELINE_ID}"
 
@@ -64,18 +65,10 @@ build:
                       bash -x _build-m0.sh
 
     # Build hax's C extension.
-    - |
-      cat >hare/_build-hax.sh <<'EOF'
-      set -eu -o pipefail
-
-      cd hax
-      python3 setup.py flake8 mypy  # sanity check
-      python3 setup.py bdist_wheel
-      EOF
     - time docker run --rm --name ${JOB_NAME}
                       -v ~+:/data -w /data/hare
                   $DOCKER_REGISTRY/mero/hare:$CENTOS_RELEASE
-                      bash -x _build-hax.sh
+                      make
 
     # Containers run commands as 'root' user.  Restore the ownership.
     - sudo chown -R $(id -u):$(id -g) .
@@ -112,12 +105,30 @@ build:
           sudo losetup /dev/loop$i /var/mero/disk$i.img
       done
 
-      # XXX `systemctl start hax` command, called by `bootstrap-node` script,
+      # XXX `systemctl start hare-hax` command, called by `bootstrap-node` script,
       # will fail unless `mero-kernel` systemd service is installed.
       sudo /data/mero/scripts/install-mero-service
 
-      bash -x /data/hare/install
+      sudo make -C /data/hare devinstall
       EOF
+
+
+rpmbuild:
+  stage: build
+  tags: [ docker-build ]
+  except: [ tags ]
+  image: $DOCKER_REGISTRY/mero/hare:$CENTOS_RELEASE
+
+  script:
+    - export LATEST_RELEASE_DIR="$(ls -td /releases/master/B* | head -n1)"
+    - '[[ -d $RPMSYNC_DIR ]] || mkdir -vp $RPMSYNC_DIR || true'
+    - cp -v $LATEST_RELEASE_DIR/mero{,-devel}-[0-9]*.rpm $RPMSYNC_DIR/
+    - yum install -y $LATEST_RELEASE_DIR/mero{,-devel}-[0-9]*.rpm
+    - time make rpm
+    - cp -v /root/rpmbuild/RPMS/x86_64/* $RPMSYNC_DIR/
+    - cd $RPMSYNC_DIR
+    - createrepo -v . || true
+
 
 # Test ----------------------------------------------------------------- {{{1
 #
@@ -136,11 +147,11 @@ test-utils:
     - time docker run --rm --name ${JOB_NAME}-cfgen
                       -v ~+:/data -w /data/hare
                   $DOCKER_REGISTRY/mero/hare:$CENTOS_RELEASE
-                      make -C cfgen
+                      make test
     - time docker run --rm --name ${JOB_NAME}-cluster-scripts
                       -v ~+:/data -w /data/hare
                   $DOCKER_REGISTRY/mero/hare:$CENTOS_RELEASE
-                      make
+                      make install
 
 
 test-boot1:
@@ -186,7 +197,7 @@ test-boot1:
 
       do_io() {
           cp /data/mero/clovis/m0crate/tests/test1_io.yaml .
-          ./update-m0crate-io-test-conf test1_io.yaml
+          ./utils/update-m0crate-io-test-conf test1_io.yaml
           dd if=/dev/urandom of=/tmp/128M bs=1M count=100
           sudo /data/mero/clovis/m0crate/m0crate -S test1_io.yaml
       }
@@ -194,17 +205,17 @@ test-boot1:
       test_cluster() {
           local cdf=$1
 
-          time ./bootstrap --mkfs $cdf
+          time sudo hctl bootstrap --mkfs $cdf
           do_io
-          ./cluster-shutdown
-          time ./bootstrap --conf-dir /tmp  # bootstrap on existing conf
+          sudo hctl shutdown
+          time sudo hctl bootstrap --conf-dir /tmp  # bootstrap on existing conf
           do_io
-          ./cluster-shutdown
+          sudo hctl shutdown
       }
 
       cd /data/hare/
-      test_cluster cfgen/_misc/singlenode.yaml
-      test_cluster cfgen/_misc/ci-boot1-2ios.yaml
+      test_cluster cfgen/examples/singlenode.yaml
+      test_cluster cfgen/examples/ci-boot1-2ios.yaml
       EOF
     - time $M0VG run 'bash -x /data/hare/_test-boot1.sh'
 
@@ -256,8 +267,8 @@ test-boot2:
   script:
     - time $M0VG run --vm ssu1 'bash -x /data/hare/_init-node.sh'
     - time $M0VG run --vm ssu2 'bash -x /data/hare/_init-node.sh'
-    - sed -ri "s/(ssu[12])/${JOB_NAME}-\\1/" hare/cfgen/_misc/ci-boot2.yaml
-    - sed -ri "s/(ssu[12])/${JOB_NAME}-\\1/" hare/cfgen/_misc/ci-boot2-1confd.yaml
+    - sed -ri "s/(name:\s*)(ssu[12])/\\1${JOB_NAME}-\\2/"
+          hare/cfgen/examples/ci-boot2{,-1confd}.yaml
     - |
       cat >hare/_test-boot2.sh <<'EOF'
       set -eu -o pipefail
@@ -266,19 +277,20 @@ test-boot2:
       kh=~/.ssh/known_hosts
       ssh-keyscan -t rsa $OTHER_HOST >$kh
       chmod 0600 $kh
+      sudo mkdir /root/.ssh || true
+      sudo cp $kh /root/.ssh
 
       cd /data/hare/
       # Server-server Consul agents configuration.
-      time ./bootstrap --mkfs cfgen/_misc/ci-boot2.yaml
+      time sudo hctl bootstrap --mkfs cfgen/examples/ci-boot2.yaml
 
-      ./cluster-shutdown
+      sudo hctl shutdown
 
       # Server-client Consul agents configuration.
-      time ./bootstrap --mkfs cfgen/_misc/ci-boot2-1confd.yaml
+      time sudo hctl bootstrap --mkfs cfgen/examples/ci-boot2-1confd.yaml
       EOF
-    - |
-      time $M0VG run --vm ssu1 \
-          "OTHER_HOST=${JOB_NAME}-ssu2 bash -x /data/hare/_test-boot2.sh"
+    - time $M0VG run --vm ssu1
+           "OTHER_HOST=${JOB_NAME}-ssu2 bash -x /data/hare/_test-boot2.sh"
 
   after_script:
     - cd ${WORKSPACE_DIR}
