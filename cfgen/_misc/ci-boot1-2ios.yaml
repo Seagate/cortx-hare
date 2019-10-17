@@ -1,5 +1,5 @@
 hosts:
-  - name: ssu1
+  - name: localhost
     data_iface: eth1
     m0_servers:
       - runs_confd: true

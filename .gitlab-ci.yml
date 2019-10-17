@@ -119,31 +119,6 @@ build:
       bash -x /data/hare/install
       EOF
 
-    # Prepare a script which boot singlenode with specified CDF.
-    - |
-      cat >hare/_test-boot1.sh <<'EOF'
-      set -eu -o pipefail
-
-      (($# == 1)) || {
-          echo "Usage: ${0##*/} <cluster-description-file>" >&2
-          exit 1
-      }
-
-      cdf=$1
-      cd /data/hare/
-      time ./bootstrap --mkfs $cdf
-
-      # Run an I/O test.
-      cp /data/mero/clovis/m0crate/tests/test1_io.yaml .
-      ./update-m0crate-io-test-conf test1_io.yaml
-      dd if=/dev/urandom of=/tmp/128M bs=1M count=100
-      sudo /data/mero/clovis/m0crate/m0crate -S test1_io.yaml
-
-      # Make sure we can bootstrap on the ready configuration.
-      ./cluster-shutdown
-      time ./bootstrap --conf-dir /tmp
-      EOF
-
 # Test ----------------------------------------------------------------- {{{1
 #
 
@@ -205,7 +180,33 @@ test-boot1:
 
   script:
     - time $M0VG run 'bash -x /data/hare/_init-node.sh'
-    - time $M0VG run 'bash -x /data/hare/_test-boot1.sh cfgen/_misc/singlenode.yaml'
+    - |
+      cat >hare/_test-boot1.sh <<'EOF'
+      set -eu -o pipefail
+
+      do_io() {
+          cp /data/mero/clovis/m0crate/tests/test1_io.yaml .
+          ./update-m0crate-io-test-conf test1_io.yaml
+          dd if=/dev/urandom of=/tmp/128M bs=1M count=100
+          sudo /data/mero/clovis/m0crate/m0crate -S test1_io.yaml
+      }
+
+      test_cluster() {
+          local cdf=$1
+
+          time ./bootstrap --mkfs $cdf
+          do_io
+          ./cluster-shutdown
+          time ./bootstrap --conf-dir /tmp  # bootstrap on existing conf
+          do_io
+          ./cluster-shutdown
+      }
+
+      cd /data/hare/
+      test_cluster cfgen/_misc/singlenode.yaml
+      test_cluster cfgen/_misc/ci-boot1-2ios.yaml
+      EOF
+    - time $M0VG run 'bash -x /data/hare/_test-boot1.sh'
 
   after_script:
     - cd ${WORKSPACE_DIR}
@@ -270,59 +271,14 @@ test-boot2:
       # Server-server Consul agents configuration.
       time ./bootstrap --mkfs cfgen/_misc/ci-boot2.yaml
 
-      # Server-client Consul agents configuration.
       ./cluster-shutdown
+
+      # Server-client Consul agents configuration.
       time ./bootstrap --mkfs cfgen/_misc/ci-boot2-1confd.yaml
       EOF
     - |
       time $M0VG run --vm ssu1 \
           "OTHER_HOST=${JOB_NAME}-ssu2 bash -x /data/hare/_test-boot2.sh"
-
-  after_script:
-    - cd ${WORKSPACE_DIR}
-
-    # Clean up.  This ensures that VMs are destroyed in case of a manual
-    # job restart, when global 'cleanup' stage is not performed.
-    - $M0VG destroy -f || true
-
-test-boot1-2ios:
-  stage: test
-  tags: [ m0vg ]
-  except: [ tags ]
-
-  variables:
-    M0VG: m0vg-1node/scripts/m0vg
-
-  before_script:
-    # Cannot be defined in the 'variables:' section because it supports only
-    # sinle level of variable expansion, i.e., A=$VAR; B=$A won't work for B.
-    - export JOB_NAME="${WORKSPACE_NAME}-${CI_JOB_NAME}"
-
-    - cd ${WORKSPACE_DIR}
-
-    - date -u -Isec
-    - printenv
-
-    - |
-      d=${M0VG%%/*}
-      [[ -d $d ]] || git clone --recursive --depth 1 --shallow-submodules \
-          http://gitlab.mero.colo.seagate.com/mero/mero.git $d
-
-    # Prepare m0vg (singlenode).
-    - |
-      $M0VG env add <<EOF
-      M0_VM_BOX=centos75/dev-halon
-      M0_VM_BOX_URL='http://ci-storage.mero.colo.seagate.com/vagrant/centos75/dev'
-      M0_VM_CMU_MEM_MB=4096
-      M0_VM_NAME_PREFIX=${JOB_NAME}
-      M0_VM_HOSTNAME_PREFIX=${JOB_NAME}
-      EOF
-    - time $M0VG up --no-provision ssu1
-    - time $M0VG reload --no-provision ssu1
-
-  script:
-    - time $M0VG run 'bash -x /data/hare/_init-node.sh'
-    - time $M0VG run 'bash -x /data/hare/_test-boot1.sh cfgen/_misc/ci-boot1-2ios.yaml'
 
   after_script:
     - cd ${WORKSPACE_DIR}

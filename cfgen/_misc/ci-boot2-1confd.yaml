@@ -1,4 +1,3 @@
-# This file is used by "test-boot2" CI job; see `.gitlab-ci.yml`.
 hosts:
   - name: ssu1
     data_iface: eth1
