@@ -114,7 +114,7 @@ SYSTEMD_CONFIG_DIR = $(DESTDIR)/usr/lib/systemd/system
 
 # install {{{2
 .PHONY: install
-install: install-dirs install-cfgen install-hax install-systemd
+install: install-dirs install-cfgen install-hax install-systemd install-vendor
 	@$(call _info,Installing hare utils)
 	@for f in utils/*; do \
 	     $(call _log,copying $$f -> $(HARE_LIBEXEC)); \
@@ -187,9 +187,16 @@ $(HAX_EGG_LINK) $(HAX_EXE): $(HAX_WHL)
 	@$(call _info,Installing hax with '$(HAX_INSTALL_CMD)')
 	@cd hax && $(HAX_INSTALL_CMD)
 
+.PHONY: install-vendor
+install-vendor: vendor/consul-bin/current/consul \
+                $(wildcard vendor/dhall-bin/current/*)
+	@$(call _info,Installing Consul and Dhall)
+	@install --verbose --directory $(DESTDIR)/$(PREFIX)/bin
+	@install --verbose $^ $(DESTDIR)/$(PREFIX)/bin
+
 # devinstall {{{2
 .PHONY: devinstall
-devinstall: install-dirs devinstall-cfgen devinstall-hax devinstall-systemd
+devinstall: install-dirs devinstall-cfgen devinstall-hax devinstall-systemd devinstall-vendor
 	@$(call _info,Installing hare utils)
 	@for f in utils/*; do \
 	     $(call _log,linking $$f -> $(HARE_LIBEXEC)); \
@@ -235,6 +242,13 @@ devinstall-hax: HAX_INSTALL_CMD = $(SETUP_PY) develop --prefix $(DESTDIR)/$(PREF
 devinstall-hax: export PYTHONPATH = $(DESTDIR)/$(PREFIX)/lib/python3.$(PY3_VERSION_MINOR)/site-packages
 devinstall-hax: $(HAX_EGG_LINK)
 
+.PHONY: devinstall-vendor
+devinstall-vendor: vendor/consul-bin/current/consul \
+                   $(wildcard vendor/dhall-bin/current/*)
+	@$(call _info,Installing Consul and Dhall)
+	@install --verbose --directory $(DESTDIR)/$(PREFIX)/bin
+	@ln -v -sf $(addprefix $(TOP_SRC_DIR), $^) $(DESTDIR)/$(PREFIX)/bin
+
 # Uninstall ------------------------------------------- {{{1
 #
 
@@ -254,6 +268,8 @@ uninstall-hax:
 	          $(CONSUL_LIBEXEC) $(CONSUL_SHARE) \
 	          $(SYSTEMD_CONFIG_DIR)/hare*.service \
 	          $(DESTDIR)/$(PREFIX)/bin/hctl \
+	          $(DESTDIR)/$(PREFIX)/bin/consul \
+	          $(DESTDIR)/$(PREFIX)/bin/*dhall* \
 	          $(DESTDIR)/usr/bin/hctl \
 	          $(DESTDIR)/var/lib/hare \
 	          $(DESTDIR)/var/mero/hax ; \
@@ -325,6 +341,10 @@ dist:
 	@$(call _info,Generating dist archive)
 	@rm -f $(DIST_FILE)
 	@git archive -v --prefix=hare/ HEAD -o $(DIST_FILE:.gz=)
+	git submodule foreach --recursive \
+	     "git archive --prefix=hare/\$$path/ --output=\$$sha1.tar HEAD \
+	      && tar --concatenate --file=$$(pwd)/$(DIST_FILE:.gz=) \$$sha1.tar \
+	      && rm \$$sha1.tar"
 	@gzip $(DIST_FILE:.gz=)
 
 .PHONY: __rpm_pre

@@ -31,6 +31,8 @@ BuildRequires: python36-setuptools
 Requires: mero = %{h_mero_version}
 Requires: python36
 
+Conflicts: halon
+
 %description
 Cluster monitoring and recovery for high-availability.
 
@@ -43,6 +45,7 @@ make %{?_smp_mflags}
 %install
 rm -rf %{buildroot}
 make install DESTDIR=%{buildroot}
+sed -i -e 's@^#!.*\.py3venv@#!/usr@' %{buildroot}/opt/seagate/hare/bin/*
 
 %clean
 rm -rf %{buildroot}
@@ -67,3 +70,8 @@ systemctl daemon-reload
 # https://github.com/scylladb/scylla/issues/2235 suggests that a proper fix is
 # to rename all *.py files as *.py3
 %define _python_bytecompile_errors_terminate_build 0
+
+# Consul binaries are stripped and don't contain build id, so rpmbuild fails
+# with:
+#   "ERROR: No build ID note found in consul"
+%undefine _missing_build_ids_terminate_build
