@@ -2,7 +2,8 @@
 
 ### show cluster status
 
-import json
+import os
+import sys
 from socket import gethostname
 from typing import Dict, List, NamedTuple, Set
 
@@ -15,25 +16,25 @@ def processfid2str(fidk: int) -> str:
     return '{:#x}:{:#x}'.format(ord('r') << 56 | 1, fidk)
 
 
-def get_kv(c: Consul, key: str) -> str:
-    kv: Dict[str, bytes] = c.kv.get(key)[1]
+def get_kv(cns: Consul, key: str) -> str:
+    kv: Dict[str, bytes] = cns.kv.get(key)[1]
     return kv['Value'].decode() if kv is not None else ''
 
 
-def leader_tag(c: Consul, host: str) -> str:
-    return ' (RC)' if get_kv(c, 'leader') == host else ''
+def leader_tag(cns: Consul, host: str) -> str:
+    return ' (RC)' if get_kv(cns, 'leader') == host else ''
 
 
-def profile(c: Consul) -> str:
-    return get_kv(c, 'profile')
+def profile(cns: Consul) -> str:
+    return get_kv(cns, 'profile')
 
 
-def sns_pools(c: Consul) -> List[str]:
-    return get_kv(c, 'profile/pools').split(' ')
+def sns_pools(cns: Consul) -> List[str]:
+    return get_kv(cns, 'profile/pools').split(' ')
 
 
-def hosts(c: Consul) -> Set[str]:
-    data = c.kv.get('node', recurse=True)[1]
+def hosts(cns: Consul) -> Set[str]:
+    data = cns.kv.get('node', recurse=True)[1]
     host_names = {(x['Key'].split('/'))[1] for x in data}
 
     return host_names
@@ -50,15 +51,16 @@ def svc2name(types: str) -> str:
         return 'c0_client'
 
 
-def processes(c: Consul, host: str) -> List:
-    data = c.kv.get(f'node/{host}/service', recurse=True)[1]
+def processes(cns: Consul, host: str) -> List:
+    data = cns.kv.get(f'node/{host}/service', recurse=True)[1]
     fidk_list = list({(x['Key'].split('/'))[3] for x in data})
     fidk_list.sort(key=int, reverse=False)
 
     return [
-        Process(name=svc2name(get_kv(c, f'node/{host}/service/{x}/types')),
+        Process(name=svc2name(get_kv(cns, f'node/{host}/service/{x}/types')),
                 fidk=int(x),
-                ep=get_kv(c, f'node/{host}/service/{x}/ep')) for x in fidk_list
+                ep=get_kv(cns, f'node/{host}/service/{x}/ep'))
+        for x in fidk_list
     ]
 
 
@@ -67,26 +69,34 @@ def is_localhost(hostname: str) -> bool:
     return hostname in ('localhost', '127.0.0.1', name, f'{name}.local')
 
 
-def process_status(c: Consul, host: str, ps: Process) -> str:
-    attr_str = get_kv(c, f'processes/{processfid2str(ps.fidk)}')
-    if attr_str != '':
-        attr = json.loads(attr_str)
-        ret: str = attr['state'][len('M0_CONF_HA_PROCESS_'):]
-        return ret.lower()
+def process_status(cns: Consul, host: str, proc: Process) -> str:
+    svcs_status = cns.health.node(host)
+    for svc in svcs_status[1]:
+        if svc['ServiceID'] != '' and proc.fidk == int(svc['ServiceID']):
+            return 'started' if svc['Status'] == 'passing' else 'offline'
     return 'unknown'
 
 
+def consul_status(host: str) -> str:
+    cmd = '{}sudo systemctl is-active --quiet hare-consul-agent'.format(
+        '' if is_localhost(host) else f'ssh {host} ')
+    return 'passing' if os.system(cmd) == 0 else 'offline'
+
+
 def main():
-    c = Consul()
-    print(f'Profile   : {profile(c)}')
+    if consul_status(gethostname()) != 'passing':
+        print('Cluster is not running.', file=sys.stderr)
+        return -1
+    cns = Consul()
+    print('Profile: ' + profile(cns))
     print('Data Pools:')
-    for x in sns_pools(c):
+    for x in sns_pools(cns):
         print(f'    {x}')
-    print('Services  :')
-    for h in hosts(c):
-        print(f'    {h} {leader_tag(c, h)}')
-        for p in processes(c, h):
-            print(f'    [{process_status(c, h, p):<10}] {p.name:<20}\
+    print('Services:')
+    for h in hosts(cns):
+        print(f'    {h} {leader_tag(cns, h)}')
+        for p in processes(cns, h):
+            print(f'    [{process_status(cns, h, p):<10}] {p.name:<20}\
  {processfid2str(p.fidk):<30} {p.ep:<30}')
 
 
