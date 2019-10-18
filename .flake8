@@ -1,2 +1,4 @@
 [flake8]
+# This is is needed by smart comment feature '###' in utils/hare-* scripts:
+#   Too many leading '#' for block comment (E266)
 ignore = E266
