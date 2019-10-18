@@ -3,8 +3,6 @@ set -eu -o pipefail
 # set -x
 export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
 
-SRC_DIR="$(dirname $(readlink -f ${BASH_SOURCE[0]}))"
-
 usage() {
     cat <<EOF
 Usage: . ${BASH_SOURCE[0]##*/} [-n | --dry-run]
@@ -58,9 +56,9 @@ fi
 # --------------------------------------------------------------------
 
 if [[ $CONFD_IDs ]]; then
-    CONF_FILE=$SRC_DIR/consul-server-conf.json
+    CONF_FILE=/var/lib/hare/consul-server-conf.json
 else
-    CONF_FILE=$SRC_DIR/consul-client-conf.json
+    CONF_FILE=/var/lib/hare/consul-client-conf.json
 fi
 
 SVCS_CONF=''
@@ -77,7 +75,7 @@ append_hax_svc() {
       \"port\": $port,
       \"checks\": [
           {
-            \"args\": [ \"/opt/seagate/hare/check-service\", \"--hax\" ],
+            \"args\": [ \"/opt/seagate/hare/libexec/hare/check-service\", \"--hax\" ],
             \"interval\": \"1s\",
             \"status\": \"warning\"
           }
@@ -98,7 +96,7 @@ append_confd_svc() {
       \"port\": $port,
       \"checks\": [
           {
-            \"args\": [ \"/opt/seagate/hare/check-service\",
+            \"args\": [ \"/opt/seagate/hare/libexec/hare/check-service\",
                         \"--fid\", \"$fid\" ],
             \"interval\": \"1s\",
             \"status\": \"warning\"
@@ -126,7 +124,7 @@ append_ios_svc() {
       \"port\": $port,
       \"checks\": [
           {
-            \"args\": [ \"/opt/seagate/hare/check-service\",
+            \"args\": [ \"/opt/seagate/hare/libexec/hare/check-service\",
                         \"--fid\", \"$fid\" ],
             \"interval\": \"1s\",
             \"status\": \"warning\"

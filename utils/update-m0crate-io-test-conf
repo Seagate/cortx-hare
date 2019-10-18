@@ -3,9 +3,6 @@ set -eu -o pipefail
 # set -x
 export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
 
-SRC_DIR="$(dirname $(readlink -f ${BASH_SOURCE[0]}))"
-M0_SRC_DIR=${M0_SRC_DIR:-${SRC_DIR%/*}/mero}
-
 usage() {
     cat <<EOF
 

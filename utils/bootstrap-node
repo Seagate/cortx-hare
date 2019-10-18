@@ -57,20 +57,20 @@ die() {
 # anyway, with or without this check.  The purpose of the check is to
 # provide proper error message.
 #
-# Without this check `sudo systemctl start hax` fails with "Failed to
+# Without this check `sudo systemctl start hare-hax` fails with "Failed to
 # start hax.service: Unit not found" error message.  That error
 # message is misleading, because hax.service _is_ installed, it is
 # one of its dependencies - mero-kernel.service - which isn't.
 systemctl list-unit-files | grep -qE '^mero-kernel\.service\>' ||
     die "'mero-kernel' systemd service is not installed"
 
-. $SRC_DIR/update-consul-conf --dry-run  # import CONFD_IDs, IOS_IDs, id2fid()
+. update-consul-conf --dry-run  # import CONFD_IDs, IOS_IDs, id2fid()
 
 if [[ -n $CONFD_IDs || -n $IOS_IDs ]]; then
     sudo mkdir -p /var/mero/hax
-    sudo systemctl start hax
+    sudo systemctl start hare-hax
     count=1
-    while ! systemctl is-active hax > /dev/null; do
+    while ! systemctl is-active hare-hax > /dev/null; do
         (($count < 5)) || die "Failed to start hax service."
         sleep 1
         ((count++))

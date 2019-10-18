@@ -20,16 +20,16 @@ test-cfgen:
 	set -eu -o pipefail;\
  out=$$(mktemp -d);\
  if which facter >&/dev/null; then opt_mock=''; else opt_mock='--mock'; fi;\
- ./cfgen -D ./dhall $$opt_mock --debug <_misc/singlenode.yaml >/dev/null;\
- ./cfgen -D ./dhall $$opt_mock -o $$out <_misc/singlenode.yaml;\
+ ./cfgen -D ./dhall $$opt_mock --debug <examples/singlenode.yaml >/dev/null;\
+ ./cfgen -D ./dhall $$opt_mock -o $$out <examples/singlenode.yaml;\
  dhall text <$$out/confd.dhall | $(M0_SRC_DIR)/utils/m0confgen >/dev/null;\
  jq . <$$out/consul-kv.json >/dev/null;\
  rm -r $$out
 
 .PHONY: check-dhall
 check-dhall:
-	yaml-to-dhall ./dhall/types/ClusterDesc.dhall <_misc/singlenode.yaml\
- | dhall-to-yaml | diff -u - <(dhall-to-yaml <<<./_misc/singlenode.dhall)
+	yaml-to-dhall ./dhall/types/ClusterDesc.dhall <examples/singlenode.yaml\
+ | dhall-to-yaml | diff -u - <(dhall-to-yaml <<<./examples/singlenode.dhall)
 	xcode() { sort | $(M0_SRC_DIR)/utils/m0confgen; };\
- dhall text --file _misc/sample-confd.dhall | xcode\
- | diff -u - <(xcode <_misc/conf.cg)
+ dhall text --file examples/sample-confd.dhall | xcode\
+ | diff -u - <(xcode <examples/conf.cg)

@@ -1,0 +1,12 @@
+[Unit]
+Description=HAX daemon for Hare
+Requires=hare-consul-agent.service mero-kernel.service
+After=hare-consul-agent.service mero-kernel.service
+
+[Service]
+WorkingDirectory=/var/mero/hax
+# TODO: '/opt/seagate/hare' prefix can be different, e.g. '/usr'
+Environment=PYTHONPATH=/opt/seagate/hare/lib64/python3.6/site-packages:/opt/seagate/hare/lib/python3.6/site-packages
+ExecStart=/opt/seagate/hare/bin/hax
+KillMode=process
+Restart=on-failure

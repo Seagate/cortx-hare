@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+### stop the cluster
+
 import os
 import sys
 from socket import gethostname
@@ -7,7 +9,7 @@ from typing import Dict, List, NamedTuple
 
 from consul import Consul
 
-other_p = ['hax', 'consul-agent']
+other_p = ['hare-hax', 'hare-consul-agent']
 mero_p = ['ios', 'confd']
 Process = NamedTuple('Process', [('node', str), ('name', str), ('fidk', int),
                                  ('status', str)])
@@ -36,7 +38,7 @@ def processes_get(c: Consul) -> List[Process]:
 
         processes.append(
             Process(node=node['Node'],
-                    name='consul-agent',
+                    name='hare-consul-agent',
                     fidk=0,
                     status=consul_status(node['Node'])))
     return processes
@@ -48,7 +50,7 @@ def is_localhost(hostname: str) -> bool:
 
 
 def consul_status(host: str) -> str:
-    cmd = '{}sudo systemctl is-active --quiet consul-agent'.format(
+    cmd = '{}sudo systemctl is-active --quiet hare-consul-agent'.format(
         '' if is_localhost(host) else f'ssh {host} ')
     return 'passing' if os.system(cmd) == 0 else 'offline'
 

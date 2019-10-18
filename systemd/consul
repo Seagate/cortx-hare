@@ -1,6 +1,0 @@
-#!/usr/bin/env bash
-set -eu -o pipefail
-
-exec consul agent -bind $BIND -client "$CLIENT" $JOIN \
-     -config-file=/opt/seagate/hare/consul-$MODE-conf.json \
-     -data-dir=/tmp/consul $EXTRA_OPTS

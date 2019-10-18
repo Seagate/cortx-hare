@@ -1,7 +1,7 @@
 *$py.class
 *.egg-info/
 *.py[cod]
-.env/
+.py3venv/
 .mypy_cache
 __pycache__
 build/

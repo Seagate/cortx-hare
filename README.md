@@ -31,7 +31,7 @@ The scripts in this repository constitute a middleware layer between [Consul](ht
    ./install
    ```
 
-2. Edit `cfgen/_misc/singlenode.yaml` file or create a cluster description
+2. Edit `cfgen/examples/singlenode.yaml` file or create a cluster description
    file of your own.
 
    * Ensure that the disks referred to by `io_disks.path_glob` pattern
@@ -50,7 +50,7 @@ The scripts in this repository constitute a middleware layer between [Consul](ht
 
 3. Start the cluster:
    ```sh
-   ./bootstrap cfgen/_misc/singlenode.yaml
+   ./hare bootstrap cfgen/examples/singlenode.yaml
    ```
 
 ### Multi-node setup
@@ -60,7 +60,7 @@ Steps 1 and 2 should be done for each of the nodes.  The bootstrap
 command may be executed on any server node (i.e., on any of the nodes
 configured to run confd).
 
-Use `cfgen/_misc/ees-cluster.yaml` (which describes a two-node cluster)
+Use `cfgen/examples/ees-cluster.yaml` (which describes a two-node cluster)
 as an example.
 
 ## Test I/O
