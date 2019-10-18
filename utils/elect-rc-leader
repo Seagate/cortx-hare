@@ -46,8 +46,11 @@ get_session_id | grep -q ^- || {
 cleanup
 
 # Create session with the service:confd Health Checker:
-CHECKS=$(curl -s http://127.0.0.1:8500/v1/health/node/$HOSTNAME |
-         jq '[.[].CheckID]')
+CHECKS_A=($(consul kv get -recurse node/$HOSTNAME | egrep -w 'confd|ha' |
+            sed -r 's/.*service.([0-9]+).*/"service:\1"/'))
+# See the trick comma separated list explained here:
+# https://stackoverflow.com/questions/38625176/store-array-output-to-comma-separated-list-in-bash-scripting
+CHECKS=$(IFS=,; echo "[\"serfHealth\", ${CHECKS_A[*]}]")
 PAYLD="{\"Name\": \"leader\", \"Checks\": $CHECKS, \"LockDelay\": \"2s\"}"
 RES=$(curl -sX PUT -d "$PAYLD" http://localhost:8500/v1/session/create)
 SID=$(echo "$RES" | jq -r '.ID' 2>/dev/null || true)
