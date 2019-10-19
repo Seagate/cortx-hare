@@ -153,6 +153,6 @@ done
 tmpfile=$(mktemp /tmp/${CONF_FILE##*/}.XXXXXX)
 trap "rm -f $tmpfile" EXIT # delete automatically on exit
 jq ".services = [$SVCS_CONF]" <$CONF_FILE >$tmpfile
-cat $tmpfile >$CONF_FILE
+sudo cp $tmpfile $CONF_FILE
 
 consul reload > /dev/null

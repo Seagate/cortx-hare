@@ -205,12 +205,12 @@ test-boot1:
       test_cluster() {
           local cdf=$1
 
-          time sudo hctl bootstrap --mkfs $cdf
+          time hctl bootstrap --mkfs $cdf
           do_io
-          sudo hctl shutdown
-          time sudo hctl bootstrap --conf-dir /tmp  # bootstrap on existing conf
+          hctl shutdown
+          time hctl bootstrap --conf-dir /tmp  # bootstrap on existing conf
           do_io
-          sudo hctl shutdown
+          hctl shutdown
       }
 
       cd /data/hare/
@@ -282,12 +282,12 @@ test-boot2:
 
       cd /data/hare/
       # Server-server Consul agents configuration.
-      time sudo hctl bootstrap --mkfs cfgen/examples/ci-boot2.yaml
+      time hctl bootstrap --mkfs cfgen/examples/ci-boot2.yaml
 
-      sudo hctl shutdown
+      hctl shutdown
 
       # Server-client Consul agents configuration.
-      time sudo hctl bootstrap --mkfs cfgen/examples/ci-boot2-1confd.yaml
+      time hctl bootstrap --mkfs cfgen/examples/ci-boot2-1confd.yaml
       EOF
     - time $M0VG run --vm ssu1
            "OTHER_HOST=${JOB_NAME}-ssu2 bash -x /data/hare/_test-boot2.sh"
