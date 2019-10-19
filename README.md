@@ -28,7 +28,7 @@ The scripts in this repository constitute a middleware layer between [Consul](ht
    ```sh
    git clone ssh://git@gitlab.mero.colo.seagate.com:6022/mero/hare.git
    cd hare
-   ./install
+   sudo make devinstall
    ```
 
 2. Edit `cfgen/examples/singlenode.yaml` file or create a cluster description
@@ -50,7 +50,7 @@ The scripts in this repository constitute a middleware layer between [Consul](ht
 
 3. Start the cluster:
    ```sh
-   ./hare bootstrap cfgen/examples/singlenode.yaml
+   hctl bootstrap --mkfs cfgen/examples/singlenode.yaml
    ```
 
 ### Multi-node setup
