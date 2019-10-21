@@ -120,17 +120,20 @@ read _ join_ip <<< $(get_server_nodes | grep -w $HOSTNAME)
     exit 1
 }
 
-say 'Starting Consul server agent on this node... '
+say 'Starting Consul server agent on this node...'
 # $join_ip is our bind_ip address
 mk-consul-env --mode server --bind $join_ip \
               --extra-options '-ui -bootstrap-expect 1'
 
 sudo systemctl start hare-consul-agent
 
-# Give Consul some time for its internal bootstrap and leader
-# election. (Until then the KV Store won't be accessible.)
-sleep 3
-echo 'Ok.'
+# Wait for Consul's internal leader to be ready.
+# (Until then the KV Store won't be accessible.)
+while ! consul info 2>/dev/null | grep -q 'leader.*true'; do
+    sleep 1
+    echo -n '.'
+done
+echo ' Ok.'
 
 say 'Importing configuration into the KV Store... '
 jq '[.[] | {key, value: (.value | @base64)}]' < $cfgen_out/consul-kv.json |
