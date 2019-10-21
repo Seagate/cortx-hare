@@ -64,11 +64,10 @@ systemctl daemon-reload
 %postun
 systemctl daemon-reload
 
-# FIXME: don't fail if /usr/lib/rpm/brp-python-bytecompile reports synatx erros,
-# the script doesn't work with python3, there should a better way to disable it
-# completely
-# https://github.com/scylladb/scylla/issues/2235 suggests that a proper fix is
-# to rename all *.py files as *.py3
+# Don't fail if /usr/lib/rpm/brp-python-bytecompile reports syntax errors --
+# that script doesn't work with python3.
+# FIXME: https://github.com/scylladb/scylla/issues/2235 suggests that proper
+# fix is to rename all *.py files to *.py3.
 %define _python_bytecompile_errors_terminate_build 0
 
 # Consul binaries are stripped and don't contain build id, so rpmbuild fails
