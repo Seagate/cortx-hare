@@ -5,27 +5,27 @@ default: build
 help:
 	@echo 'General targets:'
 	@echo '  build          - build binary components (hax)'
-	@echo '  test           - run smoke tests'
-	@echo '  clean          - remove build artifacts'
-	@echo '  distclean      - perform clean and remove python virtual env'
+	@echo '  test           - run tests'
+	@echo '  clean          - remove build artefacts'
+	@echo '  distclean      - perform clean and remove Python virtual env'
 	@echo '                   directory with all installed pip modules'
 	@echo '  install        - system-wide installation, respects DESTDIR'
-	@echo '  devinstall     - local installation in development mode,'
+	@echo '  devinstall     - local installation in the development mode,'
 	@echo '                   respects DESTDIR'
 	@echo '  uninstall      - uninstall all components, respects DESTDIR'
-	@echo ''
+	@echo
 	@echo 'Code linters:'
-	@echo '  check          - run `flake8` and `mypy` linters for python code'
-	@echo '  flake8         - run `flake8` for python code'
-	@echo '  mypy           - run `mypy` for python code'
-	@echo ''
+	@echo '  check          - run `flake8` and `mypy` linters for Python code'
+	@echo '  flake8         - run `flake8` for Python code'
+	@echo '  mypy           - run `mypy` for Python code'
+	@echo
 	@echo 'Distribution targets:'
 	@echo '  rpm            - build release rpm package'
 	@echo '  dist           - generate source code distribution archive'
-	@echo ''
+	@echo
 	@echo 'Docker:'
-	@echo '  docker-images  - build docker images for CI environment'
-	@echo '  docker-push    - upload local Hare images to docker registry'
+	@echo '  docker-images  - build Docker images for CI environment'
+	@echo '  docker-push    - upload local Hare images to Docker registry'
 	@echo '  docker-clean   - remove local Hare images'
 
 # Globals --------------------------------------------- {{{1
@@ -36,8 +36,9 @@ SHELL := bash
 TOP_SRC_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 PY_VENV_DIR := $(TOP_SRC_DIR).py3venv
 PYTHON      := python3
-PIP         := source $(PY_VENV_DIR)/bin/activate; pip3
-SETUP_PY    := source $(PY_VENV_DIR)/bin/activate; $(PYTHON) setup.py
+PY_VENV     := source $(PY_VENV_DIR)/bin/activate
+PIP         := $(PY_VENV); pip3
+SETUP_PY    := $(PY_VENV); $(PYTHON) setup.py
 PY3_VERSION := 36
 PY3_VERSION_MINOR := $(shell grep -o . <<<$(PY3_VERSION) | tail -n1)
 
@@ -58,7 +59,7 @@ $(HAX_WHL): $(PY_VENV_DIR) $(HAX_SRC)
 	@$(call _info,Building hax .whl package)
 	@cd hax && $(SETUP_PY) bdist_wheel
 
-$(PY_VENV_DIR): cfgen/requirements.txt hax/requirements.txt
+$(PY_VENV_DIR): $(patsubst %,%/requirements.txt,cfgen hax)
 	@$(call _info,Initializing virtual env in $(PY_VENV_DIR))
 	@$(PYTHON) -m venv $@
 	@$(call _info,Installing pip modules in virtual env)
@@ -93,7 +94,7 @@ clean-hax:
 
 .PHONY: clean-mypy
 clean-mypy:
-	@$(call _info,Cleaning MyPy cache)
+	@$(call _info,Cleaning mypy cache)
 	@find . -type d -name .mypy_cache -printf '%P\n' | while read d; do \
 	     $(call _log,removing $$d); \
 	     rm -rf $$d; \
@@ -291,8 +292,7 @@ check: check-cfgen check-hax flake8 mypy
 .PHONY: check-cfgen
 check-cfgen: $(PY_VENV_DIR)
 	@$(call _info,Checking cfgen)
-	@source $(PY_VENV_DIR)/bin/activate; \
-	 $(MAKE) --quiet -C cfgen flake8 typecheck
+	@$(PY_VENV); $(MAKE) --quiet -C cfgen flake8 typecheck
 
 .PHONY: check-hax
 check-hax: $(PY_VENV_DIR)
@@ -302,14 +302,13 @@ check-hax: $(PY_VENV_DIR)
 .PHONY: flake8
 flake8: $(PYTHON_SCRIPTS)
 	@$(call _info,Checking files with flake8)
-	@source $(PY_VENV_DIR)/bin/activate; \
-	 flake8 $(FLAKE8_OPTS) $^
+	@$(PY_VENV); flake8 $(FLAKE8_OPTS) $^
 
 .PHONY: mypy
 override MYPY_OPTS := --config-file hax/mypy.ini $(MYPY_OPTS)
 mypy: $(PYTHON_SCRIPTS)
-	@$(call _info,Checking files with MyPy)
-	@source $(PY_VENV_DIR)/bin/activate; \
+	@$(call _info,Checking files with mypy)
+	@$(PY_VENV); \
 	 set -eu -o pipefail; for f in $^; do mypy $(MYPY_OPTS) $$f; done
 
 # Tests ----------------------------------------------- {{{1
@@ -321,8 +320,7 @@ test: test-cfgen
 .PHONY: test-cfgen
 test-cfgen: $(PY_VENV_DIR)
 	@$(call _info,Testing cfgen)
-	@source $(PY_VENV_DIR)/bin/activate; \
-	 $(MAKE) --quiet -C cfgen test-cfgen check-dhall
+	@$(PY_VENV); $(MAKE) --quiet -C cfgen test-cfgen check-dhall
 
 # RPM ------------------------------------------------- {{{1
 #

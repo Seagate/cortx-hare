@@ -1,2 +1,2 @@
-pyyaml
-ply
+PyYAML
+ply  # cfgen tests execute `m0confgen`, which depends on `ply`

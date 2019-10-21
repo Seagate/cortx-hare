@@ -105,7 +105,7 @@ build:
           sudo losetup /dev/loop$i /var/mero/disk$i.img
       done
 
-      # XXX `systemctl start hare-hax` command, called by `bootstrap-node` script,
+      # XXX `systemctl start hare-hax` command, called by `bootstrap-node`,
       # will fail unless `mero-kernel` systemd service is installed.
       sudo /data/mero/scripts/install-mero-service
 
@@ -197,7 +197,7 @@ test-boot1:
 
       do_io() {
           cp /data/mero/clovis/m0crate/tests/test1_io.yaml .
-          ./utils/update-m0crate-io-test-conf test1_io.yaml
+          utils/update-m0crate-io-test-conf test1_io.yaml
           dd if=/dev/urandom of=/tmp/128M bs=1M count=100
           sudo /data/mero/clovis/m0crate/m0crate -S test1_io.yaml
       }
@@ -277,7 +277,7 @@ test-boot2:
       kh=~/.ssh/known_hosts
       ssh-keyscan -t rsa $OTHER_HOST >$kh
       chmod 0600 $kh
-      sudo mkdir /root/.ssh || true
+      sudo mkdir -p /root/.ssh
       sudo cp $kh /root/.ssh
 
       cd /data/hare/
