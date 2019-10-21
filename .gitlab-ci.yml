@@ -120,7 +120,7 @@ rpmbuild:
   image: $DOCKER_REGISTRY/mero/hare:$CENTOS_RELEASE
 
   script:
-    - export LATEST_RELEASE_DIR="$(ls -td /releases/master/B* | head -n1)"
+    - export LATEST_RELEASE_DIR=$(readlink -f /releases/master/BCURRENT)
     - '[[ -d $RPMSYNC_DIR ]] || mkdir -vp $RPMSYNC_DIR || true'
     - cp -v $LATEST_RELEASE_DIR/mero{,-devel}-[0-9]*.rpm $RPMSYNC_DIR/
     - yum install -y $LATEST_RELEASE_DIR/mero{,-devel}-[0-9]*.rpm
