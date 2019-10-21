@@ -195,42 +195,70 @@ The function blocks until the epoch is returned or an error occurs.
 
 See the [[https://docs.google.com/document/d/1cR-BbxtMjGuZPj8NOc95RyFjqmeFsYf4JJ5Hw_tL1zA/edit#bookmark=id.whq5d31z34][prototype]].
 
-** _sprint-9
+** HA
 
-Sprint goal: "Halon is replaced with Hare"
+*** _(grand-)design document
 
-*** [[[https://jts.seagate.com/browse/EOS-2164][EOS-2164]]] @andriy: m0crate I/O on CI (XXX 1d only; another ticket needed)
+**** PoC experiments
+Required for the 1st implementation.
 
-*** [[[https://jts.seagate.com/browse/EOS-2054][EOS-2054]]] @rajanikant: 2 ios per node
+**** the document is not written yet
+The design is currently in Max's head, whiteboard, and sheets of paper.
+John: "I keep asking negative questions."
 
-*** [[[https://jts.seagate.com/browse/EOS-2049][EOS-2049]]] @mandar: hax HA states request
+**** maybe Konstantin can help with PoC experiments
 
-*** [[[http://jts.seagate.com/browse/EOS-2057][EOS-2057]]] @prasanna: EES cluster bootstrap on CI
+***** Konstantin: I have no knowledge of the internals of Mero.
+If I can help anyhow, I will be happy to.
 
-*** @max, @kostya, @vvv: Pacemaker integration -- EOS-2059 (XXX split)
-- [[[https://jts.seagate.com/browse/EOS-2120][EOS-2120]]] @max
-- [[[https://jts.seagate.com/browse/EOS-2237][EOS-2237]]] @kostya
-- [[[https://jts.seagate.com/browse/EOS-2236][EOS-2236]]] @vvv
+***** Max: by the end of this week I am planning to update the RFC ([[http://gitlab.mero.colo.seagate.com/mero/hare/blob/master/rfc/7/README.md][7/FAIL]])
 
-***** How do we handle failures for EES?
-- mero process fails
-- node failure
+** _sprint-10
 
-*** [[[https://jts.seagate.com/browse/EOS-2056][EOS-2056]]] @dima.c: Hare rpm
-~/opt/seagate/hare/bin/~:
-- bootstrap
-- bootstrap-node
-- cfgen
-- hax
+Sprint goal:
+1. Pass Hare RPM to QA and Mero developers to play with.
+   Get a feedback loop.
+2. Prepare HA PoCs for Hare, Mero, and, optionally, S3 server.
 
-**** Docker image
-**** CI
-**** RE
+*** HA (integration with Pacemaker)
 
-*** TODO @dima.c: outline of +Sprint-9 and+ PI-3 tasks
+**** @andriy: 10d
+We need to gain Corosync/Pacemaker expertise.
+A subtask of [[[https://jts.seagate.com/browse/EOS-2059][EOS-2059]]].
+
+**** @knekrasov: experiment with Pacemaker on local two-VM cluster
+Without Seagate code.
+
+**** HA PoCs and testing
+
+*** XXX @prasanna
+
+**** [[[https://jts.seagate.com/browse/EOS-2612][EOS-2612]]] extend CI to collect syslogs -- [[http://gitlab.mero.colo.seagate.com/mero/hare/issues/83][#83]]
+
+**** XXX
+
+*** @vvv
+
+**** [[[https://jts.seagate.com/browse/EOS-2610][EOS-2610]]] Hare boot camp for QA and Mero
+
+**** [[[https://jts.seagate.com/browse/EOS-2597][EOS-2597]]] revise Hare documentation
+
+**** XXX ? finish [[http://gitlab.mero.colo.seagate.com/mero/hare/issues/108][#108]] -- @mandar wants to do this task
+
+*** @mandar
+
+**** 5d [EOS-2049]
+
+**** [[http://gitlab.mero.colo.seagate.com/mero/hare/issues/108][#108]] 5d
+XXX ? related to [[[https://jts.seagate.com/browse/EOS-2050][EOS-2050]]] ([hax] HA state updates from Consul to Mero)
+
+*** [[[https://jts.seagate.com/browse/EOS-2611][EOS-2611]]] @rajanikant: test running of S3 servers with Hare -- [[http://gitlab.mero.colo.seagate.com/mero/hare/issues/90][#90]]
 
 ** _future sprint
 
+*** @dima.c: m0vg image
+
+*** ? @dima.c: experiment with migrating to seagit
 *** @vvv, @dima.c: hare CLI tool
 
 **** hare build --release
@@ -343,8 +371,6 @@ $ (cd .env; git status)
         lib/python3.6/site-packages/wheel/
         pip-selfcheck.json
 #+END_SRC
-
-*** @dima.c: m0vg image
 
 ** scoping
 
