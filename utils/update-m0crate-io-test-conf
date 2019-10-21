@@ -5,20 +5,19 @@ export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
 
 usage() {
     cat <<EOF
-
 Usage: ${0##*/} <test-conf-file.yaml>
 
 Update m0crate test configuration file.
-
 EOF
 }
 
-(( $# == 1 )) || { usage >&2; exit 1; }
+(($# == 1)) || { usage >&2; exit 1; }
 conf_file=$1
 
 [[ -f $conf_file ]] || {
     echo "Error: there is no such file: $conf_file" >&2
-    usage >&2; exit 1
+    usage >&2
+    exit 1
 }
 
 get_profile() {

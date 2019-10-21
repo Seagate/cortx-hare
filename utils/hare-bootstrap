@@ -175,7 +175,7 @@ say 'Update Consul agents configs from the KV Store... '
 update-consul-conf &
 pids=($!)
 while read node _; do
-    ssh $node "$(which update-consul-conf)" &
+    ssh $node "PATH=$PATH $(which update-consul-conf)" &
     pids+=($!)
 done < <(get_all_nodes | grep -vw $HOSTNAME || true)
 wait4 ${pids[@]}

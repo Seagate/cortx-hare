@@ -87,18 +87,6 @@ build:
       sudo yum install -y python36 python36-devel python36-PyYAML python36-pip
       sudo pip3 install ply python-consul
 
-      cd /tmp
-      download=https://github.com/dhall-lang/dhall-haskell/releases/download
-      for f in $download/1.26.1/dhall-1.26.1-x86_64-linux.tar.bz2 \
-               $download/1.26.1/dhall-json-1.4.1-x86_64-linux.tar.bz2; do
-          curl -LO $f
-          sudo tar -C /usr/local/ -xf ${f##*/}
-      done
-
-      curl -LO https://releases.hashicorp.com/consul/1.6.1/consul_1.6.1_linux_amd64.zip
-      unzip -x consul_1.6.1_linux_amd64.zip
-      sudo mv consul /usr/local/bin/
-
       sudo mkdir -p /var/mero
       for i in {0..9}; do
           sudo dd if=/dev/zero of=/var/mero/disk$i.img bs=1M seek=9999 count=1
@@ -194,6 +182,12 @@ test-boot1:
     - |
       cat >hare/_test-boot1.sh <<'EOF'
       set -eu -o pipefail
+
+      # XXX `update-m0crate-io-test-conf` executes `consul`,
+      # which is /opt/seagate/hare/bin.  There should be a better way
+      # to add that directory to PATH; see
+      # http://gitlab.mero.colo.seagate.com/mero/hare/merge_requests/248#note_16669
+      export PATH="/opt/seagate/hare/bin:$PATH"
 
       do_io() {
           cp /data/mero/clovis/m0crate/tests/test1_io.yaml .
