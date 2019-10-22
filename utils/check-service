@@ -40,7 +40,7 @@ done
 [[ -n $fid || -n $hax ]] || { usage >&2; exit 1; }
 
 if [[ $hax ]]; then
-    service=hax
+    service=hare-hax
 else
     service=m0d@$fid
 fi
