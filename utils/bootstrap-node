@@ -4,25 +4,30 @@ set -eu -o pipefail
 export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
 
 PROG=${0##*/}
-SRC_DIR="$(dirname $(readlink -f $0))"
 
 usage() {
     cat <<EOF
-Usage: $PROG [--mkfs|--mkfs-only] { -p|--phase 1|2 }
+Usage: $PROG [--mkfs|--mkfs-only] { -p|--phase 1|2|3 }
 
-Bootstraps single node after consul agent is started.
+Bootstraps single node after local consul agent is started.
 
 The required parameter is one of the following:
 
-  --phase 1 - start confd Mero process(es)
-  --phase 2 - start ios Mero process(es)
+  --phase 1 - start Mero confd servers
+  --phase 2 - start Mero IO servers
+  --phase 3 - start S3 servers
 
 Options:
-  --mkfs-only               Do m0mkfs only (WARNING: wipes Mero data).
-  --mkfs                    Do m0mkfs (WARNING: wipes Mero data) and start mero service(s).
-  --m0d                     Start mero services only without mkfs.
-  -h, --help                Show this help and exit.
+  --mkfs-only   Do m0mkfs only (CAUTION: wipes Mero data).
+  --mkfs        Do m0mkfs (CAUTION: wipes Mero data) and start Mero servers.
+  --m0d         Skip m0mkfs, start Mero servers.
+  -h, --help    Show this help and exit.
 EOF
+}
+
+die() {
+    echo "[$HOSTNAME] $PROG: $*" >&2
+    exit 1
 }
 
 do_mkfs=
@@ -46,15 +51,12 @@ while true; do
     esac
 done
 
-[[ $phase =~ ^phase[12]$ ]] || {
-    usage >&2
-    exit 1
-}
+[[ $phase =~ ^phase[1-3]$ ]] ||
+    die "Invalid value of 'phase' argument: $phase"
 
-die() {
-    >&2 echo "$PROG: $HOSTNAME: $*"
-    exit 1
-}
+if [[ $do_mkfs ]] && [[ $phase == 'phase3' ]]; then
+    die '--mkfs conflicts with --phase3'
+fi
 
 # If mero-kernel.service is not installed, the script will fail
 # anyway, with or without this check.  The purpose of the check is to
@@ -78,11 +80,11 @@ fi
 
 wait_active() {
     local svc=$1
-    local timeout=$2 # in secs
+    local timeout=$2  # seconds
     local count=0
 
     while ! systemctl --quiet is-active $svc; do
-        (($count < $timeout)) || die "Failed to start $svc service."
+        (($count < $timeout)) || die "Unable to start $svc service"
         sleep 1
         ((++count))
     done
@@ -93,11 +95,11 @@ wait_active() {
 # really started.
 wait_m0d_started() {
     local fid=$1
-    local timeout=$2 # in secs
+    local timeout=$2  # seconds
     local count=0
 
     while ! sudo systemctl status "m0d@$fid" | grep -q 'Started'; do
-        (($count < $timeout)) || die "Failed to start m0d@$fid service."
+        (($count < $timeout)) || die "Unable to start m0d@$fid service"
         sleep 1
         ((++count))
     done
@@ -116,11 +118,23 @@ if [[ -n $CONFD_IDs && $phase == phase1 ]]; then
     sudo cp /var/lib/hare/confd.xc /etc/mero/
 fi
 
-if [[ $phase == phase1 ]]; then
-    IDs=$CONFD_IDs
-else
-    IDs=$IOS_IDs
-fi
+case $phase in
+    phase1)
+       proc='m0d@'
+       IDs=$CONFD_IDs
+       ;;
+    phase2)
+       proc='m0d@'
+       IDs=$IOS_IDs
+       ;;
+    phase3)
+       proc='s3server@'
+       IDs=$S3_IDs
+       ;;
+    *)
+       die 'Impossible happened'
+       ;;
+esac
 
 for id in $IDs; do
     fid=$(id2fid $id)
@@ -133,7 +147,9 @@ for id in $IDs; do
     fi
 
     if [[ $do_mkfs != 'mkfs-only' ]]; then
-        sudo systemctl start m0d@$fid
-        wait_m0d_started $fid 30
+        sudo systemctl start $proc$fid
+        if [[ $proc == 'm0d@' ]]; then
+            wait_m0d_started $fid 30
+        fi
     fi
 done

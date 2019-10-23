@@ -21,3 +21,17 @@ time hctl shutdown
 
 # Server-client Consul agents configuration.
 time hctl bootstrap --mkfs cfgen/examples/ci-boot2-1confd.yaml
+
+hctl status
+
+time hctl shutdown
+
+# S3 configuration.
+cp cfgen/examples/ci-boot2.yaml /tmp/_s3_ci-boot2.yaml
+sed -i 's/s3: 0/s3: 2/' /tmp/_s3_ci-boot2.yaml
+time hctl bootstrap --mkfs /tmp/_s3_ci-boot2.yaml
+
+hctl status
+
+time hctl shutdown
+rm -rf /tmp/_s3_ci-boot2.yaml

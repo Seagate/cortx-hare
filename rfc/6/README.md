@@ -76,6 +76,13 @@ Cluster administrator
     - waits for `m0mkfs` to terminate;
     - starts `m0d` process(es).
 
+11. Starts S3 servers.  For each S3 server:
+
+    - obtains process fid from the Consul KV;
+    - adds service and watch entries to Consul configuration file;
+    - adds sysconfig and systemd entries;
+    - starts the S3 server.
+
 **Note:** `hctl bootstrap` command waits for a Mero process by polling
 status of the corresponding Consul service; see
 [5/HAX](rfc/5/README.md#storing-process-status-in-consul-kv) for more
@@ -86,3 +93,4 @@ details.
 * Mero ‘confd’ services SHALL be collocated with Consul server agents.
 * Several ‘confd’ service SHALL NOT be running on the same node.
 * Several Mero servers MAY be running on the same node.
+* Several S3 servers MAY be running on the same node.

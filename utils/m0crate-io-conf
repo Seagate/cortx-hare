@@ -29,7 +29,7 @@ clovis_clients() {
         # [...]
         # ```
         awk -F/ '/endpoint:/ {ep=$6; sub(/^endpoint:/, "", ep)}
-                 /clovis/ {printf("0x7200000000000001:0x%x %s\n", $5, ep)}'
+                 /m0_client_other/ {printf("0x7200000000000001:0x%x %s\n", $5, ep)}'
 }
 
 ## Parameterized version of `clovis/m0crate/tests/test1_io.yaml` from

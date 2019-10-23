@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -eu -o pipefail
+
+S3_PREFIX='/opt/seagate/s3'
+S3_CONFIG=$S3_PREFIX/conf/s3config.yaml
+S3_START_SCRIPT=$S3_PREFIX/s3startsystem.sh
+
+die() { echo "$@" >&2; exit 1; }
+
+[[ -e $S3_CONFIG ]] || die "$S3_CONFIG: No such file"
+[[ -x $S3_START_SCRIPT ]] || die "$S3_START_SCRIPT: No such executable"
+
+sudo sed -i 's/S3_ENABLE_AUTH_SSL: true/S3_ENABLE_AUTH_SSL: false/g' $S3_CONFIG
+sudo sed -i '$ s/$/ --disable_auth=true/' $S3_START_SCRIPT

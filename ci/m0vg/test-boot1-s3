@@ -1,0 +1,147 @@
+#!/usr/bin/env bash
+set -eu -o pipefail
+export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
+set -x
+
+. /data/hare/ci/_env  # HARE_CI_S3_ACCESS_KEY, HARE_CI_S3_SECRET_KEY
+
+export PATH="/opt/seagate/hare/bin:/opt/seagate/hare/libexec/hare:$PATH"
+
+generate_s3cfg() {
+    . update-consul-conf --dry-run  # import CONFD_IDs, IOS_IDs, id2fid()
+    local id=${S3_IDs[0]}  # In absence of haproxy using 1st S3 server instance
+    local ip_addr=$(get_service_ip_addr $(get_service_ep $id))
+    local port=$(awk -F= '$1 == "MERO_S3SERVER_PORT" {print $2}' \
+                     /etc/sysconfig/s3server-$(id2fid $id))
+    cat <<EOF
+[default]
+access_key = $HARE_CI_S3_ACCESS_KEY
+bucket_location = US
+check_ssl_certificate = False
+check_ssl_hostname = True
+cloudfront_host = s3.seagate.com
+default_mime_type = binary/octet-stream
+delay_updates = False
+delete_after = False
+delete_after_fetch = False
+delete_removed = False
+dry_run = False
+enable_multipart = True
+encrypt = False
+follow_symlinks = False
+force = False
+get_continue = False
+gpg_command = /usr/bin/gpg
+gpg_decrypt = %(gpg_command)s -d --verbose --no-use-agent --batch --yes --passphrase-fd %(passphrase_fd)s -o %(output_file)s %(input_file)s
+gpg_encrypt = %(gpg_command)s -c --verbose --no-use-agent --batch --yes --passphrase-fd %(passphrase_fd)s -o %(output_file)s %(input_file)s
+gpg_passphrase = seagate
+guess_mime_type = True
+host_base = s3.seagate.com
+host_bucket = %(bucket)s.s3.seagate.com
+human_readable_sizes = False
+invalidate_default_index_on_cf = False
+invalidate_default_index_root_on_cf = True
+invalidate_on_cf = False
+limit = -1
+limitrate = 0
+list_md5 = False
+log_target_prefix =
+long_listing = False
+max_delete = -1
+multipart_chunk_size_mb = 15
+multipart_max_chunks = 10000
+preserve_attrs = True
+progress_meter = True
+proxy_host = $ip_addr
+proxy_port = $port
+put_continue = False
+recursive = False
+recv_chunk = 65536
+reduced_redundancy = False
+requester_pays = False
+restore_days = 1
+restore_priority = Standard
+secret_key = $HARE_CI_S3_SECRET_KEY
+send_chunk = 65536
+server_side_encryption = False
+signature_v2 = False
+signurl_use_https = False
+simpledb_host = s3.seagate.com
+skip_existing = False
+socket_timeout = 300
+stats = False
+stop_on_error = False
+storage_class =
+throttle_max = 100
+urlencoding_mode = normal
+use_http_expect = False
+use_https = False
+use_mime_magic = True
+verbosity = WARNING
+website_endpoint = http://%(bucket)s.s3-website-%(location)s.seagate.com/
+website_index = index.html
+EOF
+}
+
+do_s3_ops() {
+    local s3cfg=/data/hare/ci/_s3cfg
+    local ifile=128M
+    local ofile=128M.out
+    local bkt=s3://seagate
+
+    generate_s3cfg >$s3cfg
+    [[ -s /tmp/128M ]] || dd if=/dev/urandom of=/tmp/$ifile bs=1M count=128
+
+    s3cmd --config $s3cfg mb $bkt
+    s3cmd --config $s3cfg put /tmp/$ifile $bkt
+
+    rm -f /tmp/$ofile
+    s3cmd --config $s3cfg get $bkt/$ifile /tmp/$ofile
+    s3cmd --config $s3cfg del $bkt/$ifile
+    s3cmd --config $s3cfg rb $bkt
+
+    cmp /tmp/$ifile /tmp/$ofile
+    rm -f /tmp/$ifile /tmp/$ofile
+}
+
+wait_for_s3server_to_start() {
+    local fid=$1
+    local state=$2
+    local count=10
+
+    set +x
+    until [[ $(utils/get-process-state $fid) == $state ]]; do
+        sleep 3
+        echo -n '.'
+        ((--count > 0)) || die 'Process not started'
+    done
+    set -x
+}
+
+test_cluster() {
+    local cdf=$1
+
+    s3auth-disable
+    time hctl bootstrap --mkfs $cdf
+
+    hctl status
+    . update-consul-conf --dry-run  # import CONFD_IDs, IOS_IDs, id2fid()
+
+    # In the absence of haproxy (load balancer for S3 server
+    # instances) let CI job bypass haproxy and directly use port
+    # number of the first S3 server instance port number as haproxy
+    # port.
+    #
+    # XXX FIXME Add haproxy for CI.
+    local id=${S3_IDs[0]}
+    wait_for_s3server_to_start $(id2fid $id) M0_CONF_HA_PROCESS_STARTED
+
+    do_s3_ops
+
+    time hctl shutdown
+}
+
+cd /data/hare/
+cdf=cfgen/examples/_singlenode_s3.yaml
+sed 's/s3: 0/s3: 2/' cfgen/examples/singlenode.yaml >$cdf
+test_cluster $cdf

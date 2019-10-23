@@ -10,5 +10,6 @@ cd $WORKSPACE_DIR
 ci_init_m0vg cmu
 _time $M0VG run /data/hare/ci/m0vg/init-node
 _time $M0VG run /data/hare/ci/m0vg/test-boot1
+_time $M0VG run /data/hare/ci/m0vg/test-boot1-s3
 
 ci_success

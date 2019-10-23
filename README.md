@@ -61,12 +61,25 @@ fi
 )
 ```
 
-### Install Mero and Hare
+### Install rpm packages
 
-* Download `mero` and `hare`
-  [rpm packages](http://ci-storage.mero.colo.seagate.com/releases/master/BCURRENT/).
+* Install `hare` and `s3server` packages by running these commands on
+  every machine of the cluster:
+  ```bash
+  (set -eu
 
-* Install them on every machine of the cluster.
+  if ! rpm -q hare s3server; then
+      if ! sudo yum install -y hare s3server; then
+          repo="ci-storage.mero.colo.seagate.com/releases/eos/BLATEST"
+          yum-config-manager --add-repo="http://$repo"
+          sudo tee -a /etc/yum.repos.d/${repo//\//_}.repo <<< 'gpgcheck=0'
+          unset repo
+
+          sudo yum install -y hare s3server
+      fi
+  fi
+  )
+  ```
 
 * Add `/opt/seagate/hare/bin` to PATH.
   ```sh

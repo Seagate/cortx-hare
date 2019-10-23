@@ -246,6 +246,21 @@ bootstrap_nodes phase1
 # Start ioservices
 bootstrap_nodes phase2
 
+. update-consul-conf --dry-run  # import S3_IDs
+if [[ -n $S3_IDs ]]; then
+    # Now the 3rd phase (s3servers).
+    say 'Starting S3 servers (phase3)... '
+    bootstrap-node --phase phase3 &
+    pids=($!)
+
+    while read node _; do
+        ssh $node "PATH=$PATH $(which bootstrap-node) --phase phase3" &
+        pids+=($!)
+    done < <(get_all_nodes | grep -vw $HOSTNAME || true)
+    wait4 ${pids[@]}
+    echo 'Ok.'
+fi
+
 say 'Checking health of the services... '
 check_service() {
     local svc=$1
@@ -254,7 +269,7 @@ check_service() {
         fgrep -v '["passing"]' || true
 }
 count=1
-for svc in confd ios; do
+for svc in confd ios s3service; do
     svc_not_ready=$(check_service $svc)
     while [[ $svc_not_ready ]]; do
         if (( $count > 5 )); then

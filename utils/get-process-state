@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+set -eu -o pipefail
+
+usage() {
+    cat <<EOF
+Usage: ${0##*/} [OPTION] FID
+
+Get state of the process with given FID from the Consul KV.
+
+Options:
+  -h, --help    Show this help and exit.
+EOF
+}
+
+if (($# != 1)); then
+    usage >&2
+    exit 1
+fi
+
+case $1 in
+    -h|--help) usage; exit;;
+esac
+
+fid=$1
+
+# Process state entry in the Consul KV:
+# processes/<process_fid>:{"state": "<process_state>"}
+# e.g
+#     processes/0x7200000000000001:0x2f:{"state": "M0_CONF_HA_PROCESS_STARTED"}
+
+# XXX FIXME: Process the output of `consul kv export` with `jq`.
+consul kv get processes/$fid | awk -F'[{:}]' '
+{
+    gsub(/"/, "", $2)
+    gsub(/"/, "", $3)
+    gsub(/^[ \t]+/, "", $3)
+    if ($2 == "state")
+        print $3
+}'

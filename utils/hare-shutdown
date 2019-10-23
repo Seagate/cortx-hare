@@ -15,7 +15,7 @@ Process = NamedTuple('Process', [
     ('fidk', int),
     ('status', str)
 ])
-shutdown_sequence = ('ios', 'confd', 'hax', 'consul')
+shutdown_sequence = ('s3service', 'ios', 'confd', 'hax', 'consul')
 
 
 def processfid2str(fidk: int) -> str:
@@ -25,6 +25,15 @@ def processfid2str(fidk: int) -> str:
 def get_kv(cns: Consul, key: str) -> str:
     kv: Dict[str, bytes] = cns.kv.get(key)[1]
     return kv['Value'].decode() if kv and kv['Value'] is not None else ''
+
+
+def get_systemd_name(fidk: int, svc_name: str) -> str:
+    if svc_name == 'hax':
+        return 'hare-hax'
+    elif svc_name == 's3service':
+        return 's3server@' + processfid2str(fidk)
+    else:
+        return 'm0d@' + processfid2str(fidk)
 
 
 def processes_by_consul_svc_name(cns: Consul) -> Dict[str, List[Process]]:
@@ -39,9 +48,7 @@ def processes_by_consul_svc_name(cns: Consul) -> Dict[str, List[Process]]:
                 processes.setdefault(svc_name, []).append(
                     Process(node=node['Node'],
                             consul_name=svc_name,
-                            systemd_name=(
-                                'hare-hax' if svc_name == 'hax' else
-                                'm0d@' + processfid2str(fidk)),
+                            systemd_name=get_systemd_name(fidk, svc_name),
                             fidk=fidk,
                             status=svc['Status']))
         processes.setdefault('consul', []).append(
@@ -50,7 +57,6 @@ def processes_by_consul_svc_name(cns: Consul) -> Dict[str, List[Process]]:
                     systemd_name='hare-consul-agent',
                     fidk=0,
                     status=consul_status(node['Node'])))
-    assert set(processes.keys()) == set(shutdown_sequence)
     return processes
 
 
@@ -94,8 +100,10 @@ def main() -> None:
     leader_node = get_kv(cns, 'leader')
 
     for svc in shutdown_sequence:
-        for proc in processes[svc]:
-            process_stop(proc)
+        # Some processes may be not started as per configuration
+        if svc in processes:
+            for proc in processes[svc]:
+                process_stop(proc)
     print(f'Killing RC Leader at {leader_node}... ', end='', flush=True)
     exec(ssh_prefix(leader_node) + 'sudo pkill --exact -KILL consul')
 

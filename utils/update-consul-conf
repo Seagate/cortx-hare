@@ -51,6 +51,7 @@ id2fid() {
 HAX_ID=$(get_service_ids 'grep -iw ha')
 CONFD_IDs=$(get_service_ids 'grep -iw confd')
 IOS_IDs=$(get_service_ids 'grep -iw ios | grep -iwv confd')
+S3_IDs=$(get_service_ids 'grep -iw m0_client_s3')
 HAX_EP=$(get_service_ep $HAX_ID)
 
 if $dry_run; then
@@ -141,6 +142,37 @@ MERO_PROCESS_FID='$fid'
 EOF
 }
 
+append_s3_svc() {
+    local id=$1
+    local fid=$(id2fid $id)
+    local ep=$(get_service_ep $id)
+    local addr=$(get_service_addr $ep)
+    local port=$(get_service_port $ep)
+    local s3port=$2
+    local s3svc='s3server'@$fid
+    SVCS_CONF+="${SVCS_CONF:+,}{
+      \"id\": \"$id\",
+      \"name\": \"s3service\",
+      \"address\": \"$addr\",
+      \"port\": $port,
+      \"checks\": [
+          {
+            \"args\": [ \"/opt/seagate/hare/libexec/hare/check-service\",
+                        \"--svc\", \"$s3svc\" ],
+            \"interval\": \"1s\",
+            \"status\": \"warning\"
+          }
+        ]
+    }"
+    cat <<EOF | sudo tee /etc/sysconfig/s3server-$fid > /dev/null
+MERO_PROFILE_FID=`consul kv get m0conf/profiles`
+MERO_S3SERVER_EP='$ep'
+MERO_HA_EP='$HAX_EP'
+MERO_PROCESS_FID='$fid'
+MERO_S3SERVER_PORT=$s3port
+EOF
+}
+
 for id in $HAX_ID; do
     append_hax_svc $id
 done
@@ -151,6 +183,12 @@ done
 
 for id in $IOS_IDs; do
     append_ios_svc $id
+done
+
+s3port=8081
+for id in $S3_IDs; do
+    append_s3_svc $id $s3port
+    ((s3port++))
 done
 
 tmpfile=$(mktemp /tmp/${CONF_FILE##*/}.XXXXXX)
