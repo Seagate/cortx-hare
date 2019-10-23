@@ -72,6 +72,13 @@ REACTION:
 - systemd restarts hax service, hax notifies Mero processes and re-establishes
   connections without restarting Mero services.
 
+### EVENT: S3 server crashes
+
+DETECTED BY: Consul health check
+
+REACTION: Consul [watch handler](https://www.consul.io/docs/agent/watches.html#handlers)
+restarts the S3 server.
+
 ### EVENT: Mero client crashes
 
 XXX
