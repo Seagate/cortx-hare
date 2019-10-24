@@ -77,8 +77,9 @@ hosts:
       - runs_confd: <bool>  # optional, defaults to false
         #io_disks: null                 # no IO service
         io_disks: { path_glob: <str> }  # e.g. "/dev/loop[0-9]*"
-    c0_clients: <int>        # max quantity of Clovis apps this host may have
-    m0t1fs_clients: <int>    # max quantity of m0t1fs clients
+    m0_clients:
+        s3: <int>     # number of S3 servers to start
+        other: <int>  # max quantity of other Mero clients this host may have
 pools:
   - name: <str>
     allowed_failures:  # optional section; no failures will be allowed
@@ -239,7 +240,8 @@ def validate_cluster_desc(desc: Dict[str, Any]) -> None:
         assert all_unique(disks), err('Same disk used by several IO services')
         total_nr_disks += len(disks)
 
-        assert nr_confds + host['c0_clients'] + host['m0t1fs_clients'] > 0, \
+        assert (nr_confds + host['m0_clients']['s3']
+                + host['m0_clients']['other'] > 0), \
             err('At least one Mero server or client is required')
 
     assert total_nr_confds > 0, 'At least one confd is required'
@@ -499,7 +501,7 @@ class ConfNode(ToDhall):
         return node_id
 
 
-ProcT = Enum('ProcT', 'hax m0_server m0_client')
+ProcT = Enum('ProcT', 'hax m0_server s3server c0_client')
 ProcT.__doc__ = 'Type of the process'
 
 
@@ -1282,9 +1284,13 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
                                # XXX use 'mgmt_iface' for consul?
                                ipaddr=facts[ipaddr_key(iface)]))
 
-        for _ in range(host['c0_clients'] + host['m0t1fs_clients']):
+        for _ in range(host['m0_clients']['s3']):
             proc_id = ConfProcess.build(conf, node_id, facts, iface,
-                                        ProcT.m0_client)
+                                        ProcT.s3server)
+            clients.append(proc_id.fidk)
+        for _ in range(host['m0_clients']['other']):
+            proc_id = ConfProcess.build(conf, node_id, facts, iface,
+                                        ProcT.c0_client)
             clients.append(proc_id.fidk)
 
     # XXX-TODO: support multiple profiles

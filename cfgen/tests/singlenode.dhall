@@ -12,8 +12,10 @@ in
             , io_disks = Some { path_glob = "/dev/loop[0-9]*" }
             }
           ]
-      , c0_clients = 2
-      , m0t1fs_clients = 0
+      , m0_clients =
+          { s3 = 0
+          , other = 2
+          }
       }
     ]
 , pools =

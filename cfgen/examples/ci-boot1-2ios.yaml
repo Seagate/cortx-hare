@@ -5,8 +5,9 @@ hosts:
       - runs_confd: true
       - io_disks: { path_glob: "/dev/loop[0-3]*" }
       - io_disks: { path_glob: "/dev/loop[4-9]*" }
-    c0_clients: 4
-    m0t1fs_clients: 0
+    m0_clients:
+        s3: 0
+        other: 2
 pools:
   - name: the pool
     disks: all

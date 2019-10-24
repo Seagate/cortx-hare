@@ -4,12 +4,17 @@ let M0Server =
   , io_disks : Optional { path_glob : Text }
   }
 
+-- m0_client
+let C0Client =
+  { s3 : Natural    -- max qty of S3 servers this host may run
+  , other : Natural -- max qty of other Clovis apps this host may have
+  }
+
 let Host =
   { name : Text   -- hostname
   , data_iface : Optional Text  -- data interface
   , m0_servers : List M0Server  -- m0d processes
-  , c0_clients : Natural        -- max qty of Clovis apps this host may have
-  , m0t1fs_clients : Natural    -- max qty of m0t1fs clients
+  , m0_clients : C0Client  -- clovis client processes
   }
 
 let Pool =

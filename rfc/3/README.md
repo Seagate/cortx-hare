@@ -41,8 +41,9 @@ hosts:
       - runs_confd: <bool>  # optional, defaults to false
         #io_disks: null                 # no IO service
         io_disks: { path_glob: <str> }  # e.g. "/dev/loop[0-9]*"
-    c0_clients: <int>        # max quantity of Clovis apps this host may have
-    m0t1fs_clients: <int>    # max quantity of m0t1fs clients
+    m0_clients:
+        s3: <int>     # number of S3 servers to start
+        other: <int>  # max quantity of other Mero clients this host may have
 pools:
   - name: <str>
     allowed_failures:  # optional section; no failures will be allowed

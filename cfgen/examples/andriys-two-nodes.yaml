@@ -4,15 +4,17 @@ hosts:
     m0_servers:
       - runs_confd: true
       - io_disks: { path_glob: "/dev/sd[b-i]" }
-    c0_clients: 2
-    m0t1fs_clients: 0
+    m0_clients:
+        s3: 0
+        other: 2
   - name: sage75c1
     data_iface: ens33
     m0_servers:
       - runs_confd: true
       - io_disks: { path_glob: "/dev/sd[b-i]" }
-    c0_clients: 2
-    m0t1fs_clients: 0
+    m0_clients:
+        s3: 0
+        other: 2
 pools:
   - name: the pool
     disks: all
