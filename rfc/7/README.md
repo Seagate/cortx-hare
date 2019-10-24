@@ -20,12 +20,13 @@ DETECTED BY: `m0d` (Mero IO service) or SSPL
 
 REACTION: `m0d` or SSPL sends "device failure" message to `hax`.
 
-REACTION: State of the corresponding device is updated in the Consul KV.
-
 CHAIN REACTION:
 - `hax` updates state of the corresponding device in the Consul KV.
-- Consul watch handler (provided by Hare) takes relevant XXX-TBD action.
-  E.g., it could trigger `smartctl`.
+- Consul watch handler (provided by Hare) broadcasts HA state update
+  ("device D is now FAILED") to all `hax` processes.
+- `hax`es pass HA state updates to the connected Mero processes.
+
+Consul watch handler can also perform other actions, e.g., run `smartctl`.
 
 ### EVENT: IOS crashes
 
