@@ -1125,10 +1125,10 @@ class ConfProfile(ToDhall):
 
 ConsulAgent = NamedTuple('ConsulAgent', [('hostname', str), ('ipaddr', str)])
 
-Cluster = NamedTuple('Cluster', [('consul_servers', List[ConsulAgent]),
+Cluster = NamedTuple('Cluster', [('m0conf', Dict[Oid, Any]),
+                                 ('consul_servers', List[ConsulAgent]),
                                  ('consul_clients', List[ConsulAgent]),
-                                 ('m0conf', Dict[Oid, Any]),
-                                 ('m0clients', List[int])])
+                                 ('m0clients', Dict[Oid, Oid])])
 
 
 def generate_consul_agents(cluster: Cluster) -> str:
@@ -1148,9 +1148,11 @@ def fid2str(id: Oid) -> str:
     return f'{hex((ord(types[id.type]) << 56)+1)}:{hex(id.fidk)}'
 
 
-def generate_consul_kv(m0conf: Dict[Oid, Any], m0clients: List[int],
+def generate_consul_kv(m0conf: Dict[Oid, Any], m0clients: Dict[Oid, Oid],
                        dhall_dir: str) -> str:
     assert os.path.isabs(dhall_dir)
+    assert all(k.type is ObjT.process and v.type is ObjT.service
+               for k, v in m0clients.items())
 
     global fidk_gen
     _fidk_gen = next(fidk_gen)
@@ -1158,7 +1160,7 @@ def generate_consul_kv(m0conf: Dict[Oid, Any], m0clients: List[int],
     del fidk_gen
 
     ConsulService = NamedTuple('ConsulService', [
-        ('node_name', str), ('proc_id', Oid), ('ep', str),
+        ('node_name', str), ('proc_id', Oid), ('ep', Endpoint),
         ('svc_id', Oid), ('stype', str)])
 
     def profile() -> str:
@@ -1186,26 +1188,26 @@ def generate_consul_kv(m0conf: Dict[Oid, Any], m0clients: List[int],
                     stype = m0conf[svc_id].type.name[len('M0_CST_'):].lower()
                     yield ConsulService(node_name=node.hostname,
                                         proc_id=proc_id,
-                                        ep=str(m0conf[proc_id].endpoint),
+                                        ep=m0conf[proc_id].endpoint,
                                         svc_id=svc_id, stype=stype)
                 # Add clovis clients to consul kv
-                if proc_id.fidk in m0clients:
+                if proc_id in m0clients:
                     yield ConsulService(node_name=node.hostname,
                                         proc_id=proc_id,
-                                        ep=str(m0conf[proc_id].endpoint),
-                                        svc_id=Oid(ObjT.service,
-                                                   svc_id.fidk + 1),
+                                        ep=m0conf[proc_id].endpoint,
+                                        svc_id=m0clients[proc_id],
                                         stype='clovis')
 
     return json.dumps([dict(key=k, value=v) for k, v in (
-        ('leader', ''),
         ('epoch', 1),
+        ('leader', ''),
         ('last_fidk', _fidk_gen),
-        ('profile', profile()),
-        ('profile/pools', sns_pools()),
-        *[(f'node/{x.node_name}/process/{x.proc_id.fidk}/service/{x.stype}',
-           f'{x.svc_id.fidk}') for x in processes()],
-        *[(f'node/{x.node_name}/process/{x.proc_id.fidk}/ep', f'{x.ep}')
+        ('m0conf/profiles', profile()),
+        ('m0conf/profiles/pools', sns_pools()),
+        *[(f'm0conf/nodes/{x.node_name}/processes/{x.proc_id.fidk}/services/'
+           f'{x.stype}', x.svc_id.fidk) for x in processes()],
+        *[(f'm0conf/nodes/{x.node_name}/processes/{x.proc_id.fidk}/endpoint',
+           str(x.ep))
           for x in processes()])],
                       indent=2) + '\n'
 
@@ -1250,10 +1252,9 @@ def validate_m0conf(m0conf: Dict[Oid, Any]) -> None:
 
 
 def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
-    cluster = Cluster(consul_servers=[], consul_clients=[], m0conf={},
-                      m0clients=[])
+    cluster = Cluster(m0conf={}, consul_servers=[], consul_clients=[],
+                      m0clients={})
     conf = cluster.m0conf
-    clients = cluster.m0clients
     root_id = ConfRoot.build(conf)
     # XXX Move all the logic into ConfRoot.build?
 
@@ -1287,11 +1288,11 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
         for _ in range(host['m0_clients']['s3']):
             proc_id = ConfProcess.build(conf, node_id, facts, iface,
                                         ProcT.s3server)
-            clients.append(proc_id.fidk)
+            cluster.m0clients[proc_id] = new_oid(ObjT.service)
         for _ in range(host['m0_clients']['other']):
             proc_id = ConfProcess.build(conf, node_id, facts, iface,
                                         ProcT.c0_client)
-            clients.append(proc_id.fidk)
+            cluster.m0clients[proc_id] = new_oid(ObjT.service)
 
     # XXX-TODO: support multiple profiles
     prof_id = ConfProfile.build(conf, root_id)

@@ -101,8 +101,9 @@ class ConsulUtil:
     def get_rm_fid(self) -> Fid:
         rm_node = self.get_session_node(self.get_leader_session())
         confd = self._service_by_name(rm_node, 'confd')
-        proc_fidk = int(confd['ServiceID'])
-        fidk = self._kv_get(f'node/{rm_node}/process/{proc_fidk}/service/rms')
+        pfidk = int(confd['ServiceID'])
+        fidk = self._kv_get(f'm0conf/nodes/{rm_node}/processes/{pfidk}/'
+                            'services/rms')
         return mk_fid(ObjT.SERVICE, int(fidk['Value']))
 
     def get_hax_endpoint(self) -> str:

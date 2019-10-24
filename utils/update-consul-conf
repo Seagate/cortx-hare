@@ -22,14 +22,14 @@ esac
 
 get_service_ids() {
     local filter=$1
-    local cmd="consul kv get -recurse node/$HOSTNAME/process/ |
-                  $filter | sed 's/.*process.//' | cut -d/ -f1"
+    local cmd="consul kv get -recurse m0conf/nodes/$HOSTNAME/processes/ |
+                  $filter | sed 's/.*processes.//' | cut -d/ -f1"
     eval $cmd || true
 }
 
 get_service_ep() {
     local id=$1
-    consul kv get node/$HOSTNAME/process/$id/ep
+    consul kv get m0conf/nodes/$HOSTNAME/processes/$id/endpoint
 }
 
 get_service_addr() {

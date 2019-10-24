@@ -26,15 +26,15 @@ def leader_tag(cns: Consul, host: str) -> str:
 
 
 def profile(cns: Consul) -> str:
-    return get_kv(cns, 'profile')
+    return get_kv(cns, 'm0conf/profiles')
 
 
 def sns_pools(cns: Consul) -> List[str]:
-    return get_kv(cns, 'profile/pools').split(' ')
+    return get_kv(cns, 'm0conf/profiles/pools').split(' ')
 
 
 def hosts(cns: Consul) -> Set[str]:
-    data = cns.kv.get('node', recurse=True)[1]
+    data = cns.kv.get('m0conf/nodes', recurse=True)[1]
     host_names = {(x['Key'].split('/'))[1] for x in data}
 
     return host_names
@@ -52,14 +52,15 @@ def svc2name(types: str) -> str:
 
 
 def processes(cns: Consul, host: str) -> List:
-    data = cns.kv.get(f'node/{host}/service', recurse=True)[1]
+    data = cns.kv.get(f'm0conf/nodes/{host}/processes', recurse=True)[1]
     fidk_list = list({(x['Key'].split('/'))[3] for x in data})
     fidk_list.sort(key=int, reverse=False)
 
     return [
-        Process(name=svc2name(get_kv(cns, f'node/{host}/service/{x}/types')),
+        Process(name=svc2name(get_kv(cns,
+                              f'm0conf/nodes/{host}/processes/{x}/rms')),
                 fidk=int(x),
-                ep=get_kv(cns, f'node/{host}/service/{x}/ep'))
+                ep=get_kv(cns, f'm0conf/nodes/{host}/processes/{x}/endpoint'))
         for x in fidk_list
     ]
 

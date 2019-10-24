@@ -16,7 +16,7 @@ Key | Value | Description
 `bq/<epoch>` | (conf object fid, HA state) | `bq/*` items are collectively referred to as the BQ (Broadcast Queue).  The items - HA state updates - are produced by the RC (Recovery Coordinator) script.
 `epoch` | current epoch | Atomically incremented counter, which is used to generate unique ordered identifiers for EQ and BQ entries.  Natural number.
 `eq/<epoch>` | event | `eq/*` items are collectively referred to as the EQ (Event Queue).  Events are consumed and dequeued by the RC script.
-`last_fidk` | last genarated fid key | Atomically incremented counter that is used to generate fids.  Natural number.
+`last_fidk` | last generated fid key | Atomically incremented counter that is used to generate fids.  Natural number.
 `leader` | node name | This key is used for RC leader election.  Created with [`consul lock`](https://www.consul.io/docs/commands/lock.html) command.
 `m0conf/nodes/<name>/processes/<process_fidk>/endpoint` | endpoint address | Endpoint address of the Mero process (Consul service) with fid key `<process_fidk>`.  Example: `192.168.180.162@tcp:12345:44:101`.
 `m0conf/nodes/<name>/processes/<process_fidk>/services/<svc_type>` | Fid key | Fid key of the Mero service, specified by its type, parent process, and node.

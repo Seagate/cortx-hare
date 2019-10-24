@@ -21,13 +21,13 @@ conf_file=$1
 }
 
 get_profile() {
-    consul kv get profile
+    consul kv get m0conf/profiles
 }
 
 get_fids() {
-    consul kv get -recurse node |
-        awk -F/ '/ep:/ {ep=$5; sub(/^ep:/, "", ep)}
-                 /clovis/ {printf("0x7200000000000001:0x%x\t%s\n", $4, ep)}'
+    consul kv get -recurse m0conf/nodes |
+        awk -F/ '/endpoint:/ {ep=$6; sub(/^endpoint:/, "", ep)}
+                 /clovis/ {printf("0x7200000000000001:0x%x\t%s\n", $5, ep)}'
 }
 
 while read fid ep; do
