@@ -65,13 +65,15 @@ def process_stop(h: str, ps: Process):
                  f'm0d@{processfid2str(int(ps.fidk))}')
         cmd = '{}sudo systemctl stop --force {}'.format(
             '' if is_localhost(h) else f'ssh {h} ', sname)
-        print(f'Stopping {ps.name} ({sname}) on {h}...{exec(cmd)}')
+        print(f'Stopping {ps.name} ({sname}) on {h}...', end='', flush=True)
+        print(exec(cmd))
 
 
 def stop_watcher(host: str):
     cmd = '{}sudo pkill -9 consul'.format(
         '' if is_localhost(host) else f'ssh {host} ')
-    print(f'Stopping consul watcher on {host}...{exec(cmd)}')
+    print(f'Stopping consul watcher on {host}...', end='', flush=True)
+    print(exec(cmd))
 
 
 def node_stop(node: str, ps: List):
