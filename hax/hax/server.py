@@ -60,7 +60,7 @@ class KVHandler(BaseHTTPRequestHandler):
             return 'online' if ok else 'offline'
 
         return [
-            HAState(fid=create_process_fid(t['Service']['ID']),
+            HAState(fid=create_process_fid(int(t['Service']['ID'])),
                     status=get_status(t['Checks'])) for t in data
         ]
 

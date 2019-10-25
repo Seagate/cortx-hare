@@ -12,16 +12,16 @@ ServiceData = NamedTuple('ServiceData', [('node', str), ('fid', Fid),
                                          ('address', str)])
 
 
-def create_process_fid(key: Any) -> Fid:
+def create_process_fid(key: int) -> Fid:
     """
     Returns a correct Fid instance by the given fidk value. The resulting
     Fid will correspond to a Mero process.
     """
-    return Fid(PROCESS_CONTAINER, int(key))
+    return Fid(PROCESS_CONTAINER, key)
 
 
 def _to_service_fid(key: int) -> Fid:
-    return Fid(SERVICE_CONTAINER, int(key))
+    return Fid(SERVICE_CONTAINER, key)
 
 
 class ConsulUtil:
@@ -39,8 +39,8 @@ class ConsulUtil:
         Returns the fid of the current hax process (in other words, returns
         "my own" fid)
         """
-        serv = self.get_local_service_by_name('hax')
-        return create_process_fid(serv['ServiceID'])
+        serv: Dict[str, Any] = self.get_local_service_by_name('hax')
+        return create_process_fid(int(serv['ServiceID']))
 
     def get_ha_fid(self) -> Fid:
         serv = self.get_local_service_by_name('hax')
@@ -97,7 +97,7 @@ class ConsulUtil:
     @staticmethod
     def _to_canonical_service_data(service: Dict[str, Any]) -> ServiceData:
         node = service['Node']
-        fidk = service['ServiceID']
+        fidk = int(service['ServiceID'])
         srv_address = service['ServiceAddress']
         srv_port = service['ServicePort']
         return ServiceData(node=node,
