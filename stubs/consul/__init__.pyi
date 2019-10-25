@@ -13,6 +13,7 @@ class Consul:
     kv: KV
     session: Session
 
+
 class Health:
     def node(
         self,
@@ -22,6 +23,7 @@ class Health:
         dc: str = None,
         token: str = None,
     ) -> Tuple[int, List[Dict[str, Any]]]: ...
+
 
 class Catalog:
     def nodes(
@@ -34,6 +36,7 @@ class Catalog:
         token: str = None,
         node_meta: Dict[str, str] = None,
     ) -> Tuple[int, List[Dict[str, Any]]]: ...
+
     def service(
         self,
         service: str,
@@ -49,6 +52,7 @@ class Catalog:
 class Agent:
     def self(self) -> Dict[str, Any]: ...
 
+
 class KV:
     def get(
         self,
@@ -61,6 +65,7 @@ class KV:
         separator: str = None,
         dc: str = None,
     ) -> Tuple[int, Any]: ...
+
 
 class Session:
     def info(
