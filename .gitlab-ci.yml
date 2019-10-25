@@ -214,11 +214,40 @@ test-boot1:
     - time $M0VG run 'bash -x /data/hare/_test-boot1.sh'
 
   after_script:
+    - date -u -Isec
     - cd ${WORKSPACE_DIR}
+
+    # Collect syslog.
+    - $M0VG run sudo journalctl --no-pager --full --utc --boot
+                                --output short-precise
+                                > $CI_PROJECT_DIR/${CI_JOB_NAME}_syslog.log
+
+    # Collect Consul logs.
+    - |
+      $M0VG scp cmu:/tmp/consul\*.log $CI_PROJECT_DIR/
+      ( cd $CI_PROJECT_DIR/
+        for f in consul*.log; do mv -v {,${CI_JOB_NAME}_}$f; done )
+
+    # Collect m0reportbug archives.
+    - |
+      $M0VG run sudo /data/mero/utils/m0reportbug
+      $M0VG scp cmu:m0reportbug-\*.tar.xz $CI_PROJECT_DIR/
+      ( cd $CI_PROJECT_DIR/
+        for f in m0reportbug-*.tar.xz; do mv -v {,${CI_JOB_NAME}_}$f; done )
 
     # Clean up.  This ensures that VMs are destroyed in case of a manual
     # job restart, when global 'cleanup' stage is not performed.
     - $M0VG destroy -f || true
+
+  artifacts:
+    name: "$CI_PROJECT_NAME job $CI_JOB_ID ($CI_JOB_NAME) logs"
+    when: always  # whenever the job has failed or succeeded
+    paths:
+      - ${CI_JOB_NAME}_syslog.log
+      - ${CI_JOB_NAME}_m0reportbug-data.tar.xz
+      # - ${CI_JOB_NAME}_m0reportbug-cores.tar.xz  # XXX core files are big
+      - ${CI_JOB_NAME}_m0reportbug-traces.tar.xz
+      - ${CI_JOB_NAME}_consul*.log
 
 
 test-boot2:
@@ -287,11 +316,49 @@ test-boot2:
            "OTHER_HOST=${JOB_NAME}-ssu2 bash -x /data/hare/_test-boot2.sh"
 
   after_script:
+    - date -u -Isec
     - cd ${WORKSPACE_DIR}
+
+    # Collect syslogs.
+    - |
+      for host in ssu1 ssu2; do
+          $M0VG run --vm $host sudo journalctl \
+              --no-pager --full --utc --boot --output short-precise \
+              > $CI_PROJECT_DIR/${CI_JOB_NAME}_${host}_syslog.log
+      done
+
+    # Collect Consul logs.
+    - |
+      for host in ssu1 ssu2; do
+          $M0VG scp $host:/tmp/consul\*.log $CI_PROJECT_DIR/
+          ( cd $CI_PROJECT_DIR/
+            for f in consul*.log; do mv -v {,${CI_JOB_NAME}_${host}_}$f; done )
+      done
+
+    # Collect m0reportbug archives.
+    - |
+      for host in ssu1 ssu2; do
+          $M0VG run --vm $host sudo /data/mero/utils/m0reportbug
+          $M0VG scp $host:m0reportbug-\*.tar.xz $CI_PROJECT_DIR/
+          ( cd $CI_PROJECT_DIR/
+            for f in m0reportbug-*.tar.xz; do
+                mv -v {,${CI_JOB_NAME}_${host}_}$f
+            done )
+      done
 
     # Clean up.  This ensures that VMs are destroyed in case of a manual
     # job restart, when global 'cleanup' stage is not performed.
     - $M0VG destroy -f || true
+
+  artifacts:
+    name: "$CI_PROJECT_NAME job $CI_JOB_ID ($CI_JOB_NAME) logs"
+    when: always  # whenever the job has failed or succeeded
+    paths:
+      - ${CI_JOB_NAME}_*_syslog.log
+      - ${CI_JOB_NAME}_*_m0reportbug-data.tar.xz
+      # - ${CI_JOB_NAME}_*_m0reportbug-cores.tar.xz  # XXX core files are big
+      - ${CI_JOB_NAME}_*_m0reportbug-traces.tar.xz
+      - ${CI_JOB_NAME}_*_consul*.log
 
 
 # Cleanup ----------------------------------------------------------------- {{{1
