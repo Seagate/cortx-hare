@@ -35,30 +35,29 @@ def sns_pools(cns: Consul) -> List[str]:
 
 def hosts(cns: Consul) -> Set[str]:
     data = cns.kv.get('m0conf/nodes', recurse=True)[1]
-    host_names = {(x['Key'].split('/'))[1] for x in data}
+    host_names = {(x['Key'].split('/'))[2] for x in data}
 
     return host_names
 
 
-def svc2name(types: str) -> str:
-    if 'ios' in types.split(' '):
-        return 'ioservice'
-    elif 'ha' in types.split(' '):
-        return 'hax'
-    elif 'confd' in types.split(' '):
-        return 'confd'
-    else:
-        return 'c0_client'
+proc_names = {'ios': 'ioservice', 'ha': 'hax', 'confd': 'confd'}
+
+
+def proc_id2name(cns: Consul, node: str, proc_id: int) -> str:
+    for t in proc_names:
+        if get_kv(cns, f'm0conf/nodes/{node}/processes/{proc_id}/services/{t}'):
+            return proc_names[t]
+
+    return 'm0_client'
 
 
 def processes(cns: Consul, host: str) -> List:
     data = cns.kv.get(f'm0conf/nodes/{host}/processes', recurse=True)[1]
-    fidk_list = list({(x['Key'].split('/'))[3] for x in data})
+    fidk_list = list({(x['Key'].split('/'))[4] for x in data})
     fidk_list.sort(key=int, reverse=False)
 
     return [
-        Process(name=svc2name(get_kv(cns,
-                              f'm0conf/nodes/{host}/processes/{x}/rms')),
+        Process(name=proc_id2name(cns, host, x),
                 fidk=int(x),
                 ep=get_kv(cns, f'm0conf/nodes/{host}/processes/{x}/endpoint'))
         for x in fidk_list
