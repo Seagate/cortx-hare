@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -eu -o pipefail
+export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
+set -x
+
+KERNEL=$(yum list installed kernel | tail -n1 | awk '{ print $2 }')
+
+cd /data/mero
+./autogen.sh
+./configure --with-linux=/lib/modules/$KERNEL.x86_64/build
+make -j10

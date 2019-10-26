@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -eu -o pipefail
+export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
+set -x
+
+latest_release_dir=$(readlink -f /releases/master/BCURRENT)
+mkdir -vp $RPMSYNC_DIR
+cp -v $latest_release_dir/mero{,-devel}-[0-9]*.rpm $RPMSYNC_DIR/
+
+time yum install -y $latest_release_dir/mero{,-devel}-[0-9]*.rpm
+
+time make rpm
+
+cp -v /root/rpmbuild/RPMS/x86_64/* $RPMSYNC_DIR/
+cd $RPMSYNC_DIR
+createrepo -v . || true

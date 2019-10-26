@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+set -eu -o pipefail
+export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
+set -x
+
+# Don't require passphrase to ssh $OTHER_HOST.
+kh=~/.ssh/known_hosts
+ssh-keyscan -t rsa $OTHER_HOST >$kh
+chmod 0600 $kh
+sudo mkdir -p /root/.ssh
+sudo cp $kh /root/.ssh
+
+cd /data/hare/
+
+# Server-server Consul agents configuration.
+time hctl bootstrap --mkfs cfgen/examples/ci-boot2.yaml
+
+hctl shutdown
+
+# Server-client Consul agents configuration.
+time hctl bootstrap --mkfs cfgen/examples/ci-boot2-1confd.yaml

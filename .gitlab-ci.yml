@@ -32,91 +32,14 @@ build:
   stage: build
   tags: [ m0vg ]
   except: [ tags ]
-  script:
-    # can't be defined in the 'variables:' section because it supports only
-    # single level of variable expansion, e.g. A=$VAR; B=$A won't work for B
-    - export JOB_NAME="${WORKSPACE_NAME}-${CI_JOB_NAME}"
-
-    - sudo rm -rf ${WORKSPACE_DIR}
-    - mkdir -p ${WORKSPACE_DIR}
-    - cp -a ../${CI_PROJECT_NAME} ${WORKSPACE_DIR}
-    - cd ${WORKSPACE_DIR}
-
-    # make sure that build image is up to date
-    - docker pull $DOCKER_REGISTRY/mero/hare:$CENTOS_RELEASE
-
-    # Get fresh Mero copy.
-    - git clone --recursive --depth 1 --shallow-submodules http://gitlab.mero.colo.seagate.com/mero/mero.git
-
-    # Build Mero.
-    - |
-      cat >mero/_build-m0.sh <<'EOF'
-      set -eu -o pipefail
-
-      KERNEL=$(yum list installed kernel | tail -n1 | awk '{ print $2 }')
-
-      ./autogen.sh
-      ./configure --with-linux=/lib/modules/${KERNEL}.x86_64/build
-      make -j10
-      EOF
-    - time docker run --rm --name ${JOB_NAME}
-                      -v ~+:/data -w /data/mero
-                  $DOCKER_REGISTRY/mero/hare:$CENTOS_RELEASE
-                      bash -x _build-m0.sh
-
-    # Build hax's C extension.
-    - time docker run --rm --name ${JOB_NAME}
-                      -v ~+:/data -w /data/hare
-                  $DOCKER_REGISTRY/mero/hare:$CENTOS_RELEASE
-                      make
-
-    # Containers run commands as 'root' user.  Restore the ownership.
-    - sudo chown -R $(id -u):$(id -g) .
-
-    # Prepare a script that will be used by `test-boot*` jobs.
-    - |
-      cat >hare/_init-node.sh <<'EOF'
-      set -eu -o pipefail
-
-      # XXX python36 is not available in `epel` repository; see issue #109.
-      # It might reappear eventually.  If it does, remove this workaround.
-      alt_epel=http://ci-storage.mero.colo.seagate.com
-      alt_epel+=/prvsnr/vendor/centos/epel/
-      sudo yum-config-manager --add-repo=$alt_epel
-
-      sudo yum install -y python36 python36-devel python36-PyYAML python36-pip
-      sudo pip3 install ply python-consul
-
-      sudo mkdir -p /var/mero
-      for i in {0..9}; do
-          sudo dd if=/dev/zero of=/var/mero/disk$i.img bs=1M seek=9999 count=1
-          sudo losetup /dev/loop$i /var/mero/disk$i.img
-      done
-
-      # XXX `systemctl start hare-hax` command, called by `bootstrap-node`,
-      # will fail unless `mero-kernel` systemd service is installed.
-      sudo /data/mero/scripts/install-mero-service
-
-      sudo make -C /data/hare devinstall
-      EOF
-
+  script: [ ci/build ]
 
 rpmbuild:
   stage: build
   tags: [ docker-build ]
   except: [ tags ]
   image: $DOCKER_REGISTRY/mero/hare:$CENTOS_RELEASE
-
-  script:
-    - export LATEST_RELEASE_DIR=$(readlink -f /releases/master/BCURRENT)
-    - '[[ -d $RPMSYNC_DIR ]] || mkdir -vp $RPMSYNC_DIR || true'
-    - cp -v $LATEST_RELEASE_DIR/mero{,-devel}-[0-9]*.rpm $RPMSYNC_DIR/
-    - yum install -y $LATEST_RELEASE_DIR/mero{,-devel}-[0-9]*.rpm
-    - time make rpm
-    - cp -v /root/rpmbuild/RPMS/x86_64/* $RPMSYNC_DIR/
-    - cd $RPMSYNC_DIR
-    - createrepo -v . || true
-
+  script: [ ci/rpmbuild ]
 
 # Test ----------------------------------------------------------------- {{{1
 #
@@ -125,97 +48,18 @@ test-utils:
   stage: test
   tags: [ m0vg ]
   except: [ tags ]
-
-  script:
-    # Cannot be defined in the 'variables:' section because it supports only
-    # single level of variable expansion, e.g. A=$VAR; B=$A won't work for B.
-    - export JOB_NAME="${WORKSPACE_NAME}-${CI_JOB_NAME}"
-
-    - cd ${WORKSPACE_DIR}
-    - time docker run --rm --name ${JOB_NAME}-cfgen
-                      -v ~+:/data -w /data/hare
-                  $DOCKER_REGISTRY/mero/hare:$CENTOS_RELEASE
-                      make test
-    - time docker run --rm --name ${JOB_NAME}-cluster-scripts
-                      -v ~+:/data -w /data/hare
-                  $DOCKER_REGISTRY/mero/hare:$CENTOS_RELEASE
-                      make install
-
+  script: [ ci/test-utils ]
 
 test-boot1:
   stage: test
   tags: [ m0vg ]
   except: [ tags ]
-
-  variables:
-    M0VG: m0vg-1node/scripts/m0vg
-
-  before_script:
-    # Cannot be defined in the 'variables:' section because it supports only
-    # sinle level of variable expansion, i.e., A=$VAR; B=$A won't work for B.
-    - export JOB_NAME="${WORKSPACE_NAME}-${CI_JOB_NAME}"
-
-    - cd ${WORKSPACE_DIR}
-
-    - date -u -Isec
-    - printenv
-
-    - |
-      d=${M0VG%%/*}
-      [[ -d $d ]] || git clone --recursive --depth 1 --shallow-submodules \
-          http://gitlab.mero.colo.seagate.com/mero/mero.git $d
-
-    # Prepare m0vg (singlenode).
-    - |
-      $M0VG env add <<EOF
-      M0_VM_BOX=centos75/dev-halon
-      M0_VM_BOX_URL='http://ci-storage.mero.colo.seagate.com/vagrant/centos75/dev'
-      M0_VM_CMU_MEM_MB=4096
-      M0_VM_NAME_PREFIX=${JOB_NAME}
-      M0_VM_HOSTNAME_PREFIX=${JOB_NAME}
-      EOF
-    - time $M0VG up --no-provision cmu
-    - time $M0VG reload --no-provision cmu
-
-  script:
-    - time $M0VG run 'bash -x /data/hare/_init-node.sh'
-    - |
-      cat >hare/_test-boot1.sh <<'EOF'
-      set -eu -o pipefail
-
-      # XXX `update-m0crate-io-test-conf` executes `consul`,
-      # which is /opt/seagate/hare/bin.  There should be a better way
-      # to add that directory to PATH; see
-      # http://gitlab.mero.colo.seagate.com/mero/hare/merge_requests/248#note_16669
-      export PATH="/opt/seagate/hare/bin:$PATH"
-
-      do_io() {
-          cp /data/mero/clovis/m0crate/tests/test1_io.yaml .
-          utils/update-m0crate-io-test-conf test1_io.yaml
-          dd if=/dev/urandom of=/tmp/128M bs=1M count=100
-          sudo /data/mero/clovis/m0crate/m0crate -S test1_io.yaml
-      }
-
-      test_cluster() {
-          local cdf=$1
-
-          time hctl bootstrap --mkfs $cdf
-          do_io
-          hctl shutdown
-          time hctl bootstrap --conf-dir /tmp  # bootstrap on existing conf
-          do_io
-          hctl shutdown
-      }
-
-      cd /data/hare/
-      test_cluster cfgen/examples/singlenode.yaml
-      test_cluster cfgen/examples/ci-boot1-2ios.yaml
-      EOF
-    - time $M0VG run 'bash -x /data/hare/_test-boot1.sh'
+  variables: { M0VG: m0vg-1node/scripts/m0vg }
+  script: [ ci/test-boot1 ]
 
   after_script:
     - date -u -Isec
-    - cd ${WORKSPACE_DIR}
+    - cd $WORKSPACE_DIR
 
     # Collect syslog.
     - $M0VG run sudo journalctl --no-pager --full --utc --boot
@@ -254,70 +98,12 @@ test-boot2:
   stage: test
   tags: [ m0vg ]
   except: [ tags ]
-
-  variables:
-    M0VG: m0vg-2nodes/scripts/m0vg
-
-  before_script:
-    # Cannot be defined in the 'variables:' section because it supports only
-    # sinle level of variable expansion, i.e., A=$VAR; B=$A won't work for B.
-    - export JOB_NAME="${WORKSPACE_NAME}-${CI_JOB_NAME}"
-
-    - cd ${WORKSPACE_DIR}
-
-    - date -u -Isec
-    - printenv
-
-    - |
-      d=${M0VG%%/*}
-      [[ -d $d ]] || git clone --recursive --depth 1 --shallow-submodules \
-          http://gitlab.mero.colo.seagate.com/mero/mero.git $d
-
-    # Prepare m0vg (two nodes).
-    - |
-      $M0VG env add <<EOF
-      M0_VM_BOX=centos75/dev-halon
-      M0_VM_BOX_URL='http://ci-storage.mero.colo.seagate.com/vagrant/centos75/dev'
-      M0_VM_CMU_MEM_MB=4096
-      M0_VM_NAME_PREFIX=${JOB_NAME}
-      M0_VM_HOSTNAME_PREFIX=${JOB_NAME}
-      EOF
-    - time $M0VG up --no-provision ssu1
-    - time $M0VG reload --no-provision ssu1
-    - time $M0VG up --no-provision ssu2
-    - time $M0VG reload --no-provision ssu2
-
-  script:
-    - time $M0VG run --vm ssu1 'bash -x /data/hare/_init-node.sh'
-    - time $M0VG run --vm ssu2 'bash -x /data/hare/_init-node.sh'
-    - sed -ri "s/(name:\s*)(ssu[12])/\\1${JOB_NAME}-\\2/"
-          hare/cfgen/examples/ci-boot2{,-1confd}.yaml
-    - |
-      cat >hare/_test-boot2.sh <<'EOF'
-      set -eu -o pipefail
-
-      # Don't require passphrase to ssh $OTHER_HOST.
-      kh=~/.ssh/known_hosts
-      ssh-keyscan -t rsa $OTHER_HOST >$kh
-      chmod 0600 $kh
-      sudo mkdir -p /root/.ssh
-      sudo cp $kh /root/.ssh
-
-      cd /data/hare/
-      # Server-server Consul agents configuration.
-      time hctl bootstrap --mkfs cfgen/examples/ci-boot2.yaml
-
-      hctl shutdown
-
-      # Server-client Consul agents configuration.
-      time hctl bootstrap --mkfs cfgen/examples/ci-boot2-1confd.yaml
-      EOF
-    - time $M0VG run --vm ssu1
-           "OTHER_HOST=${JOB_NAME}-ssu2 bash -x /data/hare/_test-boot2.sh"
+  variables: { M0VG: m0vg-2nodes/scripts/m0vg }
+  script: [ ci/test-boot2 ]
 
   after_script:
     - date -u -Isec
-    - cd ${WORKSPACE_DIR}
+    - cd $WORKSPACE_DIR
 
     # Collect syslogs.
     - |
@@ -380,8 +166,8 @@ cleanup:
     GIT_DEPTH: 30
 
   script:
-    - cd ${WORKSPACE_DIR}
-    - ./m0vg-1node/scripts/m0vg destroy -f || true
-    - ./m0vg-2nodes/scripts/m0vg destroy -f || true
+    - cd $WORKSPACE_DIR
+    - m0vg-1node/scripts/m0vg destroy -f || true
+    - m0vg-2nodes/scripts/m0vg destroy -f || true
 
 # vim: foldmethod=marker shiftwidth=2 tabstop=2 expandtab

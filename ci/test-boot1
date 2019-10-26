@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -eu -o pipefail
+export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
+set -x
+
+. ci/common-defs.sh  # ci_m0vg_init
+
+cd $WORKSPACE_DIR
+
+ci_m0vg_init cmu
+time $M0VG run /data/hare/ci/m0vg/init-node
+time $M0VG run /data/hare/ci/m0vg/test-boot1

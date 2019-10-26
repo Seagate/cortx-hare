@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -eu -o pipefail
+export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
+set -x
+
+. ci/common-defs.sh  # ci_docker
+
+sudo rm -rf $WORKSPACE_DIR
+mkdir -p $WORKSPACE_DIR
+cp -a ../$CI_PROJECT_NAME $WORKSPACE_DIR
+
+cd $WORKSPACE_DIR
+
+# Make sure that build image is up to date.
+docker pull $DOCKER_REGISTRY/mero/hare:$CENTOS_RELEASE
+
+# Get a fresh copy of Mero.
+git clone --recursive --depth 1 --shallow-submodules \
+    http://gitlab.mero.colo.seagate.com/mero/mero.git
+
+# Build Mero.
+ci_docker ci/docker/build-mero

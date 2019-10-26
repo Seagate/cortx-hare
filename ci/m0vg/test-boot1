@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -eu -o pipefail
+export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
+set -x
+
+# XXX `update-m0crate-io-test-conf` executes `consul`,
+# which is /opt/seagate/hare/bin.  There should be a better way
+# to add that directory to PATH; see
+# http://gitlab.mero.colo.seagate.com/mero/hare/merge_requests/248#note_16669
+export PATH="/opt/seagate/hare/bin:$PATH"
+
+do_io() {
+    cp /data/mero/clovis/m0crate/tests/test1_io.yaml .
+    utils/update-m0crate-io-test-conf test1_io.yaml
+    dd if=/dev/urandom of=/tmp/128M bs=1M count=100
+    sudo /data/mero/clovis/m0crate/m0crate -S test1_io.yaml
+}
+
+test_cluster() {
+    local cdf=$1
+
+    time hctl bootstrap --mkfs $cdf
+    do_io
+    hctl shutdown
+    time hctl bootstrap --conf-dir /tmp  # bootstrap on existing conf
+    do_io
+    hctl shutdown
+}
+
+cd /data/hare/
+test_cluster cfgen/examples/singlenode.yaml
+test_cluster cfgen/examples/ci-boot1-2ios.yaml
