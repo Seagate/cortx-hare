@@ -29,7 +29,7 @@ test-cfgen:
 .PHONY: check-dhall
 check-dhall:
 	yaml-to-dhall ./dhall/types/ClusterDesc.dhall <examples/singlenode.yaml\
- | dhall-to-yaml | diff -u - <(dhall-to-yaml <<<./examples/singlenode.dhall)
+ | dhall-to-yaml | diff -u - <(dhall-to-yaml <<<./tests/singlenode.dhall)
 	xcode() { sort | $(M0_SRC_DIR)/utils/m0confgen; };\
- dhall text --file examples/sample-confd.dhall | xcode\
- | diff -u - <(xcode <examples/conf.cg)
+ dhall text --file tests/sample-confd.dhall | xcode\
+ | diff -u - <(xcode <tests/conf.cg)
