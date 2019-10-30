@@ -68,7 +68,7 @@ as an example.
 ```sh
 cp $M0_SRC_DIR/clovis/m0crate/tests/test1_io.yaml .
 ./update-m0crate-io-test-conf test1_io.yaml
-dd if=/dev/urandom of=/tmp/128M bs=1M count=100
+dd if=/dev/urandom of=/tmp/128M bs=1M count=128
 sudo $M0_SRC_DIR/clovis/m0crate/m0crate -S test1_io.yaml
 ```
 

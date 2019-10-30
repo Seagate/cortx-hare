@@ -12,7 +12,7 @@ export PATH="/opt/seagate/hare/bin:$PATH"
 do_io() {
     cp /data/mero/clovis/m0crate/tests/test1_io.yaml .
     utils/update-m0crate-io-test-conf test1_io.yaml
-    dd if=/dev/urandom of=/tmp/128M bs=1M count=100
+    dd if=/dev/urandom of=/tmp/128M bs=1M count=128
     sudo /data/mero/clovis/m0crate/m0crate -S test1_io.yaml
 }
 
