@@ -78,7 +78,7 @@ How this can be achieved with Pacemaker?
 Hare and Mero services are not represented as separate resources in
 Pacemaker.  Instead, Pacemaker will see a facade or a meta-resource.
 
-![image](ees-pacemaker.png)
+![two-nodes](two-nodes.png)
 
 **XXX** andriy> Have you explored the possibility of configuring
 [resource sets](https://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/2.0/html/Pacemaker_Explained/s-resource-sets.html)?
@@ -105,9 +105,9 @@ failed-over separately from each other.
    Hare, and Mero processes.  If any of them is not healthy, the
    meta-resource instance MUST be presented to Pacemaker as "FAILING".
 
-![image](ees-pacemaker-2.png)
+![node-failed](node-failed.png)
 
-![image](ees-pacemaker-failover.png)
+![failover](failover.png)
 
 ### Meta-resource notes
 
