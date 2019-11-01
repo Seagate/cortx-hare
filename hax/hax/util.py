@@ -1,3 +1,4 @@
+import os
 import json
 
 from consul import Consul
@@ -54,7 +55,8 @@ class ConsulUtil:
         return _to_service_fid(int(sfidk['Value']))
 
     def get_my_nodename(self):
-        return self.cns.agent.self()['Config']['NodeName']
+        return (os.environ.get('HARE_HAX_NODE_NAME') or
+                self.cns.agent.self()['Config']['NodeName'])
 
     def get_node_service_by_name(self, hostname, svc_name):
         for svc in self.cns.catalog.service(service=svc_name)[1]:
