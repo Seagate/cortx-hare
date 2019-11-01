@@ -28,24 +28,30 @@ class ConsumerThread(Thread):
 
         try:
             while True:
-                logging.debug('Waiting for the next message')
+                try:
+                    logging.debug('Waiting for the next message')
 
-                item = pull_msg()
-                while item is None:
-                    time.sleep(0.2)
-                    if self.is_stopped:
-                        raise StopIteration()
                     item = pull_msg()
+                    while item is None:
+                        time.sleep(0.2)
+                        if self.is_stopped:
+                            raise StopIteration()
+                        item = pull_msg()
 
-                logging.debug('Got something from the queue')
-                if isinstance(item, EntrypointRequest):
-                    ha_link = item.ha_link_instance
-                    ha_link.send_entrypoint_request_reply(item)
-                elif isinstance(item, ProcessEvent):
-                    self.consul.update_process_status(item.evt)
-                else:
-                    logging.warning(
-                        'Unsupported event type received: {}'.format(item))
+                    logging.debug('Got something from the queue')
+                    if isinstance(item, EntrypointRequest):
+                        ha_link = item.ha_link_instance
+                        ha_link.send_entrypoint_request_reply(item)
+                    elif isinstance(item, ProcessEvent):
+                        self.consul.update_process_status(item.evt)
+                    else:
+                        logging.warning('Unsupported event type received: %s',
+                                        item)
+                except StopIteration:
+                    raise
+                except Exception:
+                    # no op, swallow the exception
+                    logging.exception('**ERROR**')
         except StopIteration:
             ffi.shun_mero_thread()
         finally:

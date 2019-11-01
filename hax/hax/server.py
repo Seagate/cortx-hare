@@ -1,8 +1,12 @@
 import json
 import logging
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from typing import Any, Dict, List, NamedTuple
 
+from hax.types import Fid
 from hax.util import create_process_fid
+
+HAState = NamedTuple('HAState', [('fid', Fid), ('status', str)])
 
 
 class KVHandler(BaseHTTPRequestHandler):
@@ -34,34 +38,31 @@ class KVHandler(BaseHTTPRequestHandler):
         self.server.halink.broadcast_ha_states(ha_states)
 
     @staticmethod
-    def parse_json(raw_data):
+    def parse_json(raw_data: bytes) -> Any:
         try:
             return json.loads(raw_data.decode('utf-8'))
         except json.JSONDecodeError:
             logging.warning('Invalid JSON object received')
 
     @staticmethod
-    def to_ha_states(data):
+    def to_ha_states(data: Any) -> List[HAState]:
         """Converts a dictionary, obtained from JSON data, into a list of
         HA states.
 
-        Format of an HA state: {'fid': <service fid>, 'status': <state>},
+        Format of an HA state: HAState(fid= <service fid>, status= <state>),
         where <state> is either 'online' or 'offline'.
         """
         if not data:
             return []
 
-        def get_status(checks):
+        def get_status(checks: List[Dict[str, Any]]) -> str:
             ok = all(x.get('Status') == 'passing' for x in checks)
             return 'online' if ok else 'offline'
 
-        result = []
-        for t in data:
-            result.append({
-                'fid': create_process_fid(t['Service']['ID']),
-                'status': get_status(t['Checks'])
-            })
-        return result
+        return [
+            HAState(fid=create_process_fid(int(t['Service']['ID'])),
+                    status=get_status(t['Checks'])) for t in data
+        ]
 
 
 def run_server(thread_to_wait=None,

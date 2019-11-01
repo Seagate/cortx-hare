@@ -1,6 +1,7 @@
 import ctypes as c
 import logging
 from errno import EAGAIN
+from typing import Any
 
 from hax.ffi import HaxFFI, make_array, make_c_str
 from hax.message import EntrypointRequest, ProcessEvent
@@ -19,7 +20,7 @@ def log_exception(fn):
 
 
 class HaLink:
-    def __init__(self, node_uuid='', ffi=None, queue=None, rm_fid=None):
+    def __init__(self, ffi: HaxFFI, queue, rm_fid: Fid, node_uuid: str = ''):
         self._ffi = ffi or HaxFFI()
         # [KN] Note that node_uuid is currently ignored by the corresponding
         # hax.c function
@@ -47,9 +48,9 @@ class HaLink:
                                'Please check mero logs for more details.')
 
     @log_exception
-    def _entrypoint_request_cb(self, reply_context, req_id,
-                               remote_rpc_endpoint, process_fid, git_rev, pid,
-                               is_first_request):
+    def _entrypoint_request_cb(self, reply_context: Any, req_id: Any,
+                               remote_rpc_endpoint: str, process_fid: Fid,
+                               git_rev: str, pid: int, is_first_request: bool):
         logging.debug('Received entrypoint request from remote endpoint'
                       " '{}', process fid = {}".format(remote_rpc_endpoint,
                                                        str(process_fid)) +
@@ -64,9 +65,7 @@ class HaLink:
                               is_first_request=is_first_request,
                               ha_link_instance=self))
 
-    @log_exception
-    def send_entrypoint_request_reply(self, message):
-        assert isinstance(message, EntrypointRequest)
+    def send_entrypoint_request_reply(self, message: EntrypointRequest):
         reply_context = message.reply_context
         req_id = message.req_id
         remote_rpc_endpoint = message.remote_rpc_endpoint
@@ -94,13 +93,15 @@ class HaLink:
         rc_quorum = int(len(confds) / 2 + 1)
 
         rm_eps = None
-        for cnf in confds:
-            if cnf.get('node') == principal_rm:
-                rm_eps = cnf.get('address')
+        for svc in confds:
+            if svc.node == principal_rm:
+                rm_eps = svc.address
                 break
+        if not rm_eps:
+            raise RuntimeError('No RM node found in Consul')
 
-        confd_fids = [x.get('fid').to_c() for x in confds]
-        confd_eps = [make_c_str(x.get('address')) for x in confds]
+        confd_fids = [x.fid.to_c() for x in confds]
+        confd_eps = [make_c_str(x.address) for x in confds]
 
         logging.debug('Passing the entrypoint reply to hax.c layer')
         self._ffi.entrypoint_reply(reply_context, req_id.to_c(), 0,
@@ -115,11 +116,11 @@ class HaLink:
         logging.debug('Broadcasting HA states %s over ha_link', ha_states)
 
         def ha_obj_state(st):
-            return HaNoteStruct.M0_NC_ONLINE if st['status'] == 'online' \
+            return HaNoteStruct.M0_NC_ONLINE if st.status == 'online' \
                 else HaNoteStruct.M0_NC_FAILED
 
         notes = [
-            HaNoteStruct(st['fid'].to_c(), ha_obj_state(st))
+            HaNoteStruct(st.fid.to_c(), ha_obj_state(st))
             for st in ha_states
         ]
         self._ffi.ha_broadcast(self._ha_ctx, make_array(HaNoteStruct, notes),

@@ -297,7 +297,9 @@ check-cfgen: $(PY_VENV_DIR)
 .PHONY: check-hax
 check-hax: $(PY_VENV_DIR)
 	@$(call _info,Checking hax)
-	@cd hax && $(SETUP_PY) flake8 mypy
+	@cd hax &&\
+	  $(PY_VENV) &&\
+	  MYPYPATH=../stubs $(PYTHON) setup.py flake8 mypy
 
 .PHONY: flake8
 flake8: $(PYTHON_SCRIPTS)
@@ -309,7 +311,7 @@ override MYPY_OPTS := --config-file hax/mypy.ini $(MYPY_OPTS)
 mypy: $(PYTHON_SCRIPTS)
 	@$(call _info,Checking files with mypy)
 	@$(PY_VENV); \
-	 set -eu -o pipefail; for f in $^; do mypy $(MYPY_OPTS) $$f; done
+	 set -eu -o pipefail; for f in $^; do MYPYPATH=stubs mypy $(MYPY_OPTS) $$f; done
 
 # Tests ----------------------------------------------- {{{1
 #

@@ -1,4 +1,5 @@
 import os
+import os.path as P
 from distutils.cmd import Command
 from distutils.errors import DistutilsError
 from distutils.log import ERROR, INFO
@@ -60,8 +61,7 @@ def get_mero_dir():
     d = os.environ.get('M0_SRC_DIR')
     if d:
         return d
-    return os.path.normpath(os.path.dirname(os.path.abspath(__file__)) +
-                            '/../../mero')
+    return P.normpath(P.dirname(P.abspath(__file__)) + '/../../mero')
 
 
 def get_mero_libs_dir():
@@ -76,7 +76,7 @@ def get_mero_libs_dir():
 
     libs_dir = get_mero_dir() + '/mero/.libs'
     libmero = libs_dir + '/libmero.so'
-    assert os.path.isfile(libmero), f'{libmero}: No such file'
+    assert P.isfile(libmero), f'{libmero}: No such file'
     return libs_dir
 
 

@@ -7,6 +7,7 @@ from hax.ffi import HaxFFI
 from hax.halink import HaLink
 from hax.handler import ConsumerThread
 from hax.server import run_server
+from hax.types import Fid
 from hax.util import ConsulUtil
 
 __all__ = ['main']
@@ -39,11 +40,11 @@ def main():
     # [KN] Note: The server is launched in the main thread.
     q = Queue(maxsize=8)
 
-    util = ConsulUtil()
-    hax_ep = util.get_hax_endpoint()
-    hax_fid = util.get_hax_fid()
-    ha_fid = util.get_ha_fid()
-    rm_fid = util.get_rm_fid()
+    util: ConsulUtil = ConsulUtil()
+    hax_ep: str = util.get_hax_endpoint()
+    hax_fid: Fid = util.get_hax_fid()
+    ha_fid: Fid = util.get_ha_fid()
+    rm_fid: Fid = util.get_rm_fid()
 
     ffi = HaxFFI()
     halink = HaLink(queue=q, rm_fid=rm_fid, ffi=ffi)

@@ -1,3 +1,9 @@
+from typing import Any
+
+from hax import halink
+from hax.types import Fid, Uint128
+
+
 class BaseMessage:
     pass
 
@@ -8,15 +14,10 @@ class Message(BaseMessage):
 
 
 class EntrypointRequest(BaseMessage):
-    def __init__(self,
-                 reply_context=None,
-                 req_id=None,
-                 remote_rpc_endpoint=None,
-                 process_fid=None,
-                 git_rev=None,
-                 pid=None,
-                 is_first_request=None,
-                 ha_link_instance=None):
+    def __init__(self, reply_context: Any, req_id: Uint128,
+                 remote_rpc_endpoint: str, process_fid: Fid, git_rev: str,
+                 pid: int, is_first_request: bool,
+                 ha_link_instance: 'halink.HaLink'):
         self.reply_context = reply_context
         self.req_id = req_id
         self.remote_rpc_endpoint = remote_rpc_endpoint

@@ -13,7 +13,7 @@ flake8: $(PYTHON_SCRIPTS)
 
 .PHONY: typecheck
 typecheck: $(PYTHON_SCRIPTS)
-	set -eu -o pipefail; for f in $^; do mypy $$f; done
+	set -eu -o pipefail; for f in $^; do MYPYPATH=../stubs mypy $$f; done
 
 .PHONY: test-cfgen
 test-cfgen:
