@@ -10,7 +10,6 @@ alt_epel+=/prvsnr/vendor/centos/epel/
 sudo yum-config-manager --add-repo=$alt_epel
 
 sudo yum install -y python36 python36-devel python36-PyYAML python36-pip
-sudo pip3 install ply python-consul
 
 sudo mkdir -p /var/mero
 for i in {0..9}; do
