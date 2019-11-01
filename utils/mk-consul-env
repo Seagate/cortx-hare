@@ -68,7 +68,7 @@ if [[ -n $extra_opts ]]; then
 fi
 
 # Prepare for consul-agent startup:
-sudo rm -rf /tmp/consul
+sudo rm -rf /var/lib/hare/consul-$bind_addr
 # TODO: '/opt/seagate/hare' prefix can be different
 sudo cp /opt/seagate/hare/share/consul/consul-$mode-conf.json.in \
         /var/lib/hare/consul-$mode-conf.json
