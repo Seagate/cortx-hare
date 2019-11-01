@@ -154,4 +154,7 @@ trap "rm -f $tmpfile" EXIT # delete automatically on exit
 jq ".services = [$SVCS_CONF]" <$CONF_FILE >$tmpfile
 sudo cp $tmpfile $CONF_FILE
 
+sudo sed -r "s;(http://)localhost;\1$(get_service_addr $HAX_EP);" \
+         -i $CONF_FILE
+
 consul reload > /dev/null

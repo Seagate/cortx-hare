@@ -4,7 +4,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any, Dict, List, NamedTuple
 
 from hax.types import Fid
-from hax.util import create_process_fid
+from hax.util import create_process_fid, ConsulUtil
 
 HAState = NamedTuple('HAState', [('fid', Fid), ('status', str)])
 
@@ -70,7 +70,8 @@ def run_server(thread_to_wait=None,
                port=8080,
                halink=None):
     port = 8080
-    server_address = ('', port)
+    util = ConsulUtil()
+    server_address = (util.get_hax_ip_address(), port)
     httpd = server_class(server_address, KVHandler)
     httpd.halink = halink
 

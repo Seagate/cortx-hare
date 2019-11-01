@@ -10,6 +10,7 @@ from hax.types import Fid
 SERVICE_CONTAINER = 0x7300000000000001
 PROCESS_CONTAINER = 0x7200000000000001
 ServiceData = NamedTuple('ServiceData', [('node', str), ('fid', Fid),
+                                         ('ip_addr', str),
                                          ('address', str)])
 
 
@@ -76,13 +77,19 @@ class ConsulUtil:
         hostname = self.get_my_nodename()
         return self.get_node_service_by_name(hostname, name)
 
-    def get_hax_endpoint(self) -> str:
+    def get_service_data(self) -> ServiceData:
         my_fid = self.get_hax_fid()
         services = self.cns.catalog.service(service='hax')[1]
-        data = list(
-            map(self._to_canonical_service_data,
-                filter(lambda x: int(x['ServiceID']) == my_fid.key, services)))
-        return data[0].address
+        data = list(map(self._to_canonical_service_data,
+                        filter(lambda x: int(x['ServiceID']) == my_fid.key,
+                               services)))
+        return data[0]
+
+    def get_hax_endpoint(self) -> str:
+        return self.get_service_data().address
+
+    def get_hax_ip_address(self) -> str:
+        return self.get_service_data().ip_addr
 
     def get_leader_session(self) -> str:
         leader = self.cns.kv.get('leader')[1]
@@ -100,10 +107,12 @@ class ConsulUtil:
     def _to_canonical_service_data(service: Dict[str, Any]) -> ServiceData:
         node = service['Node']
         fidk = int(service['ServiceID'])
+        srv_ip_addr = service['Address']
         srv_address = service['ServiceAddress']
         srv_port = service['ServicePort']
         return ServiceData(node=node,
                            fid=create_process_fid(fidk),
+                           ip_addr=srv_ip_addr,
                            address=f'{srv_address}:{srv_port}')
 
     def get_confd_list(self):
