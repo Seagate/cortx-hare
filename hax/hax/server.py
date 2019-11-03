@@ -70,8 +70,7 @@ def run_server(thread_to_wait=None,
                port=8080,
                halink=None):
     port = 8080
-    util = ConsulUtil()
-    server_address = (util.get_hax_ip_address(), port)
+    server_address = (ConsulUtil().get_hax_ip_address(), port)
     httpd = server_class(server_address, KVHandler)
     httpd.halink = halink
 
