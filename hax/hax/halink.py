@@ -1,11 +1,11 @@
 import ctypes as c
 import logging
 from errno import EAGAIN
-from typing import Any
+from typing import Any, List
 
 from hax.ffi import HaxFFI, make_array, make_c_str
-from hax.message import EntrypointRequest, ProcessEvent
-from hax.types import ConfHaProcess, Fid, FidStruct, HaNoteStruct
+from hax.message import EntrypointRequest, ProcessEvent, HaNvecGetEvent
+from hax.types import ConfHaProcess, Fid, FidStruct, HaNoteStruct, ObjT
 from hax.util import ConsulUtil
 
 
@@ -134,6 +134,27 @@ class HaLink:
                               chp_type=chp_type,
                               chp_pid=chp_pid,
                               fid=fid)))
+
+    @log_exception
+    def ha_nvec_get(self, hax_msg, nvec) -> None:
+        logging.debug('Got ha nvec of length ' + str(len(nvec)))
+        self.queue.put(HaNvecGetEvent(hax_msg, nvec, self))
+
+    @log_exception
+    def ha_nvec_get_reply(self, event: HaNvecGetEvent) -> None:
+        cutil = ConsulUtil()
+        notes: List[HaNoteStruct] = []
+        for n in event.nvec:
+            n.note.no_state = HaNoteStruct.M0_NC_ONLINE
+            if n.obj_t in (ObjT.PROCESS.name, ObjT.SERVICE.name) and \
+               cutil.get_conf_obj_status(ObjT[n.obj_t],
+                                         n.note.no_id.f_key) != 'passing':
+                n.note.no_state = HaNoteStruct.M0_NC_FAILED
+            notes.append(n.note)
+
+        logging.debug('Replying ha nvec of length ' + str(len(event.nvec)))
+        self._ffi.ha_nvec_reply(event.hax_msg,
+                                make_array(HaNoteStruct, notes), len(notes))
 
     def close(self):
         logging.debug('Destroying ha_link')

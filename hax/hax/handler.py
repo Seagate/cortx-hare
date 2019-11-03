@@ -4,7 +4,7 @@ from queue import Empty, Queue
 from threading import Thread
 
 from hax.ffi import HaxFFI
-from hax.message import EntrypointRequest, ProcessEvent
+from hax.message import EntrypointRequest, HaNvecGetEvent, ProcessEvent
 from hax.util import ConsulUtil
 
 
@@ -44,6 +44,8 @@ class ConsumerThread(Thread):
                         ha_link.send_entrypoint_request_reply(item)
                     elif isinstance(item, ProcessEvent):
                         self.consul.update_process_status(item.evt)
+                    elif isinstance(item, HaNvecGetEvent):
+                        item.ha_link_instance.ha_nvec_get_reply(item)
                     else:
                         logging.warning('Unsupported event type received: %s',
                                         item)

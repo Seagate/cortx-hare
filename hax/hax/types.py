@@ -1,4 +1,6 @@
 import ctypes as c
+from enum import Enum
+from typing import NamedTuple
 
 
 class FidStruct(c.Structure):
@@ -7,6 +9,14 @@ class FidStruct(c.Structure):
 
 class Uint128Struct(c.Structure):
     _fields_ = [("hi", c.c_uint64), ("lo", c.c_uint64)]
+
+
+ObjT = Enum('ObjT', [
+    # There are the only conf object types we care about.
+    ('PROCESS', 0x7200000000000001),
+    ('SERVICE', 0x7300000000000001)
+])
+ObjT.__doc__ = 'Mero conf object types and their m0_fid.f_container values'
 
 
 class HaNoteStruct(c.Structure):
@@ -94,3 +104,6 @@ class Uint128:
 
     def to_c(self):
         return Uint128Struct(self.hi, self.lo)
+
+
+HaNote = NamedTuple('HaNote', [('obj_t', str), ('note', HaNoteStruct)])

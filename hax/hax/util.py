@@ -1,4 +1,3 @@
-from enum import Enum
 import json
 import os
 from typing import Any, Dict, NamedTuple, List
@@ -6,7 +5,7 @@ from typing import Any, Dict, NamedTuple, List
 from consul import Consul
 
 from hax.exception import HAConsistencyException
-from hax.types import ConfHaProcess, Fid
+from hax.types import ConfHaProcess, Fid, ObjT
 
 
 __all__ = ['ConsulUtil', 'create_process_fid']
@@ -27,14 +26,6 @@ def mkServiceData(service: Dict[str, Any]) -> ServiceData:
                        ip_addr=service['Address'],
                        address='{}:{}'.format(service['ServiceAddress'],
                                               service['ServicePort']))
-
-
-ObjT = Enum('ObjT', [
-    # There are the only conf object types we care about.
-    ('PROCESS', 0x7200000000000001),
-    ('SERVICE', 0x7300000000000001)
-])
-ObjT.__doc__ = 'Mero conf object types and their m0_fid.f_container values'
 
 
 def mk_fid(obj_t: ObjT, key: int) -> Fid:
@@ -127,6 +118,46 @@ class ConsulUtil:
     def get_confd_list(self) -> List[ServiceData]:
         services = self.cns.catalog.service(service='confd')[1]
         return list(map(mkServiceData, services))
+
+    def get_conf_obj_status(self, obj_t: ObjT, fidk: int) -> str:
+        # 'node/<node_name>/process/<process_fidk>/service/type'
+        node_items = self.cns.kv.get('m0conf/nodes', recurse=True)[1]
+        keys = getattr(self, 'get_{}_keys'.
+                       format(obj_t.name.lower()))(node_items, fidk)
+        if keys:
+            node_name = keys[0].split('/', 3)[2]
+            return self.get_node_health(node_name)
+        return 'None'
+
+    @staticmethod
+    def get_process_keys(node_items: List[Any], fidk: int) -> List[Any]:
+        return [x['Key']
+                for x in node_items
+                if '/processes/' in x['Key'] and
+                str(fidk) in x['Key']]
+
+    @staticmethod
+    def get_service_keys(node_items: List[Any], fidk: int) -> List[Any]:
+        return [x['Key']
+                for x in node_items
+                if '/services/' in x['Key'] and
+                int(x['Value']) == fidk]
+
+    def get_node_health(self, node: str) -> str:
+        node_data = self.cns.health.node(node)[1]
+        return str(node_data[0]['Status'])
+
+    @staticmethod
+    def _to_canonical_service_data(service: Dict[str, Any]) -> ServiceData:
+        node = service['Node']
+        fidk = int(service['ServiceID'])
+        srv_ip_addr = service['Address']
+        srv_address = service['ServiceAddress']
+        srv_port = service['ServicePort']
+        return ServiceData(node=node,
+                           fid=create_process_fid(fidk),
+                           ip_addr=srv_ip_addr,
+                           address=f'{srv_address}:{srv_port}')
 
     def update_process_status(self, event: ConfHaProcess) -> None:
         assert 0 <= event.chp_event < len(ha_process_events), \

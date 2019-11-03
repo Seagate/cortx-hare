@@ -23,6 +23,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
+#include "conf/obj.h"            /* M0_CONF_OBJ_TYPES */
 #include "fid/fid.h"             /* M0_FID_TINIT */
 #include "ha/halon/interface.h"  /* m0_halon_interface */
 #include "ha/link.h"             /* m0_ha_link_send */
@@ -49,6 +50,7 @@ static void __ha_nvec_reply_send(const struct hax_msg *hm,
 				 struct m0_ha_nvec *nvec);
 static struct m0_ha_msg *_ha_nvec_msg_alloc(const struct m0_ha_nvec *nvec,
 					    uint64_t id_of_get,int direction);
+static PyObject *nvec_to_list(const struct m0_ha_note *notes, uint32_t nr_notes);
 
 
 M0_TL_DESCR_DEFINE(hx_links, "hax_context::hc_links", static,
@@ -170,7 +172,6 @@ M0_INTERNAL void m0_ha_entrypoint_reply_send(unsigned long long        epr,
 
 static void handle_failvec(const struct hax_msg *hm)
 {
-	M0_PRE(hm != NULL);
 	/*
 	 * Invoke python call from here, comment the mock reply send and pass
 	 * hax_msg (hm).
@@ -197,7 +198,7 @@ static void __ha_failvec_reply_send(const struct hax_msg *hm,
 				    uint32_t nr_notes)
 {
 	struct m0_ha_link      *hl = hm->hm_hl;
-	const struct m0_ha_msg *msg = hm->hm_msg;
+	const struct m0_ha_msg *msg = &hm->hm_msg;
 	struct m0_ha_msg       *repmsg;
 	uint64_t                tag;
 
@@ -219,16 +220,86 @@ static void __ha_failvec_reply_send(const struct hax_msg *hm,
 /* Tests hax - mero nvec reply send. */
 static void handle_nvec(const struct hax_msg *hm)
 {
-	/*
-	 * Call python function from here, comment below test function.
-	 * XXX TODO: Move out test calls to separate location.
-	 */
-	nvec_test_reply_send(hm);
+	struct hax_msg              *hmsg;
+	const struct m0_ha_msg      *msg = &hm->hm_msg;
+	const struct m0_ha_msg_nvec *hm_nvec = &msg->hm_data.u.hed_nvec;
+	const struct m0_ha_note     *ha_notes = hm_nvec->hmnv_arr.hmna_arr;
+	uint32_t                     nr_notes = hm_nvec->hmnv_nr;
+
+	PyGILState_STATE gstate;
+	gstate = PyGILState_Ensure();
+
+	M0_ALLOC_PTR(hmsg);
+	M0_ASSERT(hmsg != NULL);
+
+	*hmsg = *hm;
+	PyObject *l = nvec_to_list(ha_notes, nr_notes);
+	PyObject_CallMethod(hc0->hc_handler, "ha_nvec_get", "(KO)",
+			    hmsg, l);
+
+	Py_DECREF(l);
+	PyGILState_Release(gstate);
 }
 
+static const char *conf_obj_type_name(const struct m0_conf_obj_type *obj_t)
+{
+	switch (obj_t->cot_ftype.ft_id) {
+#define X_CONF(_, NAME, FT_ID) \
+	case FT_ID: return #NAME;
+
+M0_CONF_OBJ_TYPES
+#undef X_CONF
+	default:;
+	}
+
+	M0_IMPOSSIBLE("Invalind ft_id: %c (%u)",
+		      obj_t->cot_ftype.ft_id,
+		      obj_t->cot_ftype.ft_id);
+}
+
+static PyObject *nvec_to_list(const struct m0_ha_note *notes, uint32_t nr_notes)
+{
+	uint32_t                 i;
+	const struct m0_ha_note *note;
+	const char              *obj_name;
+	PyObject                *list = PyList_New(nr_notes);
+
+	PyObject *hax_mod = getModule("hax.types");
+	for (i = 0; i < nr_notes; ++i) {
+		note = &notes[i];
+		PyObject *fid = PyObject_CallMethod(hax_mod, "FidStruct",
+						    "(KK)",
+						    note->no_id.f_container,
+						    note->no_id.f_key);
+		PyObject *ha_note = PyObject_CallMethod(hax_mod, "HaNoteStruct",
+							"(OK)", fid,
+							note->no_state);
+
+		obj_name = conf_obj_type_name(m0_conf_fid_type(&note->no_id));
+		PyObject *note_item = PyObject_CallMethod(hax_mod, "HaNote",
+							  "(sO)", obj_name,
+							  ha_note);
+		PyList_SET_ITEM(list, i, note_item);
+
+		/*
+		 * Decrementing ref counts for fs and hs leads to panic probably
+		 * because the corresponding objects are released before they
+		 * are used. Refcount is decremented for the nvec list in
+		 * handle_nvec().
+		 *
+		 * Py_DECREF(fs)
+		 * Py_DECREF(hs)
+		 */
+	}
+	Py_DECREF(hax_mod);
+
+	return list;
+}
+
+static void nvec_test_reply_send(const struct hax_msg *hm) __attribute__((unused));
 static void nvec_test_reply_send(const struct hax_msg *hm)
 {
-	const struct m0_ha_msg      *msg = hm->hm_msg;
+	const struct m0_ha_msg      *msg = &hm->hm_msg;
 	const struct m0_ha_msg_nvec *nvec_req = &msg->hm_data.u.hed_nvec;
 	struct m0_ha_nvec            nvec = {
 		.nv_nr = (int32_t)nvec_req->hmnv_nr
@@ -281,16 +352,26 @@ static void nvec_test_reply_send(const struct hax_msg *hm)
  * To be invoked from python land.
  */
 M0_INTERNAL void m0_ha_nvec_reply_send(unsigned long long hm,
-				       struct m0_ha_nvec *nvec)
+				       struct m0_ha_note *notes,
+				       uint32_t nr_notes)
 {
-	__ha_nvec_reply_send((struct hax_msg *)hm, nvec);
+	struct hax_msg    *hmsg = (struct hax_msg *)hm;
+	struct m0_ha_nvec  nvec = {
+					.nv_nr = nr_notes,
+					.nv_note = notes
+				  };
+
+	M0_LOG(M0_DEBUG, "nvec->nv_nr=%d hax_msg=%p",
+		nvec.nv_nr, hmsg);
+	__ha_nvec_reply_send(hmsg, &nvec);
+	m0_free(hmsg);
 }
 
 static void __ha_nvec_reply_send(const struct hax_msg *hm,
 				 struct m0_ha_nvec *nvec)
 {
 	struct m0_ha_link      *hl = hm->hm_hl;
-	const struct m0_ha_msg *msg = hm->hm_msg;
+	const struct m0_ha_msg *msg = &hm->hm_msg;
 
 	M0_PRE(hm != NULL);
 	M0_PRE(nvec != NULL);
@@ -310,7 +391,7 @@ static void handle_process_event(const struct hax_msg *hm)
 	gstate = PyGILState_Ensure();
 
 	struct hax_context     *hc = hm->hm_hc;
-	const struct m0_ha_msg *hmsg = hm->hm_msg;
+	const struct m0_ha_msg *hmsg = &hm->hm_msg;
 
 	M0_LOG(M0_INFO, "Process fid: "FID_F, FID_P(&hmsg->hm_fid));
 	PyObject *py_fid = toFid(&hmsg->hm_fid);
@@ -335,7 +416,7 @@ static void _dummy_handle(const struct hax_msg *msg)
 static void _impossible(const struct hax_msg *hm)
 {
 	M0_IMPOSSIBLE("Unsupported ha_msg type: %d",
-		      m0_ha_msg_type_get(hm->hm_msg));
+		      m0_ha_msg_type_get(&hm->hm_msg));
 }
 
 static void (*hax_action[])(const struct hax_msg *hm) = {
@@ -366,7 +447,7 @@ static void msg_received_cb(struct m0_halon_interface *hi,
 		&(struct hax_msg){
 			.hm_hc = hc0,
 			.hm_hl = hl,
-			.hm_msg = msg
+			.hm_msg = *msg
 		});
 	m0_halon_interface_delivered(hi, hl, msg);
 }

@@ -62,6 +62,13 @@ class HaxFFI:
         ]
         self.ha_broadcast = lib.m0_ha_notify
 
+        lib.m0_ha_nvec_reply_send.argtypes = [
+            c.c_void_p,  # unsigned long long  hax_msg
+            c.POINTER(HaNoteStruct),  # struct m0_ha_note *notes
+            c.c_uint32  # uint32_t nr_notes
+        ]
+        self.ha_nvec_reply = lib.m0_ha_nvec_reply_send
+
         lib.adopt_mero_thread.argtypes = []
         lib.adopt_mero_thread.restype = c.c_int
         self.adopt_mero_thread = lib.adopt_mero_thread
