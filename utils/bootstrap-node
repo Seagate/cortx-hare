@@ -92,6 +92,9 @@ fi
 for id in $IDs; do
     fid=$(id2fid $id)
     if $do_mkfs; then
+        echo "MERO_NODE_UUID='$(uuidgen --time)'" |
+            sudo tee /etc/sysconfig/mero-kernel >/dev/null
+
         sudo systemctl start mero-mkfs@$fid
         touch /tmp/mero-mkfs-pass-$fid
         # Give time for service check to reset m0mkfs' HA state:
