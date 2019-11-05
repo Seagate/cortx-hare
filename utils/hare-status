@@ -44,9 +44,10 @@ proc_names = {'ios': 'ioservice', 'ha': 'hax', 'confd': 'confd'}
 
 
 def proc_id2name(cns: Consul, node: str, proc_id: int) -> str:
-    for t in proc_names:
-        if get_kv(cns, f'm0conf/nodes/{node}/processes/{proc_id}/services/{t}'):
-            return proc_names[t]
+    for stype in proc_names:
+        if get_kv(cns,
+                  f'm0conf/nodes/{node}/processes/{proc_id}/services/{stype}'):
+            return proc_names[stype]
 
     return 'm0_client'
 
