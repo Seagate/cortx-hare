@@ -12,15 +12,17 @@ Checks health of the specified service (hax or Mero).
 Options:
   -x, --hax       Check hax service.
   -f, --fid fid   Check Mero service of the specified fid.
+  -s, --svc svc   Check another service specified as svc.
   -h, --help      Show this help.
 EOF
 }
 
 fid=
 hax=
+svc=
 
-TEMP=$(getopt --options hxf: \
-              --longoptions help,hax,fid: \
+TEMP=$(getopt --options hxf:s: \
+              --longoptions help,hax,fid:,svc: \
               --name "$prog" -- "$@" || true)
 
 (($? == 0)) || { usage >&2; exit 1; }
@@ -32,17 +34,20 @@ while true ; do
         -h|--help)   usage; exit ;;
         -x|--hax)    hax=yes; shift 1 ;;
         -f|--fid)    fid=$2; shift 2 ;;
+        -s|--svc)    svc=$2; shift 2 ;;
         --)          shift; break ;;
         *)           echo 'getopt: internal error...'; exit 1 ;;
     esac
 done
 
-[[ -n $fid || -n $hax ]] || { usage >&2; exit 1; }
+[[ -n $fid || -n $hax || -n $svc ]] || { usage >&2; exit 1; }
 
 if [[ $hax ]]; then
     service=hare-hax
-else
+elif [[ $fid ]]; then
     service=m0d@$fid
+else
+    service=$svc
 fi
 
 if [[ $service =~ m0d ]]; then
