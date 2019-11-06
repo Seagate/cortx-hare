@@ -1,20 +1,14 @@
--- m0d
+-- m0d process
 let M0Server =
-  { runs_confd : Optional Bool  -- whether to run confd on this m0d
+  { runs_confd : Optional Bool
   , io_disks : Optional { path_glob : Text }
   }
 
--- m0_client
-let C0Client =
-  { s3 : Natural    -- max qty of S3 servers this host may run
-  , other : Natural -- max qty of other Clovis apps this host may have
-  }
-
-let Host =
-  { name : Text   -- hostname
-  , data_iface : Optional Text  -- data interface
-  , m0_servers : List M0Server  -- m0d processes
-  , m0_clients : C0Client  -- clovis client processes
+let Node =
+  { hostname : Text
+  , data_iface : Text
+  , m0_servers : List M0Server
+  , m0_clients : { s3 : Natural, other : Natural }
   }
 
 let Pool =
@@ -26,7 +20,7 @@ let Pool =
   }
 
 in
-{ hosts : List Host
+{ nodes : List Node
 , pools : List Pool
 -- XXX-TODO: add `profiles` section
 }

@@ -28,6 +28,8 @@ test-cfgen:
 
 .PHONY: check-dhall
 check-dhall:
+	for cdf in examples/*.yaml; do\
+ yaml-to-dhall ./dhall/types/ClusterDesc.dhall <$$cdf >/dev/null; done
 	yaml-to-dhall ./dhall/types/ClusterDesc.dhall <examples/singlenode.yaml\
  | dhall-to-yaml | diff -u - <(dhall-to-yaml <<<./tests/singlenode.dhall)
 	xcode() { sort | $(M0_SRC_DIR)/utils/m0confgen; };\

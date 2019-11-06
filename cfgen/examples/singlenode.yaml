@@ -1,5 +1,5 @@
-hosts:
-  - name: localhost
+nodes:
+  - hostname: localhost
     data_iface: eth1
     m0_servers:
       - runs_confd: true

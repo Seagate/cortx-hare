@@ -31,12 +31,9 @@ for Mero I/O.
 
 CDF is a YAML file with the following schema:
 ```yaml
-hosts:
-  - name: <str>  # [user@]hostname; e.g., localhost, samir@10.22.33.44
-    data_iface: <str>   # ipaddress correspond to this interface to be used for
-                        # data services (mero services). This is optional and
-                        # default ip address will be used if not specified.
-    disks:
+nodes:
+  - hostname: <str>    # [user@]hostname; e.g., localhost, pod-c1
+    data_iface: <str>  # name of network device; e.g., eth1, eth1:c1, eth1_c1
     m0_servers:
       - runs_confd: <bool>  # optional, defaults to false
         #io_disks: null                 # no IO service
@@ -63,7 +60,7 @@ pools:
     disks:
       select:
         - { host: <str>, path_regex: <str> }
-    # 2) Use all available disks of all hosts for this pool.
+    # 2) Use all available disks of all nodes for this pool.
     #disks: all
 ```
 

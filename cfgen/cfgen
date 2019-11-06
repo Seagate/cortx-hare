@@ -68,11 +68,9 @@ class ShowSchema(argparse.Action):
         print("""\
 # Cluster Description is a YAML file with the following schema:
 ---  # start of the document (optional)
-hosts:
-  - name: <str>  # [user@]hostname; e.g., localhost, samir@10.22.33.44
-    data_iface: <str>  # Name of the network interface that Mero IO services
-                       # should use; e.g., "eth1".  This field is optional.
-    disks:
+nodes:
+  - hostname: <str>    # [user@]hostname; e.g., localhost, pod-c1
+    data_iface: <str>  # name of network device; e.g., eth1, eth1:c1, eth1_c1
     m0_servers:
       - runs_confd: <bool>  # optional, defaults to false
         #io_disks: null                 # no IO service
@@ -99,7 +97,7 @@ pools:
     disks:
       select:
         - { host: <str>, path_regex: <str> }
-    # 2) Use all available disks of all hosts for this pool.
+    # 2) Use all available disks of all nodes for this pool.
     #disks: all
 ...  # end of the document (optional)""")
         sys.exit()
@@ -129,8 +127,7 @@ def main(argv=None):
 
     outs: List[Tuple[str, Callable[..., str], List[Any]]] = [
         ('consul-agents.json', generate_consul_agents, cluster),
-        ('consul-kv.json', generate_consul_kv, cluster.m0conf,
-         cluster.m0clients, opts.dhall_dir),
+        ('consul-kv.json', generate_consul_kv, cluster, opts.dhall_dir),
         ('confd.dhall', generate_confd, cluster.m0conf, opts.dhall_dir)]
     for path, generate, *args in outs:
         with open(os.path.join(opts.output_dir, path), 'w') as f:
@@ -193,60 +190,59 @@ def validate_cdf_schema(cdf: str, cdf_path: str, schema_path: str) -> None:
             proc.returncode)
 
 
-def ipaddr_key(iface: str = None) -> str:
-    return f'ipaddress_{iface}' if iface else 'ipaddress'
+def ipaddr_key(iface: str) -> str:
+    # `facter` converts "eth1:c1" to "eth1_c1".
+    return 'ipaddress_' + iface.replace(':', '_')
 
 
 def enrich_cluster_desc(desc: Dict[str, Any], mock_p: bool) -> None:
-    for host in desc['hosts']:
-        host.setdefault('data_iface', None)
+    for node in desc['nodes']:
         # The fact names used here correspond to version 2.4.1 of `facter`.
         # See https://puppet.com/docs/puppet/6.6/core_facts.html#legacy-facts
-        host['facts'] = get_facts(host['name'], mock_p,
-                                  'hostname', 'processorcount',
-                                  'memorysize_mb', 'ipaddress',
-                                  ipaddr_key(host['data_iface']), 'macaddress')
-        host['facts']['_memsize_MB'] = int(float(
-            host['facts']['memorysize_mb']))
+        node['facts'] = get_facts(node['hostname'], mock_p,
+                                  'hostname',
+                                  'processorcount',
+                                  'memorysize_mb',
+                                  ipaddr_key(node['data_iface']))
+        node['facts']['_memsize_MB'] = int(float(
+            node['facts']['memorysize_mb']))
 
-        for m0d in host['m0_servers']:
+        for m0d in node['m0_servers']:
             m0d.setdefault('runs_confd', False)
             disks = m0d.setdefault('io_disks', {'path_glob': None})
-            disks['items'] = get_disks(host['name'], mock_p,
+            disks['items'] = get_disks(node['hostname'], mock_p,
                                        disks['path_glob'])
 
 
 def validate_cluster_desc(desc: Dict[str, Any]) -> None:
-    assert all_unique(host['name'] for host in desc['hosts'])
-
-    hosts = [(h['name'], h['facts'][ipaddr_key(h['data_iface'])])
-             for h in desc['hosts']]
-    assert all_unique(ip for _name, ip in hosts), \
+    nodes = [(x['hostname'], x['facts'][ipaddr_key(x['data_iface'])])
+             for x in desc['nodes']]
+    assert all_unique(ip for _name, ip in nodes), \
         'IP addresses are not unique:\n' + \
-        '\n'.join('    ' + name + ' ' + ip for name, ip in hosts)
+        '\n'.join('    ' + name + ' ' + ip for name, ip in nodes)
 
     total_nr_confds = total_nr_disks = 0
 
-    for host in desc['hosts']:
+    for node in desc['nodes']:
         def err(msg: str) -> str:
-            return '{}: {}'.format(host['name'], msg)
+            return '{}: {}'.format(node['hostname'], msg)
 
-        nr_confds = sum(1 for m0d in host['m0_servers'] if m0d['runs_confd'])
+        nr_confds = sum(1 for m0d in node['m0_servers'] if m0d['runs_confd'])
         assert nr_confds < 2, err('Too many confd services')
         total_nr_confds += nr_confds
 
-        for m0d in host['m0_servers']:
+        for m0d in node['m0_servers']:
             assert m0d['runs_confd'] or m0d['io_disks']['path_glob'], \
                 err("Either 'runs_confd' or 'io_disks' must be set")
 
         disks: List[Disk] = []
-        for m0d in host['m0_servers']:
+        for m0d in node['m0_servers']:
             disks.extend(m0d['io_disks']['items'])
         assert all_unique(disks), err('Same disk used by several IO services')
         total_nr_disks += len(disks)
 
-        assert (nr_confds + host['m0_clients']['s3']
-                + host['m0_clients']['other'] > 0), \
+        assert (nr_confds + node['m0_clients']['s3']
+                + node['m0_clients']['other'] > 0), \
             err('At least one Mero server or client is required')
 
     assert total_nr_confds > 0, 'At least one confd is required'
@@ -279,12 +275,8 @@ def fabricate_facts(hostname: str, *args: str) -> Dict[str, Any]:
         'hostname': re.sub('[^@]*@', '', hostname),
         'processorcount': rng(1, 21),
         'memorysize_mb': '{:.2f}'.format(random.uniform(512, 16000)),
-        'ipaddress': '.'.join(str(n) for n in [
-            random.choice([10, 172, 191]), rng(256), rng(256), rng(256)]),
         'ipaddress_eth1': '.'.join(str(n) for n in [
             random.choice([10, 172, 192]), rng(256), rng(256), rng(256)]),
-        'macaddress': ':'.join('{:02x}'.format(n) for n in [
-            rng(256), rng(256), rng(256), rng(256), rng(256), rng(256)]),
     }
     return dict((k, fabricated[k]) for k in args)
 
@@ -1133,7 +1125,7 @@ ConsulAgent = NamedTuple('ConsulAgent', [('hostname', str), ('ipaddr', str)])
 Cluster = NamedTuple('Cluster', [('m0conf', Dict[Oid, Any]),
                                  ('consul_servers', List[ConsulAgent]),
                                  ('consul_clients', List[ConsulAgent]),
-                                 ('m0clients', Dict[Oid, Oid])])
+                                 ('m0_clients', Dict[Oid, Oid])])
 
 
 def generate_consul_agents(cluster: Cluster) -> str:
@@ -1153,16 +1145,17 @@ def fid2str(id: Oid) -> str:
     return f'{hex((ord(types[id.type]) << 56)+1)}:{hex(id.fidk)}'
 
 
-def generate_consul_kv(m0conf: Dict[Oid, Any], m0clients: Dict[Oid, Oid],
-                       dhall_dir: str) -> str:
+def generate_consul_kv(cluster: Cluster, dhall_dir: str) -> str:
     assert os.path.isabs(dhall_dir)
     assert all(k.type is ObjT.process and v.type is ObjT.service
-               for k, v in m0clients.items())
+               for k, v in cluster.m0_clients.items())
 
     global fidk_gen
     _fidk_gen = next(fidk_gen)
     # Give up ownership of `fidk_gen`, passing it to the Consul KV.
     del fidk_gen
+
+    m0conf = cluster.m0conf
 
     ConsulService = NamedTuple('ConsulService', [
         ('node_name', str), ('proc_id', Oid), ('ep', Endpoint),
@@ -1180,8 +1173,7 @@ def generate_consul_kv(m0conf: Dict[Oid, Any], m0clients: Dict[Oid, Oid],
                 return ' '.join([fid2str(x) for x in root.pools
                                  if x is not root.mdpool and
                                  root.imeta_pver not in m0conf[x].pvers])
-        assert len([])
-        return ''
+        raise RuntimeError('Impossible happened')
 
     def processes() -> Iterator[ConsulService]:
         for node_id, node in m0conf.items():
@@ -1196,11 +1188,11 @@ def generate_consul_kv(m0conf: Dict[Oid, Any], m0clients: Dict[Oid, Oid],
                                         ep=m0conf[proc_id].endpoint,
                                         svc_id=svc_id, stype=stype)
                 # Add clovis clients to consul kv
-                if proc_id in m0clients:
+                if proc_id in cluster.m0_clients:
                     yield ConsulService(node_name=node.hostname,
                                         proc_id=proc_id,
                                         ep=m0conf[proc_id].endpoint,
-                                        svc_id=m0clients[proc_id],
+                                        svc_id=cluster.m0_clients[proc_id],
                                         stype='clovis')
 
     return json.dumps([dict(key=k, value=v) for k, v in (
@@ -1258,28 +1250,28 @@ def validate_m0conf(m0conf: Dict[Oid, Any]) -> None:
 
 def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
     cluster = Cluster(m0conf={}, consul_servers=[], consul_clients=[],
-                      m0clients={})
+                      m0_clients={})
     conf = cluster.m0conf
     root_id = ConfRoot.build(conf)
     # XXX Move all the logic into ConfRoot.build?
 
     rack_id = ConfRack.build(conf, ConfSite.build(conf, root_id))
 
-    for host in cluster_desc['hosts']:
-        facts = host['facts']
-        iface = host['data_iface']
+    for node in cluster_desc['nodes']:
+        facts = node['facts']
+        iface = node['data_iface']
 
         node_id = ConfNode.build(conf, root_id, facts)
         ctrl_id = ConfController.build(conf,
                                        ConfEnclosure.build(conf, rack_id),
                                        node_id) \
-            if any(m0d['io_disks']['items'] for m0d in host['m0_servers']) \
+            if any(m0d['io_disks']['items'] for m0d in node['m0_servers']) \
             else None
 
         ConfProcess.build(conf, node_id, facts, iface, ProcT.hax)
 
         confd_p = False
-        for m0d in host['m0_servers']:
+        for m0d in node['m0_servers']:
             ConfProcess.build(conf, node_id, facts, iface, ProcT.m0_server,
                               m0d, ctrl_id)
             if m0d['runs_confd']:
@@ -1290,14 +1282,12 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
                                # XXX use 'mgmt_iface' for consul?
                                ipaddr=facts[ipaddr_key(iface)]))
 
-        for _ in range(host['m0_clients']['s3']):
-            proc_id = ConfProcess.build(conf, node_id, facts, iface,
-                                        ProcT.s3server)
-            cluster.m0clients[proc_id] = new_oid(ObjT.service)
-        for _ in range(host['m0_clients']['other']):
-            proc_id = ConfProcess.build(conf, node_id, facts, iface,
-                                        ProcT.c0_client)
-            cluster.m0clients[proc_id] = new_oid(ObjT.service)
+        for client_t, proc_t in [('s3', ProcT.s3server),
+                                 ('other', ProcT.c0_client)]:
+            for _ in range(node['m0_clients'][client_t]):
+                proc_id = ConfProcess.build(conf, node_id, facts, iface,
+                                            proc_t)
+                cluster.m0_clients[proc_id] = new_oid(ObjT.service)
 
     # XXX-TODO: support multiple profiles
     prof_id = ConfProfile.build(conf, root_id)

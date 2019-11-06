@@ -1,5 +1,5 @@
-hosts:
-  - name: sage75
+nodes:
+  - hostname: sage75
     data_iface: ens33
     m0_servers:
       - runs_confd: true
@@ -7,7 +7,7 @@ hosts:
     m0_clients:
         s3: 0
         other: 2
-  - name: sage75c1
+  - hostname: sage75c1
     data_iface: ens33
     m0_servers:
       - runs_confd: true

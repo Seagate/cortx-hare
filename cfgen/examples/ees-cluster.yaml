@@ -1,5 +1,5 @@
-hosts:
-  - name: ssu1.local
+nodes:
+  - hostname: ssu1.local
     data_iface: eth1
     m0_servers:
       - runs_confd: true
@@ -7,7 +7,7 @@ hosts:
     m0_clients:
         s3: 0
         other: 2
-  - name: ssu2.local
+  - hostname: ssu2.local
     data_iface: eth1
     m0_servers:
       - io_disks: { path_glob: "/dev/loop[0-9]*" }
