@@ -70,29 +70,30 @@ pools:
 ### `cfgen` script
 
 ```
-usage: cfgen [-o <output-dir>] [--mock]
+usage: cfgen [OPTION]... CDF
 
 Generate configuration files required to start Mero cluster.
 
+positional arguments:
+  CDF                  cluster description file; use '--help-schema' option
+                       for format description
+
 optional arguments:
   -h, --help           show this help message and exit
-  --help-schema        show cluster description file schema
+  --help-schema        show the schema of cluster description file (CDF)
   -D dir, --dhall dir  directory with auxiliary Dhall expressions (defaults to
-                       '/opt/cfgen/dhall')
+                       '/opt/seagate/hare/share/cfgen/dhall')
   -o output-dir        output directory (defaults to '.')
   --mock               Generate pseudo-random "facts". The hosts specified in
                        the cluster description file will not be visited and
                        don't even have to exist.
   --debug              print the enriched cluster description and exit
   -V, --version        show program's version number and exit
-
-The program reads cluster description in YAML format from the standard input;
-'--help-schema' option shows the schema.
 ```
 
-**cfgen** reads the CDF from stdin, ssh-es to the hosts mentioned in it,
-collects their "facts" (e.g., number of CPUs, RAM size), and uses that
-information to generate configuration data.
+**cfgen** reads the CDF, ssh-es to the hosts mentioned in it, collects
+their "facts" (e.g., number of CPUs, RAM size), and uses that information
+to generate configuration data.
 
 ### Output files
 

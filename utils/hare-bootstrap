@@ -106,7 +106,7 @@ cfgen_out=${conf_dir:-'/tmp'}
 
 if ! [[ $conf_dir ]]; then
     say 'Generating cluster configuration... '
-    cfgen -o $cfgen_out < $cluster_descr
+    cfgen -o $cfgen_out $cluster_descr
     sudo mkdir -p /etc/mero
     dhall text < $cfgen_out/confd.dhall | m0confgen > $cfgen_out/confd.xc
     echo 'Ok.'

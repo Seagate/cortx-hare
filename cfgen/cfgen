@@ -18,19 +18,19 @@ from typing import Any, Callable, Dict, Iterator, List, NamedTuple, Set, \
 import yaml
 
 
-__version__ = '0.2.2'
-__author__ = 'Valery V. Vorotyntsev <valery.vorotyntsev@seagate.com>'
+__version__ = '0.3'
 
 
 def parse_opts(argv):
-    p = argparse.ArgumentParser(
-        description='Generate configuration files required to start'
-        ' Mero cluster.',
-        usage='%(prog)s [-o <output-dir>] [--mock]',
-        epilog='The program reads cluster description in YAML format from the'
-        " standard input; '--help-schema' option shows the schema.")
-    p.add_argument('--help-schema', nargs=0, help='show cluster description'
-                   ' file schema', action=ShowSchema)
+    p = argparse.ArgumentParser(description='Generate configuration files'
+                                ' required to start Mero cluster.',
+                                usage='%(prog)s [OPTION]... CDF')
+    p.add_argument('CDF', type=argparse.FileType(),
+                   help='cluster description file;'
+                   " use '--help-schema' option for format description")
+    p.add_argument('--help-schema', nargs=0,
+                   help='show the schema of cluster description file (CDF)',
+                   action=ShowSchema)
     default_dhall_dir = '/opt/seagate/hare/share/cfgen/dhall'
     p.add_argument('-D', '--dhall', metavar='dir',
                    help='directory with auxiliary Dhall expressions'
@@ -107,14 +107,16 @@ pools:
 
 def main(argv=None):
     opts = parse_opts(argv)
-    try:
-        check_dhall_versions()
-        input_str = sys.stdin.read()
-        validate_schema(input_str, os.path.join(opts.dhall_dir, 'types',
-                                                'ClusterDesc.dhall'))
-        cluster_desc = yaml.safe_load(input_str)
-    except KeyboardInterrupt:
-        sys.exit(1)
+
+    check_dhall_versions()
+
+    cdf = opts.CDF.read()
+    opts.CDF.close()
+    validate_cdf_schema(cdf,
+                        cdf_path=opts.CDF.name,
+                        schema_path=os.path.join(
+                            opts.dhall_dir, 'types', 'ClusterDesc.dhall'))
+    cluster_desc = yaml.safe_load(cdf)
 
     enrich_cluster_desc(cluster_desc, opts.mock)
     validate_cluster_desc(cluster_desc)
@@ -177,15 +179,18 @@ def check_dhall_versions() -> None:
             die(f'{exe} >= {ver} required')
 
 
-def validate_schema(input_str: str, schema_path: str) -> None:
+def validate_cdf_schema(cdf: str, cdf_path: str, schema_path: str) -> None:
     assert os.path.isabs(schema_path)
     proc = subprocess.Popen(['yaml-to-dhall', schema_path],
                             stdin=subprocess.PIPE,
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE)
-    err = proc.communicate(input=input_str.encode(), timeout=15)[1]
+    err = proc.communicate(input=cdf.encode(), timeout=15)[1]
     if proc.returncode != 0:
-        die('Invalid input\n' + err.decode(), proc.returncode)
+        die(f'**ERROR** {cdf_path}: Invalid cluster description\n' +
+            err.decode().strip() +
+            f"\n\nTo learn more, run '{sys.argv[0]} --help-schema'.",
+            proc.returncode)
 
 
 def ipaddr_key(iface: str = None) -> str:

@@ -15,4 +15,4 @@ sed -ri "s/(name:\s*)(ssu[12])/\\1${JOB_NAME}-\\2/" \
     hare/cfgen/examples/ci-boot2{,-1confd}.yaml
 
 time $M0VG run --vm ssu1 \
-     "OTHER_HOST=${JOB_NAME}-ssu2 /data/hare/ci/m0vg/test-boot2"
+    "OTHER_HOST=${JOB_NAME}-ssu2 /data/hare/ci/m0vg/test-boot2"
