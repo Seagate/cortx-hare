@@ -155,7 +155,7 @@ install-cfgen: $(CFGEN_EXE) install-cfgen-deps
 	 done
 
 .PHONY: install-cfgen-deps
-install-cfgen-deps: cfgen/requirements.txt
+install-cfgen-deps: cfgen/requirements.txt $(PY_VENV_DIR)
 	@$(call _info,Installing cfgen dependencies)
 	@$(PIP) install --ignore-installed --prefix $(DESTDIR)/$(PREFIX) -r $<
 
