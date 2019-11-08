@@ -18,7 +18,7 @@ from typing import Any, Callable, Dict, Iterator, List, NamedTuple, Set, \
 import yaml
 
 
-__version__ = '0.3'
+__version__ = '0.3.1'
 
 
 def parse_opts(argv):
@@ -498,7 +498,7 @@ class ConfNode(ToDhall):
         return node_id
 
 
-ProcT = Enum('ProcT', 'hax m0_server s3server c0_client')
+ProcT = Enum('ProcT', 'hax m0_server m0_client_s3 m0_client_other')
 ProcT.__doc__ = 'Type of the process'
 
 
@@ -1282,8 +1282,8 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
                                # XXX use 'mgmt_iface' for consul?
                                ipaddr=facts[ipaddr_key(iface)]))
 
-        for client_t, proc_t in [('s3', ProcT.s3server),
-                                 ('other', ProcT.c0_client)]:
+        for client_t, proc_t in [('s3', ProcT.m0_client_s3),
+                                 ('other', ProcT.m0_client_other)]:
             for _ in range(node['m0_clients'][client_t]):
                 proc_id = ConfProcess.build(conf, node_id, facts, iface,
                                             proc_t)
