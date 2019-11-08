@@ -46,6 +46,11 @@ def main():
     ha_fid: Fid = util.get_ha_fid()
     rm_fid: Fid = util.get_rm_fid()
 
+    logging.info('Welcome to HaX')
+    logging.info(f'Setting up ha_link interface with the options as follows: '
+                 f'hax fid = {hax_fid}, hax endpoint = {hax_ep}, '
+                 f'HA fid = {ha_fid}, RM fid = {rm_fid}')
+
     ffi = HaxFFI()
     halink = HaLink(queue=q, rm_fid=rm_fid, ffi=ffi)
     thread = _run_qconsumer_thread(q, ffi)
@@ -55,6 +60,7 @@ def main():
                      process=hax_fid,
                      ha_service=ha_fid,
                      rm_service=rm_fid)
+        logging.info('ha_link connection has been established')
         # [KN] This is a blocking call. It will work until the program is
         # terminated by signal
         run_server(thread_to_wait=thread, halink=halink)

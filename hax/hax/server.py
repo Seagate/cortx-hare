@@ -1,10 +1,10 @@
 import json
 import logging
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from typing import Any, Dict, List, NamedTuple
+from typing import Any, Dict, List, NamedTuple, Tuple
 
 from hax.types import Fid
-from hax.util import create_process_fid, ConsulUtil
+from hax.util import ConsulUtil, create_process_fid
 
 HAState = NamedTuple('HAState', [('fid', Fid), ('status', str)])
 
@@ -70,11 +70,12 @@ def run_server(thread_to_wait=None,
                port=8080,
                halink=None):
     port = 8080
-    server_address = (ConsulUtil().get_hax_ip_address(), port)
+    addr = ConsulUtil().get_hax_ip_address()
+    server_address: Tuple[str, int] = (addr, port)
     httpd = server_class(server_address, KVHandler)
     httpd.halink = halink
 
-    logging.info('Starting HTTP server...')
+    logging.info(f'Starting HTTP server at {addr}:{port} ...')
     try:
         httpd.serve_forever()
     finally:
