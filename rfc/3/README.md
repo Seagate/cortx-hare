@@ -94,6 +94,9 @@ to generate configuration data.
 
 ### Output files
 
+  * `confd.dhall` &mdash; Mero configuration in
+    [Dhall](https://dhall-lang.org/) format.
+
   * `consul-agents.json` &mdash; tells [`bootstrap`](rfc/6/README.md) script
     where Consul server and client agents should be started and which
     IP addresses they should bind to.
@@ -120,6 +123,3 @@ to generate configuration data.
   * `consul-kv.json` &mdash; key/value pairs in JSON format, ready to be
     consumed by
     [`consul kv import`](https://www.consul.io/docs/commands/kv/import.html).
-
-  * `confd.xc` &mdash; Mero configuration in xcode string format, ready to
-    be used by confd services.
