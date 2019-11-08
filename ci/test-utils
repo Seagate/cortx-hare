@@ -1,9 +1,0 @@
-#!/usr/bin/env bash
-set -eu -o pipefail
-export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
-set -x
-
-. ci/common-defs.sh  # ci_docker
-
-ci_docker make test
-ci_docker make install

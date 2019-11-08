@@ -20,3 +20,7 @@ git clone --recursive --depth 1 --shallow-submodules \
 
 # Build Mero.
 ci_docker ci/docker/build-mero
+
+# Build Hare.
+ci_docker make test
+ci_docker make install
