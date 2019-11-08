@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-### show cluster status
+# :help: show cluster status
 
 import os
 import sys

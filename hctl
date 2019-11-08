@@ -43,17 +43,19 @@ Usage: $PROG <command> [options]
 
 $(commands_usage)
 
-    help         Show this help screen.
+    help         Show this help screen and exit.
 EOF
 }
 
 commands_usage() {
-    local padding='    '
-
-    for cmd in $(ls -1 $HARE_BASE_DIR/libexec/hare/hare-*); do
+    local tag='# :help: '
+    for cmd in $HARE_BASE_DIR/libexec/hare/hare-*; do
         local name=${cmd##*/hare-}
-        local info=$(grep -Po '(?<=^###).*' $cmd)
-        echo -e "$padding$name\t$info"
+        if [[ $(grep -c "^$tag" $cmd) != 1 ]]; then
+            die "$cmd: '$tag' line is missing"
+        fi
+        local info=$(grep -Po "(?<=^$tag).*" $cmd)
+        echo -e "    $name\t$info"
     done
 }
 

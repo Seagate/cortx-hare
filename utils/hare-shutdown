@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-### stop the cluster
+# :help: stop the cluster
 
 import os
 import sys
