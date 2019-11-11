@@ -21,10 +21,11 @@ test_cluster() {
 
     time hctl bootstrap --mkfs $cdf
     do_io
-    hctl shutdown
+    time hctl shutdown
+
     time hctl bootstrap --conf-dir /tmp  # bootstrap on existing conf
     do_io
-    hctl shutdown
+    time hctl shutdown
 }
 
 cd /data/hare/

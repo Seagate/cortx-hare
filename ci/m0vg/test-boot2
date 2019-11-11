@@ -17,7 +17,7 @@ time hctl bootstrap --mkfs cfgen/examples/ci-boot2.yaml
 
 hctl status
 
-hctl shutdown
+time hctl shutdown
 
 # Server-client Consul agents configuration.
 time hctl bootstrap --mkfs cfgen/examples/ci-boot2-1confd.yaml
