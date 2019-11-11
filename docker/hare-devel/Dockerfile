@@ -1,4 +1,4 @@
-ARG  CENTOS_RELEASE=latest
+ARG  CENTOS_RELEASE=7
 FROM registry.gitlab.mero.colo.seagate.com/mero/mero:${CENTOS_RELEASE}
 
 ENV HARE_VENV_DIR=$HOME/.hare-venv

@@ -1,4 +1,4 @@
-CENTOS_RELEASE  := latest
+CENTOS_RELEASE  := 7
 NAMESPACE       := registry.gitlab.mero.colo.seagate.com
 DOCKER          := docker
 
@@ -15,12 +15,10 @@ docker-image-latest: hare-devel-image
 
 .PHONY: docker-image-7.6
 docker-image-7.6: CENTOS_RELEASE := 7.6
-docker-image-7.6: override DOCKER_OPTS += --build-arg CENTOS_RELEASE=$(CENTOS_RELEASE)
 docker-image-7.6: hare-devel-image
 
 .PHONY: docker-image-eos
 docker-image-eos: CENTOS_RELEASE := eos
-docker-image-eos: override DOCKER_OPTS += --build-arg CENTOS_RELEASE=$(CENTOS_RELEASE)
 docker-image-eos: hare-devel-image
 
 
@@ -29,6 +27,7 @@ hare-devel-image:
 	cd $(INAME) \
 	&& tar -ch . \
 	   | $(DOCKER) build \
+	                --build-arg CENTOS_RELEASE=$(CENTOS_RELEASE) \
 			-t $(NAMESPACE)/$(INAME):$(CENTOS_RELEASE) \
 			-t $(NAMESPACE)/mero/hare:$(CENTOS_RELEASE) \
 			$(DOCKER_OPTS) -
