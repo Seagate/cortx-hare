@@ -164,4 +164,37 @@ cleanup:
     - m0vg-1node/scripts/m0vg destroy -f || true
     - m0vg-2nodes/scripts/m0vg destroy -f || true
 
+# Docker images ----------------------------------------------------------- {{{1
+#
+
+docker:rebuild-images:
+  stage: build
+  tags: [ docker-image-build ]
+  when: manual
+  only:
+    changes:
+      - docker/**/*
+  except: [ schedules ]
+
+  variables:
+    DOCKER_IMAGE_TAG: latest
+
+  script:
+    - cd docker/
+    - make $DOCKER_IMAGE_TAG
+    - make push tag="${DOCKER_IMAGE_TAG}*"
+
+
+docker:rebuild-images:76:
+  extends: docker:rebuild-images
+  variables:
+    DOCKER_IMAGE_TAG: '7.6'
+
+
+docker:rebuild-images:eos:
+  extends: docker:rebuild-images
+  variables:
+    DOCKER_IMAGE_TAG: eos
+
+
 # vim: foldmethod=marker shiftwidth=2 tabstop=2 expandtab
