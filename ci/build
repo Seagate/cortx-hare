@@ -18,9 +18,7 @@ docker pull $DOCKER_REGISTRY/mero/hare:$CENTOS_RELEASE
 git clone --recursive --depth 1 --shallow-submodules \
     http://gitlab.mero.colo.seagate.com/mero/mero.git
 
-# Build Mero.
 ci_docker ci/docker/build-mero
 
 # Build Hare.
-ci_docker make test
-ci_docker make install
+ci_docker make build

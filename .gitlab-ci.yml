@@ -44,6 +44,12 @@ rpmbuild:
 # Test ----------------------------------------------------------------- {{{1
 #
 
+test-utils:
+  stage: test
+  tags: [ m0vg ]
+  except: [ tags ]
+  script: [ ci/test-utils ]
+
 test-boot1:
   stage: test
   tags: [ m0vg ]
