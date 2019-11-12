@@ -490,6 +490,12 @@ static void link_reused_cb(struct m0_halon_interface *hi,
 	M0_LOG(M0_DEBUG, "noop");
 }
 
+static void link_absent_cb(struct m0_halon_interface *hi,
+			   const struct m0_uint128 *req_id)
+{
+	M0_LOG(M0_DEBUG, "noop");
+}
+
 static void link_is_disconnecting_cb(struct m0_halon_interface *hi,
 				     struct m0_ha_link *hl)
 {
@@ -581,6 +587,7 @@ int start(unsigned long long   ctx,
 		msg_is_not_delivered_cb,
 		link_connected_cb,
 		link_reused_cb,
+		link_absent_cb,
 		link_is_disconnecting_cb,
 		link_disconnected_cb);
 }
