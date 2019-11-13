@@ -77,7 +77,7 @@ class HaLink:
         sess = principal_rm = confds = None
         try:
             prov = ConsulUtil()
-            sess = prov.get_leader_session()
+            sess = prov.get_leader_session_no_wait()
             principal_rm = prov.get_session_node(sess)
             confds = prov.get_confd_list()
         except Exception:

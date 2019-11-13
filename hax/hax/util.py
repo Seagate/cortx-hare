@@ -1,6 +1,9 @@
 import json
+import logging
 import os
+from time import sleep
 from typing import Any, Dict, NamedTuple, List
+from functools import wraps
 
 from consul import Consul
 
@@ -43,6 +46,27 @@ ha_process_events = (
     'M0_CONF_HA_PROCESS_STOPPING',
     'M0_CONF_HA_PROCESS_STOPPED'
 )
+
+
+def repeat_if_fails(wait_seconds=5):
+    def callable(f):
+        @wraps(f)
+        def wrapper(*args, **kwds):
+            while (True):
+                try:
+                    logging.debug('Attempting to invoke the repeatable call')
+                    result = f(*args, **kwds)
+                    logging.debug('The repeatable call succeeded')
+                    return result
+                except HAConsistencyException as e:
+                    logging.warn(
+                        f'Got HAConsistencyException: {e.message}. The'
+                        f' attempt will be repeated in {wait_seconds} seconds')
+                    sleep(wait_seconds)
+
+        return wrapper
+
+    return callable
 
 
 class ConsulUtil:
@@ -103,7 +127,20 @@ class ConsulUtil:
     def get_hax_ip_address(self) -> str:
         return self._service_data().ip_addr
 
+    @repeat_if_fails()
     def get_leader_session(self) -> str:
+        """
+        Blocking version of `get_leader_session_no_wait()`.
+        The method either returns the RC leader session or blocks until the
+        session becomes available.
+        """
+        return self.get_leader_session_no_wait()
+
+    def get_leader_session_no_wait(self) -> str:
+        """
+        Returns the RC leader session. HAConsistencyException is raised
+        immediately if there is no RC leader selected at the moment.
+        """
         leader = self._kv_get('leader')
         try:
             return str(leader['Session'])
