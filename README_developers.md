@@ -5,24 +5,24 @@ The scripts in this repository constitute a middleware layer between [Consul](ht
 - generate initial configuration of Mero cluster;
 - mediate communications between Mero services and Consul agents.
 
-## Dependencies
+## Prerequisites
 
-* Python &geq; 3.6
-
-## Installation
-
-* Ensure that `python3.6` command is available and refers to Python 3.6:
+* Ensure that `python3.6` command is available and refers to Python &geq; 3.6:
   ```sh
   $ python3.6 --version
   Python 3.6.3
   ```
-* Ensure that Mero sources are built.
+
+* Ensure that Mero is built and its systemd services are installed.
   ```sh
+  M0_SRC_DIR=/data/mero  # YMMV
+
   $M0_SRC_DIR/scripts/m0 make
+  sudo $M0_SRC_DIR/scripts/install-mero-service --link
   ```
   <!-- XXX TODO: Hare should be able to work with Mero installed from rpm. -->
 
-### Single-node setup
+## Single-node setup
 
 1. Prepare the node:
    ```sh
@@ -32,8 +32,7 @@ The scripts in this repository constitute a middleware layer between [Consul](ht
    sudo make devinstall
    ```
 
-2. Edit `cfgen/examples/singlenode.yaml` file or create a cluster description
-   file of your own.
+2. Edit `cfgen/examples/singlenode.yaml` file.
 
    * Ensure that the disks referred to by `io_disks.path_glob` pattern
      exist.  Create loop devices, if necessary:
@@ -47,14 +46,14 @@ The scripts in this repository constitute a middleware layer between [Consul](ht
 
    * If `data_iface` field is specified, make sure that it refers to
      an existing network interface (it should be present in the output
-     of `ifconfig` command).
+     of `ip a` command).
 
 3. Start the cluster:
    ```sh
    hctl bootstrap --mkfs cfgen/examples/singlenode.yaml
    ```
 
-### Multi-node setup
+## Multi-node setup
 
 For multi-node cluster the steps are similar to those of single-node.
 Steps 1 and 2 should be done for each of the nodes.  The bootstrap
