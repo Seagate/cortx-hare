@@ -8,14 +8,14 @@ The scripts in this repository constitute a middleware layer between [Consul](ht
 ## Dependencies
 
 * Python &geq; 3.6
-* [Consul](https://www.consul.io/downloads.html)
-* [Dhall](https://github.com/dhall-lang/dhall-lang/wiki/Getting-started%3A-Generate-JSON-or-YAML#linux)
 
 ## Installation
 
-* Copy `consul` executable to a `$PATH` directory (e.g.,
-  `/usr/local/bin/`) on each node of the cluster.
-
+* Ensure that `python3` is an alias to Python 3.6 or newer:
+  ```sh
+  $ python3 --version
+  Python 3.6.3
+  ```
 * Ensure that Mero sources are built.
   ```sh
   $M0_SRC_DIR/scripts/m0 make
@@ -26,7 +26,7 @@ The scripts in this repository constitute a middleware layer between [Consul](ht
 
 1. Prepare the node:
    ```sh
-   git clone ssh://git@gitlab.mero.colo.seagate.com:6022/mero/hare.git
+   git clone ssh://git@gitlab.mero.colo.seagate.com:6022/mero/hare.git --recursive
    cd hare
    sudo make devinstall
    ```
