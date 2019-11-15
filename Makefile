@@ -35,7 +35,7 @@ SHELL := bash
 
 TOP_SRC_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 PY_VENV_DIR := $(TOP_SRC_DIR).py3venv
-PYTHON      := python3
+PYTHON      := python3.6
 PY_VENV     := source $(PY_VENV_DIR)/bin/activate
 PIP         := $(PY_VENV); pip3
 SETUP_PY    := $(PY_VENV); $(PYTHON) setup.py

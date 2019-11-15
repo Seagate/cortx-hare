@@ -11,9 +11,9 @@ The scripts in this repository constitute a middleware layer between [Consul](ht
 
 ## Installation
 
-* Ensure that `python3` is an alias to Python 3.6 or newer:
+* Ensure that `python3.6` command is available and refers to Python 3.6:
   ```sh
-  $ python3 --version
+  $ python3.6 --version
   Python 3.6.3
   ```
 * Ensure that Mero sources are built.
