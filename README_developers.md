@@ -26,7 +26,7 @@ The scripts in this repository constitute a middleware layer between [Consul](ht
 
 1. Prepare the node:
    ```sh
-   git clone ssh://git@gitlab.mero.colo.seagate.com:6022/mero/hare.git --recursive
+   git clone --recursive ssh://git@gitlab.mero.colo.seagate.com:6022/mero/hare.git
    cd hare
    sudo make devinstall
    ```
