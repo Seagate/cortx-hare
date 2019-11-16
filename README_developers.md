@@ -7,10 +7,11 @@ The scripts in this repository constitute a middleware layer between [Consul](ht
 
 ## Prerequisites
 
-* Ensure that `python3.6` command is available and refers to Python &geq; 3.6:
+* Python &geq; 3.6 and the corresponding header files.
+
+  To install them on CentOS 7.6, run
   ```sh
-  $ python3.6 --version
-  Python 3.6.3
+  sudo yum install python3 python3-devel
   ```
 
 * Ensure that Mero is built and its systemd services are installed.
