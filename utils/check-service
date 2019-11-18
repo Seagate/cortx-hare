@@ -66,6 +66,7 @@ fi
 
 case $(systemctl is-active $service) in
     'active') exit 0;;
+    'deactivating') exit 0;;
     'failed') exit 2;;
     *) exit 1;;
 esac
