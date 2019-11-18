@@ -35,8 +35,8 @@ ci_m0vg_init() (
     fi
 
     $M0VG env add <<EOF
-M0_VM_BOX=centos75/dev-halon
-M0_VM_BOX_URL='http://ci-storage.mero.colo.seagate.com/vagrant/centos75/dev'
+M0_VM_BOX=centos76/dev
+M0_VM_BOX_URL='http://ci-storage.mero.colo.seagate.com/vagrant/centos76/dev'
 M0_VM_CMU_MEM_MB=4096
 M0_VM_NAME_PREFIX=$JOB_NAME
 M0_VM_HOSTNAME_PREFIX=$JOB_NAME

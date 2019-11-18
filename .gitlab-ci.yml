@@ -5,7 +5,7 @@ variables:
   GIT_DEPTH: 1  # clone only the current commit
   GIT_STRATEGY: clone  # make a fresh `git clone` of the repo for every new CI job
   GIT_SUBMODULE_STRATEGY: normal  # init and check out submodules
-  CENTOS_RELEASE: eos
+  CENTOS_RELEASE: '7.6'
   DOCKER_REGISTRY: registry.gitlab.mero.colo.seagate.com
   M0_VG_NO_SYMLINKS: "true"
   RPMSYNC_DIR:    "/releases/dev/$CI_PROJECT_PATH/$CI_COMMIT_REF_SLUG/B$CI_PIPELINE_ID"
