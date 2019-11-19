@@ -26,7 +26,6 @@
 #include "conf/obj.h"            /* M0_CONF_OBJ_TYPES */
 #include "fid/fid.h"             /* M0_FID_TINIT */
 #include "ha/halon/interface.h"  /* m0_halon_interface */
-#include "ha/link.h"             /* m0_ha_link_send */
 #include "ha/note.h"
 #include "module/instance.h"
 #include "lib/assert.h"          /* M0_ASSERT */
@@ -197,7 +196,8 @@ static void __ha_failvec_reply_send(const struct hax_msg *hm,
 				    struct m0_fid *pool_fid,
 				    uint32_t nr_notes)
 {
-	struct m0_ha_link      *hl = hm->hm_hl;
+	struct m0_ha_link         *hl = hm->hm_hl;
+	struct m0_halon_interface *hif = hm->hm_hc->hc_hi;
 	const struct m0_ha_msg *msg = &hm->hm_msg;
 	struct m0_ha_msg       *repmsg;
 	uint64_t                tag;
@@ -213,7 +213,7 @@ static void __ha_failvec_reply_send(const struct hax_msg *hm,
 		msg->hm_data.u.hed_fvec_req.mfq_cookie;
 
 	repmsg->hm_data.u.hed_fvec_rep.mfp_nr = nr_notes;
-	m0_ha_link_send(hl, repmsg, &tag);
+	m0_halon_interface_send(hif, hl, repmsg, &tag);
 	m0_free(repmsg);
 }
 
@@ -279,17 +279,9 @@ static PyObject *nvec_to_list(const struct m0_ha_note *notes, uint32_t nr_notes)
 		PyObject *note_item = PyObject_CallMethod(hax_mod, "HaNote",
 							  "(sO)", obj_name,
 							  ha_note);
+		// Note: this call "steals" reference to note_item which means
+		// that we don't need to call Py_DECREF(note_item)
 		PyList_SET_ITEM(list, i, note_item);
-
-		/*
-		 * Decrementing ref counts for fs and hs leads to panic probably
-		 * because the corresponding objects are released before they
-		 * are used. Refcount is decremented for the nvec list in
-		 * handle_nvec().
-		 *
-		 * Py_DECREF(fs)
-		 * Py_DECREF(hs)
-		 */
 	}
 	Py_DECREF(hax_mod);
 
