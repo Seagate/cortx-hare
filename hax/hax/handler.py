@@ -5,7 +5,7 @@ from threading import Thread
 
 from hax.ffi import HaxFFI
 from hax.message import EntrypointRequest, HaNvecGetEvent, ProcessEvent
-from hax.util import ConsulUtil
+from hax.util import ConsulUtil, repeat_if_fails
 
 
 class ConsumerThread(Thread):
@@ -41,11 +41,28 @@ class ConsumerThread(Thread):
                     logging.debug('Got something from the queue')
                     if isinstance(item, EntrypointRequest):
                         ha_link = item.ha_link_instance
+                        # While replying any Exception is catched. In such a
+                        # case, the mero process will receive EAGAIN and
+                        # hence will need to make new attempt by itself
                         ha_link.send_entrypoint_request_reply(item)
                     elif isinstance(item, ProcessEvent):
-                        self.consul.update_process_status(item.evt)
+                        fn = self.consul.update_process_status
+                        # If a consul-related exception appears, it will
+                        # be processed by repeat_if_fails.
+                        #
+                        # This thread will become blocked until that
+                        # intermittent error gets resolved.
+                        decorated = (repeat_if_fails(wait_seconds=5))(fn)
+                        decorated(item.evt)
                     elif isinstance(item, HaNvecGetEvent):
-                        item.ha_link_instance.ha_nvec_get_reply(item)
+                        fn = item.ha_link_instance.ha_nvec_get_reply
+                        # If a consul-related exception appears, it will
+                        # be processed by repeat_if_fails.
+                        #
+                        # This thread will become blocked until that
+                        # intermittent error gets resolved.
+                        decorated = (repeat_if_fails(wait_seconds=5))(fn)
+                        decorated(item)
                     else:
                         logging.warning('Unsupported event type received: %s',
                                         item)

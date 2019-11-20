@@ -8,9 +8,14 @@ from hax.halink import HaLink
 from hax.handler import ConsumerThread
 from hax.server import run_server
 from hax.types import Fid
-from hax.util import ConsulUtil
+from hax.util import ConsulUtil, repeat_if_fails
+from typing import NamedTuple
 
 __all__ = ['main']
+
+
+HL_Fids = NamedTuple('HL_Fids', [('hax_ep', str), ('hax_fid', Fid),
+                                 ('ha_fid', Fid), ('rm_fid', Fid)])
 
 
 def _setup_logging():
@@ -23,6 +28,19 @@ def _run_qconsumer_thread(queue: Queue, ffi: HaxFFI):
     thread = ConsumerThread(queue, ffi)
     thread.start()
     return thread
+
+
+@repeat_if_fails()
+def _get_halink_fids(util: ConsulUtil) -> HL_Fids:
+    hax_ep: str = util.get_hax_endpoint()
+    hax_fid: Fid = util.get_hax_fid()
+    ha_fid: Fid = util.get_ha_fid()
+    rm_fid: Fid = util.get_rm_fid()
+    return HL_Fids(
+            hax_ep,
+            hax_fid,
+            ha_fid,
+            rm_fid)
 
 
 def main():
@@ -41,25 +59,22 @@ def main():
     q = Queue(maxsize=8)
 
     util: ConsulUtil = ConsulUtil()
-    hax_ep: str = util.get_hax_endpoint()
-    hax_fid: Fid = util.get_hax_fid()
-    ha_fid: Fid = util.get_ha_fid()
-    rm_fid: Fid = util.get_rm_fid()
+    cfg = _get_halink_fids(util)
 
     logging.info('Welcome to HaX')
     logging.info(f'Setting up ha_link interface with the options as follows: '
-                 f'hax fid = {hax_fid}, hax endpoint = {hax_ep}, '
-                 f'HA fid = {ha_fid}, RM fid = {rm_fid}')
+                 f'hax fid = {cfg.hax_fid}, hax endpoint = {cfg.hax_ep}, '
+                 f'HA fid = {cfg.ha_fid}, RM fid = {cfg.rm_fid}')
 
     ffi = HaxFFI()
-    halink = HaLink(queue=q, rm_fid=rm_fid, ffi=ffi)
+    halink = HaLink(queue=q, rm_fid=cfg.rm_fid, ffi=ffi)
     thread = _run_qconsumer_thread(q, ffi)
 
     try:
-        halink.start(hax_ep,
-                     process=hax_fid,
-                     ha_service=ha_fid,
-                     rm_service=rm_fid)
+        halink.start(cfg.hax_ep,
+                     process=cfg.hax_fid,
+                     ha_service=cfg.ha_fid,
+                     rm_service=cfg.rm_fid)
         logging.info('ha_link connection has been established')
         # [KN] This is a blocking call. It will work until the program is
         # terminated by signal
