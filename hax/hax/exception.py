@@ -1,6 +1,6 @@
-class ConsulException(RuntimeError):
+class HaxAPIException(RuntimeError):
     pass
 
 
-class HAConsistencyException(ConsulException):
+class HAConsistencyException(HaxAPIException):
     pass

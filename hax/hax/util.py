@@ -5,7 +5,7 @@ from time import sleep
 from typing import Any, Dict, NamedTuple, List
 from functools import wraps
 
-from consul import Consul
+from consul import Consul, ConsulException
 
 from hax.exception import HAConsistencyException
 from hax.types import ConfHaProcess, Fid, ObjT
@@ -73,12 +73,23 @@ class ConsulUtil:
     def __init__(self):
         self.cns: Consul = Consul()
 
-    def _kv_get(self, key: str) -> Any:
+    def _kv_get(self, key: str, **kwargs) -> Any:
+        """
+        Helper method that should be used by default in this class whenver
+        we want to invoke Consul.kv.get()
+        """
         assert key
-        return self.cns.kv.get(key)[1]
+        return self.cns.kv.get(key, **kwargs)[1]
+
+    def _catalog_service_get(self, svc_name: str) -> List[Dict[str, Any]]:
+        try:
+            return self.cns.catalog.service(service=svc_name)[1]
+        except ConsulException as e:
+            raise HAConsistencyException('Could not access Consul Catalog')\
+                from e
 
     def _service_by_name(self, hostname: str, svc_name: str) -> Dict[str, Any]:
-        for svc in self.cns.catalog.service(service=svc_name)[1]:
+        for svc in self._catalog_service_get(svc_name):
             if svc['Node'] == hostname:
                 return svc
         raise HAConsistencyException(
@@ -89,13 +100,17 @@ class ConsulUtil:
         Returns the service data by its name assuming that it runs at the same
         node to the current hax process.
         """
-        local_nodename = os.environ.get('HARE_HAX_NODE_NAME') or \
-            self.cns.agent.self()['Config']['NodeName']
+        try:
+            local_nodename = os.environ.get('HARE_HAX_NODE_NAME') or \
+                self.cns.agent.self()['Config']['NodeName']
+        except ConsulException as e:
+            raise HAConsistencyException('Failed to communicate '
+                                         'to Consul Agent') from e
         return self._service_by_name(local_nodename, name)
 
     def _service_data(self) -> ServiceData:
         my_fidk = self.get_hax_fid().key
-        services = self.cns.catalog.service(service='hax')[1]
+        services = self._catalog_service_get('hax')
         for svc in services:
             if int(svc['ServiceID']) == my_fidk:
                 return mkServiceData(svc)
@@ -149,11 +164,15 @@ class ConsulUtil:
                 'Could not get the leader from Consul')
 
     def get_session_node(self, session_id: str) -> str:
-        session = self.cns.session.info(session_id)[1]
-        return str(session['Node'])  # principal RM
+        try:
+            session = self.cns.session.info(session_id)[1]
+            return str(session['Node'])  # principal RM
+        except ConsulException as e:
+            raise HAConsistencyException('Failed to communicate to'
+                                         ' Consul Agent') from e
 
     def get_confd_list(self) -> List[ServiceData]:
-        services = self.cns.catalog.service(service='confd')[1]
+        services = self._catalog_service_get('confd')
         return list(map(mkServiceData, services))
 
     def get_conf_obj_status(self, obj_t: ObjT, fidk: int) -> str:
@@ -181,8 +200,12 @@ class ConsulUtil:
                 int(x['Value']) == fidk]
 
     def get_node_health(self, node: str) -> str:
-        node_data = self.cns.health.node(node)[1]
-        return str(node_data[0]['Status'])
+        try:
+            node_data = self.cns.health.node(node)[1]
+            return str(node_data[0]['Status'])
+        except ConsulException as e:
+            raise HAConsistencyException(f'Failed to get {node} node health')\
+                    from e
 
     @staticmethod
     def _to_canonical_service_data(service: Dict[str, Any]) -> ServiceData:
@@ -200,8 +223,12 @@ class ConsulUtil:
         assert 0 <= event.chp_event < len(ha_process_events), \
             f'Invalid event type: {event.chp_event}'
 
-        self.cns.kv.put(  # type: ignore
-            # This `type:` directive prevents mypy error:
-            #     "KV" has no attribute "put"
-            f'processes/{event.fid}',
-            json.dumps({'state': ha_process_events[event.chp_event]}))
+        try:
+            # TODO [KN] improve type stubs!
+            self.cns.kv.put(  # type: ignore
+                # This `type:` directive prevents mypy error:
+                #     "KV" has no attribute "put"
+                f'processes/{event.fid}',
+                json.dumps({'state': ha_process_events[event.chp_event]}))
+        except ConsulException as e:
+            raise HAConsistencyException('Failed to put value to KV') from e

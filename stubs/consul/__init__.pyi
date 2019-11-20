@@ -76,3 +76,7 @@ class Session:
         consistency: str = None,
         dc: str = None,
     ) -> Tuple[int, Any]: ...
+
+
+class ConsulException(Exception):
+    ...
