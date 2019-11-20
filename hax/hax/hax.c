@@ -618,11 +618,11 @@ void m0_ha_broadcast_test(unsigned long long ctx)
 void m0_ha_notify(unsigned long long ctx, struct m0_ha_note *notes,
 		  uint32_t nr_notes)
 {
-	struct hax_context         *hc = (struct hax_context *)ctx;
-	struct m0_ha_nvec           nvec = {
-					.nv_nr = nr_notes,
-					.nv_note = notes
-				    };
+	struct hax_context        *hc = (struct hax_context *)ctx;
+	struct m0_ha_nvec          nvec = {
+		.nv_nr = nr_notes,
+		.nv_note = notes
+	};
 	struct m0_halon_interface *hi = hc->hc_hi;
 	struct hax_link           *hxl;
 	struct m0_ha_msg          *msg;
@@ -637,7 +637,8 @@ void m0_ha_notify(unsigned long long ctx, struct m0_ha_note *notes,
 }
 
 static struct m0_ha_msg *_ha_nvec_msg_alloc(const struct m0_ha_nvec *nvec,
-					    uint64_t id_of_get,int direction)
+					    uint64_t id_of_get,
+					    int direction)
 {
 	struct m0_ha_msg *msg;
 
@@ -647,18 +648,18 @@ static struct m0_ha_msg *_ha_nvec_msg_alloc(const struct m0_ha_nvec *nvec,
 		.hm_data = {
 			.hed_type   = M0_HA_MSG_NVEC,
 			.u.hed_nvec = {
-				.hmnv_type      = direction,
-				.hmnv_id_of_get = id_of_get,
-				.hmnv_nr        = nvec->nv_nr,
+				.hmnv_type              = direction,
+				.hmnv_id_of_get         = id_of_get,
+				.hmnv_ignore_same_state = 1,
+				.hmnv_nr                = nvec->nv_nr,
 			},
 		},
 	};
 	M0_ASSERT(nvec->nv_nr > 0 &&
-		  (nvec->nv_nr <=
-		   (int)ARRAY_SIZE(msg->hm_data.u.hed_nvec.hmnv_arr.hmna_arr)));
+		  nvec->nv_nr <=
+		  (int)ARRAY_SIZE(msg->hm_data.u.hed_nvec.hmnv_arr.hmna_arr));
 	memcpy(msg->hm_data.u.hed_nvec.hmnv_arr.hmna_arr, nvec->nv_note,
 			nvec->nv_nr * sizeof(nvec->nv_note[0]));
-
 	return msg;
 }
 
