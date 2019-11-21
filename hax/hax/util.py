@@ -1,34 +1,32 @@
+from functools import wraps
 import json
 import logging
 import os
 from time import sleep
 from typing import Any, Dict, NamedTuple, List
-from functools import wraps
 
 from consul import Consul, ConsulException
 
 from hax.exception import HAConsistencyException
 from hax.types import ConfHaProcess, Fid, ObjT
 
-
 __all__ = ['ConsulUtil', 'create_process_fid']
-
 
 # XXX What is the difference between `ip_addr` and `address`?
 # The names are hard to discern.
-ServiceData = NamedTuple('ServiceData', [('node', str),
-                                         ('fid', Fid),
-                                         ('ip_addr', str),
-                                         ('address', str)])
+ServiceData = NamedTuple('ServiceData', [('node', str), ('fid', Fid),
+                                         ('ip_addr', str), ('address', str)])
 
 
 def mkServiceData(service: Dict[str, Any]) -> ServiceData:
-    return ServiceData(node=service['Node'],
-                       fid=mk_fid(ObjT.PROCESS,  # XXX s/PROCESS/SERVICE/ ?
-                                  int(service['ServiceID'])),
-                       ip_addr=service['Address'],
-                       address='{}:{}'.format(service['ServiceAddress'],
-                                              service['ServicePort']))
+    return ServiceData(
+        node=service['Node'],
+        fid=mk_fid(
+            ObjT.PROCESS,  # XXX s/PROCESS/SERVICE/ ?
+            int(service['ServiceID'])),
+        ip_addr=service['Address'],
+        address='{}:{}'.format(service['ServiceAddress'],
+                               service['ServicePort']))
 
 
 def mk_fid(obj_t: ObjT, key: int) -> Fid:
@@ -40,12 +38,10 @@ def create_process_fid(key: int) -> Fid:
 
 
 # See enum m0_conf_ha_process_event in Mero source code.
-ha_process_events = (
-    'M0_CONF_HA_PROCESS_STARTING',
-    'M0_CONF_HA_PROCESS_STARTED',
-    'M0_CONF_HA_PROCESS_STOPPING',
-    'M0_CONF_HA_PROCESS_STOPPED'
-)
+ha_process_events = ('M0_CONF_HA_PROCESS_STARTING',
+                     'M0_CONF_HA_PROCESS_STARTED',
+                     'M0_CONF_HA_PROCESS_STOPPING',
+                     'M0_CONF_HA_PROCESS_STOPPED')
 
 
 def repeat_if_fails(wait_seconds=5):
@@ -178,8 +174,9 @@ class ConsulUtil:
     def get_conf_obj_status(self, obj_t: ObjT, fidk: int) -> str:
         # 'node/<node_name>/process/<process_fidk>/service/type'
         node_items = self.cns.kv.get('m0conf/nodes', recurse=True)[1]
-        keys = getattr(self, 'get_{}_keys'.
-                       format(obj_t.name.lower()))(node_items, fidk)
+        keys = getattr(self,
+                       'get_{}_keys'.format(obj_t.name.lower()))(node_items,
+                                                                 fidk)
         if keys:
             node_name = keys[0].split('/', 3)[2]
             return self.get_node_health(node_name)
@@ -187,17 +184,17 @@ class ConsulUtil:
 
     @staticmethod
     def get_process_keys(node_items: List[Any], fidk: int) -> List[Any]:
-        return [x['Key']
-                for x in node_items
-                if '/processes/' in x['Key'] and
-                str(fidk) in x['Key']]
+        return [
+            x['Key'] for x in node_items
+            if '/processes/' in x['Key'] and str(fidk) in x['Key']
+        ]
 
     @staticmethod
     def get_service_keys(node_items: List[Any], fidk: int) -> List[Any]:
-        return [x['Key']
-                for x in node_items
-                if '/services/' in x['Key'] and
-                int(x['Value']) == fidk]
+        return [
+            x['Key'] for x in node_items
+            if '/services/' in x['Key'] and int(x['Value']) == fidk
+        ]
 
     def get_node_health(self, node: str) -> str:
         try:

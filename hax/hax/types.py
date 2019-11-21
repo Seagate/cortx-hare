@@ -11,11 +11,13 @@ class Uint128Struct(c.Structure):
     _fields_ = [("hi", c.c_uint64), ("lo", c.c_uint64)]
 
 
-ObjT = Enum('ObjT', [
-    # There are the only conf object types we care about.
-    ('PROCESS', 0x7200000000000001),
-    ('SERVICE', 0x7300000000000001)
-])
+ObjT = Enum(
+    'ObjT',
+    [
+        # These are the only conf object types we care about.
+        ('PROCESS', 0x7200000000000001),
+        ('SERVICE', 0x7300000000000001)
+    ])
 ObjT.__doc__ = 'Mero conf object types and their m0_fid.f_container values'
 
 

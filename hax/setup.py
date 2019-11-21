@@ -90,8 +90,10 @@ def get_mero_cflags():
         # the system
         pass
 
-    return ['-g', '-Werror', '-Wall', '-Wextra',
-            '-Wno-attributes', '-Wno-unused-parameter']
+    return [
+        '-g', '-Werror', '-Wall', '-Wextra', '-Wno-attributes',
+        '-Wno-unused-parameter'
+    ]
 
 
 setup(
@@ -103,15 +105,14 @@ setup(
     install_requires=['python-consul>=1.1.0'],
     entry_points={'console_scripts': ['hax=hax.hax:main']},
     ext_modules=[
-        Extension(name='libhax',
-                  sources=['hax/hax.c'],
-                  include_dirs=[get_mero_dir()],
-                  define_macros=[('M0_INTERNAL', ''), ('M0_EXTERN', 'extern')],
-                  library_dirs=[get_mero_libs_dir()],
-                  runtime_library_dirs=[get_mero_libs_dir()],
-                  libraries=['mero'],
-                  extra_compile_args=[
-                      x for x in get_mero_cflags() + ['-fPIC']
-                  ])
+        Extension(
+            name='libhax',
+            sources=['hax/hax.c'],
+            include_dirs=[get_mero_dir()],
+            define_macros=[('M0_INTERNAL', ''), ('M0_EXTERN', 'extern')],
+            library_dirs=[get_mero_libs_dir()],
+            runtime_library_dirs=[get_mero_libs_dir()],
+            libraries=['mero'],
+            extra_compile_args=[x for x in get_mero_cflags() + ['-fPIC']])
     ],
 )

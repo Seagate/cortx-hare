@@ -34,10 +34,7 @@ class ProcessEvent(BaseMessage):
 
 
 class HaNvecGetEvent(BaseMessage):
-    def __init__(self,
-                 hax_msg=None,
-                 nvec=None,
-                 ha_link_instance=None):
+    def __init__(self, hax_msg=None, nvec=None, ha_link_instance=None):
         self.hax_msg = hax_msg
         self.nvec = nvec
         self.ha_link_instance = ha_link_instance

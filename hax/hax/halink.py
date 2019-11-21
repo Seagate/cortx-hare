@@ -4,7 +4,7 @@ from errno import EAGAIN
 from typing import Any, List
 
 from hax.ffi import HaxFFI, make_array, make_c_str
-from hax.message import EntrypointRequest, ProcessEvent, HaNvecGetEvent
+from hax.message import EntrypointRequest, HaNvecGetEvent, ProcessEvent
 from hax.types import ConfHaProcess, Fid, FidStruct, HaNoteStruct, ObjT
 from hax.util import ConsulUtil
 
@@ -120,8 +120,7 @@ class HaLink:
                 else HaNoteStruct.M0_NC_FAILED
 
         notes = [
-            HaNoteStruct(st.fid.to_c(), ha_obj_state(st))
-            for st in ha_states
+            HaNoteStruct(st.fid.to_c(), ha_obj_state(st)) for st in ha_states
         ]
         self._ffi.ha_broadcast(self._ha_ctx, make_array(HaNoteStruct, notes),
                                len(notes))
@@ -153,8 +152,8 @@ class HaLink:
             notes.append(n.note)
 
         logging.debug('Replying ha nvec of length ' + str(len(event.nvec)))
-        self._ffi.ha_nvec_reply(event.hax_msg,
-                                make_array(HaNoteStruct, notes), len(notes))
+        self._ffi.ha_nvec_reply(event.hax_msg, make_array(HaNoteStruct, notes),
+                                len(notes))
 
     def close(self):
         logging.debug('Destroying ha_link')
