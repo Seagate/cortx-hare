@@ -1,9 +1,10 @@
-from functools import wraps
 import json
 import logging
 import os
+import re
+from functools import wraps
 from time import sleep
-from typing import Any, Dict, NamedTuple, List
+from typing import Any, Dict, List, NamedTuple
 
 from consul import Consul, ConsulException
 
@@ -16,6 +17,8 @@ __all__ = ['ConsulUtil', 'create_process_fid']
 # The names are hard to discern.
 ServiceData = NamedTuple('ServiceData', [('node', str), ('fid', Fid),
                                          ('ip_addr', str), ('address', str)])
+
+FidWithType = NamedTuple('FidWithType', [('fid', Fid), ('service_type', str)])
 
 
 def mkServiceData(service: Dict[str, Any]) -> ServiceData:
@@ -174,12 +177,39 @@ class ConsulUtil:
         services = self._catalog_service_get('confd')
         return list(map(mkServiceData, services))
 
-    def get_services_by_parent_process(self, process_fid: Fid) -> List[Fid]:
-        pass
+    def get_services_by_parent_process(self,
+                                       process_fid: Fid) -> List[FidWithType]:
+        node_items = self._kv_get('m0conf/nodes', recurse=True)
+        fidk = str(process_fid.key)
+
+        # This is the RegExp to match the keys in Consul KV that describe
+        # the Mero services that are enclosed into the Mero process that has
+        # the given fidk.
+        #
+        # Note: we assume that fidk uniquely identifies the given process
+        # within the whole cluster (that's why we are not interested in the
+        # hostnames here).
+        #
+        # Examples of the key that will match:
+        #   m0conf/nodes/cmu/processes/6/services/ha
+        #   m0conf/nodes/cmu/processes/6/services/rms
+        regex = re.compile(
+            f'^m0conf\\/.*\\/processes\\/{fidk}\\/services\\/(.+)$')
+        services = []
+        for node in node_items:
+            match_result = re.match(regex, node['Key'])
+            if not match_result:
+                continue
+            srv_type = match_result.group(1)
+            srv_fidk = int(node['Value'])
+            services.append(
+                FidWithType(fid=mk_fid(ObjT.SERVICE, srv_fidk),
+                            service_type=srv_type))
+        return services
 
     def get_conf_obj_status(self, obj_t: ObjT, fidk: int) -> str:
         # 'node/<node_name>/process/<process_fidk>/service/type'
-        node_items = self.cns.kv.get('m0conf/nodes', recurse=True)[1]
+        node_items = self._kv_get('m0conf/nodes', recurse=True)
         # TODO [KN] This code is too cryptic. To be refactored.
         keys = getattr(self,
                        'get_{}_keys'.format(obj_t.name.lower()))(node_items,
@@ -208,7 +238,7 @@ class ConsulUtil:
             return str(node_data[0]['Status'])
         except ConsulException as e:
             raise HAConsistencyException(f'Failed to get {node} node health')\
-                    from e
+                from e
 
     @staticmethod
     def _to_canonical_service_data(service: Dict[str, Any]) -> ServiceData:

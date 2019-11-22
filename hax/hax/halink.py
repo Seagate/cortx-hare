@@ -5,7 +5,8 @@ from typing import Any, List
 
 from hax.ffi import HaxFFI, make_array, make_c_str
 from hax.message import EntrypointRequest, HaNvecGetEvent, ProcessEvent
-from hax.types import ConfHaProcess, Fid, FidStruct, HaNote, HaNoteStruct, ObjT
+from hax.types import (ConfHaProcess, Fid, FidStruct, HaNote, HaNoteStruct,
+                       HAState, ObjT)
 from hax.util import ConsulUtil
 
 
@@ -112,16 +113,20 @@ class HaLink:
                                    self.rm_fid.to_c(), make_c_str(rm_eps))
         logging.debug('Entrypoint request has been replied to')
 
-    def broadcast_ha_states(self, ha_states):
+    def broadcast_ha_states(self, ha_states: List[HAState]):
         logging.debug('Broadcasting HA states %s over ha_link', ha_states)
+        cns = ConsulUtil()
 
         def ha_obj_state(st):
             return HaNoteStruct.M0_NC_ONLINE if st.status == 'online' \
                 else HaNoteStruct.M0_NC_FAILED
 
-        notes = [
-            HaNoteStruct(st.fid.to_c(), ha_obj_state(st)) for st in ha_states
-        ]
+        notes = []
+        for st in ha_states:
+            note = HaNoteStruct(st.fid.to_c(), ha_obj_state(st))
+            notes.append(note)
+            notes += self._generate_sub_services(note, cns)
+
         self._ffi.ha_broadcast(self._ha_ctx, make_array(HaNoteStruct, notes),
                                len(notes))
 
@@ -141,6 +146,9 @@ class HaLink:
 
     @log_exception
     def ha_nvec_get_reply(self, event: HaNvecGetEvent) -> None:
+        logging.debug(
+            'Preparing the reply for HaNvecGetEvent (nvec size = %s)',
+            len(event.nvec))
         cutil = ConsulUtil()
         notes: List[HaNoteStruct] = []
         for n in event.nvec:
@@ -154,6 +162,18 @@ class HaLink:
         logging.debug('Replying ha nvec of length ' + str(len(event.nvec)))
         self._ffi.ha_nvec_reply(event.hax_msg, make_array(HaNoteStruct, notes),
                                 len(notes))
+
+    def _generate_sub_services(self, note: HaNoteStruct,
+                               cns: ConsulUtil) -> List[HaNoteStruct]:
+        new_state = note.no_state
+        fid = Fid.from_struct(note.no_id)
+        service_list = cns.get_services_by_parent_process(fid)
+        logging.debug('Process fid=%s encloses %s services as follows: %s',
+                      fid, len(service_list), service_list)
+        return [
+            HaNoteStruct(no_id=x.fid.to_c(), no_state=new_state)
+            for x in service_list
+        ]
 
     def close(self):
         logging.debug('Destroying ha_link')

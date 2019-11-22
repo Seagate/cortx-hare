@@ -82,6 +82,10 @@ class Fid:
         cont, key = tuple(int(s, 16) for s in val.split(':', 1))
         return Fid(cont, key)
 
+    @staticmethod
+    def from_struct(val: FidStruct):
+        return Fid(val.f_container, val.f_key)
+
     def to_c(self):
         return FidStruct(self.container, self.key)
 
@@ -109,3 +113,5 @@ class Uint128:
 
 
 HaNote = NamedTuple('HaNote', [('obj_t', str), ('note', HaNoteStruct)])
+
+HAState = NamedTuple('HAState', [('fid', Fid), ('status', str)])

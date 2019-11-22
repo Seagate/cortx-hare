@@ -1,12 +1,10 @@
 import json
 import logging
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from typing import Any, Dict, List, NamedTuple, Tuple
+from typing import Any, Dict, List, Tuple
 
-from hax.types import Fid
+from hax.types import HAState
 from hax.util import ConsulUtil, create_process_fid
-
-HAState = NamedTuple('HAState', [('fid', Fid), ('status', str)])
 
 
 class KVHandler(BaseHTTPRequestHandler):
