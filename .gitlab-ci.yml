@@ -187,7 +187,7 @@ docker:rebuild-images:
 
   script:
     - cd docker/
-    - make $DOCKER_IMAGE_TAG
+    - make docker-image-${DOCKER_IMAGE_TAG}
     - make push tag="${DOCKER_IMAGE_TAG}*"
 
 
