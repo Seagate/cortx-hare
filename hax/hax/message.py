@@ -1,7 +1,7 @@
-from typing import Any
+from typing import Any, List
 
 from hax import halink
-from hax.types import Fid, Uint128
+from hax.types import Fid, HaNote, Uint128
 
 
 class BaseMessage:
@@ -34,7 +34,8 @@ class ProcessEvent(BaseMessage):
 
 
 class HaNvecGetEvent(BaseMessage):
-    def __init__(self, hax_msg=None, nvec=None, ha_link_instance=None):
+    def __init__(self, hax_msg: int, nvec: List[HaNote],
+                 ha_link_instance: 'halink.HaLink'):
         self.hax_msg = hax_msg
         self.nvec = nvec
         self.ha_link_instance = ha_link_instance

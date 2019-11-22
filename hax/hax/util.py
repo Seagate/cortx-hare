@@ -174,16 +174,19 @@ class ConsulUtil:
         services = self._catalog_service_get('confd')
         return list(map(mkServiceData, services))
 
+    def get_services_by_parent_process(self, process_fid: Fid) -> List[Fid]:
+        pass
+
     def get_conf_obj_status(self, obj_t: ObjT, fidk: int) -> str:
         # 'node/<node_name>/process/<process_fidk>/service/type'
         node_items = self.cns.kv.get('m0conf/nodes', recurse=True)[1]
+        # TODO [KN] This code is too cryptic. To be refactored.
         keys = getattr(self,
                        'get_{}_keys'.format(obj_t.name.lower()))(node_items,
                                                                  fidk)
-        if keys:
-            node_name = keys[0].split('/', 3)[2]
-            return self.get_node_health(node_name)
-        return 'None'
+        assert keys
+        node_name = keys[0].split('/', 3)[2]
+        return self.get_node_health(node_name)
 
     @staticmethod
     def get_process_keys(node_items: List[Any], fidk: int) -> List[Any]:

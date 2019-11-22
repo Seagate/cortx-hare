@@ -5,7 +5,7 @@ from typing import Any, List
 
 from hax.ffi import HaxFFI, make_array, make_c_str
 from hax.message import EntrypointRequest, HaNvecGetEvent, ProcessEvent
-from hax.types import ConfHaProcess, Fid, FidStruct, HaNoteStruct, ObjT
+from hax.types import ConfHaProcess, Fid, FidStruct, HaNote, HaNoteStruct, ObjT
 from hax.util import ConsulUtil
 
 
@@ -135,8 +135,8 @@ class HaLink:
                               fid=fid)))
 
     @log_exception
-    def ha_nvec_get(self, hax_msg, nvec) -> None:
-        logging.debug('Got ha nvec of length ' + str(len(nvec)))
+    def ha_nvec_get(self, hax_msg: int, nvec: List[HaNote]) -> None:
+        logging.debug('Got ha nvec of length %s from Mero land', len(nvec))
         self.queue.put(HaNvecGetEvent(hax_msg, nvec, self))
 
     @log_exception
@@ -161,8 +161,6 @@ class HaLink:
         self._ha_ctx = 0
         logging.debug('ha_link destroyed. Bye!')
 
-    # TODO refactor: Separate the C calls from HaLink class,
-    # so that hax.c functions can be invoked outside of HaLink instance.
     def adopt_mero_thread(self):
         logging.debug('Adopting mero thread')
         self._ffi.adopt_mero_thread()
