@@ -36,6 +36,7 @@ class KVHandler(BaseHTTPRequestHandler):
         ha_states = self.to_ha_states(KVHandler.parse_json(post_data))
         logging.info('HA states: %s', ha_states)
         self.server.halink.broadcast_ha_states(ha_states)
+        logging.debug('POST request processed')
 
     @staticmethod
     def parse_json(raw_data: bytes) -> Any:

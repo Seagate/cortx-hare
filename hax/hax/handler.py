@@ -38,7 +38,7 @@ class ConsumerThread(Thread):
                             raise StopIteration()
                         item = pull_msg()
 
-                    logging.debug('Got something from the queue')
+                    logging.debug('Got %s message from queue', item)
                     if isinstance(item, EntrypointRequest):
                         ha_link = item.ha_link_instance
                         # While replying any Exception is catched. In such a

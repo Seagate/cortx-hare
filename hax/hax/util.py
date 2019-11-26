@@ -50,9 +50,12 @@ def repeat_if_fails(wait_seconds=5):
         def wrapper(*args, **kwds):
             while (True):
                 try:
-                    logging.debug('Attempting to invoke the repeatable call')
+                    logging.debug(
+                        'Attempting to invoke the repeatable call: %s',
+                        f.__name__)
                     result = f(*args, **kwds)
-                    logging.debug('The repeatable call succeeded')
+                    logging.debug('The repeatable call succeeded: %s',
+                                  f.__name__)
                     return result
                 except HAConsistencyException as e:
                     logging.warn(
@@ -222,10 +225,12 @@ class ConsulUtil:
 
         try:
             # TODO [KN] improve type stubs!
+            data = json.dumps({'state': ha_process_events[event.chp_event]})
+            key = f'processes/{event.fid}'
+            logging.debug('Setting process status in KV: %s:%s', key, data)
             self.cns.kv.put(  # type: ignore
                 # This `type:` directive prevents mypy error:
                 #     "KV" has no attribute "put"
-                f'processes/{event.fid}',
-                json.dumps({'state': ha_process_events[event.chp_event]}))
+                key, data)
         except ConsulException as e:
             raise HAConsistencyException('Failed to put value to KV') from e
