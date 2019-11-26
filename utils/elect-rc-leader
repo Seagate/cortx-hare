@@ -46,31 +46,41 @@ get_session_id | grep -q ^- || {
 cleanup
 
 # Create session with the service:confd Health Checker:
-CHECKS_A=($(consul kv get -recurse m0conf/nodes/$HOSTNAME | egrep -w 'confd|ha' |
-            sed -r 's/.*processes.([0-9]+).*/"service:\1"/'))
-# See the trick comma separated list explained here:
-# https://stackoverflow.com/questions/38625176/store-array-output-to-comma-separated-list-in-bash-scripting
-CHECKS=$(IFS=,; echo "[\"serfHealth\", ${CHECKS_A[*]}]")
-PAYLD="{\"Name\": \"leader\", \"Checks\": $CHECKS, \"LockDelay\": \"2s\"}"
-RES=$(curl -sX PUT -d "$PAYLD" http://localhost:8500/v1/session/create)
-SID=$(echo "$RES" | jq -r '.ID' 2>/dev/null || true)
+create_session() {
+    local checks_a=($(consul kv get -recurse m0conf/nodes/$HOSTNAME |
+                      egrep -w 'confd|ha' |
+                      sed -r 's/.*processes.([0-9]+).*/"service:\1"/'))
+    # See the trick comma separated list explained here:
+    # https://stackoverflow.com/questions/38625176/store-array-output-to-comma-separated-list-in-bash-scripting
+    local checks=$(IFS=,; echo "[\"serfHealth\", ${checks_a[*]}]")
+    local payld="{\"Name\": \"leader\", \"Checks\": $checks, \"LockDelay\": \"2s\"}"
+    local res=$(curl -sX PUT -d "$payld" http://localhost:8500/v1/session/create)
+    local sid=$(echo "$res" | jq -r '.ID' 2>/dev/null || true)
 
-[[ $SID ]] || {
-    echo "Session creation failed: $RES" >&2
-    exit 0  # don't stop our watch
+    [[ $sid ]] || {
+        echo "Session creation failed: $res" >&2
+        return 1
+    }
+
+    echo $sid
 }
 
-clean_exit() {
-    curl -sX PUT http://localhost:8500/v1/session/destroy/$SID &>/dev/null ||
+destroy_session() {
+    local sid=$1
+    curl -sX PUT http://localhost:8500/v1/session/destroy/$sid &>/dev/null ||
         true
-    exit 0
 }
 
 # Try to acquire the lock unless it's already acquired by someone else:
 while true; do
-    get_session_id | grep -q ^- || clean_exit
+    get_session_id | grep -q ^- || exit 0
     sleep $((RANDOM % 10))
-    consul kv put -acquire -session=$SID leader `hostname` 2>/dev/null && break
+    SID=$(create_session || true)
+    if [[ $SID ]]; then
+        consul kv put -acquire -session=$SID leader $HOSTNAME \
+                      2>/dev/null && break
+        destroy_session $SID
+    fi
 done
 
 # We've got the lock! Start the leader in background:
