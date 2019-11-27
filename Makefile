@@ -80,7 +80,7 @@ distclean: clean
 	 fi
 
 .PHONY: clean
-clean: clean-hax clean-mypy
+clean: clean-hax clean-mypy clean-dhall-prelude
 
 .PHONY: clean-hax
 clean-hax:
@@ -99,6 +99,10 @@ clean-mypy:
 	     $(call _log,removing $$d); \
 	     rm -rf $$d; \
 	 done
+
+.PHONY: clean-dhall-prelude
+clean-dhall-prelude:
+	$(MAKE) --quiet -C cfgen clean-dhall-prelude
 
 # Install --------------------------------------------- {{{1
 #
@@ -144,9 +148,13 @@ install-hax-dirs:
 	     install --verbose --directory $$d; \
 	 done
 
+.PHONY: unpack-dhall-prelude
+unpack-dhall-prelude:
+	$(MAKE) --quiet -C cfgen unpack-dhall-prelude
+
 .PHONY: install-cfgen
 install-cfgen: CFGEN_INSTALL_CMD = install
-install-cfgen: $(CFGEN_EXE) install-cfgen-deps
+install-cfgen: $(CFGEN_EXE) install-cfgen-deps unpack-dhall-prelude
 	@$(call _info,Installing cfgen/dhall configs)
 	@install --verbose --directory $(CFGEN_SHARE)
 	@for d in cfgen/dhall cfgen/examples; do \
@@ -211,7 +219,7 @@ devinstall: install-dirs devinstall-cfgen devinstall-hax devinstall-systemd devi
 
 .PHONY: devinstall-cfgen
 devinstall-cfgen: CFGEN_INSTALL_CMD = ln -sf
-devinstall-cfgen: $(CFGEN_EXE) install-cfgen-deps
+devinstall-cfgen: $(CFGEN_EXE) install-cfgen-deps unpack-dhall-prelude
 	@$(call _info,Installing cfgen/dhall configs)
 	@install --verbose --directory $(CFGEN_SHARE)
 	@for d in cfgen/dhall cfgen/examples; do \

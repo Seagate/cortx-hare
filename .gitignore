@@ -5,6 +5,7 @@
 .mypy_cache
 __pycache__
 build/
+cfgen/dhall/dhall-lang-[0-9]*
 dist/
 systemd/hax-environment
 tags

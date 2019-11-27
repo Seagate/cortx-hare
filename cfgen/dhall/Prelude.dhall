@@ -21,5 +21,6 @@
 -}
 
   env:DHALL_PRELUDE
-? https://raw.githubusercontent.com/dhall-lang/dhall-lang/v10.0.0/Prelude/package.dhall sha256:771c7131fc87e13eb18f770a27c59f9418879f7e230ba2a50e46f4461f43ec69
-? https://raw.githubusercontent.com/dhall-lang/dhall-lang/v10.0.0/Prelude/package.dhall
+? ./dhall-lang-11.1.0/Prelude/package.dhall sha256:99462c205117931c0919f155a6046aec140c70fb8876d208c7c77027ab19c2fa
+? https://raw.githubusercontent.com/dhall-lang/dhall-lang/v11.1.0/Prelude/package.dhall sha256:99462c205117931c0919f155a6046aec140c70fb8876d208c7c77027ab19c2fa
+? https://raw.githubusercontent.com/dhall-lang/dhall-lang/v11.1.0/Prelude/package.dhall

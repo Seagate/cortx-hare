@@ -4,3 +4,6 @@
 [submodule "vendor/dhall-bin"]
 	path = vendor/dhall-bin
 	url = ../../mero/hare-deps/dhall-bin
+[submodule "vendor/dhall-prelude"]
+	path = vendor/dhall-prelude
+	url = ../../mero/hare-deps/dhall-prelude
