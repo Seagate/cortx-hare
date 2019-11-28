@@ -21,10 +21,7 @@ def processfid2str(fidk: int) -> str:
 
 def get_kv(c: Consul, key: str) -> str:
     kv: Dict[str, bytes] = c.kv.get(key)[1]
-    if not kv:
-        return ''
-    val = kv['Value']
-    return val.decode() if val is not None else ''
+    return kv['Value'].decode() if kv and kv['Value'] is not None else ''
 
 
 def processes_get(c: Consul) -> List[Process]:
