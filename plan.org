@@ -195,182 +195,167 @@ The function blocks until the epoch is returned or an error occurs.
 
 See the [[https://docs.google.com/document/d/1cR-BbxtMjGuZPj8NOc95RyFjqmeFsYf4JJ5Hw_tL1zA/edit#bookmark=id.whq5d31z34][prototype]].
 
-** HA
-
-*** _(grand-)design document
-
-**** PoC experiments
-Required for the 1st implementation.
-
-**** the document is not written yet
-The design is currently in Max's head, whiteboard, and sheets of paper.
-John: "I keep asking negative questions."
-
-**** maybe Konstantin can help with PoC experiments
-
-***** Konstantin: I have no knowledge of the internals of Mero.
-If I can help anyhow, I will be happy to.
-
-***** Max: by the end of this week I am planning to update the RFC ([[http://gitlab.mero.colo.seagate.com/mero/hare/blob/master/rfc/7/README.md][7/FAIL]])
-
-** _sprint-10
+** _sprint-12
 
 Sprint goal:
-1. Pass Hare RPM to QA and Mero developers to play with.
-   Get a feedback loop.
-2. Prepare HA PoCs for Hare, Mero, and, optionally, S3 server.
+- control S3 servers
+- CI the HA prototype
 
-*** HA (integration with Pacemaker)
+*** @andriy
 
-**** @andriy: 10d
-We need to gain Corosync/Pacemaker expertise.
-A subtask of [[[https://jts.seagate.com/browse/EOS-2059][EOS-2059]]].
+**** issue with HA prototype: consul crash
 
-**** @knekrasov: experiment with Pacemaker on local two-VM cluster
-Without Seagate code.
+***** XXX needs @kostya's help with hax
 
-**** HA PoCs and testing
+**** CI the HA prototype
 
-*** XXX @prasanna
+*** @kostya
 
-**** [[[https://jts.seagate.com/browse/EOS-2612][EOS-2612]]] extend CI to collect syslogs -- [[http://gitlab.mero.colo.seagate.com/mero/hare/issues/83][#83]]
+**** finish [[https://jts.seagate.com/browse/EOS-2050][EOS-2050]]
 
-**** XXX
+***** debug the patch -- [[http://gitlab.mero.colo.seagate.com/mero/hare/merge_requests/317][!317]], [[http://gitlab.mero.colo.seagate.com/mero/hare/issues/108][#108]]
 
-*** @vvv
-
-**** [[[https://jts.seagate.com/browse/EOS-2610][EOS-2610]]] Hare boot camp for QA and Mero
-
-**** [[[https://jts.seagate.com/browse/EOS-2597][EOS-2597]]] revise Hare documentation
-
-**** XXX ? finish [[http://gitlab.mero.colo.seagate.com/mero/hare/issues/108][#108]] -- @mandar wants to do this task
+**** help @max with PRG (Pacemaker Resource Graph) PoC
 
 *** @mandar
 
-**** 5d [EOS-2049]
+**** Hyper-V
 
-**** [[http://gitlab.mero.colo.seagate.com/mero/hare/issues/108][#108]] 5d
-XXX ? related to [[[https://jts.seagate.com/browse/EOS-2050][EOS-2050]]] ([hax] HA state updates from Consul to Mero)
+***** update ~m0vg~; test the changes; let @dima.c review the patch
 
-*** [[[https://jts.seagate.com/browse/EOS-2611][EOS-2611]]] @rajanikant: test running of S3 servers with Hare -- [[http://gitlab.mero.colo.seagate.com/mero/hare/issues/90][#90]]
+***** update [[https://docs.google.com/document/d/1zhlBMF1usZtMmLIDwl7s8h9QgwGkHy2B4wMhetZPrN4/edit][EES HA HOWTO]]
 
-** _future sprint
+Update Windows-specific sections with Hyper-V m0vg information.
 
-*** @dima.c: m0vg image
+**** Halon replacement
 
-*** ? @dima.c: experiment with migrating to seagit
-*** @vvv, @dima.c: hare CLI tool
+- Understand how Halon is currently used in RE-provided setups.
+- What is needed to replace Halon with Hare on those setups?
+- Are we ready for the switch? Or should Hare support s3server first?
 
-**** hare build --release
-Builds RPMs.
+*** @prasanna
 
-**** _test-build
+**** ? help @mandar with Halon replacement
+
+*** @max
+
+**** Pacemaker Resource Graph PoC
+
+**** work with component leads
+
+*** @rajanikant
+
+**** start/stop s3servers -- [[http://gitlab.mero.colo.seagate.com/mero/hare/issues/139][#139]], [[https://jts.seagate.com/browse/EOS-2690][EOS-2690]]
+
+*** @vvv
+
+**** [CI] install Mero rpm instead of building it
+
+**** [[#s3server-from-sources][build s3server from sources]]
+
+**** ? CI the HA prototype
+
+** PI-4
+
+Goal: implement [[#user-story-1][User Story 1]].
+
+*** _QUESTIONS
+
+**** VirtualBox / Hyper-V / iSCSI
+
+*** user story-based approach
+
+**** story 1
+:PROPERTIES:
+:CUSTOM_ID: user-story-1
+:END:
+
+- hctl bootstrap
+- I/O via S3
+- fail something (confd? box?)
+- let failover happen
+- ? failback
+
+**** story 2
+
+s/fail/freeze/
+
+Consul health check to send "keep-alive fops"?
+
+*** s3server
+
+**** installation from rpm -- [[http://gitlab.mero.colo.seagate.com/mero/hare/issues/139][#139]]
+
+[[http://ci-storage.mero.colo.seagate.com/releases/eos/BLATEST/][http://ci-storage.mero.colo.seagate.com/releases/eos/BLATEST/]]
+
+***** update hare/README.md
+
+***** s3server.yaml CDF
+
+**** building from sources -- [[https://jts.seagate.com/browse/EOS-3167][EOS-3167]]
+:PROPERTIES:
+:CUSTOM_ID: s3server-from-sources
+:END:
+
+***** Problem: building s3server with latest mero is complicated
+
+s3server uses ~third_party/mero~ submodule, which is 52 commits behind
+current mero master.
+
 #+BEGIN_SRC
-$ cl
-Would skip repository .env/
-Would remove _test-build
-Would remove hax/build/
-Would remove hax/hax.egg-info/
-Would remove hax/libhax.cpython-36m-x86_64-linux-gnu.so
-$ find hax/build
-hax/build
-hax/build/temp.linux-x86_64-3.6
-hax/build/temp.linux-x86_64-3.6/hax
-hax/build/temp.linux-x86_64-3.6/hax/hax.o
-hax/build/lib.linux-x86_64-3.6
-hax/build/lib.linux-x86_64-3.6/libhax.cpython-36m-x86_64-linux-gnu.so
-$ find hax/hax.egg-info
-hax/hax.egg-info
-hax/hax.egg-info/PKG-INFO
-hax/hax.egg-info/SOURCES.txt
-hax/hax.egg-info/entry_points.txt
-hax/hax.egg-info/requires.txt
-hax/hax.egg-info/top_level.txt
-hax/hax.egg-info/dependency_links.txt
-$
-$ (cd .env; git status)
-[...]
-        bin/chardetect
-        bin/hax
-        bin/wheel
-        lib/python3.6/site-packages/certifi-2019.9.11-py3.6.egg/
-        lib/python3.6/site-packages/chardet-3.0.4-py3.6.egg/
-        lib/python3.6/site-packages/easy-install.pth
-        lib/python3.6/site-packages/hax.egg-link
-        lib/python3.6/site-packages/idna-2.8-py3.6.egg/
-        lib/python3.6/site-packages/python_consul-1.1.0-py3.6.egg/
-        lib/python3.6/site-packages/requests-2.22.0-py3.6.egg/
-        lib/python3.6/site-packages/six-1.12.0-py3.6.egg/
-        lib/python3.6/site-packages/urllib3-1.25.6-py3.6.egg/
-        lib/python3.6/site-packages/wheel-0.33.6.dist-info/
-        lib/python3.6/site-packages/wheel/
-        pip-selfcheck.json
+[vagrant@pod-c1 s3server]$ git submodule status
+d84702c9036505d0906b2f3d222ce5498ec65bc6 third_party/jsoncpp (1.0.0-372-gd84702c)
+64a25bcdf54a3fc8001e76ea51e0506320567e17 third_party/libevent (release-2.1.10-stable)
+c84f68d258d07c4015820ceb87fd17decd054bfc third_party/libevhtp (1.2.11n)
+5360d277b238a296e72a8e39c2362b56047178f7 third_party/mero (v1.4-370-g5360d27)
 #+END_SRC
-**** _test-build wheel
-#+BEGIN_SRC
-$ cl
-Would skip repository .env/
-Would remove hax/build/
-Would remove hax/dist/
-Would remove hax/hax.egg-info/
-$ find hax/build
-hax/build
-hax/build/temp.linux-x86_64-3.6
-hax/build/temp.linux-x86_64-3.6/hax
-hax/build/temp.linux-x86_64-3.6/hax/hax.o
-hax/build/bdist.linux-x86_64
-hax/build/lib.linux-x86_64-3.6
-hax/build/lib.linux-x86_64-3.6/libhax.cpython-36m-x86_64-linux-gnu.so
-hax/build/lib.linux-x86_64-3.6/hax
-hax/build/lib.linux-x86_64-3.6/hax/exception.py
-hax/build/lib.linux-x86_64-3.6/hax/server.py
-hax/build/lib.linux-x86_64-3.6/hax/handler.py
-hax/build/lib.linux-x86_64-3.6/hax/halink.py
-hax/build/lib.linux-x86_64-3.6/hax/util.py
-hax/build/lib.linux-x86_64-3.6/hax/__init__.py
-hax/build/lib.linux-x86_64-3.6/hax/message.py
-hax/build/lib.linux-x86_64-3.6/hax/types.py
-hax/build/lib.linux-x86_64-3.6/hax/hax.py
-hax/build/lib.linux-x86_64-3.6/hax/ffi.py
-$ find hax/dist
-hax/dist
-hax/dist/hax-0.0.1-cp36-cp36m-linux_x86_64.whl
-$ find hax/hax.egg-info
-hax/hax.egg-info
-hax/hax.egg-info/PKG-INFO
-hax/hax.egg-info/SOURCES.txt
-hax/hax.egg-info/entry_points.txt
-hax/hax.egg-info/requires.txt
-hax/hax.egg-info/top_level.txt
-hax/hax.egg-info/dependency_links.txt
-$
-$ (cd .env; git status)
-[...]
-        bin/chardetect
-        bin/hax
-        bin/wheel
-        lib/python3.6/site-packages/__pycache__/six.cpython-36.pyc
-        lib/python3.6/site-packages/certifi-2019.9.11.dist-info/
-        lib/python3.6/site-packages/certifi/
-        lib/python3.6/site-packages/chardet-3.0.4.dist-info/
-        lib/python3.6/site-packages/chardet/
-        lib/python3.6/site-packages/consul/
-        lib/python3.6/site-packages/hax-0.0.1.dist-info/
-        lib/python3.6/site-packages/hax/
-        lib/python3.6/site-packages/idna-2.8.dist-info/
-        lib/python3.6/site-packages/idna/
-        lib/python3.6/site-packages/libhax.cpython-36m-x86_64-linux-gnu.so
-        lib/python3.6/site-packages/python_consul-1.1.0.dist-info/
-        lib/python3.6/site-packages/requests-2.22.0.dist-info/
-        lib/python3.6/site-packages/requests/
-        lib/python3.6/site-packages/six-1.12.0.dist-info/
-        lib/python3.6/site-packages/six.py
-        lib/python3.6/site-packages/urllib3-1.25.6.dist-info/
-        lib/python3.6/site-packages/urllib3/
-        lib/python3.6/site-packages/wheel-0.33.6.dist-info/
-        lib/python3.6/site-packages/wheel/
-        pip-selfcheck.json
-#+END_SRC
+
+Solution: write an s3server patch, which will
+- modify [[http://gitlab.mero.colo.seagate.com/mero/s3server/blob/master/rebuildall.sh#L102][rebuildall.sh]] to use `M0_SRC_DIR` environment variable;
+- remove [[http://gitlab.mero.colo.seagate.com/mero/s3server/blob/master/.gitmodules#L14][third_party/mero submodule]].
+
+Related Jira ticket: [[https://jts.seagate.com/browse/EOS-3167][EOS-3167]]
+
+---
+
+This is how s3server rpm gets compiled (against latest mero master):
+
+- [[http://gitlab.mero.colo.seagate.com/re/release-build/blob/master/.gitlab-ci.yml#L222][CI job executes]] `rpms/s3/buildrpm.sh`
+- which [[http://gitlab.mero.colo.seagate.com/mero/s3server/blob/master/rpms/s3/buildrpm.sh#L77][executes `rpmbuild`]]
+- which runs commands from the [[http://gitlab.mero.colo.seagate.com/mero/s3server/blob/master/rpms/s3/s3rpm.spec#L74][`%build` section]] of `rpms/s3/s3rpm.spec`
+
+***** write ~install-s3-service~ script
+Analogous to ~[[http://gitlab.mero.colo.seagate.com/mero/mero/blob/master/scripts/install-mero-service][install-mero-service]]~.
+
+***** update hare/README_developer.md
+
+**** modify hare-bootstrap/status/shutdown scripts -- [[http://gitlab.mero.colo.seagate.com/mero/hare/issues/139][#139]]
+
+**** CI bootstrap/shutdown with s3server -- [[http://gitlab.mero.colo.seagate.com/mero/hare/issues/139][#139]]
+
+***** disable s3authserver
+
+CI scripts only! Not in ~hare-bootstrap~.
+
+**** CI I/O via S3
+
+**** HA s3server
+
+***** How? -- [[http://gitlab.mero.colo.seagate.com/mero/hare/issues/194][#194]]
+
+*** replace Halon
+
+*** CI the [[https://docs.google.com/document/d/1zhlBMF1usZtMmLIDwl7s8h9QgwGkHy2B4wMhetZPrN4/edit][HA prototype]]
+
+*** ? add other components to HA (Pacemaker)
+
+**** CSM
+
+**** RAS
+
+**** HA proxy
+
+*** @max to prove his "Pacemaker resouce graph" concept experimentally
 
 ** scoping
 
