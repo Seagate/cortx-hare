@@ -1,201 +1,6 @@
 * Hare - Halon replacement
 
-** design constraints
-
-*** design [[https://tools.ietf.org/html/rfc2119#section-4][SHOULD NOT]] require changes of other subsystems (Mero, SSPL, etc.)
-
-Hare is a drop-in Halon replacement.
-
-** definitions
-
-*** BQ (Broadcast Queue)
-
-Consul KV entries whose keys have "bq/<N>" format, where <N> is a natural number.  Value is a pair of *conf object* fid and *HA state*.
-
-*** conf object
-
-Information about cluster's hardware or software entity:
-- static attributes (e.g., identifier)
-- current *HA status*
-*** EQ (Event Queue)
-
-Consul KV entries whose keys have "eq/<N>" format, where <N> is a natural number.  Values are *events*.
-
-*** epoch
-
-Counter value stored in Consul KV under "epoch" key.  The epoch is used to generate unique ordered identifiers for *EQ* and *BQ* entries.
-
-See also [[#hare.new_epoch][hare.new_epoch()]].
-
-*** event
-
-Cluster event, an item of the *EQ*.  Events originate from Mero processes and SSPL, and are enqueued to the *EQ* by hare scripts (e.g., ~hax~).  Events are consumed by the *RC* script, which processes and dequeues them.
-
-An event has /type/ and /payload/.  Proposed encoding: "<type> <payload>".
-
-*** HA state
-
-Availability of a *conf object*, e.g., "online", "starting", "failed", etc.  Represented by ~m0_ha_obj_state~ in Mero code.
-
-*** Mero configuration
-
-Subset of *RG* data, cached by *Mero processes*.
-
-*** Mero process
-
-m0d process, Clovis application, m0t1fs kernel module.  Mero process uses confc API to cache *Mero configuration*.
-
-*** RC (Recovery Coordinator?)
-
-A program executed by Consul watch whenever the *EQ* is modified.
-
-*** RG (Resource Graph)
-
-Information about *conf objects* and their interrelations. Stored in Consul.
-
-** requirements
-
-*** initial cluster configuration
-
-**** systemd configuration
-
-See also:
-- [[https://docs.google.com/document/d/1cR-BbxtMjGuZPj8NOc95RyFjqmeFsYf4JJ5Hw_tL1zA/edit#bookmark=id.7c6yyeenu47i][systemd dependencies proposal]]
-- [[https://www.consul.io/docs/commands/services/register.html][Consul Agent Service Registration]]
-- [[file:rfc/3/README.md][3/CFGEN]]
-
-**** confd.xc
-
-Provide Mero confd services with initial cluster configuration.
-
-**** Consul KV imports
-
-*** bootstrap
-
-- start Consul agent
-- start hax
-- start Mero processes
-
-*** XXX build and update the RG
-
-What exactly we have to put there?
-Perhaps we'll gradually come to the answer by tackling other requirements.
-
-*** communication with Mero processes
-
-Mero process and Consul agent cannot communicate directly.  Implement a bridge, one side of which accepts connections from Mero processes, the other side communicates with Consul agent over HTTP.
-
-**** entrypoint request
-
-- [hax] from Mero: ~m0_ha_entrypoint_req~ fop
-- [hax] get entrypoint data from Consul
-- [hax] to Mero: ~m0_ha_entrypoint_rep~ fop
-
-**** HA states request
-
-- [hax] from Mero: ~m0_ha_msg_nvec~ (~M0_HA_NVEC_GET~)
-- [hax] query Consul
-- [hax] to Mero: ~m0_ha_msg_nvec~ (~M0_HA_NVEC_SET~)
-
-**** HA states update
-
-- [hax] from Consul: "BQ updated" HTTP POST request from Consul's [[https://www.consul.io/docs/agent/watches.html#http-endpoint][watch handler]]
-- [hax] to Mero: ~m0_ha_msg_nvec~ (~M0_HA_NVEC_SET~)
-
-**** IO errors, rpc timeouts, etc.
-
-- [hax] from Mero: ~m0_stob_ioq_error~
-- [hax] to Consul: [[#hare.enqueue_event][hare.enqueue_event()]]
-
-*** communication with SSPL
-
-Reference: [[https://docs.google.com/presentation/d/1L1_1XgzK7yRHGKKtcGedT5gJVP0tVSbCKK8v9goH3h4/edit#slide=id.g3f241aae34_2_0][SSPL v2 Overview]]
-
-**** sensor messages
-
-- from SSPL: JSON message in ~sensor-queue~
-- to Consul: [[#hare.enqueue_event][enqueue event]]
-
-SSPL process and Consul agent cannot communicate directly.  Implement a bridge, one side of which accepts connections from Mero processes, the other side communicates with Consul agent over HTTP.
-
-**** actuator requests & responses
-
-Sending of "run SMART test" actuator requests to SSPL is not required for EES.
-
-XXX Are there any other actuator requests? Should Hare support them?
-
-**** IEM
-
-XXX What are those? Should Hare support them?
-
-*** health checking
-
-Use Consule health checking mechanism.
-
-- m0d processes
-- m0d locales
-- m0d services
-- hax
-
-**** setup Consul watches that will [[https://docs.google.com/document/d/1cR-BbxtMjGuZPj8NOc95RyFjqmeFsYf4JJ5Hw_tL1zA/edit#heading=h.zgvalvz417v1][health-check m0ds]]
-NB: This requires sending of current HA states of _all_ services (not only those that changed HA state).
-
-*** RC script (events processing)
-
-- EQ
-- RC
-- rules
-- BQ
-
-*** HA state updates broadcasting
-
-BQ changes ==> Consul [[https://www.consul.io/docs/agent/watches.html][watch handlers]] trigger
-
-*** high availability
-
-XXX [[https://learn.hashicorp.com/consul/developer-configuration/elections][Leader Election Guide]]
-
-- Q: Is RC a daemon or a short-lived process?
-  A: RC is a short-lived process, triggered by Consul watch handler when the EQ is modified.
-
-- Q: How to handle RC failures?
-  A: RC leader election is based on sessions and locking mechanisms [[https://learn.hashicorp.com/consul/developer-configuration/elections][provided by Consul]].  We use ~consul kv put -acquire -session=<session-id>~ command to acquire a lock on ~leader~ key in Consul KV store.  The session with two health checks - ~serfHealth~ (default Consul's check for the node) and ~service:<fid>~ (confd's check on the node) - is created beforehand.  Whenever any of those checks fails or whenever currently running RC fails, the session will be destroyed and the lock of ~leader~ key will be released.  This will trigger the watch handler associated with ~leader~ key (~elect-rc-leader~ script), which will elect new RC leader.
-
-*** authentication
-
-Not every user should be able to issue `consul` commands.
-See also Consul [[https://www.consul.io/docs/internals/security.html][Security Model]] page.
-
-** hare API
-
-*** enqueue_event
-:PROPERTIES:
-:CUSTOM_ID: hare.enqueue_event
-:END:
-
-#+BEGIN_SRC haskell
-enqueue_event :: Event -> EpochId -> IO ()
-#+END_SRC
-
-Append new item to the EQ.
-(Sends HTTP POST request to the local Consul agent.)
-
-*** new_epoch
-:PROPERTIES:
-:CUSTOM_ID: hare.new_epoch
-:END:
-
-#+BEGIN_SRC haskell
-new_epoch :: IO EpochId
-#+END_SRC
-
-Increment the epoch counter in Consul KV by [[https://www.consul.io/docs/commands/kv/put.html#cas][check-and-set]] operation and return its value.
-
-The function blocks until the epoch is returned or an error occurs.
-
-See the [[https://docs.google.com/document/d/1cR-BbxtMjGuZPj8NOc95RyFjqmeFsYf4JJ5Hw_tL1zA/edit#bookmark=id.whq5d31z34][prototype]].
-
-** _sprint-12
+** sprint-12
 
 Sprint goal:
 - control S3 servers
@@ -314,8 +119,6 @@ Solution: write an s3server patch, which will
 - modify [[http://gitlab.mero.colo.seagate.com/mero/s3server/blob/master/rebuildall.sh#L102][rebuildall.sh]] to use `M0_SRC_DIR` environment variable;
 - remove [[http://gitlab.mero.colo.seagate.com/mero/s3server/blob/master/.gitmodules#L14][third_party/mero submodule]].
 
-Related Jira ticket: [[https://jts.seagate.com/browse/EOS-3167][EOS-3167]]
-
 ---
 
 This is how s3server rpm gets compiled (against latest mero master):
@@ -357,53 +160,249 @@ CI scripts only! Not in ~hare-bootstrap~.
 
 *** @max to prove his "Pacemaker resouce graph" concept experimentally
 
-** scoping
+** _attic :ARCHIVE:
+*** design constraints
+
+**** design [[https://tools.ietf.org/html/rfc2119#section-4][SHOULD NOT]] require changes of other subsystems (Mero, SSPL, etc.)
+
+Hare is a drop-in Halon replacement.
+
+*** definitions
+
+**** BQ (Broadcast Queue)
+
+Consul KV entries whose keys have "bq/<N>" format, where <N> is a natural number.  Value is a pair of *conf object* fid and *HA state*.
+
+**** conf object
+
+Information about cluster's hardware or software entity:
+- static attributes (e.g., identifier)
+- current *HA status*
+**** EQ (Event Queue)
+
+Consul KV entries whose keys have "eq/<N>" format, where <N> is a natural number.  Values are *events*.
+
+**** epoch
+
+Counter value stored in Consul KV under "epoch" key.  The epoch is used to generate unique ordered identifiers for *EQ* and *BQ* entries.
+
+See also [[#hare.new_epoch][hare.new_epoch()]].
+
+**** event
+
+Cluster event, an item of the *EQ*.  Events originate from Mero processes and SSPL, and are enqueued to the *EQ* by hare scripts (e.g., ~hax~).  Events are consumed by the *RC* script, which processes and dequeues them.
+
+An event has /type/ and /payload/.  Proposed encoding: "<type> <payload>".
+
+**** HA state
+
+Availability of a *conf object*, e.g., "online", "starting", "failed", etc.  Represented by ~m0_ha_obj_state~ in Mero code.
+
+**** Mero configuration
+
+Subset of *RG* data, cached by *Mero processes*.
+
+**** Mero process
+
+m0d process, Clovis application, m0t1fs kernel module.  Mero process uses confc API to cache *Mero configuration*.
+
+**** RC (Recovery Coordinator?)
+
+A program executed by Consul watch whenever the *EQ* is modified.
+
+**** RG (Resource Graph)
+
+Information about *conf objects* and their interrelations. Stored in Consul.
+
+*** requirements
+
+**** initial cluster configuration
+
+***** systemd configuration
+
+See also:
+- [[https://docs.google.com/document/d/1cR-BbxtMjGuZPj8NOc95RyFjqmeFsYf4JJ5Hw_tL1zA/edit#bookmark=id.7c6yyeenu47i][systemd dependencies proposal]]
+- [[https://www.consul.io/docs/commands/services/register.html][Consul Agent Service Registration]]
+- [[file:rfc/3/README.md][3/CFGEN]]
+
+***** confd.xc
+
+Provide Mero confd services with initial cluster configuration.
+
+***** Consul KV imports
+
+**** bootstrap
+
+- start Consul agent
+- start hax
+- start Mero processes
+
+**** XXX build and update the RG
+
+What exactly we have to put there?
+Perhaps we'll gradually come to the answer by tackling other requirements.
+
+**** communication with Mero processes
+
+Mero process and Consul agent cannot communicate directly.  Implement a bridge, one side of which accepts connections from Mero processes, the other side communicates with Consul agent over HTTP.
+
+***** entrypoint request
+
+- [hax] from Mero: ~m0_ha_entrypoint_req~ fop
+- [hax] get entrypoint data from Consul
+- [hax] to Mero: ~m0_ha_entrypoint_rep~ fop
+
+***** HA states request
+
+- [hax] from Mero: ~m0_ha_msg_nvec~ (~M0_HA_NVEC_GET~)
+- [hax] query Consul
+- [hax] to Mero: ~m0_ha_msg_nvec~ (~M0_HA_NVEC_SET~)
+
+***** HA states update
+
+- [hax] from Consul: "BQ updated" HTTP POST request from Consul's [[https://www.consul.io/docs/agent/watches.html#http-endpoint][watch handler]]
+- [hax] to Mero: ~m0_ha_msg_nvec~ (~M0_HA_NVEC_SET~)
+
+***** IO errors, rpc timeouts, etc.
+
+- [hax] from Mero: ~m0_stob_ioq_error~
+- [hax] to Consul: [[#hare.enqueue_event][hare.enqueue_event()]]
+
+**** communication with SSPL
+
+Reference: [[https://docs.google.com/presentation/d/1L1_1XgzK7yRHGKKtcGedT5gJVP0tVSbCKK8v9goH3h4/edit#slide=id.g3f241aae34_2_0][SSPL v2 Overview]]
+
+***** sensor messages
+
+- from SSPL: JSON message in ~sensor-queue~
+- to Consul: [[#hare.enqueue_event][enqueue event]]
+
+SSPL process and Consul agent cannot communicate directly.  Implement a bridge, one side of which accepts connections from Mero processes, the other side communicates with Consul agent over HTTP.
+
+***** actuator requests & responses
+
+Sending of "run SMART test" actuator requests to SSPL is not required for EES.
+
+XXX Are there any other actuator requests? Should Hare support them?
+
+***** IEM
+
+XXX What are those? Should Hare support them?
+
+**** health checking
+
+Use Consule health checking mechanism.
+
+- m0d processes
+- m0d locales
+- m0d services
+- hax
+
+***** setup Consul watches that will [[https://docs.google.com/document/d/1cR-BbxtMjGuZPj8NOc95RyFjqmeFsYf4JJ5Hw_tL1zA/edit#heading=h.zgvalvz417v1][health-check m0ds]]
+NB: This requires sending of current HA states of _all_ services (not only those that changed HA state).
+
+**** RC script (events processing)
+
+- EQ
+- RC
+- rules
+- BQ
+
+**** HA state updates broadcasting
+
+BQ changes ==> Consul [[https://www.consul.io/docs/agent/watches.html][watch handlers]] trigger
+
+**** high availability
+
+XXX [[https://learn.hashicorp.com/consul/developer-configuration/elections][Leader Election Guide]]
+
+- Q: Is RC a daemon or a short-lived process?
+  A: RC is a short-lived process, triggered by Consul watch handler when the EQ is modified.
+
+- Q: How to handle RC failures?
+  A: RC leader election is based on sessions and locking mechanisms [[https://learn.hashicorp.com/consul/developer-configuration/elections][provided by Consul]].  We use ~consul kv put -acquire -session=<session-id>~ command to acquire a lock on ~leader~ key in Consul KV store.  The session with two health checks - ~serfHealth~ (default Consul's check for the node) and ~service:<fid>~ (confd's check on the node) - is created beforehand.  Whenever any of those checks fails or whenever currently running RC fails, the session will be destroyed and the lock of ~leader~ key will be released.  This will trigger the watch handler associated with ~leader~ key (~elect-rc-leader~ script), which will elect new RC leader.
+
+**** authentication
+
+Not every user should be able to issue `consul` commands.
+See also Consul [[https://www.consul.io/docs/internals/security.html][Security Model]] page.
+
+*** hare API
+
+**** enqueue_event
+:PROPERTIES:
+:CUSTOM_ID: hare.enqueue_event
+:END:
+
+#+BEGIN_SRC haskell
+enqueue_event :: Event -> EpochId -> IO ()
+#+END_SRC
+
+Append new item to the EQ.
+(Sends HTTP POST request to the local Consul agent.)
+
+**** new_epoch
+:PROPERTIES:
+:CUSTOM_ID: hare.new_epoch
+:END:
+
+#+BEGIN_SRC haskell
+new_epoch :: IO EpochId
+#+END_SRC
+
+Increment the epoch counter in Consul KV by [[https://www.consul.io/docs/commands/kv/put.html#cas][check-and-set]] operation and return its value.
+
+The function blocks until the epoch is returned or an error occurs.
+
+See the [[https://docs.google.com/document/d/1cR-BbxtMjGuZPj8NOc95RyFjqmeFsYf4JJ5Hw_tL1zA/edit#bookmark=id.whq5d31z34][prototype]].
+
+*** scoping
 
 - [[https://docs.google.com/spreadsheets/d/1bOTRXxbOuZdEjoSKTEryGqC6tQube6EAqUVL0JSUeOU/edit#gid=0][Hare roadmap (2019)]]
 - [[https://docs.google.com/spreadsheets/d/1zTmBfHFZXQJ7DS9hLzFVDwTU9ieQUKM09bS5IVATSpQ/edit#gid=0][Google spreadsheet]]
 - [[https://app.smartsheet.com/sheets/5gR2F28rvjVxRJfvp7QfRCwjxgVRp79wGfGJg2G1?view=grid][the smartisheet]]
 
-*** [2w] health checking
+**** [2w] health checking
 
-**** write the RFC
+***** write the RFC
 
-**** HA state updates via health checking
+***** HA state updates via health checking
 
 - Consul [health] [[https://www.consul.io/docs/agent/checks.html][check]] on each node (e.g., ~pgrep m0d~)
 - Consul check watch on each node. Sends HA states (of *all* services) to the local ~hax~.
 
-*** [5w] cluster configuration
+**** [5w] cluster configuration
 
-**** [5w] initial
+***** [5w] initial
 
-***** [3w] confd.xc
+****** [3w] confd.xc
 
-***** [2w] consul-kv-import.json (aka "initial RG")
+****** [2w] consul-kv-import.json (aka "initial RG")
 
 [[https://www.consul.io/docs/commands/kv/import.html][Consul KV import]] files (JSON).
 
 - write the RFC ([[file:rfc/4/README.md][4/KV]])
 - generate the JSONs
 
-**** HOLD RG: disks, pools                                          :HOLD:
+***** HOLD RG: disks, pools                                        :HOLD:
 
 - EES uses static configuration.  EES doesn't support disk failures.
 
-*** [8w] hax
+**** [8w] hax
 
 Support entrypoint fops and ha-msgs.
 
-*** [4w] bootstrap
+**** [4w] bootstrap
 
-**** write the RFC
+***** write the RFC
 
-**** systemd scripts (with [[https://docs.google.com/document/d/1cR-BbxtMjGuZPj8NOc95RyFjqmeFsYf4JJ5Hw_tL1zA/edit#bookmark=id.7c6yyeenu47i][dependencies between Consul/confd/ios]])
+***** systemd scripts (with [[https://docs.google.com/document/d/1cR-BbxtMjGuZPj8NOc95RyFjqmeFsYf4JJ5Hw_tL1zA/edit#bookmark=id.7c6yyeenu47i][dependencies between Consul/confd/ios]])
 
-**** /etc config
+***** /etc config
 
-**** bootstrap script (pdsh)
+***** bootstrap script (pdsh)
 
-*** [? 2w] RC infrastructure R&D
+**** [? 2w] RC infrastructure R&D
 
 XXX Needed only if we want Hare to handle events that cannot be handled with Consul health checks (e.g., rpc timeouts or IO errors reported by Mero processes).
 
@@ -412,6 +411,7 @@ XXX Needed only if we want Hare to handle events that cannot be handled with Con
 - rules
 - BQ
 
-*** rabbix (RabbitMQ exchanger)
+**** rabbix (RabbitMQ exchanger)
 
 XXX Do we have to process SSPL sensor messages for EES?
+
