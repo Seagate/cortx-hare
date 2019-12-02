@@ -8,57 +8,93 @@ Sprint goal:
 
 *** @andriy
 
-**** issue with HA prototype: consul crash
+**** issue with the HA prototype: Consul crash
 
-***** XXX needs @kostya's help with hax
+**** CI the HA prototype -- [[http://gitlab.mero.colo.seagate.com/mero/hare/issues/197][#197]]
 
-**** CI the HA prototype
+XXX This depends on m0vg iSCSI, which @dima.c is working on.
+
+*** @dima.c
+
+**** m0vg iSCSI
+
+Jira: [[https://jts.seagate.com/browse/EOS-2492][EOS-2492]]
+
+ETA: 2019-12-05 (Thu)
 
 *** @kostya
 
-**** finish [[https://jts.seagate.com/browse/EOS-2050][EOS-2050]]
+**** document Consul<->hax<->Mero protocol in [[http://gitlab.mero.colo.seagate.com/mero/hare/blob/master/rfc/5/README.md][5/HAX]] RFC -- [[http://gitlab.mero.colo.seagate.com/mero/hare/issues/196][#196]]
 
-***** debug the patch -- [[http://gitlab.mero.colo.seagate.com/mero/hare/merge_requests/317][!317]], [[http://gitlab.mero.colo.seagate.com/mero/hare/issues/108][#108]]
+Jira: [[https://jts.seagate.com/browse/EOS-3523][EOS-3523]]
 
-**** help @max with PRG (Pacemaker Resource Graph) PoC
+- remove noisy sections from the RFC
+- create a table of inputs and outputs
+  (e.g., Mero sends request A to hax ==> hax sends request B to Consul
+  ==> Consul replies with C ==> ...)
+
+| Incoming message   | Source | Reaction of `hax` |
+|--------------------+--------+-------------------|
+| entrypoint request | Mero   | ...               |
+
+**** help @max with the Pacemaker Resource Graph PoC
 
 *** @mandar
 
-**** Hyper-V
+**** Hyper-V -- [[http://gitlab.mero.colo.seagate.com/mero/mero/issues/6][mero#6]]
 
-***** update ~m0vg~; test the changes; let @dima.c review the patch
+Jira: [[https://jts.seagate.com/browse/EOS-3529][EOS-3529]]
 
-***** update [[https://docs.google.com/document/d/1zhlBMF1usZtMmLIDwl7s8h9QgwGkHy2B4wMhetZPrN4/edit][EES HA HOWTO]]
+- update ~m0vg~ scripts
+- test the changes
+- let @dima.c review the patch
+- update Windows-specific sections of [[https://docs.google.com/document/d/1zhlBMF1usZtMmLIDwl7s8h9QgwGkHy2B4wMhetZPrN4/edit][EES HA HOWTO]] with Hyper-V m0vg
+  information.
 
-Update Windows-specific sections with Hyper-V m0vg information.
+**** finish [[https://jts.seagate.com/browse/EOS-2050][EOS-2050]]
 
-**** Halon replacement
+[[http://gitlab.mero.colo.seagate.com/mero/hare/issues/108][#108]]
+
+- Check the patch ([[http://gitlab.mero.colo.seagate.com/mero/hare/merge_requests/317][!317]]) on local VM.
+- Merge the MR, if there are no problems with the patch.
+
+**** Halon replacement -- [[https://jts.seagate.com/browse/EOS-3530][EOS-3530]]
 
 - Understand how Halon is currently used in RE-provided setups.
 - What is needed to replace Halon with Hare on those setups?
-- Are we ready for the switch? Or should Hare support s3server first?
+- Are we ready to switch?  Or should Hare support s3server first?
 
 *** @prasanna
 
-**** ? help @mandar with Halon replacement
+**** help @mandar with Halon replacement
 
 *** @max
 
 **** Pacemaker Resource Graph PoC
 
+Jira: [[https://jts.seagate.com/browse/EOS-3538][EOS-3538]]
+
 **** work with component leads
 
 *** @rajanikant
 
-**** start/stop s3servers -- [[http://gitlab.mero.colo.seagate.com/mero/hare/issues/139][#139]], [[https://jts.seagate.com/browse/EOS-2690][EOS-2690]]
+**** start/stop s3servers -- [[http://gitlab.mero.colo.seagate.com/mero/hare/issues/139][#139]]
+
+Jira: [[https://jts.seagate.com/browse/EOS-2690][EOS-2690]]
 
 *** @vvv
 
-**** [CI] install Mero rpm instead of building it
+**** [CI] install Mero rpm instead of building it -- [[http://gitlab.mero.colo.seagate.com/mero/hare/issues/198][#198]]
+
+Jira: [[https://jts.seagate.com/browse/EOS-3535][EOS-3535]]
+
+**** [CI] solve the problem of hanging CI pipelines -- [[http://gitlab.mero.colo.seagate.com/mero/hare/issues/125][#125]]
+
+Jira: [[https://jts.seagate.com/browse/EOS-3537][EOS-3537]]
 
 **** [[#s3server-from-sources][build s3server from sources]]
 
-**** ? CI the HA prototype
+**** ? help @andriy with CI-ing the HA prototype
 
 ** PI-4
 
@@ -97,12 +133,14 @@ Consul health check to send "keep-alive fops"?
 
 ***** s3server.yaml CDF
 
-**** building from sources -- [[https://jts.seagate.com/browse/EOS-3167][EOS-3167]]
+**** building from sources
 :PROPERTIES:
 :CUSTOM_ID: s3server-from-sources
 :END:
 
 ***** Problem: building s3server with latest mero is complicated
+
+Jira: [[https://jts.seagate.com/browse/EOS-3167][EOS-3167]]
 
 s3server uses ~third_party/mero~ submodule, which is 52 commits behind
 current mero master.
