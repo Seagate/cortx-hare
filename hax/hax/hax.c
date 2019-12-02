@@ -26,7 +26,6 @@
 #include "conf/obj.h"            /* M0_CONF_OBJ_TYPES */
 #include "fid/fid.h"             /* M0_FID_TINIT */
 #include "ha/halon/interface.h"  /* m0_halon_interface */
-#include "ha/note.h"
 #include "module/instance.h"
 #include "lib/assert.h"          /* M0_ASSERT */
 #include "lib/memory.h"          /* M0_ALLOC_ARR */
@@ -57,12 +56,12 @@ M0_TL_DESCR_DEFINE(hx_links, "hax_context::hc_links", static,
                    9, 10);
 M0_TL_DEFINE(hx_links, static, struct hax_link);
 
-void hax_lock(struct hax_context *hx)
+static void hax_lock(struct hax_context *hx)
 {
 	m0_mutex_lock(&hx->hc_mutex);
 }
 
-void hax_unlock(struct hax_context *hx)
+static void hax_unlock(struct hax_context *hx)
 {
 	m0_mutex_unlock(&hx->hc_mutex);
 }
@@ -279,8 +278,9 @@ static PyObject *nvec_to_list(const struct m0_ha_note *notes, uint32_t nr_notes)
 		PyObject *note_item = PyObject_CallMethod(hax_mod, "HaNote",
 							  "(sO)", obj_name,
 							  ha_note);
-		// Note: this call "steals" reference to note_item which means
-		// that we don't need to call Py_DECREF(note_item)
+		/* Note: this call "steals" reference to note_item which means
+		 * that we don't need to call Py_DECREF(note_item)
+		 */
 		PyList_SET_ITEM(list, i, note_item);
 	}
 	Py_DECREF(hax_mod);
@@ -362,14 +362,18 @@ M0_INTERNAL void m0_ha_nvec_reply_send(unsigned long long hm,
 static void __ha_nvec_reply_send(const struct hax_msg *hm,
 				 struct m0_ha_nvec *nvec)
 {
-	struct m0_ha_link      *hl = hm->hm_hl;
-	const struct m0_ha_msg *msg = &hm->hm_msg;
-
 	M0_PRE(hm != NULL);
 	M0_PRE(nvec != NULL);
 
-	m0_ha_msg_nvec_send(nvec, msg->hm_data.u.hed_nvec.hmnv_id_of_get,
-			    true, M0_HA_NVEC_SET, hl);
+	struct m0_halon_interface *hi = hm->hm_hc->hc_hi;
+
+	struct m0_ha_link	  *hl = hm->hm_hl;
+	const struct m0_ha_msg	 *msg = &hm->hm_msg;
+	uint64_t		  tag;
+
+	msg = _ha_nvec_msg_alloc(nvec, msg->hm_data.u.hed_nvec.hmnv_id_of_get,
+				 M0_HA_NVEC_SET);
+	m0_halon_interface_send(hi, hl, msg, &tag);
 }
 
 static void handle_process_event(const struct hax_msg *hm)

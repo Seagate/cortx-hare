@@ -30,9 +30,14 @@ struct m0_halon_interface;
 
 struct hax_context {
 	struct m0_halon_interface *hc_hi;
+	/**
+	 * Guards access to hx->hc_links.
+	 *
+	 * @see hax_lock(), hax_unlock()
+	 */
 	struct m0_mutex            hc_mutex;
 	struct m0_tl               hc_links;
-	bool			   hc_alive;
+	bool                       hc_alive;
 	PyObject                  *hc_handler;
 };
 
@@ -76,8 +81,6 @@ void m0_ha_failvec_reply_send(unsigned long long hm, struct m0_fid *pool_fid,
 void m0_ha_nvec_reply_send(unsigned long long hm, struct m0_ha_note *notes, uint32_t nr_notes);
 void m0_ha_notify(unsigned long long ctx, struct m0_ha_note *notes, uint32_t nr_notes);
 void m0_ha_broadcast_test(unsigned long long ctx);
-void hax_lock(struct hax_context *hc);
-void hax_unlock(struct hax_context *hc);
 
 /* __HAX_H__ */
 #endif
