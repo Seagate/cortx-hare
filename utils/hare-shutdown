@@ -9,8 +9,8 @@ from typing import Dict, List, NamedTuple
 
 from consul import Consul
 
-other_p = ['hare-hax', 'hare-consul-agent']
-mero_p = ['ios', 'confd']
+shutdown_sequence = ('ios', 'confd', 'hare-hax', 'hare-consul-agent')
+
 Process = NamedTuple('Process', [('node', str), ('name', str), ('fidk', int),
                                  ('status', str)])
 
@@ -19,14 +19,15 @@ def processfid2str(fidk: int) -> str:
     return '{:#x}:{:#x}'.format(ord('r') << 56 | 1, fidk)
 
 
+# XXX s/c/cns/
 def get_kv(c: Consul, key: str) -> str:
     kv: Dict[str, bytes] = c.kv.get(key)[1]
     return kv['Value'].decode() if kv and kv['Value'] is not None else ''
 
 
+# XXX s/c/cns/
 def processes_get(c: Consul) -> List[Process]:
     processes: List[Process] = []
-    c = Consul()
     for node in c.catalog.nodes()[1]:
         svcs_status = c.health.node(node['Node'])
         processes.extend(
@@ -49,58 +50,54 @@ def is_localhost(hostname: str) -> bool:
     return hostname in ('localhost', '127.0.0.1', name, f'{name}.local')
 
 
+def ssh_prefix(hostname: str) -> str:
+    return '' if is_localhost(hostname) else f'ssh {hostname} '
+
+
 def consul_status(host: str) -> str:
-    cmd = '{}sudo systemctl is-active --quiet hare-consul-agent'.format(
-        '' if is_localhost(host) else f'ssh {host} ')
+    cmd = ssh_prefix(host) \
+        + 'sudo systemctl is-active --quiet hare-consul-agent'
     return 'passing' if os.system(cmd) == 0 else 'offline'
 
 
 def exec(cmd) -> str:
-    return 'done' if os.system(cmd) == 0 else 'failed'
+    return 'done' if os.system(cmd) == 0 else '**ERROR**'
 
 
-def process_stop(h: str, ps: Process):
-    if ps.status == 'passing':
-        sname = (ps.name if ps.name in other_p else
-                 f'm0d@{processfid2str(int(ps.fidk))}')
-        cmd = '{}sudo systemctl stop --force {}'.format(
-            '' if is_localhost(h) else f'ssh {h} ', sname)
-        print(f'Stopping {ps.name} ({sname}) on {h}...', end='', flush=True)
-        print(exec(cmd))
-
-
-def stop_watcher(host: str):
-    cmd = '{}sudo pkill -9 consul'.format(
-        '' if is_localhost(host) else f'ssh {host} ')
-    print(f'Stopping consul watcher on {host}...', end='', flush=True)
-    print(exec(cmd))
-
-
-def node_stop(node: str, ps: List):
-    def processbyname(ps: List[Process], pname: str) -> List[Process]:
-        return [p for p in ps if p.name == pname]
-
-    for t in mero_p + other_p:
-        for p in processbyname(ps, t):
-            if p.node == node:
-                process_stop(node, p)
+def process_stop(proc: Process):
+    if proc.status == 'passing':
+        svc = proc.name if proc.name.startswith('hare-') \
+            else 'm0d@' + processfid2str(proc.fidk)
+        print(f'Stopping {proc.name} ({svc}) at {proc.node}... ', end='',
+              flush=True)
+        print(exec(
+            ssh_prefix(proc.node) + f'sudo systemctl stop --force {svc}'))
 
 
 def main():
     if consul_status(gethostname()) != 'passing':
-        print('Cluster is not running.')
-        return -1
+        exit('Cluster is not running')
 
-    c = Consul()
+    c = Consul()  # XXX s/c/cns/
     processes = processes_get(c)
-    leader = get_kv(c, 'leader')
+    leader_node = get_kv(c, 'leader')
 
-    for node in set(p.node for p in processes):
-        if node != leader:
-            node_stop(node, processes)
+    leader = None
+    for svc in shutdown_sequence:
+        for proc in processes:
+            if proc.name != svc:
+                continue
+            assert 'hare-consul-agent' == shutdown_sequence[-1]
+            if svc == 'hare-consul-agent' and proc.node == leader_node:
+                leader = proc
+                continue
+            process_stop(proc)
+    assert leader is not None
 
-    node_stop(leader, processes)
-    stop_watcher(leader)
+    process_stop(leader)
+    print(f'Killing Consul leader at {leader.node}... ', end='', flush=True)
+    print(exec(ssh_prefix(leader.node) + 'sudo pkill -KILL consul'))
+
     return 0
 
 
