@@ -29,7 +29,138 @@ The code of `hax` consists of C and Python parts.
 
 # Interaction with Mero
 
+## Mero Messages
+
+| Incoming message type     | Reaction of `hax`                                                                                                                    |
+|---------------------------|--------------------------------------------------------------------------------------------------------------------------------------|
+| M0_HA_MSG_STOB_IOQ        | m0_panic()                                                                                                                           |
+| M0_HA_MSG_NVEC            | Build the reply based on Consul. See the [details below](#4-when-nvec_get-request-is-received-from-ha_link-hax-replies). |
+| M0_HA_MSG_FAILURE_VEC_REQ | Reply with stub data - zero-sized vector for fid `M0_FID_TINIT('o', 2, 9)`                                                           |
+| M0_HA_MSG_FAILURE_VEC_REP | Reply with stub data - zero-sized vector for fid `M0_FID_TINIT('o', 2, 9)`                                                           |
+| M0_HA_MSG_KEEPALIVE_REQ   | m0_panic()                                                                                                                           |
+| M0_HA_MSG_KEEPALIVE_REP   | m0_panic()                                                                                                                           |
+| M0_HA_MSG_EVENT_PROCESS   | Update the status in Consul KV. See the [details below](#3-on-m0_ha_msg_event_process-hax-updates-the-process-status-in-consul-kv).  |
+| M0_HA_MSG_EVENT_SERVICE   | None                                                                                                                                 |
+| M0_HA_MSG_EVENT_RPC       | None                                                                                                                                 |
+| M0_HA_MSG_BE_IO_ERR       | m0_panic()                                                                                                                           |
+| M0_HA_MSG_SNS_ERR         | m0_panic()                                                                                                                           |
+
 ## Interaction Use Cases
+
+### 1. Hax replies to incoming entrypoint requests
+
+```plantuml
+@startuml
+participant "m0mkfs/m0d" as Mero
+participant Hax
+participant "Consul KV" as KV
+participant "Consul Service Catalog" as Services
+activate Mero
+activate KV
+activate Services
+
+Mero -> Hax: Send entrypoint request
+activate Hax
+Hax -> Hax: Process asynchronously
+activate Hax
+Hax -> KV: get_leader_session_no_wait()
+note right of KV: Leader session is required to get the Principal RM node
+KV --> Hax
+Hax -> Services: Get all confd processes
+Services --> Hax
+Hax -> Mero: Send entrypoint reply
+deactivate Hax
+@enduml
+```
+
+**Notes**:
+1. Entrypoint request replies are sent from a different thread to the one which received the request.
+2. The order of replies is the same to the order of received requests.
+3. If hax is not able to build the reply (e.g. if Consul is not operational), hax will send `EAGAIN` back to the Mero process. Mero process MUST repeat the request.
+
+### 2. When Consul watcher sends the new Mero process statuses, hax forwards the statuses via ha_link
+
+```plantuml
+@startuml
+participant "ha_link" as HAlink
+participant Hax
+participant Consul
+activate HAlink
+activate Hax
+activate Consul
+
+Consul -> Hax: Send new status of all Mero processes
+Hax -> Hax: Convert JSON to ha_notes
+Hax -> HAlink: Send M0_HA_NVEC_SET message
+@enduml
+```
+**Notes**:
+1. Incoming HTTP requests from Consul are processed in MainThread.
+2. The new HTTP request will not be handled until the current HTTP request has been processed.
+
+### 3. On M0_HA_MSG_EVENT_PROCESS hax updates the process status in Consul KV
+
+```plantuml
+@startuml
+participant "m0mkfs/m0d" as Mero
+participant Hax
+participant "Consul KV" as KV
+activate Mero
+activate KV
+
+Mero -> Hax: Send M0_HA_MSG_EVENT_PROCESS message
+activate Hax
+Hax -> Hax: Process asynchronously
+activate Hax
+loop if ConsulException raises
+  Hax -> KV: put new status to 'process/{fid}' key
+  KV --> Hax
+end
+deactivate Hax
+@enduml
+```
+
+**Notes**:
+1. The message is processed asynchronously in hax.
+2. No other asynchronous requests can start processing until the current one gets processed.
+   - Corollary: In case of Consul consistency issues, all asynchronous processing will be effectively paused: hax will only be responsive on HTTP requests during that time.
+
+### 4. When NVEC_GET request is received from ha_link, hax replies
+
+```plantuml
+@startuml
+participant "m0mkfs/m0d" as Mero
+participant Hax
+participant "Consul KV" as KV
+activate Mero
+activate KV
+
+Mero -> Hax: Send M0_HA_MSG_NVEC message
+activate Hax
+Hax -> Hax: Process asynchronously
+activate Hax
+loop if ConsulException raises
+  loop for item in nvec
+    Hax -> KV: get subtree of 'm0conf/nodes'
+    note right of KV
+      This is the way to learn the last known
+      status of this particular item (regardless
+      where exactly this service or process is located).
+    end note
+    KV --> Hax
+    Hax -> Hax: Build ha_nvec reply
+    note right of Hax: Resulting no_state is one of (M0_NC_FAILED, M0_NC_ONLINE).
+    Hax -> Mero: Send reply of M0_HA_NVEC_SET type
+  end
+end
+deactivate Hax
+@enduml
+```
+
+**Notes**:
+1. The message is processed asynchronously in hax.
+2. No other asynchronous requests can start processing until the current one gets processed.
+   - Corollary: In case of Consul consistency issues, all asynchronous processing will be effectively paused: hax will only be responsive on HTTP requests during that time.
 
 ## Various Technical Details
 
