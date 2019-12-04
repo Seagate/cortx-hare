@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+set -eu -o pipefail
+export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
+set -x
+
+outdir=$CI_PROJECT_DIR
+rm -rf $outdir
+mkdir -p $outdir
+
+_m0vg="/usr/bin/time $M0VG"
+
+$M0VG status | awk '$2 == "running" {print $1}' | while read vm
+do
+    # syslog
+    $_m0vg run --vm $vm sudo journalctl --no-pager --full --utc --boot \
+        --output short-precise > $outdir/${CI_JOB_NAME}_${vm}_syslog.log
+
+    # Consul logs
+    $_m0vg scp $vm:/tmp/consul\*.log $outdir/
+    (
+        cd $outdir
+        for f in consul*.log; do
+            mv -v {,${CI_JOB_NAME}_${vm}_}$f
+        done
+    )
+
+    # m0reportbug archives
+    $_m0vg run --vm $vm sudo /data/mero/utils/m0reportbug
+    $_m0vg scp $vm:m0reportbug-\*.tar.xz $outdir/
+    (
+        cd $outdir
+        for f in m0reportbug-*.tar.xz; do
+            mv -v {,${CI_JOB_NAME}_${vm}_}$f
+        done
+    )
+done
