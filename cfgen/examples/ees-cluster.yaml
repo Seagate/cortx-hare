@@ -1,16 +1,17 @@
 nodes:
-  - hostname: ssu1.local
+  - hostname: pod-c1
     data_iface: eth1
     m0_servers:
       - runs_confd: true
-      - io_disks: { path_glob: "/dev/loop[0-9]*" }
+      - io_disks: { path_glob: "/dev/sd[d-g]"}
     m0_clients:
         s3: 0
         other: 2
-  - hostname: ssu2.local
+  - hostname: pod-c2
     data_iface: eth1
     m0_servers:
-      - io_disks: { path_glob: "/dev/loop[0-9]*" }
+      - runs_confd: true
+      - io_disks: { path_glob: "/dev/sd[h-k]" }
     m0_clients:
         s3: 0
         other: 2
