@@ -9,10 +9,9 @@ from typing import Dict, List, NamedTuple
 
 from consul import Consul
 
-shutdown_sequence = ('ios', 'confd', 'hare-hax', 'hare-consul-agent')
-
 Process = NamedTuple('Process', [('node', str), ('name', str), ('fidk', int),
                                  ('status', str)])
+CONSUL = 'hare-consul-agent'
 
 
 def processfid2str(fidk: int) -> str:
@@ -37,7 +36,7 @@ def processes_get(cns: Consul) -> List[Process]:
 
         processes.append(
             Process(node=node['Node'],
-                    name='hare-consul-agent',
+                    name=CONSUL,
                     fidk=0,
                     status=consul_status(node['Node'])))
     return processes
@@ -53,23 +52,27 @@ def ssh_prefix(hostname: str) -> str:
 
 
 def consul_status(host: str) -> str:
-    cmd = ssh_prefix(host) \
-        + 'sudo systemctl is-active --quiet hare-consul-agent'
+    cmd = ssh_prefix(host) + 'sudo systemctl is-active --quiet ' + CONSUL
     return 'passing' if os.system(cmd) == 0 else 'offline'
 
 
-def exec(cmd) -> str:
-    return 'done' if os.system(cmd) == 0 else '**ERROR**'
+def exec(cmd: str) -> None:
+    assert cmd
+    print('done' if os.system(cmd) == 0 else '**ERROR**')
 
 
-def process_stop(proc: Process):
-    if proc.status == 'passing':
-        svc = proc.name if proc.name.startswith('hare-') \
-            else 'm0d@' + processfid2str(proc.fidk)
-        print(f'Stopping {proc.name} ({svc}) at {proc.node}... ', end='',
-              flush=True)
-        print(exec(
-            ssh_prefix(proc.node) + f'sudo systemctl stop --force {svc}'))
+def process_stop(proc: Process) -> None:
+    if proc.status != 'passing':
+        return
+    if proc.name.startswith('hare-'):
+        svc = proc.name
+        label = ''
+    else:
+        svc = 'm0d@' + processfid2str(proc.fidk)
+        label = f' ({proc.name})'
+    print(f'Stopping {svc}{label} at {proc.node}... ', end='',
+          flush=True)
+    exec(ssh_prefix(proc.node) + 'sudo systemctl stop --force ' + svc)
 
 
 def main():
@@ -81,12 +84,11 @@ def main():
     leader_node = get_kv(cns, 'leader')
 
     leader = None
-    for svc in shutdown_sequence:
+    for svc in ('ios', 'confd', 'hare-hax', CONSUL):
         for proc in processes:
             if proc.name != svc:
                 continue
-            assert 'hare-consul-agent' == shutdown_sequence[-1]
-            if svc == 'hare-consul-agent' and proc.node == leader_node:
+            if svc == CONSUL and proc.node == leader_node:
                 leader = proc
                 continue
             process_stop(proc)
@@ -94,8 +96,7 @@ def main():
 
     process_stop(leader)
     print(f'Killing Consul leader at {leader.node}... ', end='', flush=True)
-    print(exec(ssh_prefix(leader.node) + 'sudo pkill -KILL consul'))
-
+    exec(ssh_prefix(leader.node) + 'sudo pkill -KILL consul')
     return 0
 
 
