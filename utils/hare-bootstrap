@@ -181,6 +181,12 @@ done < <(get_all_nodes | grep -vw $HOSTNAME || true)
 wait4 ${pids[@]}
 echo 'Ok.'
 
+say 'Install Mero configuration files... '
+while read node _; do
+    scp -q $cfgen_out/confd.xc $node:/tmp/
+done < <(get_server_nodes | grep -vw $HOSTNAME || true)
+echo 'Ok.'
+
 say 'Waiting for the RC Leader to be elected...'
 wait_rc_leader
 sid=$(get_session)
@@ -195,31 +201,49 @@ while (( $(get_session_checks_nr $sid) == 1 )); do
 done
 echo ' Ok.'
 
+get_nodes() {
+    local phase=$1
+
+    if [[ $phase == phase1 ]]; then
+        # Note: confd-s are running on server nodes only.
+        get_server_nodes
+    else
+        get_all_nodes
+    fi
+}
+
+start_mero() {
+    local op=$1
+    local phase=$2
+
+    say "Starting Mero `echo $op | sed 's/--//; s/-only$//'` ($phase)... "
+    bootstrap-node $op --phase $phase &
+    pids=($!)
+
+    while read node _; do
+        ssh $node "PATH=$PATH $(which bootstrap-node) $op --phase $phase" &
+        pids+=($!)
+    done < <(get_nodes $phase | grep -vw $HOSTNAME || true)
+    wait4 ${pids[@]}
+    echo 'Ok.'
+}
+
 # Start Mero in two phases: 1st confd-s, then ios-es.
-say 'Starting Mero (phase1)... '
-bootstrap-node ${opt_mkfs:-} --phase 1 &
-pids=($!)
+bootstrap_nodes() {
+    local phase=$1
+    local mkfs=${opt_mkfs:-}
 
-while read node _; do
-    scp -q $cfgen_out/confd.xc $node:/tmp/
-    ssh $node "PATH=$PATH $(which bootstrap-node) ${opt_mkfs:-} --phase 1" &
-    pids+=($!)
-# Note: confd-s are running on server nodes only.
-done < <(get_server_nodes | grep -vw $HOSTNAME || true)
-wait4 ${pids[@]}
-echo 'Ok.'
+    if [[ $mkfs ]]; then
+        start_mero --mkfs-only $phase
+    fi
+    start_mero --m0d $phase
+}
 
-# Now the 2nd phase (ios-es).
-say 'Starting Mero (phase2)... '
-bootstrap-node ${opt_mkfs:-} --phase 2 &
-pids=($!)
+# Start confds first
+bootstrap_nodes phase1
 
-while read node _; do
-    ssh $node "PATH=$PATH $(which bootstrap-node) ${opt_mkfs:-} --phase 2" &
-    pids+=($!)
-done < <(get_all_nodes | grep -vw $HOSTNAME || true)
-wait4 ${pids[@]}
-echo 'Ok.'
+# Start ioservices
+bootstrap_nodes phase2
 
 say 'Checking the health of the services... '
 check_service() {

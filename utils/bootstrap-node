@@ -8,7 +8,7 @@ SRC_DIR="$(dirname $(readlink -f $0))"
 
 usage() {
     cat <<EOF
-Usage: $PROG [--mkfs] { -p|--phase 1|2 }
+Usage: $PROG [--mkfs|--mkfs-only] { -p|--phase 1|2 }
 
 Bootstraps single node after consul agent is started.
 
@@ -18,16 +18,18 @@ The required parameter is one of the following:
   --phase 2 - start ios Mero process(es)
 
 Options:
-  --mkfs                    Do m0mkfs (WARNING: wipes Mero data).
+  --mkfs-only               Do m0mkfs only (WARNING: wipes Mero data).
+  --mkfs                    Do m0mkfs (WARNING: wipes Mero data) and start mero service(s).
+  --m0d                     Start mero services only without mkfs.
   -h, --help                Show this help and exit.
 EOF
 }
 
-do_mkfs=false
+do_mkfs=
 phase=-
 
 TEMP=$(getopt --options hp: \
-              --longoptions help,mkfs,phase: \
+              --longoptions help,mkfs,mkfs-only,m0d,phase: \
               --name "$PROG" -- "$@" || true)
 
 (($? == 0)) || { usage >&2; exit 1; }
@@ -36,14 +38,16 @@ eval set -- "$TEMP"
 while true; do
     case "$1" in
         -h|--help)           usage; exit ;;
-        --mkfs)              do_mkfs=true; shift ;;
+        --mkfs)              do_mkfs=mkfs; shift ;;
+        --mkfs-only)         do_mkfs=mkfs-only; shift ;;
+        --m0d)               do_mkfs=; shift ;;
         -p|--phase)          phase=$2; shift 2 ;;
         --)                  shift; break ;;
         *)                   echo 'getopt: internal error...'; exit 1 ;;
     esac
 done
 
-[[ $phase =~ ^[12]$ ]] || {
+[[ $phase =~ ^phase[12]$ ]] || {
     usage >&2
     exit 1
 }
@@ -77,13 +81,13 @@ if [[ -n $CONFD_IDs || -n $IOS_IDs ]]; then
     done
 fi
 
-if [[ -n $CONFD_IDs && $phase == 1 ]]; then
+if [[ -n $CONFD_IDs && $phase == phase1 ]]; then
     [[ -f /tmp/confd.xc ]] ||
         die 'Cannot bootstrap a server node without /tmp/confd.xc file'
     sudo cp /tmp/confd.xc /etc/mero/
 fi
 
-if [[ $phase == 1 ]]; then
+if [[ $phase == phase1 ]]; then
     IDs=$CONFD_IDs
 else
     IDs=$IOS_IDs
@@ -91,7 +95,7 @@ fi
 
 for id in $IDs; do
     fid=$(id2fid $id)
-    if $do_mkfs; then
+    if [[ $do_mkfs ]]; then
         echo "MERO_NODE_UUID='$(uuidgen --time)'" |
             sudo tee /etc/sysconfig/mero-kernel >/dev/null
 
@@ -101,5 +105,8 @@ for id in $IDs; do
         # (1s * 2) - time of two checks + 1s. (See check-service.)
         sleep 3
     fi
-    sudo systemctl start m0d@$fid
+
+    if [[ $do_mkfs != 'mkfs-only' ]]; then
+        sudo systemctl start m0d@$fid
+    fi
 done
