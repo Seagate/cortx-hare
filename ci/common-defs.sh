@@ -1,8 +1,16 @@
-JOB_NAME="${WORKSPACE_NAME}-${CI_JOB_NAME}"
+JOB_LABEL="${WORKSPACE_NAME}-${CI_JOB_NAME}"
 
 die() {
     echo "$@" >&2
     exit 1
+}
+
+_time() {
+    if [[ -x /usr/bin/time ]]; then
+        /usr/bin/time "$@"
+    else
+        time "$@"
+    fi
 }
 
 ci_docker() (
@@ -10,7 +18,7 @@ ci_docker() (
 
     cd $WORKSPACE_DIR
 
-    time docker run --rm --name $JOB_NAME -v ~+:/data -w /data/hare \
+    _time docker run --rm --name $JOB_LABEL -v ~+:/data -w /data/hare \
          $DOCKER_REGISTRY/mero/hare:$CENTOS_RELEASE "$@"
 
     # Containers run commands as 'root' user.  Restore the ownership.
@@ -38,13 +46,18 @@ ci_m0vg_init() (
 M0_VM_BOX=centos76/dev
 M0_VM_BOX_URL='http://ci-storage.mero.colo.seagate.com/vagrant/centos76/dev'
 M0_VM_CMU_MEM_MB=4096
-M0_VM_NAME_PREFIX=$JOB_NAME
-M0_VM_HOSTNAME_PREFIX=$JOB_NAME
+M0_VM_NAME_PREFIX=$JOB_LABEL
+M0_VM_HOSTNAME_PREFIX=$JOB_LABEL
 EOF
 
     local host=
     for host in "$@"; do
-        time $M0VG up --no-provision $host
-        time $M0VG reload --no-provision $host
+        _time $M0VG up --no-provision $host
+        _time $M0VG reload --no-provision $host
     done
 )
+
+ci_success() {
+    # `expect-timeout` expects this message as a test success criteria.
+    echo "$CI_JOB_NAME: test status: SUCCESS"
+}

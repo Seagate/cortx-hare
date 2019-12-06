@@ -1,0 +1,32 @@
+#!/usr/bin/env expect
+
+set usage "Usage: $argv0 <timeout (seconds)> <program> \[<arguments>\]"
+
+proc die {msg {rc 1}} {
+    send_error "**ERROR** $msg\n"
+    exit $rc
+}
+
+switch -- [lindex $argv 0] {
+    {-h} -
+    {--help} {
+        puts $usage
+        exit
+    }
+}
+if {[llength $argv] < 2} {
+    puts stderr "Invalid command\n$usage"
+    exit 1
+}
+
+set timeout [lindex $argv 0]
+
+spawn sh -c [lrange $argv 1 end]
+expect {
+    {: test status: SUCCESS} {}
+    eof {}
+    timeout {die {Timed out!} 124}
+}
+
+set rc [lindex [wait] end]
+if {$rc != 0} {die "FAIL $rc" $rc}

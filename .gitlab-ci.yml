@@ -11,6 +11,7 @@ variables:
   RPMSYNC_DIR:    "/releases/dev/$CI_PROJECT_PATH/$CI_COMMIT_REF_SLUG/B$CI_PIPELINE_ID"
   WORKSPACE_NAME: "${CI_PROJECT_NAME}${CI_PIPELINE_ID}"
   WORKSPACE_DIR:  "/home/gitlab-runner/workspaces/${CI_PROJECT_NAME}${CI_PIPELINE_ID}"
+  TEST_BOOT_TIMEOUT: 30  # max allowed duration of test-boot* job, in minutes
 
 stages:
   - build
@@ -51,42 +52,40 @@ test-utils:
   script: [ ci/test-utils ]
 
 # See https://docs.gitlab.com/ce/ci/yaml/README.html#anchors
-.after_script_template: &after_script_definition
-  - date -u -Isec
-  - cd $WORKSPACE_DIR
-  - /usr/bin/time hare/ci/collect-artifacts
+.test_boot_template: &test_boot_definition
+  stage: test
+  tags: [ m0vg ]
+  except: [ tags ]
+  script:
+    # `ci/expect-timeout` is only needed for GitLab < 12.3;
+    # see https://docs.gitlab.com/ee/ci/yaml/#timeout
+    - time ci/expect-timeout $((TEST_BOOT_TIMEOUT * 60)) ci/$CI_JOB_NAME
+  after_script:
+    - date -u -Isec
+    - cd $WORKSPACE_DIR
+    - /usr/bin/time hare/ci/collect-artifacts
 
-  # Clean up.  This ensures that VMs are destroyed in case of a manual
-  # job restart, when global 'cleanup' stage is not performed.
-  - $M0VG destroy -f || true
+    # Clean up.  This ensures that VMs are destroyed in case of a manual
+    # job restart, when global 'cleanup' stage is not performed.
+    - $M0VG destroy -f || true
 
-.artifacts_template: &artifacts_definition
-  name: "$CI_PROJECT_NAME job $CI_JOB_ID ($CI_JOB_NAME) logs"
-  when: always  # whenever the job has failed or succeeded
-  paths:
-    - ${CI_JOB_NAME}*consul*.log
-    - ${CI_JOB_NAME}*m0reportbug-data.tar.xz
-    # - ${CI_JOB_NAME}*m0reportbug-cores.tar.xz  # XXX too big
-    - ${CI_JOB_NAME}*m0reportbug-traces.tar.xz
-    - ${CI_JOB_NAME}*syslog.log
+  artifacts:
+    name: "${CI_PROJECT_NAME}_job${CI_JOB_ID}_${CI_JOB_NAME}"
+    when: always  # whenever the job has failed or succeeded
+    paths:
+      - ${CI_JOB_NAME}*consul*.log
+      - ${CI_JOB_NAME}*m0reportbug-data.tar.xz
+      # - ${CI_JOB_NAME}*m0reportbug-cores.tar.xz  # XXX too big
+      - ${CI_JOB_NAME}*m0reportbug-traces.tar.xz
+      - ${CI_JOB_NAME}*syslog.log
 
 test-boot1:
-  stage: test
-  tags: [ m0vg ]
-  except: [ tags ]
   variables: { M0VG: m0vg-1node/scripts/m0vg }
-  script: [ ci/test-boot1 ]
-  after_script: *after_script_definition
-  artifacts: *artifacts_definition
+  <<: *test_boot_definition
 
 test-boot2:
-  stage: test
-  tags: [ m0vg ]
-  except: [ tags ]
   variables: { M0VG: m0vg-2nodes/scripts/m0vg }
-  script: [ ci/test-boot2 ]
-  after_script: *after_script_definition
-  artifacts: *artifacts_definition
+  <<: *test_boot_definition
 
 # Cleanup ----------------------------------------------------------------- {{{1
 #
@@ -142,6 +141,5 @@ docker:rebuild-images:eos:
   extends: docker:rebuild-images
   variables:
     DOCKER_IMAGE_TAG: eos
-
 
 # vim: foldmethod=marker shiftwidth=2 tabstop=2 expandtab
