@@ -19,17 +19,15 @@ def processfid2str(fidk: int) -> str:
     return '{:#x}:{:#x}'.format(ord('r') << 56 | 1, fidk)
 
 
-# XXX s/c/cns/
-def get_kv(c: Consul, key: str) -> str:
-    kv: Dict[str, bytes] = c.kv.get(key)[1]
+def get_kv(cns: Consul, key: str) -> str:
+    kv: Dict[str, bytes] = cns.kv.get(key)[1]
     return kv['Value'].decode() if kv and kv['Value'] is not None else ''
 
 
-# XXX s/c/cns/
-def processes_get(c: Consul) -> List[Process]:
+def processes_get(cns: Consul) -> List[Process]:
     processes: List[Process] = []
-    for node in c.catalog.nodes()[1]:
-        svcs_status = c.health.node(node['Node'])
+    for node in cns.catalog.nodes()[1]:
+        svcs_status = cns.health.node(node['Node'])
         processes.extend(
             Process(node=node['Node'],
                     name=svc['ServiceName'],
@@ -78,9 +76,9 @@ def main():
     if consul_status(gethostname()) != 'passing':
         exit('Cluster is not running')
 
-    c = Consul()  # XXX s/c/cns/
-    processes = processes_get(c)
-    leader_node = get_kv(c, 'leader')
+    cns = Consul()
+    processes = processes_get(cns)
+    leader_node = get_kv(cns, 'leader')
 
     leader = None
     for svc in shutdown_sequence:
