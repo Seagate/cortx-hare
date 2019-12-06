@@ -9,11 +9,9 @@ contributors:
   - Konstantin Nekrasov <konstantin.nekrasov@seagate.com>
 ---
 
-# Language
+## Language
 
 The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "MAY", and "OPTIONAL" in this document are to be interpreted as described in [RFC 2119](https://tools.ietf.org/html/rfc2119).
-
-# General Architecture
 
 ## HAlink eXchange (hax)
 
@@ -27,27 +25,29 @@ The code of `hax` consists of C and Python parts.
 * The callback functions passed to `m0_halon_interface_start()` are defined in the Python code.  Callback handlers (e.g., `entrypoint_request_cb`, `msg_received_cb`) send HTTP requests to Consul.
 * Python part also runs HTTP server.  This server receives HTTP POST request from a Consul's watch handler with payload of HA state updates.
 
-# Interaction with Mero
+## Interaction with Mero
 
-## Mero Messages
+### Messages from Mero
 
-| Incoming message type     | Reaction of `hax`                                                                                                                    |
-|---------------------------|--------------------------------------------------------------------------------------------------------------------------------------|
-| M0_HA_MSG_STOB_IOQ        | m0_panic()                                                                                                                           |
-| M0_HA_MSG_NVEC            | Build the reply based on Consul. See the [details below](#4-when-nvec_get-request-is-received-from-ha_link-hax-replies). |
-| M0_HA_MSG_FAILURE_VEC_REQ | Reply with stub data - zero-sized vector for fid `M0_FID_TINIT('o', 2, 9)`                                                           |
-| M0_HA_MSG_FAILURE_VEC_REP | Reply with stub data - zero-sized vector for fid `M0_FID_TINIT('o', 2, 9)`                                                           |
-| M0_HA_MSG_KEEPALIVE_REQ   | m0_panic()                                                                                                                           |
-| M0_HA_MSG_KEEPALIVE_REP   | m0_panic()                                                                                                                           |
-| M0_HA_MSG_EVENT_PROCESS   | Update the status in Consul KV. See the [details below](#3-on-m0_ha_msg_event_process-hax-updates-the-process-status-in-consul-kv).  |
-| M0_HA_MSG_EVENT_SERVICE   | None                                                                                                                                 |
-| M0_HA_MSG_EVENT_RPC       | None                                                                                                                                 |
-| M0_HA_MSG_BE_IO_ERR       | m0_panic()                                                                                                                           |
-| M0_HA_MSG_SNS_ERR         | m0_panic()                                                                                                                           |
+[m0_ha_msg_type][] | Reaction of `hax`
+--- | ---
+M0_HA_MSG_STOB_IOQ | `m0_panic()`
+M0_HA_MSG_NVEC | Build the reply based on Consul data; see the [details below](#4-handling-of-nvec-get-request).
+M0_HA_MSG_FAILURE_VEC_REQ | Reply with stub data &mdash; empty vector for fid `M0_FID_TINIT('o', 2, 9)`.
+M0_HA_MSG_FAILURE_VEC_REP | Reply with stub data &mdash; empty vector for fid `M0_FID_TINIT('o', 2, 9)`.
+M0_HA_MSG_KEEPALIVE_REQ | `m0_panic()`
+M0_HA_MSG_KEEPALIVE_REP | `m0_panic()`
+M0_HA_MSG_EVENT_PROCESS | Update the status in Consul KV; see the [details below](#3-handling-of-m0-ha-msg-event-process-message).
+M0_HA_MSG_EVENT_SERVICE | None.
+M0_HA_MSG_EVENT_RPC | None.
+M0_HA_MSG_BE_IO_ERR | `m0_panic()`
+M0_HA_MSG_SNS_ERR | `m0_panic()`
 
-## Interaction Use Cases
+[m0_ha_msg_type]: http://gitlab.mero.colo.seagate.com/mero/mero/blob/master/ha/msg.h#L70
 
-### 1. Hax replies to incoming entrypoint requests
+### Interaction Use Cases
+
+#### 1. Hax replies to incoming entrypoint requests
 
 ```plantuml
 @startuml
@@ -78,7 +78,9 @@ deactivate Hax
 2. The order of replies is the same to the order of received requests.
 3. If hax is not able to build the reply (e.g. if Consul is not operational), hax will send `EAGAIN` back to the Mero process. Mero process MUST repeat the request.
 
-### 2. When Consul watcher sends the new Mero process statuses, hax forwards the statuses via ha_link
+#### 2. Consul watch sends new Mero process statuses
+
+When Consul watch sends new Mero process statuses, `hax` forwards the statuses via ha_link.
 
 ```plantuml
 @startuml
@@ -98,7 +100,9 @@ Hax -> HAlink: Send M0_HA_NVEC_SET message
 1. Incoming HTTP requests from Consul are processed in MainThread.
 2. The new HTTP request will not be handled until the current HTTP request has been processed.
 
-### 3. On M0_HA_MSG_EVENT_PROCESS hax updates the process status in Consul KV
+#### 3. Handling of M0_HA_MSG_EVENT_PROCESS message
+
+Having received M0_HA_MSG_EVENT_PROCESS from Mero, `hax` updates process status in the Consul KV.
 
 ```plantuml
 @startuml
@@ -125,7 +129,7 @@ deactivate Hax
 2. No other asynchronous requests can start processing until the current one gets processed.
    - Corollary: In case of Consul consistency issues, all asynchronous processing will be effectively paused: hax will only be responsive on HTTP requests during that time.
 
-### 4. When NVEC_GET request is received from ha_link, hax replies
+#### 4. Handling of NVEC_GET request
 
 ```plantuml
 @startuml
@@ -162,11 +166,7 @@ deactivate Hax
 2. No other asynchronous requests can start processing until the current one gets processed.
    - Corollary: In case of Consul consistency issues, all asynchronous processing will be effectively paused: hax will only be responsive on HTTP requests during that time.
 
-## Various Technical Details
-
-### Mero service notifications
-
-#### HA Link callbacks support
+### HA Link callbacks support
 
 Hax processes the following callbacks from `ha_link` (via `m0_ha_halon_interface`):
 
@@ -212,11 +212,12 @@ end
    - This is OK that the keys in the KV are not reader-friendly and don't expose the logical name of the mero process. The end user will need to look into [Consul services](https://www.consul.io/api/agent/service.html) to learn the state of the particular mero process.
 2. Checker script must check both value in Consul KV and `pgrep` the process. This is required to make sure that the value in KV is not obsolete.
 3. "online" status shown at the diagram is chosen for the sake of simplicity. The exhaustive list of the values to store can be seen in [4/KV](../4/README.md).
-# Interaction with Consul
 
-Internally `hax` uses [python-consul](https://pypi.org/project/python-consul/) Python module to interact with Consul. HaX depends on Consul KV and Consul watchers.
+## Interaction with Consul
 
-## Incoming HTTP requests
+Internally `hax` uses [python-consul](https://pypi.org/project/python-consul/) Python module to interact with Consul. HaX depends on Consul KV and Consul watches.
+
+### Incoming HTTP requests
 
 `hax` receives HTTP POST requests from Consul's [watch handler](https://www.consul.io/docs/agent/watches.html#http-endpoint).  The payload is JSON formatted data with the following structure:
 
