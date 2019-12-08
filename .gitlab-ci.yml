@@ -21,7 +21,7 @@ stages:
 before_script:
   - date -u -Isec
   - git log -1 --pretty=fuller
-  - printenv
+  - export
 
 after_script:
   - date -u -Isec
