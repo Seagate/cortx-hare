@@ -3,22 +3,30 @@ set -eu -o pipefail
 export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
 set -x
 
-. ci/common-defs.sh  # ci_docker
+. ci/common-defs.sh  # ci_docker, die
 
-sudo rm -rf $WORKSPACE_DIR
+# Make sure that the build image is up to date.
+docker pull $DOCKER_REGISTRY/mero/hare:$CENTOS_RELEASE
+
+if [[ -d $WORKSPACE_DIR ]]; then
+    die "${FUNCNAME[0]}: \$WORKSPACE_DIR is not expected to exist"
+fi
 mkdir -p $WORKSPACE_DIR
-cp -a ../$CI_PROJECT_NAME $WORKSPACE_DIR
+cp -a $CI_PROJECT_DIR $WORKSPACE_DIR/
 
 cd $WORKSPACE_DIR
 
-# Make sure that build image is up to date.
-docker pull $DOCKER_REGISTRY/mero/hare:$CENTOS_RELEASE
+cat > hare/ci/_env <<EOF
+MERO_COMMIT_REF=${MERO_COMMIT_REF:-}
+RPMSYNC_DIR=${RPMSYNC_DIR:-}
+EOF
 
-# Get a fresh copy of Mero.
-git clone --recursive --depth 1 --shallow-submodules \
-    http://gitlab.mero.colo.seagate.com/mero/mero.git
+if [[ -n ${MERO_COMMIT_REF:-} ]]; then
+    git clone --recursive http://gitlab.mero.colo.seagate.com/mero/mero.git
+    cd mero
+    git checkout $MERO_COMMIT_REF
+    cd -
 
-ci_docker ci/docker/build-mero
-
-# Build Hare.
-ci_docker make build
+    ci_docker ci/docker/build-mero
+    ci_docker make build  # build Hare
+fi

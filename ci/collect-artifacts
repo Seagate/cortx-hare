@@ -23,7 +23,7 @@ do
     )
 
     # m0reportbug archives
-    $_m0vg run --vm $vm sudo /data/mero/utils/m0reportbug
+    $_m0vg run --vm $vm sudo ${MERO_COMMIT_REF:+/data/mero/utils/}m0reportbug
     $_m0vg scp $vm:m0reportbug-\*.tar.xz $outdir/
     (
         cd $outdir

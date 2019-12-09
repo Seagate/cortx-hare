@@ -188,7 +188,7 @@ while read node _; do
 done < <(get_server_nodes | grep -vw $HOSTNAME || true)
 echo 'Ok.'
 
-say 'Waiting for the RC Leader to be elected...'
+say 'Waiting for the RC Leader to get elected...'
 wait_rc_leader
 sid=$(get_session)
 # There is always the serfHealth check in the session. But
@@ -246,7 +246,7 @@ bootstrap_nodes phase1
 # Start ioservices
 bootstrap_nodes phase2
 
-say 'Checking the health of the services... '
+say 'Checking health of the services... '
 check_service() {
     local svc=$1
     curl -s http://127.0.0.1:8500/v1/health/service/$svc |

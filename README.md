@@ -117,45 +117,9 @@ See `cfgen --help-schema` for the description of CDF format.
   -->
 
   ```sh
-  cat <<'EOF' >/tmp/test-io.yaml
-  CrateConfig_Sections: [MERO_CONFIG, WORKLOAD_SPEC]
-
-  MERO_CONFIG:
-    MERO_LOCAL_ADDR: 192.168.122.122@tcp:12345:33:302
-    MERO_HA_ADDR:    192.168.122.122@tcp:12345:34:101
-    CLOVIS_PROF: <0x7000000000000001:0x4d>  # profile
-    LAYOUT_ID: 9                      # defines the UNIT_SIZE (9: 1MB)
-    IS_OOSTORE: 1                     # is oostore-mode?
-    IS_READ_VERIFY: 0                 # enable read-verify?
-    CLOVIS_TM_RECV_QUEUE_MIN_LEN: 16  # minimum length of the receive queue
-    CLOVIS_MAX_RPC_MSG_SIZE: 65536    # maximum rpc message size
-    CLOVIS_PROCESS_FID: <0x7200000000000001:0x28>
-    CLOVIS_IDX_SERVICE_ID: 1
-
-  LOG_LEVEL: 4  # err(0), warn(1), info(2), trace(3), debug(4)
-
-  WORKLOAD_SPEC:              # workload specification section
-    WORKLOAD:                 # first workload
-      WORKLOAD_TYPE: 1        # index(0), IO(1)
-      WORKLOAD_SEED: tstamp   # SEED to the random number generator
-      OPCODE: 3               # operation(s) to test: 2-WRITE, 3-WRITE+READ
-      CLOVIS_IOSIZE: 10m      # total size of IO to perform per object
-      BLOCK_SIZE: 2m          # in N+K conf set to (N * UNIT_SIZE) for max perf
-      BLOCKS_PER_OP: 1        # number of blocks per Clovis operation
-      MAX_NR_OPS: 1           # max concurrent operations per thread
-      NR_OBJS: 10             # number of objects to create by each thread
-      NR_THREADS: 4           # number of threads to run in this workload
-      RAND_IO: 1              # random (1) or sequential (0) IO?
-      MODE: 1                 # synchronous=0, asynchronous=1
-      THREAD_OPS: 0           # all threads write to the same object?
-      NR_ROUNDS: 1            # number of times this workload is run
-      EXEC_TIME: unlimited    # execution time (secs or "unlimited")
-      SOURCE_FILE: /tmp/128M  # source data file
-  EOF
-
-  /opt/seagate/hare/libexec/hare/update-m0crate-io-test-conf /tmp/test-io.yaml
+  /opt/seagate/hare/libexec/hare/m0crate-io-conf >/tmp/m0crate-io.yaml
   dd if=/dev/urandom of=/tmp/128M bs=1M count=128
-  sudo m0crate -S /tmp/test-io.yaml
+  sudo m0crate -S /tmp/m0crate-io.yaml
   ```
 
 * Stop the cluster

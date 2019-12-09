@@ -11,7 +11,7 @@
 # parallel build jobs
 %define h_build_jobs_opt  %(test -n "$build_jobs" && echo "-j$build_jobs" || echo '')
 
-Summary: HARE (HAlon REplacement)
+Summary: Hare (Halon replacement)
 Name: hare
 Version: %{h_version}
 Release: %{h_build_num}_%{h_gitrev}_m0%{h_mero_gitrev}%{?dist}

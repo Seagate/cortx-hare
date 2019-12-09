@@ -18,26 +18,28 @@ ci_docker() (
 
     cd $WORKSPACE_DIR
 
-    _time docker run --rm --name $JOB_LABEL -v ~+:/data -w /data/hare \
+    _time docker run --rm --name $JOB_LABEL -v $PWD:/data -w /data/hare \
          $DOCKER_REGISTRY/mero/hare:$CENTOS_RELEASE "$@"
 
     # Containers run commands as 'root' user.  Restore the ownership.
     sudo chown -R $(id -u):$(id -g) .
 )
 
-ci_m0vg_init() (
+ci_init_m0vg() (
     case $# in
         1) local m0vg_dir=m0vg-1node;;
         2) local m0vg_dir=m0vg-2nodes;;
         *) die "Usage: ${FUNCNAME[0]} HOST...";;
     esac
-
     [[ $M0VG == $m0vg_dir/scripts/m0vg ]] ||
         die "${FUNCNAME[0]}: Impossible happened"
 
     cd $WORKSPACE_DIR
 
     if [[ ! -d $m0vg_dir ]]; then
+        # Get `m0vg` script ($m0vg_dir/scripts/m0vg).
+        # Note that we download the latest Mero, disregarding
+        # `MERO_COMMIT_REF`.
         git clone --recursive --depth 1 --shallow-submodules \
             http://gitlab.mero.colo.seagate.com/mero/mero.git $m0vg_dir
     fi

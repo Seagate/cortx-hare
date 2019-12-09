@@ -2,10 +2,13 @@ SHELL = bash
 
 PYTHON_SCRIPTS = cfgen
 
-M0_SRC_DIR = ../../mero
+M0CONFGEN := $(if $(shell which m0confgen),m0confgen,../../mero/utils/m0confgen)
 
 dhall-lang-version := $(shell readlink ../vendor/dhall-prelude/current)
 dhall-lang-dir := dhall/dhall-lang-$(dhall-lang-version)
+
+opt_mock := $(shell if ! which facter >& /dev/null ||\
+ grep -q ':/docker/' /proc/1/cgroup 2>/dev/null; then echo '--mock'; fi)
 
 .PHONY: check
 check: flake8 typecheck test-cfgen check-dhall
@@ -22,10 +25,9 @@ typecheck: $(PYTHON_SCRIPTS)
 test-cfgen: unpack-dhall-prelude
 	set -eu -o pipefail;\
  out=$$(mktemp -d);\
- if which facter >&/dev/null; then opt_mock=''; else opt_mock='--mock'; fi;\
- ./cfgen -D ./dhall $$opt_mock --debug examples/singlenode.yaml >/dev/null;\
- ./cfgen -D ./dhall $$opt_mock -o $$out examples/singlenode.yaml;\
- dhall text <$$out/confd.dhall | $(M0_SRC_DIR)/utils/m0confgen >/dev/null;\
+ ./cfgen -D ./dhall $(opt_mock) --debug examples/singlenode.yaml >/dev/null;\
+ ./cfgen -D ./dhall $(opt_mock) -o $$out examples/singlenode.yaml;\
+ dhall text <$$out/confd.dhall | $(M0CONFGEN) >/dev/null;\
  jq . <$$out/consul-kv.json >/dev/null;\
  rm -r $$out
 
@@ -35,7 +37,7 @@ check-dhall: unpack-dhall-prelude
  yaml-to-dhall ./dhall/types/ClusterDesc.dhall <$$cdf >/dev/null; done
 	yaml-to-dhall ./dhall/types/ClusterDesc.dhall <examples/singlenode.yaml\
  | dhall-to-yaml | diff -u - <(dhall-to-yaml <<<./tests/singlenode.dhall)
-	xcode() { sort | $(M0_SRC_DIR)/utils/m0confgen; };\
+	xcode() { sort | $(M0CONFGEN); };\
  dhall text --file tests/sample-confd.dhall | xcode\
  | diff -u - <(xcode <tests/conf.cg)
 
@@ -43,7 +45,7 @@ check-dhall: unpack-dhall-prelude
 unpack-dhall-prelude: $(dhall-lang-dir)/Prelude/package.dhall
 
 $(dhall-lang-dir)/Prelude/package.dhall:
-	tar -C dhall -xzf\
+	tar -C dhall --no-same-owner -xzf\
  ../vendor/dhall-prelude/$(dhall-lang-version)/v$(dhall-lang-version).tar.gz\
  dhall-lang-$(dhall-lang-version)/Prelude
 

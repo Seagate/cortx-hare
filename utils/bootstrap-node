@@ -69,6 +69,13 @@ systemctl list-unit-files | grep -qE '^mero-kernel\.service\>' ||
 
 . update-consul-conf --dry-run  # import CONFD_IDs, IOS_IDs, id2fid()
 
+if [[ $do_mkfs ]] && [[ ! -e /etc/sysconfig/mero-kernel ]]; then
+    # Auto-start of `mero-kernel` systemd unit will cause kernel panic
+    # unless `MERO_NODE_UUID` configuration option is provided.
+    echo "MERO_NODE_UUID='$(uuidgen --time)'" |
+        sudo tee /etc/sysconfig/mero-kernel >/dev/null
+fi
+
 if [[ -n $CONFD_IDs || -n $IOS_IDs ]]; then
     sudo mkdir -p /var/mero/hax
     sudo systemctl start hare-hax
@@ -82,7 +89,8 @@ fi
 
 if [[ -n $CONFD_IDs && $phase == phase1 ]]; then
     [[ -f /var/lib/hare/confd.xc ]] ||
-        die 'Cannot bootstrap a server node without /var/lib/hare/confd.xc file'
+        die 'Cannot bootstrap server node without /var/lib/hare/confd.xc file'
+    sudo mkdir -p /etc/mero
     sudo cp /var/lib/hare/confd.xc /etc/mero/
 fi
 
@@ -95,9 +103,6 @@ fi
 for id in $IDs; do
     fid=$(id2fid $id)
     if [[ $do_mkfs ]]; then
-        echo "MERO_NODE_UUID='$(uuidgen --time)'" |
-            sudo tee /etc/sysconfig/mero-kernel >/dev/null
-
         sudo systemctl start mero-mkfs@$fid
         touch /tmp/mero-mkfs-pass-$fid
         # Give time for service check to reset m0mkfs' HA state:

@@ -3,14 +3,24 @@ set -eu -o pipefail
 export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
 set -x
 
+. /data/hare/ci/_env  # MERO_COMMIT_REF, RPMSYNC_DIR
+
 sudo mkdir -p /var/mero
 for i in {0..9}; do
     sudo dd if=/dev/zero of=/var/mero/disk$i.img bs=1M seek=9999 count=1
     sudo losetup /dev/loop$i /var/mero/disk$i.img
 done
 
-# XXX `systemctl start hare-hax` command, called by `bootstrap-node`,
-# will fail unless `mero-kernel` systemd service is installed.
-sudo /data/mero/scripts/install-mero-service
+if [[ -n ${MERO_COMMIT_REF:-} ]]; then
+    # `systemctl start hare-hax` command, called by `bootstrap-node`,
+    # will fail unless `mero-kernel` systemd service is installed.
+    sudo /data/mero/scripts/install-mero-service
 
-sudo make -C /data/hare devinstall
+    sudo make -C /data/hare devinstall
+else
+    repo="ci-storage.mero.colo.seagate.com${RPMSYNC_DIR}"
+    sudo yum-config-manager --add-repo="http://$repo"
+    sudo tee -a /etc/yum.repos.d/${repo//\//_}.repo <<< 'gpgcheck=0'
+
+    sudo yum install -y hare
+fi

@@ -1,5 +1,5 @@
 # Contexts of execution
 
-- `ci/docker/*` scripts run within Docker container.
-- `ci/m0vg/*` scripts run within m0vg VM.
 - `ci/*` scripts run at GitLab runner's machine.
+- `ci/docker/*` scripts run inside Docker container.
+- `ci/m0vg/*` scripts run inside m0vg VM.

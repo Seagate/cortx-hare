@@ -2,16 +2,26 @@
 #
 
 variables:
+  CENTOS_RELEASE: '7.6'
+
+  # Mero git reference to build and use.
+  #
+  # If `MERO_COMMIT_REF` is empty or undefined, CI will use rpms from
+  # http://ci-storage.mero.colo.seagate.com/releases/eos/BLATEST/
+  MERO_COMMIT_REF: ''
+
+  DOCKER_REGISTRY: registry.gitlab.mero.colo.seagate.com
   GIT_DEPTH: 1  # clone only the current commit
   GIT_STRATEGY: clone  # make a fresh `git clone` of the repo for every new CI job
   GIT_SUBMODULE_STRATEGY: normal  # init and check out submodules
-  CENTOS_RELEASE: '7.6'
-  DOCKER_REGISTRY: registry.gitlab.mero.colo.seagate.com
   M0_VG_NO_SYMLINKS: "true"
-  RPMSYNC_DIR:    "/releases/dev/$CI_PROJECT_PATH/$CI_COMMIT_REF_SLUG/B$CI_PIPELINE_ID"
-  WORKSPACE_NAME: "${CI_PROJECT_NAME}${CI_PIPELINE_ID}"
-  WORKSPACE_DIR:  "/home/gitlab-runner/workspaces/${CI_PROJECT_NAME}${CI_PIPELINE_ID}"
+
+  # rpms will be accessible at http://ci-storage.mero.colo.seagate.com${RPMSYNC_DIR}
+  RPMSYNC_DIR: "/releases/dev/$CI_PROJECT_PATH/$CI_COMMIT_REF_SLUG/B$CI_PIPELINE_ID"
+
   TEST_BOOT_TIMEOUT: 30  # max allowed duration of test-boot* job, in minutes
+  WORKSPACE_DIR:  "/home/gitlab-runner/workspaces/${CI_PROJECT_NAME}${CI_PIPELINE_ID}"
+  WORKSPACE_NAME: "${CI_PROJECT_NAME}${CI_PIPELINE_ID}"
 
 stages:
   - build
@@ -41,15 +51,11 @@ rpmbuild:
   except: [ tags ]
   image: $DOCKER_REGISTRY/mero/hare:$CENTOS_RELEASE
   script: [ ci/rpmbuild ]
+  except:
+    variables: [ $MERO_COMMIT_REF ]
 
 # Test ----------------------------------------------------------------- {{{1
 #
-
-test-utils:
-  stage: test
-  tags: [ m0vg ]
-  except: [ tags ]
-  script: [ ci/test-utils ]
 
 # See https://docs.gitlab.com/ce/ci/yaml/README.html#anchors
 .test_boot_template: &test_boot_definition
@@ -86,6 +92,12 @@ test-boot1:
 test-boot2:
   variables: { M0VG: m0vg-2nodes/scripts/m0vg }
   <<: *test_boot_definition
+
+test-utils:
+  stage: test
+  tags: [ m0vg ]
+  except: [ tags ]
+  script: [ ci/test-utils ]
 
 # Cleanup ----------------------------------------------------------------- {{{1
 #
