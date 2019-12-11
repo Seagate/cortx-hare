@@ -136,8 +136,7 @@ install: install-dirs install-cfgen install-hax install-systemd install-vendor
 install-dirs: install-hax-dirs
 	@$(call _info,Installing directories)
 	@install --verbose --directory --mode=777 $(DESTDIR)/var/lib/hare
-	@install --verbose --directory $(DESTDIR)/var/log/hare
-	@for d in $(HARE_LIBEXEC) ; \
+	@for d in $(HARE_LIBEXEC) $(DESTDIR)/var/log/hare ; \
 	 do \
 	     install --verbose --directory $$d; \
 	 done
@@ -268,11 +267,8 @@ HAX_MODULE    = $(wildcard $(DESTDIR)/$(PREFIX)/lib64/python3.$(PY3_VERSION_MINO
 EASY_INST_PTH = $(DESTDIR)/$(PREFIX)/lib/python3.$(PY3_VERSION_MINOR)/site-packages/easy-install.pth
 
 .PHONY: uninstall
-uninstall: uninstall-hax
-
-.PHONY: uninstall-hax
-uninstall-hax:
-	@$(call _info,Un-installing hax)
+uninstall:
+	@$(call _info,Un-installing)
 	@for d in $(CFGEN_EXE) $(CFGEN_SHARE) \
 	          $(HAX_EXE) $(HAX_EGG_LINK) $(HAX_EGG) $(HAX_MODULE) \
 	          $(EASY_INST_PTH) \
