@@ -85,6 +85,7 @@ TEMP=$(getopt --options hc: \
 eval set -- "$TEMP"
 
 conf_dir=
+opt_mkfs=
 
 while true; do
     case "$1" in
@@ -216,7 +217,8 @@ start_mero() {
     local op=$1
     local phase=$2
 
-    say "Starting Mero `echo $op | sed 's/--//; s/-only$//'` ($phase)... "
+    say "Starting Mero ($phase, $op)... "
+    [[ $op == 'mkfs' ]] && op='--mkfs-only' || op=
     bootstrap-node $op --phase $phase &
     pids=($!)
 
@@ -231,12 +233,11 @@ start_mero() {
 # Start Mero in two phases: 1st confd-s, then ios-es.
 bootstrap_nodes() {
     local phase=$1
-    local mkfs=${opt_mkfs:-}
 
-    if [[ $mkfs ]]; then
-        start_mero --mkfs-only $phase
+    if [[ $opt_mkfs ]]; then
+        start_mero 'mkfs' $phase
     fi
-    start_mero --m0d $phase
+    start_mero 'm0d' $phase
 }
 
 # Start confds first
