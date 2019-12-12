@@ -134,8 +134,8 @@ install: install-dirs install-cfgen install-hax install-systemd install-vendor
 .PHONY: install-dirs
 install-dirs: install-hax-dirs
 	@$(call _info,Installing directories)
-	@for d in $(DESTDIR)/var/lib/hare \
-	          $(HARE_LIBEXEC) ; \
+	@install --verbose --directory --mode=777 $(DESTDIR)/var/lib/hare
+	@for d in $(HARE_LIBEXEC) ; \
 	 do \
 	     install --verbose --directory $$d; \
 	 done

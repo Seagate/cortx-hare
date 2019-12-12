@@ -23,7 +23,7 @@ test_cluster() {
     do_io
     time hctl shutdown
 
-    time hctl bootstrap --conf-dir /tmp  # bootstrap on existing conf
+    time hctl bootstrap --conf-dir /var/lib/hare  # bootstrap on existing conf
     do_io
     time hctl shutdown
 }

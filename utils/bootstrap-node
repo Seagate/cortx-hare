@@ -81,9 +81,9 @@ if [[ -n $CONFD_IDs || -n $IOS_IDs ]]; then
 fi
 
 if [[ -n $CONFD_IDs && $phase == phase1 ]]; then
-    [[ -f /tmp/confd.xc ]] ||
-        die 'Cannot bootstrap a server node without /tmp/confd.xc file'
-    sudo cp /tmp/confd.xc /etc/mero/
+    [[ -f /var/lib/hare/confd.xc ]] ||
+        die 'Cannot bootstrap a server node without /var/lib/hare/confd.xc file'
+    sudo cp /var/lib/hare/confd.xc /etc/mero/
 fi
 
 if [[ $phase == phase1 ]]; then

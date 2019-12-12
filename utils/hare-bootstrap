@@ -103,7 +103,7 @@ done
 }
 
 cluster_descr=${1:-}
-cfgen_out=${conf_dir:-'/tmp'}
+cfgen_out=${conf_dir:-'/var/lib/hare'}
 
 if ! [[ $conf_dir ]]; then
     say 'Generating cluster configuration... '
@@ -184,7 +184,7 @@ echo 'Ok.'
 
 say 'Install Mero configuration files... '
 while read node _; do
-    scp -q $cfgen_out/confd.xc $node:/tmp/
+    scp -q $cfgen_out/confd.xc $node:$cfgen_out
 done < <(get_server_nodes | grep -vw $HOSTNAME || true)
 echo 'Ok.'
 
