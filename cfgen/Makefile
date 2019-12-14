@@ -2,7 +2,8 @@ SHELL = bash
 
 PYTHON_SCRIPTS = cfgen
 
-M0CONFGEN := $(if $(shell which m0confgen),m0confgen,../../mero/utils/m0confgen)
+M0CONFGEN := $(if\
+ $(shell which m0confgen 2>/dev/null),m0confgen,../../mero/utils/m0confgen)
 
 dhall-lang-version := $(shell readlink ../vendor/dhall-prelude/current)
 dhall-lang-dir := dhall/dhall-lang-$(dhall-lang-version)
