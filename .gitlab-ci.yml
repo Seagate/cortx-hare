@@ -69,7 +69,7 @@ rpmbuild:
   after_script:
     - date -u -Isec
     - cd $WORKSPACE_DIR
-    - /usr/bin/time hare/ci/collect-artifacts
+    - /usr/bin/time hare/ci/collect-artifacts || true
 
     # Clean up.  This ensures that VMs are destroyed in case of a manual
     # job restart, when global 'cleanup' stage is not performed.
