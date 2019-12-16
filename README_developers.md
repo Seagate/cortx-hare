@@ -99,12 +99,12 @@ has been elected.
 
 * RC leader election log:
   ```sh
-  tail -f /var/lib/hare/consul-elect-rc-leader.log
+  tail -f /var/log/hare/consul-elect-rc-leader.log
   ```
 
 * RC log:
   ```sh
-  tail -f /var/lib/hare/consul-proto-rc.log
+  tail -f /var/log/hare/consul-proto-rc.log
   ```
 
 * System log:
@@ -128,7 +128,7 @@ has been elected.
 * Add a timeout and monitor it via the log:
 
   ```
-  $ tail -f /var/lib/hare/consul-proto-rc.log &
+  $ tail -f /var/log/hare/consul-proto-rc.log &
   [2] 10457
   $
   $ consul kv put timeout/201907221208.00 tmo1

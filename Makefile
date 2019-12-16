@@ -136,6 +136,7 @@ install: install-dirs install-cfgen install-hax install-systemd install-vendor
 install-dirs: install-hax-dirs
 	@$(call _info,Installing directories)
 	@install --verbose --directory --mode=777 $(DESTDIR)/var/lib/hare
+	@install --verbose --directory $(DESTDIR)/var/log/hare
 	@for d in $(HARE_LIBEXEC) ; \
 	 do \
 	     install --verbose --directory $$d; \
@@ -282,6 +283,7 @@ uninstall-hax:
 	          $(DESTDIR)/$(PREFIX)/bin/*dhall* \
 	          $(DESTDIR)/usr/bin/hctl \
 	          $(DESTDIR)/var/lib/hare \
+	          $(DESTDIR)/var/log/hare \
 	          $(DESTDIR)/var/mero/hax ; \
 	 do \
 	     if [[ -e $$d ]]; then \

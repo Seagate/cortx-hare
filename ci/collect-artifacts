@@ -12,7 +12,7 @@ do
         --output short-precise > $outdir/${CI_JOB_NAME}_${vm}_syslog.log
 
     # Consul logs
-    $M0VG scp $vm:/var/lib/hare/consul\*.log $outdir/ || true
+    $M0VG scp $vm:/var/log/hare/consul\*.log $outdir/ || true
     (
         cd $outdir
         for f in consul*.log; do

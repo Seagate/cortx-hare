@@ -12,8 +12,10 @@ set -eu -o pipefail
 # $ consul watch -type=key -key leader elect-rc-leader
 #
 
+sudo mkdir -p /var/log/hare
+
 # Redirect all printouts to the log file with the timestamp prefix:
-exec &>> /var/lib/hare/consul-${0##*/}.log
+exec &>> /var/log/hare/consul-${0##*/}.log
 exec &> >(stdbuf -oL gawk '{ print strftime("%Y-%m-%d %H:%M:%S"), $0 }')
 
 export SRC_DIR="$(dirname $(readlink -f $0))"
