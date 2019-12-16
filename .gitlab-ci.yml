@@ -116,6 +116,7 @@ cleanup:
     # commit. Cloning 30 latest commits seems to be good enough - it's quite
     # rare for people to push more than 30 new commits in one go.
     GIT_DEPTH: 30
+    GIT_SUBMODULE_STRATEGY: none
 
   script:
     - cd $WORKSPACE_DIR
