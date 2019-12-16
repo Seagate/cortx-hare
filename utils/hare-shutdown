@@ -96,7 +96,7 @@ def main() -> None:
     for svc in shutdown_sequence:
         for proc in processes[svc]:
             process_stop(proc)
-    print(f'Killing Consul leader at {leader_node}... ', end='', flush=True)
+    print(f'Killing RC Leader at {leader_node}... ', end='', flush=True)
     exec(ssh_prefix(leader_node) + 'sudo pkill --exact -KILL consul')
 
 
