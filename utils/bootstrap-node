@@ -76,15 +76,34 @@ if [[ $do_mkfs ]] && [[ ! -e /etc/sysconfig/mero-kernel ]]; then
         sudo tee /etc/sysconfig/mero-kernel >/dev/null
 fi
 
+wait_active() {
+    local svc=$1
+    local timeout=$2 # in secs
+    local count=0
+
+    while ! systemctl --quiet is-active $svc; do
+        (($count < $timeout)) || die "Failed to start $svc service."
+        sleep 1
+        ((++count))
+    done
+}
+
+wait_m0d_started() {
+    local fid=$1
+    local timeout=$2 # in secs
+    local count=0
+
+    while ! sudo systemctl status "m0d@$fid" | grep -q 'Started'; do
+        (($count < $timeout)) || die "Failed to start m0d@$fid service."
+        sleep 1
+        ((++count))
+    done
+}
+
 if [[ -n $CONFD_IDs || -n $IOS_IDs ]]; then
     sudo mkdir -p /var/mero/hax
     sudo systemctl start hare-hax
-    count=1
-    while ! systemctl is-active hare-hax > /dev/null; do
-        (($count < 5)) || die "Failed to start hax service."
-        sleep 1
-        ((count++))
-    done
+    wait_active hare-hax 5
 fi
 
 if [[ -n $CONFD_IDs && $phase == phase1 ]]; then
@@ -112,5 +131,6 @@ for id in $IDs; do
 
     if [[ $do_mkfs != 'mkfs-only' ]]; then
         sudo systemctl start m0d@$fid
+        wait_m0d_started $fid 30
     fi
 done
