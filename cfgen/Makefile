@@ -8,7 +8,7 @@ M0CONFGEN := $(if\
 dhall-lang-version := $(shell readlink ../vendor/dhall-prelude/current)
 dhall-lang-dir := dhall/dhall-lang-$(dhall-lang-version)
 
-opt_mock := $(shell if ! which facter >& /dev/null ||\
+opt_mock := $(shell if ! which facter &>/dev/null ||\
  grep -q ':/docker/' /proc/1/cgroup 2>/dev/null; then echo '--mock'; fi)
 
 .PHONY: check
