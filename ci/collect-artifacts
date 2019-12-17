@@ -3,30 +3,31 @@ set -eu -o pipefail
 export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
 # set -x
 
+say() {
+    echo "[$(date +%T)] $*"
+}
+
 outdir=$CI_PROJECT_DIR
 
-$M0VG status | awk '$2 == "running" {print $1}' | while read vm
-do
-    # syslog
+for vm in $($M0VG status | awk '$2 == "running" {print $1}'); do
+    echo "----- $vm -----"
+
+    say 'syslog'
     $M0VG run --vm $vm sudo journalctl --no-pager --full --utc --boot \
-        --output short-precise > $outdir/${CI_JOB_NAME}_${vm}_syslog.log
+        --output short-precise >$outdir/syslog.log 2>/dev/null
 
-    # Consul logs
-    $M0VG scp $vm:/var/log/hare/consul\*.log $outdir/ || true
-    (
-        cd $outdir
-        for f in consul*.log; do
-            mv -v {,${CI_JOB_NAME}_${vm}_}$f
-        done
-    )
+    say 'Consul logs'
+    $M0VG scp $vm:/var/log/hare/consul\*.log $outdir/ &>/dev/null
 
-    # m0reportbug archives
-    $M0VG run --vm $vm sudo ${MERO_COMMIT_REF:+/data/mero/utils/}m0reportbug
-    $M0VG scp $vm:m0reportbug-\*.tar.xz $outdir/ || true
-    (
-        cd $outdir
-        for f in m0reportbug-*.tar.xz; do
-            mv -v {,${CI_JOB_NAME}_${vm}_}$f
-        done
-    )
+    say 'm0reportbug'
+    $M0VG run --vm $vm sudo ${MERO_COMMIT_REF:+/data/mero/utils/}m0reportbug \
+          &>/dev/null
+    $M0VG scp $vm:m0reportbug-\*.tar.xz $outdir/ &>/dev/null
+
+    say
+    cd $outdir
+    for f in {syslog,consul,m0reportbug}*; do
+        [[ -e $f ]] && mv {,${CI_JOB_NAME}_${vm}_}$f
+    done
+    cd -
 done
