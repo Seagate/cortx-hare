@@ -88,6 +88,9 @@ wait_active() {
     done
 }
 
+# m0d sends 'active' to systemd before the startup is actually finished,
+# so we need to parse the output of m0d this way to make sure it is
+# really started.
 wait_m0d_started() {
     local fid=$1
     local timeout=$2 # in secs
