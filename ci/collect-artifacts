@@ -29,5 +29,5 @@ for vm in $($M0VG status | awk '$2 == "running" {print $1}'); do
     for f in {syslog,consul,m0reportbug}*; do
         [[ -e $f ]] && mv {,${CI_JOB_NAME}_${vm}_}$f
     done
-    cd -
+    cd - >/dev/null
 done
