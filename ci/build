@@ -17,10 +17,19 @@ cp -a $CI_PROJECT_DIR $WORKSPACE_DIR/
 cd $WORKSPACE_DIR
 
 cat > hare/ci/_env <<EOF
-HARE_CI_S3_ACCESS_KEY=${HARE_CI_S3_ACCESS_KEY:-}
-HARE_CI_S3_SECRET_KEY=${HARE_CI_S3_SECRET_KEY:-}
 MERO_COMMIT_REF=${MERO_COMMIT_REF:-}
 RPMSYNC_DIR=${RPMSYNC_DIR:-}
+
+# Disable 'set -x' while assigning secret variables in order for their
+# values to not be shown.
+_orig_set_flags=\$-
+set +x
+
+HARE_CI_S3_ACCESS_KEY=${HARE_CI_S3_ACCESS_KEY:-}
+HARE_CI_S3_SECRET_KEY=${HARE_CI_S3_SECRET_KEY:-}
+
+set -\$_orig_set_flags
+unset _orig_set_flags
 EOF
 
 if [[ -n ${MERO_COMMIT_REF:-} ]]; then
