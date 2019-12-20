@@ -10,28 +10,23 @@ chmod 0600 $kh
 sudo mkdir -p /root/.ssh
 sudo cp $kh /root/.ssh
 
+test_cluster() {
+    local cdf=$1
+
+    time hctl bootstrap --mkfs $cdf
+    hctl status
+    time hctl shutdown
+}
+
 cd /data/hare/
 
 # Server-server Consul agents configuration.
-time hctl bootstrap --mkfs cfgen/examples/ci-boot2.yaml
-
-hctl status
-
-time hctl shutdown
+test_cluster cfgen/examples/ci-boot2.yaml
 
 # Server-client Consul agents configuration.
-time hctl bootstrap --mkfs cfgen/examples/ci-boot2-1confd.yaml
+test_cluster cfgen/examples/ci-boot2-1confd.yaml
 
-hctl status
-
-time hctl shutdown
-
-# S3 configuration.
-cp cfgen/examples/ci-boot2.yaml /tmp/_s3_ci-boot2.yaml
-sed -i 's/s3: 0/s3: 2/' /tmp/_s3_ci-boot2.yaml
-time hctl bootstrap --mkfs /tmp/_s3_ci-boot2.yaml
-
-hctl status
-
-time hctl shutdown
-rm -rf /tmp/_s3_ci-boot2.yaml
+# 2x2 S3 servers.
+cdf=cfgen/examples/_ci-boot2_s3.yaml
+sed 's/s3: 0/s3: 2/' cfgen/examples/ci-boot2.yaml >$cdf
+test_cluster $cdf
