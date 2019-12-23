@@ -4,6 +4,7 @@ export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
 set -x
 
 . /data/hare/ci/_env  # MERO_COMMIT_REF
+. /data/hare/ci/functions.sh  # _time
 
 # XXX `m0crate-io-conf` executes `consul`, which is /opt/seagate/hare/bin.
 # There should be a better way to add that directory to PATH; see
@@ -13,8 +14,8 @@ export PATH="/opt/seagate/hare/bin:$PATH"
 do_io() {
     utils/m0crate-io-conf >_m0crate-io.yaml
     dd if=/dev/urandom of=/tmp/128M bs=1M count=128
-    sudo ${MERO_COMMIT_REF:+/data/mero/clovis/m0crate/}m0crate \
-         -S _m0crate-io.yaml
+    _time sudo ${MERO_COMMIT_REF:+/data/mero/clovis/m0crate/}m0crate \
+          -S _m0crate-io.yaml
 }
 
 test_cluster() {
@@ -22,11 +23,11 @@ test_cluster() {
 
     time hctl bootstrap --mkfs $cdf
     do_io
-    time hctl shutdown
+    _time hctl shutdown
 
     time hctl bootstrap --conf-dir /var/lib/hare  # bootstrap on existing conf
     do_io
-    time hctl shutdown
+    _time hctl shutdown
 }
 
 cd /data/hare/

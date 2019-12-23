@@ -17,28 +17,14 @@ if [[ -n ${MERO_COMMIT_REF:-} ]]; then
     sudo /data/mero/scripts/install-mero-service
 
     sudo make -C /data/hare devinstall
-    exit
+else
+    repo="ci-storage.mero.colo.seagate.com${RPMSYNC_DIR}"
+    sudo yum-config-manager --add-repo="http://$repo"
+    sudo tee -a /etc/yum.repos.d/${repo//\//_}.repo <<< 'gpgcheck=0'
+
+    sudo yum install -y hare s3server s3cmd
 fi
 
-add_repo() {
-    local repo=$1
-    if [[ $repo == ${repo#http://} ]]; then
-        echo 'http:// prefix expected' >&2
-        return 1
-    fi
-    sudo yum-config-manager --add-repo=$repo
-    repo=${repo#http://}
-    sudo tee -a /etc/yum.repos.d/${repo//\//_}.repo <<< 'gpgcheck=0'
-}
-
-ci_storage_url=http://ci-storage.mero.colo.seagate.com
-
-add_repo ${ci_storage_url}${RPMSYNC_DIR}
-sudo yum install -y hare
+# Current user should be able to write to /var/lib/hare/ directory,
+# which is owned by 'hare' group.
 sudo usermod --append --groups hare $USER
-
-add_repo $ci_storage_url/releases/eos/s3server_uploads
-sudo yum install -y log4cxx_eos log4cxx_eos-devel s3cmd
-
-add_repo $ci_storage_url/releases/eos/BLATEST
-sudo yum install -y s3server

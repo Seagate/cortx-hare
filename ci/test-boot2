@@ -3,15 +3,18 @@ set -eu -o pipefail
 export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
 set -x
 
-. ci/common-defs.sh  # JOB_LABEL, _time, ci_init_m0vg, ci_success
+. ci/functions.sh  # _time, ci_init_m0vg, ci_success
 
 cd $WORKSPACE_DIR
 
 ci_init_m0vg ssu1 ssu2
-_time $M0VG run --vm ssu1 /data/hare/ci/m0vg/init-node
-_time $M0VG run --vm ssu1 /data/hare/utils/s3auth-disable
-_time $M0VG run --vm ssu2 /data/hare/ci/m0vg/init-node
-_time $M0VG run --vm ssu2 /data/hare/utils/s3auth-disable
+for vm in ssu{1,2}; do
+    _time $M0VG run --vm $vm /data/hare/ci/m0vg/init-node
+    XXX_with_s3server &&
+        _time $M0VG run --vm $vm /data/hare/utils/s3auth-disable
+done
+
+. hare/ci/_env  # JOB_LABEL
 
 sed -ri "s/(name:\s*)(ssu[12])/\\1${JOB_LABEL}-\\2/" \
     hare/cfgen/examples/ci-boot2{,-1confd}.yaml

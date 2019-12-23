@@ -3,24 +3,32 @@ set -eu -o pipefail
 export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
 set -x
 
-. ci/common-defs.sh  # _time, die
+. ci/functions.sh  # _time, die
 
 [[ -z ${MERO_COMMIT_REF:-} ]] ||
-    die "$0 expects \$MERO_COMMIT_REF to be unset or empty"
+    die "$0 expects MERO_COMMIT_REF to be unset or empty"
 
+# `BLATEST` is a symlink, which may be reset at any moment.
+# Store the path of its current target into a variable.
 latest_release_dir=$(readlink -f /releases/eos/BLATEST)
 
+# Build Hare rpm.  This requires mero{,-devel} packages to be installed.
 _time yum install -y $latest_release_dir/mero{,-devel}-[0-9]*.rpm
-time make rpm  # build Hare rpm
+time make rpm
 
+# Create local yum repository with a snapshot of compatible rpms used
+# by this CI pipeline.  This snapshot is needed for repeatability of
+# CI jobs.
 mkdir -vp $RPMSYNC_DIR
-cp -v /root/rpmbuild/RPMS/x86_64/* $RPMSYNC_DIR/
-cp -v $latest_release_dir/mero{,-devel}-[0-9]*.rpm $RPMSYNC_DIR/
-cp -v $latest_release_dir/s3*-[0-9]*.rpm $RPMSYNC_DIR/
+cp -v \
+   /root/rpmbuild/RPMS/x86_64/* \
+   $latest_release_dir/mero{,-devel}-[0-9]*.rpm \
+   $latest_release_dir/s3server-[0-9]*.rpm \
+   /releases/eos/s3server_uploads/log4cxx_eos{,-devel}-[0-9]*.rpm \
+   /releases/eos/s3server_uploads/s3cmd-[0-9]*.rpm \
+   $RPMSYNC_DIR/
 cd $RPMSYNC_DIR
-
-# Build local yum repository [https://wiki.centos.org/HowTos/CreateLocalRepos].
-createrepo -v .
+createrepo -v .  # see https://wiki.centos.org/HowTos/CreateLocalRepos
 
 ## The repository should have been created at
 ## http://ci-storage.mero.colo.seagate.com${RPMSYNC_DIR}

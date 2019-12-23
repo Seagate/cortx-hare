@@ -3,7 +3,22 @@ set -eu -o pipefail
 export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
 set -x
 
-. ci/common-defs.sh  # ci_docker, die
+. ci/functions.sh  # die
+
+JOB_LABEL="${WORKSPACE_NAME}-${CI_JOB_NAME}"
+
+ci_docker() {
+    (($# > 0)) || die "${FUNCNAME[0]}: Arguments expected"
+
+    [[ $PWD == $WORKSPACE_DIR ]] ||
+        die "${FUNCNAME[0]}: Wrong working directory"
+
+    _time docker run --rm --name $JOB_LABEL -v $PWD:/data -w /data/hare \
+         $DOCKER_REGISTRY/mero/hare:$CENTOS_RELEASE "$@"
+
+    # Containers run commands as 'root' user.  Restore the ownership.
+    sudo chown -R $(id -u):$(id -g) .
+}
 
 # Make sure that the build image is up to date.
 docker pull $DOCKER_REGISTRY/mero/hare:$CENTOS_RELEASE
@@ -16,7 +31,8 @@ cp -a $CI_PROJECT_DIR $WORKSPACE_DIR/
 
 cd $WORKSPACE_DIR
 
-cat > hare/ci/_env <<EOF
+cat >hare/ci/_env <<EOF
+JOB_LABEL=$JOB_LABEL
 MERO_COMMIT_REF=${MERO_COMMIT_REF:-}
 RPMSYNC_DIR=${RPMSYNC_DIR:-}
 
@@ -39,5 +55,6 @@ if [[ -n ${MERO_COMMIT_REF:-} ]]; then
     cd -
 
     ci_docker ci/docker/build-mero
+    #ci_docker ci/docker/build-s3server  # XXX-FIXME issue #216
     ci_docker make build  # build Hare
 fi

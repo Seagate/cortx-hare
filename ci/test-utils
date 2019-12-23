@@ -3,9 +3,8 @@ set -eu -o pipefail
 export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
 set -x
 
-. ci/common-defs.sh  # JOB_LABEL
-
 cd $WORKSPACE_DIR
 
+. hare/ci/_env  # JOB_LABEL
 time docker run --rm --name $JOB_LABEL -v $PWD:/data -w /data/hare \
      $DOCKER_REGISTRY/mero/hare:$CENTOS_RELEASE ci/docker/test-utils
