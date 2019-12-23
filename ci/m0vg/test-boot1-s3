@@ -4,6 +4,7 @@ export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
 set -x
 
 . /data/hare/ci/_env  # HARE_CI_S3_ACCESS_KEY, HARE_CI_S3_SECRET_KEY
+. /data/hare/ci/functions.sh  # _time
 
 export PATH="/opt/seagate/hare/bin:/opt/seagate/hare/libexec/hare:$PATH"
 
@@ -84,24 +85,24 @@ EOF
 }
 
 do_s3_ops() {
-    local s3cfg=/data/hare/ci/_s3cfg
-    local ifile=128M
-    local ofile=128M.out
-    local bkt=s3://seagate
+    local s3cfg=ci/_s3cfg
+    local ifile=/tmp/128M
+    local ofile=/tmp/128M.out
+    local bucket=s3://seagate
 
     generate_s3cfg >$s3cfg
-    [[ -s /tmp/128M ]] || dd if=/dev/urandom of=/tmp/$ifile bs=1M count=128
 
-    s3cmd --config $s3cfg mb $bkt
-    s3cmd --config $s3cfg put /tmp/$ifile $bkt
+    dd if=/dev/urandom of=$ifile bs=1M count=128
 
-    rm -f /tmp/$ofile
-    s3cmd --config $s3cfg get $bkt/$ifile /tmp/$ofile
-    s3cmd --config $s3cfg del $bkt/$ifile
-    s3cmd --config $s3cfg rb $bkt
+    s3cmd --config $s3cfg mb $bucket
+    s3cmd --config $s3cfg put $ifile $bucket
 
-    cmp /tmp/$ifile /tmp/$ofile
-    rm -f /tmp/$ifile /tmp/$ofile
+    s3cmd --config $s3cfg get $bucket/${ifile##*/} $ofile
+    s3cmd --config $s3cfg del $bucket/${ifile##*/}
+    s3cmd --config $s3cfg rb $bucket
+
+    cmp $ifile $ofile
+    rm -f $ifile $ofile
 }
 
 wait_for_s3server_to_start() {
@@ -118,30 +119,23 @@ wait_for_s3server_to_start() {
     set -x
 }
 
-test_cluster() {
-    local cdf=$1
-
-    s3auth-disable
-    time hctl bootstrap --mkfs $cdf
-
-    hctl status
-    . update-consul-conf --dry-run  # import CONFD_IDs, IOS_IDs, id2fid()
-
-    # In the absence of haproxy (load balancer for S3 server
-    # instances) let CI job bypass haproxy and directly use port
-    # number of the first S3 server instance port number as haproxy
-    # port.
-    #
-    # XXX FIXME Add haproxy for CI.
-    local id=${S3_IDs[0]}
-    wait_for_s3server_to_start $(id2fid $id) M0_CONF_HA_PROCESS_STARTED
-
-    do_s3_ops
-
-    time hctl shutdown
-}
-
 cd /data/hare/
+
 cdf=cfgen/examples/_singlenode_s3.yaml
 sed 's/s3: 0/s3: 2/' cfgen/examples/singlenode.yaml >$cdf
-test_cluster $cdf
+
+s3auth-disable
+_time hctl bootstrap --mkfs $cdf
+hctl status
+
+. update-consul-conf --dry-run  # import CONFD_IDs, IOS_IDs, id2fid
+
+# In the absence of HAProxy (load balancer for S3 server instances),
+# let CI job use port number of the first S3 server instance as
+# HAProxy port.
+#
+# XXX FIXME Add haproxy for CI.
+wait_for_s3server_to_start $(id2fid ${S3_IDs[0]}) M0_CONF_HA_PROCESS_STARTED
+
+time do_s3_ops
+_time hctl shutdown
