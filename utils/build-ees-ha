@@ -91,7 +91,7 @@ sudo pcs resource group add c2 ip-c2 lnet-c2
 
 echo 'Preparing Hare configuration files...'
 mkfs_ext4() {
-    dev=$1
+    local dev=$1
     sudo mkfs.ext4 -q $dev &>/dev/null < <(echo y)
 }
 
@@ -147,7 +147,7 @@ done'
 pdsh -w pod-c[1-2] $cmd
 
 cmd_deregister_node() {
-    node=$1
+    local node=$1
     echo "/usr/bin/curl -i -X PUT -d '{\\\"Node\\\":\\\"$node\\\"}' 'http://localhost:8500/v1/catalog/deregister'"
 }
 
@@ -234,7 +234,7 @@ sudo pcs constraint order lnet-c2 then mero-kernel-clone
 echo 'Adding Hax to Pacemaker...'
 
 get_sd_id() {
-    sd_name=$1
+    local sd_name=$1
     ls -l /dev/disk/by-id/ | grep "$sd_name$" | head -1 | awk '{print $9}'
 }
 
@@ -284,16 +284,16 @@ sudo pcs constraint order consul-c1 then hax-c2
 
 echo 'Adding Mero to Pacemaker...'
 cmd='
-sudo sed 's/TimeoutStopSec=.*/TimeoutStopSec=15sec/'
+sudo sed "s/TimeoutStopSec=.*/TimeoutStopSec=15sec/"
          -i /usr/lib/systemd/system/m0d@.service &&
 sudo systemctl daemon-reload'
 pdsh -w pod-c[1-2] $cmd
 
 get_fid() {
-    cfg=$1
-    svc=$2
-    cat $cfg | jq -r '.services[] | "\(.name) \(.checks[].args[])"' |
-        grep "${svc}.0x" | awk '{print $2}'
+    local cfg=$1
+    local svc=$2
+    jq -r '.services[] | "\(.name) \(.checks[].args[])"' $cfg |
+        awk "/$svc.0x/ {print \$2}"
 }
 
 confd_c1_fid=$(get_fid $hare_dir/consul-server-c1-conf.json confd)
@@ -317,4 +317,3 @@ sudo pcs -f mcfg resource group add c2 mero-ios-c2
 sudo pcs -f mcfg constraint order mero-confd-c1 then mero-ios-c2
 sudo pcs -f mcfg constraint order mero-confd-c2 then mero-ios-c1
 sudo pcs cluster cib-push mcfg --config
-
