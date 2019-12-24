@@ -9,6 +9,7 @@ say() {
 
 outdir=$CI_PROJECT_DIR
 
+# XXX-TODO Collect artifacts from different hosts in parallel.
 for vm in $($M0VG status | awk '$2 == "running" {print $1}'); do
     echo "----- $vm -----"
 
@@ -20,9 +21,8 @@ for vm in $($M0VG status | awk '$2 == "running" {print $1}'); do
     $M0VG scp $vm:/var/log/hare/consul\*.log $outdir/ &>/dev/null
 
     say 'm0reportbug'
-    $M0VG run --vm $vm sudo ${MERO_COMMIT_REF:+/data/mero/utils/}m0reportbug \
-          &>/dev/null
-    $M0VG scp $vm:m0reportbug-\*.tar.xz $outdir/ &>/dev/null
+    $M0VG run --vm $vm sudo ${MERO_COMMIT_REF:+/data/mero/utils/}m0reportbug
+    $M0VG scp $vm:m0reportbug-\*.tar.xz $outdir/
 
     say
     cd $outdir
