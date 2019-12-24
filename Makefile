@@ -131,12 +131,17 @@ install: install-dirs install-cfgen install-hax install-systemd install-vendor
 	@$(call _log,linking hctl -> $(DESTDIR)/usr/bin)
 	@install --verbose --directory $(DESTDIR)/usr/bin
 	@ln -sf /$(PREFIX)/bin/hctl $(DESTDIR)/usr/bin
+	@$(call _info, Creating group 'hare')
+	@groupadd --force hare
+	@chown root:hare $(DESTDIR)/var/lib/hare
+	@chmod 775 $(DESTDIR)/var/lib/hare
 
 .PHONY: install-dirs
 install-dirs: install-hax-dirs
 	@$(call _info,Installing directories)
-	@install --verbose --directory --mode=777 $(DESTDIR)/var/lib/hare
-	@for d in $(HARE_LIBEXEC) $(DESTDIR)/var/log/hare ; \
+	@for d in $(HARE_LIBEXEC) \
+			  $(DESTDIR)/var/log/hare \
+			  $(DESTDIR)/var/lib/hare ; \
 	 do \
 	     install --verbose --directory $$d; \
 	 done
@@ -268,6 +273,8 @@ EASY_INST_PTH = $(DESTDIR)/$(PREFIX)/lib/python3.$(PY3_VERSION_MINOR)/site-packa
 
 .PHONY: uninstall
 uninstall:
+	@$(call _info,Removing 'hare' group)
+	@groupdel hare||true
 	@$(call _info,Un-installing)
 	@for d in $(CFGEN_EXE) $(CFGEN_SHARE) \
 	          $(HAX_EXE) $(HAX_EGG_LINK) $(HAX_EGG) $(HAX_MODULE) \

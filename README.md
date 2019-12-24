@@ -105,7 +105,16 @@ vi ~/CDF.yaml
 See `cfgen --help-schema` for the description of CDF format.
 
 ## Hare we go
+* Create group `hare`
 
+  ```sh
+  sudo groupadd --force hare
+  ```
+* Add user to `hare` group
+
+  ```
+  sudo usermod --append --groups hare $USER
+  ```
 * Start the cluster
 
   ```sh

@@ -60,6 +60,9 @@ rm -rf %{buildroot}
 
 %post
 systemctl daemon-reload
+groupadd --force hare
+chown root:hare /var/lib/hare
+chmod 775 /var/lib/hare
 
 %postun
 systemctl daemon-reload

@@ -49,7 +49,16 @@ The scripts in this repository constitute a middleware layer between [Consul](ht
      an existing network interface (it should be present in the output
      of `ip a` command).
 
-3. Start the cluster:
+3. Create group `hare`
+
+   ```sh
+   sudo groupadd --force hare
+   ```
+4. Add user to `hare` group
+   ```
+   sudo usermod --append --groups hare $USER
+   ```
+5. Start the cluster:
    ```sh
    hctl bootstrap --mkfs cfgen/examples/singlenode.yaml
    ```
