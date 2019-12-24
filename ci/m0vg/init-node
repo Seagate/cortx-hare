@@ -35,7 +35,7 @@ ci_storage_url=http://ci-storage.mero.colo.seagate.com
 
 add_repo ${ci_storage_url}${RPMSYNC_DIR}
 sudo yum install -y hare
-sudo usermod -aG hare vagrant
+sudo usermod --append --groups hare $USER
 
 add_repo $ci_storage_url/releases/eos/s3server_uploads
 sudo yum install -y log4cxx_eos log4cxx_eos-devel s3cmd
