@@ -139,15 +139,11 @@ $(DESTDIR)/var/lib/hare:
 	@chmod --changes g+w $@
 
 .PHONY: install-dirs
-install-dirs: install-hax-dirs $(DESTDIR)/var/lib/hare
-	@for d in $(HARE_LIBEXEC) $(DESTDIR)/var/log/hare; do \
-	     install --verbose --directory $$d; \
-	 done
-
-.PHONY: install-hax-dirs
-install-hax-dirs:
-	@$(call _info,Installing hax directories)
-	@for d in $(DESTDIR)/var/mero/hax; do \
+install-dirs: $(DESTDIR)/var/lib/hare
+	@for d in $(HARE_LIBEXEC) \
+	          $(DESTDIR)/var/log/hare \
+	          $(DESTDIR)/var/mero/hax; \
+	 do \
 	     install --verbose --directory $$d; \
 	 done
 
