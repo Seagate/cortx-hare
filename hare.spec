@@ -60,9 +60,10 @@ rm -rf %{buildroot}
 
 %post
 systemctl daemon-reload
+install --directory --mode=0775 /var/lib/hare
 groupadd --force hare
-chown root:hare /var/lib/hare
-chmod 775 /var/lib/hare
+chgrp hare /var/lib/hare
+chmod g+w /var/lib/hare
 
 %postun
 systemctl daemon-reload

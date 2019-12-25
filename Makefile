@@ -131,27 +131,23 @@ install: install-dirs install-cfgen install-hax install-systemd install-vendor
 	@$(call _log,linking hctl -> $(DESTDIR)/usr/bin)
 	@install --verbose --directory $(DESTDIR)/usr/bin
 	@ln -sf /$(PREFIX)/bin/hctl $(DESTDIR)/usr/bin
-	@$(call _info,creating 'hare' group)
+
+$(DESTDIR)/var/lib/hare:
+	@install --verbose --directory --mode=0775 $@
 	@groupadd --force hare
-	@$(call _info,updating ownership and permissions of /var/lib/hare/)
-	@chown root:hare $(DESTDIR)/var/lib/hare
-	@chmod g+w $(DESTDIR)/var/lib/hare
+	@chgrp hare $@
+	@chmod --changes g+w $@
 
 .PHONY: install-dirs
-install-dirs: install-hax-dirs
-	@$(call _info,Installing directories)
-	@for d in $(HARE_LIBEXEC) \
-	          $(DESTDIR)/var/log/hare \
-	          $(DESTDIR)/var/lib/hare ; \
-	 do \
+install-dirs: install-hax-dirs $(DESTDIR)/var/lib/hare
+	@for d in $(HARE_LIBEXEC) $(DESTDIR)/var/log/hare; do \
 	     install --verbose --directory $$d; \
 	 done
 
 .PHONY: install-hax-dirs
 install-hax-dirs:
 	@$(call _info,Installing hax directories)
-	@for d in $(DESTDIR)/var/mero/hax ; \
-	 do \
+	@for d in $(DESTDIR)/var/mero/hax; do \
 	     install --verbose --directory $$d; \
 	 done
 
@@ -288,7 +284,7 @@ uninstall:
 	          $(DESTDIR)/usr/bin/hctl \
 	          $(DESTDIR)/var/lib/hare \
 	          $(DESTDIR)/var/log/hare \
-	          $(DESTDIR)/var/mero/hax ; \
+	          $(DESTDIR)/var/mero/hax; \
 	 do \
 	     if [[ -e $$d ]]; then \
 	         $(call _log,removing $$d); \
@@ -420,7 +416,7 @@ docker-%:
 # decent on the default black/white terminal, as well as on Solarized
 define _info
     if [[ -t 1 ]]; then \
-        CYAN=$$(tput bold ; tput setaf 6); \
+        CYAN=$$(tput bold; tput setaf 6); \
         NC=$$(tput sgr0); \
     fi; \
     echo "$${CYAN}--> $(1)$${NC}"
