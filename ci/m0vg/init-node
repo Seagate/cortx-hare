@@ -16,7 +16,8 @@ if [[ -n ${MERO_COMMIT_REF:-} ]]; then
     # will fail unless `mero-kernel` systemd service is installed.
     sudo /data/mero/scripts/install-mero-service
 
-    sudo make -C /data/hare devinstall
+    # `TERM=dumb` silences `tput: unknown terminal "unknown"` warnings.
+    sudo make -C /data/hare TERM=dumb devinstall
 else
     repo="ci-storage.mero.colo.seagate.com${RPMSYNC_DIR}"
     if sudo yum-config-manager --add-repo="http://$repo"; then
