@@ -26,6 +26,12 @@ test_cluster cfgen/examples/ci-boot2.yaml
 # Server-client Consul agents configuration.
 test_cluster cfgen/examples/ci-boot2-1confd.yaml
 
+# XXX-TODO: Remove this block after
+# http://gitlab.mero.colo.seagate.com/mero/hare/issues/216 is resolved.
+. ci/_env
+. ci/functions.sh
+XXX_with_s3server || exit 0
+
 # 2x2 S3 servers.
 cdf=cfgen/examples/_ci-boot2_s3.yaml
 sed 's/s3: 0/s3: 2/' cfgen/examples/ci-boot2.yaml >$cdf
