@@ -29,9 +29,11 @@ ensure that
 1 | passwordless `sudo` works for \<user\> | all machines
 2 | \<user\> can `ssh` from \<origin\> to other machines | \<origin\>
 3 | `lustre-client` rpm is installed | all machines
-4 | `mero` and `hare` rpms are installed | all machines
+4 | `hare` and `s3server` rpms are installed | all machines
 5 | `/opt/seagate/hare/bin` is in \<user\>'s PATH | all machines
-6 | CDF exists and corresponds to cluster setup | \<origin\>
+6 | `hare` group exists | all machines
+7 | \<user\> belongs `hare` group | all machines
+8 | CDF exists and reflects actual cluster configuration | \<origin\>
 
 ### LNet
 
@@ -86,6 +88,12 @@ fi
   export PATH="/opt/seagate/hare/bin:$PATH"
   ```
 
+* Create `hare` group and add current user to it.
+  ```sh
+  sudo groupadd --force hare
+  sudo usermod --append --groups hare $USER
+  ```
+
 ### Prepare a CDF
 
 To start the cluster for the first time you will need a cluster
@@ -105,29 +113,18 @@ vi ~/CDF.yaml
 See `cfgen --help-schema` for the description of CDF format.
 
 ## Hare we go
-* Create group `hare`
 
-  ```sh
-  sudo groupadd --force hare
-  ```
-* Add user to `hare` group
-
-  ```
-  sudo usermod --append --groups hare $USER
-  ```
-* Start the cluster
-
+* Start the cluster.
   ```sh
   hctl bootstrap --mkfs ~/CDF.yaml
   ```
   <!-- XXX-UX: s/bootstrap/start/ -->
 
-* Run I/O test
+* Run I/O test.
 
-  **XXX TODO:** Simplify.
   <!-- XXX
   `m0crate` is a benchmarking tool.  Why would end users want to use
-  benchmarking tool?
+  a benchmarking tool?
 
   Creating a file
   ```sh
@@ -144,12 +141,10 @@ See `cfgen --help-schema` for the description of CDF format.
   sudo m0crate -S /tmp/m0crate-io.yaml
   ```
 
-* Stop the cluster
-
+* Stop the cluster.
   ```sh
   hctl shutdown
   ```
-  <!-- XXX-UX: s/shutdown/stop/ -->
 
 ## Contributing
 
