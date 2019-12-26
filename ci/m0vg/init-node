@@ -19,9 +19,12 @@ if [[ -n ${MERO_COMMIT_REF:-} ]]; then
     sudo make -C /data/hare devinstall
 else
     repo="ci-storage.mero.colo.seagate.com${RPMSYNC_DIR}"
-    sudo yum-config-manager --add-repo="http://$repo"
-    sudo tee -a /etc/yum.repos.d/${repo//\//_}.repo <<< 'gpgcheck=0'
-
+    if sudo yum-config-manager --add-repo="http://$repo"; then
+        # `yum-config-manager` may fail with
+        # "Cannot add repo from [...] a duplicate of an existing repo"
+        # error message.  This happens when the CI job is retried manually.
+        sudo tee -a /etc/yum.repos.d/${repo//\//_}.repo <<< 'gpgcheck=0'
+    fi
     sudo yum install -y hare s3server s3cmd
 fi
 
