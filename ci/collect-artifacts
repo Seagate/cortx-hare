@@ -4,7 +4,7 @@ export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
 # set -x
 
 say() {
-    echo "[$(date +%T)] $*"
+    echo "[$(date -u +%T)] $*"
 }
 
 outdir=$CI_PROJECT_DIR
@@ -15,7 +15,11 @@ for vm in $($M0VG status | awk '$2 == "running" {print $1}'); do
 
     say 'syslog'
     $M0VG run --vm $vm sudo journalctl --no-pager --full --utc --boot \
-        --output short-precise >$outdir/syslog.log 2>/dev/null
+        --output short-precise >$outdir/syslog.txt 2>/dev/null
+
+    say 'systemctl status'
+    $M0VG run --vm $vm sudo systemctl --all --full --no-pager status \
+          {hare,m0,mero,s3}\\* >$outdir/systemctl-status.txt || true
 
     say 'Consul logs'
     $M0VG scp $vm:/var/log/hare/consul\*.log $outdir/ &>/dev/null
@@ -26,7 +30,7 @@ for vm in $($M0VG status | awk '$2 == "running" {print $1}'); do
 
     say
     cd $outdir
-    for f in {syslog,consul,m0reportbug}*; do
+    for f in {syslog,systemctl,consul,m0reportbug}*; do
         [[ -e $f ]] && mv {,${CI_JOB_NAME}_${vm}_}$f
     done
     cd - >/dev/null

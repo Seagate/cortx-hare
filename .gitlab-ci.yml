@@ -83,7 +83,8 @@ rpmbuild:
       - ${CI_JOB_NAME}*m0reportbug-data.tar.xz
       # - ${CI_JOB_NAME}*m0reportbug-cores.tar.xz  # XXX too big
       - ${CI_JOB_NAME}*m0reportbug-traces.tar.xz
-      - ${CI_JOB_NAME}*syslog.log
+      - ${CI_JOB_NAME}*syslog.txt
+      - ${CI_JOB_NAME}*systemctl-status.txt
 
 test-boot1:
   variables: { M0VG: m0vg-1node/scripts/m0vg }
