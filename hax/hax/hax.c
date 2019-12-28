@@ -532,18 +532,19 @@ M0_INTERNAL struct hax_context *init_halink(PyObject *obj,
 	hc0->hc_alive = true;
 	hx_links_tlist_init(&hc0->hc_links);
 	m0_mutex_init(&hc0->hc_mutex);
-	rc = m0_halon_interface_init(&hc0->hc_hi, "M0_VERSION_GIT_REV_ID",
-			"M0_VERSION_BUILD_CONFIGURE_OPTS",
-			"disable-compatibility-check", NULL);
+	rc = m0_halon_interface_init(
+		&hc0->hc_hi,
+		M0_VERSION_GIT_REV_ID,
+		M0_VERSION_BUILD_CONFIGURE_OPTS,
+		"disable-compatibility-check log-entrypoint log-link log-msg",
+		NULL);
 	if (rc != 0) {
 		hx_links_tlist_fini(&hc0->hc_links);
 		m0_mutex_fini(&hc0->hc_mutex);
 		free(hc0);
-		return 0;
+		return NULL;
 	}
-
 	hc0->hc_handler = obj;
-
 	return hc0;
 }
 
@@ -664,9 +665,8 @@ void adopt_mero_thread(void)
 	int rc;
 
 	rc = m0_halon_interface_thread_adopt(hc0->hc_hi, &m0thread);
-	if (rc != 0) {
+	if (rc != 0)
 		M0_LOG(M0_ERROR, "Mero thread adoption failed: %d\n", rc);
-	}
 }
 
 void shun_mero_thread(void)
