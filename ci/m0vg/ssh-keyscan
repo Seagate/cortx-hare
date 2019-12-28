@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+set -eu -o pipefail
+export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
+# set -x
+
+if (($# == 0)); then
+    cat >&2 <<EOF
+Usage: ${0##*/} HOST...
+
+Make sure SSH connection can be established with no
+> Are you sure you want to continue connecting (yes/no)?
+questions asked.
+EOF
+    exit 1
+fi
+
+kh=~/.ssh/known_hosts
+for host in "$@"; do
+    ssh-keyscan -t rsa $host >>$kh
+done >$kh
+chmod 0600 $kh
+sudo mkdir -p /root/.ssh
+sudo cp $kh /root/.ssh/

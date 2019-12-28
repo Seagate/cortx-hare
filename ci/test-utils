@@ -5,7 +5,7 @@ set -x
 
 cd $WORKSPACE_DIR
 
-. hare/ci/functions.sh  # ci_job_label
+. hare/ci/functions.sh  # ci_vm_name_prefix
 
-time docker run --rm --name $(ci_job_label) -v $PWD:/data -w /data/hare \
+time docker run --rm --name $(ci_vm_name_prefix) -v $PWD:/data -w /data/hare \
      $DOCKER_REGISTRY/mero/hare:$CENTOS_RELEASE ci/docker/test-utils

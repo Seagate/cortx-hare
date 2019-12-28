@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+set -eu -o pipefail
+export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
+set -x
+
+. ci/functions.sh  # _time, ci_init_m0vg, ci_vm_name_prefix, ci_success
+
+cd $WORKSPACE_DIR
+
+pass_file=hare/ci/m0vg/_test-pcs.pass
+{
+    tr -dc '_[:alnum:]' </dev/urandom | head -c20 || true
+    echo
+} >$pass_file
+
+ci_init_m0vg
+for vm in pod-c{1,2}; do
+    _time $M0VG run --vm $vm /data/hare/ci/m0vg/init-node
+    _time $M0VG run --vm $vm \
+          PASS_FILE=/data/$pass_file /data/hare/ci/m0vg/init-pcs
+done
+
+$M0VG run --vm pod-c1 /data/hare/ci/m0vg/ssh-keyscan $(ci_vm_name_prefix)-pod-c2
+
+#XXX sed -r "s/(hostname:\s*)(pod-c[12])/\\1$(ci_vm_name_prefix)-\\2/" \
+#XXX     hare/cfgen/examples/ees-cluster.yaml > hare/ci/m0vg/_test-pcs.yaml
+
+_time $M0VG run --vm pod-c1 \
+      PASS_FILE=/data/$pass_file /data/hare/ci/m0vg/test-pcs
+
+ci_success

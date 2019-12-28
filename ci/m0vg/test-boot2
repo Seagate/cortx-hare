@@ -3,13 +3,6 @@ set -eu -o pipefail
 export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
 set -x
 
-# Don't require passphrase to ssh $OTHER_HOST.
-kh=~/.ssh/known_hosts
-ssh-keyscan -t rsa $OTHER_HOST >$kh
-chmod 0600 $kh
-sudo mkdir -p /root/.ssh
-sudo cp $kh /root/.ssh
-
 test_cluster() {
     local cdf=$1
 
@@ -21,10 +14,10 @@ test_cluster() {
 cd /data/hare/
 
 # Server-server Consul agents configuration.
-test_cluster cfgen/examples/ci-boot2.yaml
+test_cluster ci/m0vg/_test-boot2.yaml
 
 # Server-client Consul agents configuration.
-test_cluster cfgen/examples/ci-boot2-1confd.yaml
+test_cluster ci/m0vg/_test-boot2-1confd.yaml
 
 # XXX-TODO: Remove this block after
 # http://gitlab.mero.colo.seagate.com/mero/hare/issues/216 is resolved.
@@ -33,6 +26,6 @@ test_cluster cfgen/examples/ci-boot2-1confd.yaml
 XXX_with_s3server || exit 0
 
 # 2x2 S3 servers.
-cdf=cfgen/examples/_ci-boot2_s3.yaml
-sed 's/s3: 0/s3: 2/' cfgen/examples/ci-boot2.yaml >$cdf
+cdf=ci/m0vg/_test-boot2-s3.yaml
+sed 's/s3: 0/s3: 2/' ci/m0vg/_test-boot2.yaml >$cdf
 test_cluster $cdf

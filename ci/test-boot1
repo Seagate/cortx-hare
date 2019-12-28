@@ -7,7 +7,7 @@ set -x
 
 cd $WORKSPACE_DIR
 
-ci_init_m0vg cmu
+ci_init_m0vg
 _time $M0VG run /data/hare/ci/m0vg/init-node
 _time $M0VG run /data/hare/ci/m0vg/test-boot1
 XXX_with_s3server && _time $M0VG run /data/hare/ci/m0vg/test-boot1-s3

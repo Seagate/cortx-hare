@@ -3,7 +3,7 @@ set -eu -o pipefail
 export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
 set -x
 
-. ci/functions.sh  # ci_job_label, die
+. ci/functions.sh  # ci_vm_name_prefix, die
 
 ci_docker() {
     (($# > 0)) || die "${FUNCNAME[0]}: Arguments expected"
@@ -11,8 +11,8 @@ ci_docker() {
     [[ $PWD == $WORKSPACE_DIR ]] ||
         die "${FUNCNAME[0]}: Wrong working directory"
 
-    _time docker run --rm --name $(ci_job_label) -v $PWD:/data -w /data/hare \
-         $DOCKER_REGISTRY/mero/hare:$CENTOS_RELEASE "$@"
+    _time docker run --rm --name $(ci_vm_name_prefix) -v $PWD:/data \
+        -w /data/hare $DOCKER_REGISTRY/mero/hare:$CENTOS_RELEASE "$@"
 
     # Containers run commands as 'root' user.  Restore the ownership.
     sudo chown -R $(id -u):$(id -g) .
@@ -31,7 +31,8 @@ cd $WORKSPACE_DIR
 
 cat >hare/ci/_env <<EOF
 MERO_COMMIT_REF=${MERO_COMMIT_REF:-}
-RPMSYNC_DIR=${RPMSYNC_DIR:-}
+RPMSYNC_DIR=$RPMSYNC_DIR
+WORKSPACE_NAME=$WORKSPACE_NAME
 
 # Disable 'set -x' while assigning secret variables in order for their
 # values to not be shown.

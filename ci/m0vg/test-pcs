@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+set -eu -o pipefail
+export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
+set -x
+
+cd /data/hare/
+
+. ci/functions.sh  # ci_vm_name_prefix, die
+. ci/_env  # WORKSPACE_NAME (used by ci_vm_name_prefix)
+
+[[ $(hostname) == $(ci_vm_name_prefix test-pcs)-pod-c1 ]] || die 'Wrong host'
+
+hosts=($(ci_vm_name_prefix test-pcs)-pod-c{1,2})
+
+[[ -s $PASS_FILE ]] || die "Cannot get password from $PASS_FILE"
+
+# Configure Corosync.
+# https://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/2.0/html/Clusters_from_Scratch/_configure_corosync.html
+sudo pcs cluster auth ${hosts[@]} -u hacluster -p $(cat $PASS_FILE)
+sudo pcs cluster setup --name ees-cluster ${hosts[@]}
+
+sudo pcs cluster start --all
+sleep 30  # XXX How can we know for sure that the cluster has started?
+
+out="$(sudo pcs status)"
+echo "$out"
+if grep -qi 'offline' <<<"$out"; then
+    die 'Cluster did not start'
+fi
+
+sudo pcs property set stonith-enabled=false
+
+# Validate the Pacemaker configuration.
+# https://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/2.0/html/Clusters_from_Scratch/_explore_the_existing_configuration.html
+sudo crm_verify --live-check --verbose
+
+# Generate roaming IP addresses.
+ips=($(awk '/pod-c/ {print $1}' /etc/hosts))
+((${#ips[@]} == 2)) ||
+    die "/etc/hosts: 2 'pod-c' lines expected, got ${#ips[@]}"
+[[ ${ips[0]%.*} == ${ips[1]%.*} ]] ||
+    die "IP addresses are not from the same /24 network: ${ips[@]}"
+net=${ips[0]%.*}
+roaming_ips=($net.101 $net.102)  # K.I.S.S.
+(($(echo ${ips[@]} ${roaming_ips[@]} | tr ' ' \\n | sort -u | wc -l) == 4)) ||
+    die 'Cannot generate roaming IP addresses'
+
+for ((i = 1; i <= ${#roaming_ips[@]}; ++i)); do
+    sudo pcs resource create ip-c$i ocf:heartbeat:IPaddr2 \
+         ip=${roaming_ips[$((i-1))]} cidr_netmask=24 iflabel=c$i op monitor \
+         interval=30s
+    sudo pcs constraint location ip-c$i prefers \
+         $(ci_vm_name_prefix test-pcs)-pod-c$i
+done
+sudo pcs status
