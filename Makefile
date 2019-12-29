@@ -266,8 +266,6 @@ EASY_INST_PTH = $(DESTDIR)/$(PREFIX)/lib/python3.$(PY3_VERSION_MINOR)/site-packa
 
 .PHONY: uninstall
 uninstall:
-	@$(call _info,Removing 'hare' group)
-	@groupdel hare||true
 	@$(call _info,Un-installing)
 	@for d in $(CFGEN_EXE) $(CFGEN_SHARE) \
 	          $(HAX_EXE) $(HAX_EGG_LINK) $(HAX_EGG) $(HAX_MODULE) \
@@ -287,6 +285,8 @@ uninstall:
 	         rm -rf $$d; \
 	     fi; \
 	 done
+	@$(call _info,Removing 'hare' group)
+	@groupdel hare || true
 
 # Linters --------------------------------------------- {{{1
 #

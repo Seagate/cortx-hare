@@ -25,7 +25,7 @@ The scripts in this repository constitute a middleware layer between [Consul](ht
 
 ## Single-node setup
 
-1. Prepare the node:
+1. Build and install Hare:
    ```sh
    git clone --recursive http://gitlab.mero.colo.seagate.com/mero/hare.git
    cd hare
@@ -33,7 +33,13 @@ The scripts in this repository constitute a middleware layer between [Consul](ht
    sudo make devinstall
    ```
 
-2. Edit `cfgen/examples/singlenode.yaml` file.
+2. Add current user to `hare` group.
+   ```sh
+   sudo usermod --append --groups hare $USER
+   ```
+   Log out and log back in.
+
+3. Edit `cfgen/examples/singlenode.yaml` file.
 
    * Ensure that the disks referred to by `io_disks.path_glob` pattern
      exist.  Create loop devices, if necessary:
@@ -49,12 +55,6 @@ The scripts in this repository constitute a middleware layer between [Consul](ht
      an existing network interface (it should be present in the output
      of `ip a` command).
 
-3. Create `hare` group and add current user to it.
-   ```sh
-   sudo groupadd --force hare
-   sudo usermod --append --groups hare $USER
-   ```
-
 4. Start the cluster.
    ```sh
    hctl bootstrap --mkfs cfgen/examples/singlenode.yaml
@@ -63,11 +63,11 @@ The scripts in this repository constitute a middleware layer between [Consul](ht
 ## Multi-node setup
 
 For multi-node cluster the steps are similar to those of single-node.
-Steps 1–3 should be performed on each of the nodes.  The bootstrap
+Steps 1–2 should be performed on each of the nodes.  The bootstrap
 command may be executed on any server node (i.e., on any of the nodes
 configured to run confd).
 
-Use `cfgen/examples/ees-cluster.yaml`, which describes a two-node cluster,
+Use `cfgen/examples/ees-cluster.yaml`, which describes a dual-node cluster,
 as an example.
 
 ## Test I/O

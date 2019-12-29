@@ -31,9 +31,8 @@ ensure that
 3 | `lustre-client` rpm is installed | all machines
 4 | `hare` and `s3server` rpms are installed | all machines
 5 | `/opt/seagate/hare/bin` is in \<user\>'s PATH | all machines
-6 | `hare` group exists | all machines
-7 | \<user\> belongs `hare` group | all machines
-8 | CDF exists and reflects actual cluster configuration | \<origin\>
+6 | \<user\> is a member of `hare` group | all machines
+7 | CDF exists and reflects actual cluster configuration | \<origin\>
 
 ### LNet
 
@@ -88,11 +87,11 @@ fi
   export PATH="/opt/seagate/hare/bin:$PATH"
   ```
 
-* Create `hare` group and add current user to it.
+* Add current user to `hare` group.
   ```sh
-  sudo groupadd --force hare
   sudo usermod --append --groups hare $USER
   ```
+  Log out and log back in.
 
 ### Prepare a CDF
 
