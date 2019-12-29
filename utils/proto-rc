@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 set -eu -o pipefail
+export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
+# set -x
 
 # Recovery Coordinator (RC) prototype.
 #
@@ -27,7 +29,9 @@ sig_handler() {
 }
 
 check4signal() {
-    if [[ $STOP -eq 1 ]]; then exit 1; fi
+    if (( STOP == 1 )); then
+        exit 1
+    fi
 }
 
 # Users can use this function to set timeouts.
@@ -48,7 +52,7 @@ sed 's/null//' | jq -r '.[] | "\(.Key) \(.Value | @base64d)"' | {
     while read EPOCH EVENT; do
         echo "$CONSUL_INDEX: Process $EPOCH $EVENT..."
         case $EVENT in
-          "wake_RC")
+          'wake_RC')
             ;;
           tmo*)
             set_timeout 60 "tmo$CONSUL_INDEX"
@@ -84,8 +88,8 @@ schedule_timeout() {
                       <<< $tmo)
     local tmo_s=$(date -d "$tmo_f" '+%s')
     local now_s=$(date -d 'now' '+%s')
-    local after_s=$(($tmo_s - $now_s))
-    [[ $after_s > 0 ]] || wake_rc
+    local after_s=$((tmo_s - now_s))
+    (( after_s > 0 )) || wake_rc
     wake_me_after $after_s
 }
 
@@ -96,7 +100,7 @@ consul kv get -recurse timeout | {
     while read TMO EVENT; do
         tmo=${TMO#*/}
         now=$(date +%Y%m%d%H%M.%S)
-        if [[ $tmo > $now ]]; then
+        if (( tmo > now )); then
             schedule_timeout $tmo
             exit 0
         fi
