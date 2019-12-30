@@ -285,8 +285,6 @@ uninstall:
 	         rm -rf $$d; \
 	     fi; \
 	 done
-	@$(call _info,Removing 'hare' group)
-	@groupdel hare || true
 
 # Linters --------------------------------------------- {{{1
 #
