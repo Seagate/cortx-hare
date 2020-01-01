@@ -27,7 +27,7 @@ for vm in $($M0VG status | awk '$2 == "running" {print $1}'); do
 
         say 'm0reportbug'
         $M0VG run --vm $vm \
-              sudo ${MERO_COMMIT_REF:+/data/mero/utils/}m0reportbug
+              sudo ${MERO_COMMIT_REF:+/data/mero/utils/}m0reportbug || true
         $M0VG scp $vm:m0reportbug-\*.tar.xz $outdir/
     fi
     say
