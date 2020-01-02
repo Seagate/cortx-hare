@@ -98,7 +98,7 @@ wait_m0d_started() {
     local timeout=$2  # seconds
     local count=0
 
-    while ! sudo systemctl status "m0d@$fid" | grep -q 'Started'; do
+    while ! sudo systemctl status "m0d@$fid" | grep -q ': Started$'; do
         (($count < $timeout)) || die "Unable to start m0d@$fid service"
         sleep 1
         ((++count))
