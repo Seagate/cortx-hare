@@ -141,9 +141,13 @@ for id in $IDs; do
     if [[ $do_mkfs ]]; then
         sudo systemctl start mero-mkfs@$fid
         touch /tmp/mero-mkfs-pass-$fid
-        # Give time for service check to reset m0mkfs' HA state:
-        # (1s * 2) - time of two checks + 1s. (See check-service.)
-        sleep 3
+        # Give time for service check to reset m0mkfs' HA state
+        # (see utils/check-service).
+        while [[ -f /tmp/mero-mkfs-pass-$fid ||
+                 -f /tmp/mero-mkfs-fail-$fid ]]; do
+            sleep 1
+        done
+        sleep 1
     fi
 
     if [[ $do_mkfs != 'mkfs-only' ]]; then
