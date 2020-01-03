@@ -142,9 +142,10 @@ for id in $IDs; do
         sudo systemctl start mero-mkfs@$fid
         touch /tmp/mero-mkfs-pass-$fid
         # Give time for service check to reset m0mkfs' HA state
-        # (see utils/check-service).
+        # (see utils/check-service also).
         while [[ -f /tmp/mero-mkfs-pass-$fid ||
-                 -f /tmp/mero-mkfs-fail-$fid ]]; do
+                 -f /tmp/mero-mkfs-fail-$fid ]] ||
+              ! consul kv get processes/$fid | grep -q 'STOPPED'; do
             sleep 1
         done
         sleep 1
