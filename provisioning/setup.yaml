@@ -1,0 +1,16 @@
+hare:
+  post_install:
+    script: null
+    args: null
+  init:
+    script: null
+    args: null
+  config:
+    script: /opt/seagate/hare/libexec/hare/config
+    args: /var/lib/hare/cluster.yaml
+  test:
+    script: null
+    args: null
+  reset:
+    script: null
+    args: null

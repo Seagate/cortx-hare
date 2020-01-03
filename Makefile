@@ -113,6 +113,7 @@ CFGEN_EXE          = $(DESTDIR)/$(PREFIX)/bin/cfgen
 CFGEN_SHARE        = $(DESTDIR)/$(PREFIX)/share/cfgen
 CONSUL_LIBEXEC     = $(DESTDIR)/$(PREFIX)/libexec/consul
 CONSUL_SHARE       = $(DESTDIR)/$(PREFIX)/share/consul
+HARE_CONF          = $(DESTDIR)/$(PREFIX)/conf
 HARE_LIBEXEC       = $(DESTDIR)/$(PREFIX)/libexec/hare
 HAX_EXE            = $(DESTDIR)/$(PREFIX)/bin/hax
 HAX_EGG_LINK       = $(DESTDIR)/$(PREFIX)/lib/python3.$(PY3_VERSION_MINOR)/site-packages/hax.egg-link
@@ -125,6 +126,11 @@ install: install-dirs install-cfgen install-hax install-systemd install-vendor
 	@for f in utils/*; do \
 	     $(call _log,copying $$f -> $(HARE_LIBEXEC)); \
 	     install $$f $(HARE_LIBEXEC); \
+	 done
+	@$(call _info,Installing hare provisioning)
+	@for f in provisioning/*; do \
+	     $(call _log,copying $$f -> $(HARE_CONF)); \
+	     install $$f $(HARE_CONF); \
 	 done
 	@$(call _log,copying hctl -> $(DESTDIR)/$(PREFIX)/bin)
 	@install hctl $(DESTDIR)/$(PREFIX)/bin
@@ -140,7 +146,8 @@ $(DESTDIR)/var/lib/hare:
 
 .PHONY: install-dirs
 install-dirs: $(DESTDIR)/var/lib/hare
-	@for d in $(HARE_LIBEXEC) \
+	@for d in $(HARE_CONF) \
+                  $(HARE_LIBEXEC) \
 	          $(DESTDIR)/var/log/hare \
 	          $(DESTDIR)/var/mero/hax; \
 	 do \
@@ -268,6 +275,7 @@ EASY_INST_PTH = $(DESTDIR)/$(PREFIX)/lib/python3.$(PY3_VERSION_MINOR)/site-packa
 uninstall:
 	@$(call _info,Un-installing)
 	@for d in $(CFGEN_EXE) $(CFGEN_SHARE) \
+	          $(HARE_CONF) \
 	          $(HAX_EXE) $(HAX_EGG_LINK) $(HAX_EGG) $(HAX_MODULE) \
 	          $(EASY_INST_PTH) \
 	          $(CONSUL_LIBEXEC) $(CONSUL_SHARE) \

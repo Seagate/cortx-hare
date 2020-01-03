@@ -4,7 +4,7 @@ set -eu -o pipefail
 # TODO: '/opt/seagate/hare' prefix can be different, e.g. '/usr'
 HARE_BASE_DIR=/opt/seagate/hare
 
-PATH="$HARE_BASE_DIR/libexec/hare:$PATH"
+PATH="$HARE_BASE_DIR/libexec:$PATH"
 PATH="$HARE_BASE_DIR/bin:$PATH"
 export PATH
 
