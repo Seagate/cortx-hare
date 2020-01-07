@@ -536,7 +536,7 @@ M0_INTERNAL struct hax_context *init_halink(PyObject *obj,
 		&hc0->hc_hi,
 		M0_VERSION_GIT_REV_ID,
 		M0_VERSION_BUILD_CONFIGURE_OPTS,
-		"disable-compatibility-check log-entrypoint log-link log-msg",
+		"log-entrypoint log-link log-msg",
 		NULL);
 	if (rc != 0) {
 		hx_links_tlist_fini(&hc0->hc_links);
