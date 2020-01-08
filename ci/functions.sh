@@ -11,6 +11,12 @@ _time() {
     fi
 }
 
+# CAUTION: ci_job_label cannot be used in "m0vg" environment, because
+# WORKSPACE_NAME and CI_JOB_NAME are not defined there.
+ci_job_label() {
+    echo "${WORKSPACE_NAME}-${CI_JOB_NAME}"
+}
+
 ci_init_m0vg() (
     case $# in
         1) local m0vg_dir=m0vg-1node;;
@@ -30,13 +36,12 @@ ci_init_m0vg() (
             http://gitlab.mero.colo.seagate.com/mero/mero.git $m0vg_dir
     fi
 
-    . hare/ci/_env  # JOB_LABEL
     $M0VG env add <<EOF
 M0_VM_BOX=centos76/dev
 M0_VM_BOX_URL='http://ci-storage.mero.colo.seagate.com/vagrant/centos76/dev'
 M0_VM_CMU_MEM_MB=4096
-M0_VM_NAME_PREFIX=$JOB_LABEL
-M0_VM_HOSTNAME_PREFIX=$JOB_LABEL
+M0_VM_NAME_PREFIX=$(ci_job_label)
+M0_VM_HOSTNAME_PREFIX=$(ci_job_label)
 EOF
 
     local host=

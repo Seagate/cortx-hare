@@ -3,7 +3,7 @@ set -eu -o pipefail
 export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
 set -x
 
-. ci/functions.sh  # _time, ci_init_m0vg, ci_success
+. ci/functions.sh  # _time, ci_init_m0vg, ci_job_label, ci_success
 
 cd $WORKSPACE_DIR
 
@@ -14,12 +14,10 @@ for vm in ssu{1,2}; do
         _time $M0VG run --vm $vm /data/hare/utils/s3auth-disable
 done
 
-. hare/ci/_env  # JOB_LABEL
-
-sed -ri "s/(name:\s*)(ssu[12])/\\1${JOB_LABEL}-\\2/" \
+sed -ri "s/(name:\s*)(ssu[12])/\\1$(ci_job_label)-\\2/" \
     hare/cfgen/examples/ci-boot2{,-1confd}.yaml
 
-_time $M0VG run --vm ssu1 \
-    "OTHER_HOST=${JOB_LABEL}-ssu2 /data/hare/ci/m0vg/test-boot2"
+$M0VG run --vm ssu1 /data/hare/ci/m0vg/ssh-keyscan $(ci_job_label)-ssu2
+_time $M0VG run --vm ssu1 /data/hare/ci/m0vg/test-boot2
 
 ci_success
