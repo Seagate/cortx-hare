@@ -79,7 +79,7 @@ append_hax_svc() {
       \"port\": $port,
       \"checks\": [
           {
-            \"args\": [ \"/opt/seagate/hare/libexec/hare/check-service\", \"--hax\" ],
+            \"args\": [ \"/opt/seagate/eos/hare/libexec/check-service\", \"--hax\" ],
             \"interval\": \"1s\",
             \"status\": \"warning\"
           }
@@ -100,7 +100,7 @@ append_confd_svc() {
       \"port\": $port,
       \"checks\": [
           {
-            \"args\": [ \"/opt/seagate/hare/libexec/hare/check-service\",
+            \"args\": [ \"/opt/seagate/eos/hare/libexec/check-service\",
                         \"--fid\", \"$fid\" ],
             \"interval\": \"1s\",
             \"status\": \"warning\"
@@ -128,7 +128,7 @@ append_ios_svc() {
       \"port\": $port,
       \"checks\": [
           {
-            \"args\": [ \"/opt/seagate/hare/libexec/hare/check-service\",
+            \"args\": [ \"/opt/seagate/eos/hare/libexec/check-service\",
                         \"--fid\", \"$fid\" ],
             \"interval\": \"1s\",
             \"status\": \"warning\"
@@ -157,7 +157,7 @@ append_s3_svc() {
       \"port\": $port,
       \"checks\": [
           {
-            \"args\": [ \"/opt/seagate/hare/libexec/hare/check-service\",
+            \"args\": [ \"/opt/seagate/eos/hare/libexec/check-service\",
                         \"--svc\", \"$s3svc\" ],
             \"interval\": \"1s\",
             \"status\": \"warning\"

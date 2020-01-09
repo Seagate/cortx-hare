@@ -6,7 +6,7 @@ hare:
     script: null
     args: null
   config:
-    script: /opt/seagate/hare/libexec/hare/config
+    script: /opt/seagate/eos/hare/libexec/config
     args: /var/lib/hare/cluster.yaml
   test:
     script: null

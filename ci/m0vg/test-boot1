@@ -6,10 +6,10 @@ set -x
 . /data/hare/ci/_env  # MERO_COMMIT_REF
 . /data/hare/ci/functions.sh  # _time
 
-# XXX `m0crate-io-conf` executes `consul`, which is /opt/seagate/hare/bin.
+# XXX `m0crate-io-conf` executes `consul`, which is /opt/seagate/eos/hare/bin.
 # There should be a better way to add that directory to PATH; see
 # http://gitlab.mero.colo.seagate.com/mero/hare/merge_requests/248#note_16669
-export PATH="/opt/seagate/hare/bin:$PATH"
+export PATH="/opt/seagate/eos/hare/bin:$PATH"
 
 do_io() {
     utils/m0crate-io-conf >_m0crate-io.yaml

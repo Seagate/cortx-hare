@@ -108,13 +108,13 @@ clean-dhall-prelude:
 # Install --------------------------------------------- {{{1
 #
 
-PREFIX            := opt/seagate/hare
+PREFIX            := opt/seagate/eos/hare
 CFGEN_EXE          = $(DESTDIR)/$(PREFIX)/bin/cfgen
 CFGEN_SHARE        = $(DESTDIR)/$(PREFIX)/share/cfgen
 CONSUL_LIBEXEC     = $(DESTDIR)/$(PREFIX)/libexec/consul
 CONSUL_SHARE       = $(DESTDIR)/$(PREFIX)/share/consul
 HARE_CONF          = $(DESTDIR)/$(PREFIX)/conf
-HARE_LIBEXEC       = $(DESTDIR)/$(PREFIX)/libexec/hare
+HARE_LIBEXEC       = $(DESTDIR)/$(PREFIX)/libexec
 HAX_EXE            = $(DESTDIR)/$(PREFIX)/bin/hax
 HAX_EGG_LINK       = $(DESTDIR)/$(PREFIX)/lib/python3.$(PY3_VERSION_MINOR)/site-packages/hax.egg-link
 SYSTEMD_CONFIG_DIR = $(DESTDIR)/usr/lib/systemd/system

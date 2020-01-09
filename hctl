@@ -27,8 +27,8 @@ die() {
 if [[ $SRC_DIR =~ bin/?$ ]]; then
     HARE_BASE_DIR=$SRC_DIR/..
 else
-    # TODO: '/opt/seagate/hare' prefix can be different, e.g. '/usr'
-    HARE_BASE_DIR=/opt/seagate/hare
+    # TODO: '/opt/seagate/eos/hare' prefix can be different, e.g. '/usr'
+    HARE_BASE_DIR=/opt/seagate/eos/hare
     [[ -d $HARE_BASE_DIR && -e $HARE_BASE_DIR/bin/hctl ]] ||
         die 'Hare is not installed, please run `make devinstall`.'
 fi
@@ -49,7 +49,7 @@ EOF
 
 commands_usage() {
     local tag='# :help: '
-    for cmd in $HARE_BASE_DIR/libexec/hare/hare-*; do
+    for cmd in $HARE_BASE_DIR/libexec/hare-*; do
         local name=${cmd##*/hare-}
         if [[ $(grep -c "^$tag" $cmd) != 1 ]]; then
             die "$cmd: '$tag' line is missing"
@@ -84,7 +84,7 @@ case $cmd in
         if [[ -d $M0_SRC_DIR/utils ]]; then
             PATH="$M0_SRC_DIR/utils:$PATH"
         fi
-        PATH="$HARE_BASE_DIR/libexec/hare:$PATH"
+        PATH="$HARE_BASE_DIR/libexec:$PATH"
         PATH="$HARE_BASE_DIR/bin:$PATH"
         export PATH
 
@@ -93,7 +93,7 @@ case $cmd in
         PYTHONPATH="$HARE_BASE_DIR/lib64/python3.6/site-packages:$PYTHONPATH"
         export PYTHONPATH
 
-        exec $HARE_BASE_DIR/libexec/hare/hare-$cmd "$@"
+        exec $HARE_BASE_DIR/libexec/hare-$cmd "$@"
         ;;
     *) die "Unknown command: '$cmd'" ;;
 esac

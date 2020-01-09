@@ -3,7 +3,7 @@ nodes:
     data_iface: eth1
     m0_servers:
       - runs_confd: true
-      - io_disks: { path_glob: "/dev/sd[d-g]"}
+      - io_disks: { path_glob: "/dev/sd[d-g]" }
     m0_clients:
         s3: 0
         other: 2

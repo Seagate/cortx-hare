@@ -5,8 +5,8 @@ export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
 
 PROG=${BASH_SOURCE[0]##*/}
 
-# TODO: '/opt/seagate/hare' prefix can be different
-ENV_TEMPLATE=/opt/seagate/hare/share/consul/consul-env.in
+# TODO: '/opt/seagate/eos/hare' prefix can be different
+ENV_TEMPLATE=/opt/seagate/eos/hare/share/consul/consul-env.in
 ENV_FILE=/var/lib/hare/consul-env
 
 usage() {
@@ -69,6 +69,6 @@ fi
 
 # Prepare for consul-agent startup:
 sudo rm -rf /var/lib/hare/consul-$bind_addr
-# TODO: '/opt/seagate/hare' prefix can be different
-sudo cp /opt/seagate/hare/share/consul/consul-$mode-conf.json.in \
+# TODO: '/opt/seagate/eos/hare' prefix can be different
+sudo cp /opt/seagate/eos/hare/share/consul/consul-$mode-conf.json.in \
         /var/lib/hare/consul-$mode-conf.json

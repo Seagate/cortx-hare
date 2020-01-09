@@ -30,7 +30,7 @@ ensure that
 2 | \<user\> can `ssh` from \<origin\> to other machines | \<origin\>
 3 | `lustre-client` rpm is installed | all machines
 4 | `hare` and `s3server` rpms are installed | all machines
-5 | `/opt/seagate/hare/bin` is in \<user\>'s PATH | all machines
+5 | `/opt/seagate/eos/hare/bin` is in \<user\>'s PATH | all machines
 6 | \<user\> is a member of `hare` group | all machines
 7 | CDF exists and reflects actual cluster configuration | \<origin\>
 
@@ -82,9 +82,9 @@ fi
   )
   ```
 
-* Add `/opt/seagate/hare/bin` to PATH.
+* Add `/opt/seagate/eos/hare/bin` to PATH.
   ```sh
-  export PATH="/opt/seagate/hare/bin:$PATH"
+  export PATH="/opt/seagate/eos/hare/bin:$PATH"
   ```
 
 * Add current user to `hare` group.
@@ -99,13 +99,13 @@ To start the cluster for the first time you will need a cluster
 description file (CDF).
 
 Make a copy of
-`/opt/seagate/hare/share/cfgen/examples/ees-cluster.yaml` (or
+`/opt/seagate/eos/hare/share/cfgen/examples/ees-cluster.yaml` (or
 `singlenode.yaml` in case of single-node setup) and adapt it to match
 your cluster.  `host`, `data_iface`, and `io_disks` fields may require
 modifications.
 
 ```sh
-cp /opt/seagate/hare/share/cfgen/examples/ees-cluster.yaml ~/CDF.yaml
+cp /opt/seagate/eos/hare/share/cfgen/examples/ees-cluster.yaml ~/CDF.yaml
 vi ~/CDF.yaml
 ```
 
@@ -135,7 +135,7 @@ See `cfgen --help-schema` for the description of CDF format.
   -->
 
   ```sh
-  /opt/seagate/hare/libexec/hare/m0crate-io-conf >/tmp/m0crate-io.yaml
+  /opt/seagate/eos/hare/libexec/m0crate-io-conf >/tmp/m0crate-io.yaml
   dd if=/dev/urandom of=/tmp/128M bs=1M count=128
   sudo m0crate -S /tmp/m0crate-io.yaml
   ```

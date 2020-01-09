@@ -45,7 +45,7 @@ make %{?_smp_mflags}
 %install
 rm -rf %{buildroot}
 make install DESTDIR=%{buildroot}
-sed -i -e 's@^#!.*\.py3venv@#!/usr@' %{buildroot}/opt/seagate/hare/bin/*
+sed -i -e 's@^#!.*\.py3venv@#!/usr@' %{buildroot}/opt/seagate/eos/hare/bin/*
 
 %clean
 rm -rf %{buildroot}
@@ -56,7 +56,7 @@ rm -rf %{buildroot}
 %{_exec_prefix}/lib/systemd/system/*
 %{_sharedstatedir}/hare/
 %{_localstatedir}/mero/hax/
-/opt/seagate/hare/*
+/opt/seagate/eos/hare/*
 
 %post
 systemctl daemon-reload
