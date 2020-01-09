@@ -154,7 +154,7 @@ for id in $IDs; do
     if [[ $do_mkfs != 'mkfs-only' ]]; then
         sudo systemctl start $proc$fid
         if [[ $proc == 'm0d@' ]]; then
-            wait_m0d_started $fid 30
+            wait_m0d_started $fid 120
         fi
     fi
 done
