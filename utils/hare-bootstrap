@@ -22,6 +22,11 @@ Options:
 EOF
 }
 
+die() {
+    echo "$PROG: $*" >&2
+    exit 1
+}
+
 say() {
     echo -n "$(date '+%F %T'): $*"
 }
@@ -104,6 +109,10 @@ done
 
 cluster_descr=${1:-}
 cfgen_out=${conf_dir:-'/var/lib/hare'}
+
+if sudo systemctl --quiet is-active hare-consul-agent; then
+    die 'Consul agent is active ==> cluster is already running'
+fi
 
 if ! [[ $conf_dir ]]; then
     say 'Generating cluster configuration... '
