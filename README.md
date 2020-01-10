@@ -71,7 +71,8 @@ fi
 
   if ! rpm -q hare s3server; then
       if ! sudo yum install -y hare s3server; then
-          repo="ci-storage.mero.colo.seagate.com/releases/eos/BLATEST"
+          repo='ci-storage.mero.colo.seagate.com'
+          repo+='/releases/eos/'integration/last_successful'
           yum-config-manager --add-repo="http://$repo"
           sudo tee -a /etc/yum.repos.d/${repo//\//_}.repo <<< 'gpgcheck=0'
           unset repo
