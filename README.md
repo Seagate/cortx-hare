@@ -28,39 +28,10 @@ ensure that
 --- | --- | ---
 1 | passwordless `sudo` works for \<user\> | all machines
 2 | \<user\> can `ssh` from \<origin\> to other machines | \<origin\>
-3 | `lustre-client` rpm is installed | all machines
-4 | `hare` and `s3server` rpms are installed | all machines
-5 | `/opt/seagate/eos/hare/bin` is in \<user\>'s PATH | all machines
-6 | \<user\> is a member of `hare` group | all machines
-7 | CDF exists and reflects actual cluster configuration | \<origin\>
-
-### LNet
-
-Mero object store uses Lustre networking (LNet).  Run these commands
-on every machine of the cluster to ensure that LNet is installed:
-
-```bash
-(set -eu
-
-if ! rpm -q lustre-client --quiet lustre-client; then
-    if ! sudo yum install -y lustre-client; then
-        repo=downloads.whamcloud.com/public/lustre/lustre-2.10.4/el7/client
-        sudo yum-config-manager --add-repo=https://$repo
-        sudo tee -a /etc/yum.repos.d/${repo//\//_}.repo <<< gpgcheck=0
-        unset repo
-
-        sudo yum install -y lustre-client
-    fi
-fi
-
-# `lnetctl import /etc/lnet.conf` will fail unless /etc/lnet.conf
-# exists and is a valid YAML document.  YAML document cannot be empty;
-# document separator ('---') is the shortest valid YAML document.
-if [[ ! -s /etc/lnet.conf ]]; then
-    sudo tee /etc/lnet.conf <<<'---' >/dev/null
-fi
-)
-```
+3 | `hare` and `s3server` rpms are installed | all machines
+4 | `/opt/seagate/eos/hare/bin` is in \<user\>'s PATH | all machines
+5 | \<user\> is a member of `hare` group | all machines
+6 | CDF exists and reflects actual cluster configuration | \<origin\>
 
 ### Install rpm packages
 
@@ -71,11 +42,13 @@ fi
 
   if ! rpm -q hare s3server; then
       if ! sudo yum install -y hare s3server; then
-          repo='ci-storage.mero.colo.seagate.com'
-          repo+='/releases/eos/integration/centos-7.7.1908/last_successful'
-          yum-config-manager --add-repo="http://$repo"
-          sudo tee -a /etc/yum.repos.d/${repo//\//_}.repo <<< 'gpgcheck=0'
-          unset repo
+          for x in 'integration/centos-7.7.1908/last_successful' 's3server_uploads'
+          do
+              repo="ci-storage.mero.colo.seagate.com/releases/eos/$x"
+              yum-config-manager --add-repo="http://$repo"
+              sudo tee -a /etc/yum.repos.d/${repo//\//_}.repo <<< 'gpgcheck=0'
+	  done
+	  unset repo x
 
           sudo yum install -y hare s3server
       fi
@@ -94,6 +67,28 @@ fi
   ```
   Log out and log back in.
 
+### Check mero-kernel service
+
+Mero processes require Mero kernel module to be inserted.
+Make sure Mero kernel service is running:
+```sh
+[[ $(systemctl is-active mero-kernel) == active ]] ||
+    sudo systemctl start mero-kernel
+```
+
+### Check LNet network ids
+
+Check if LNet network ids are configured:
+```sh
+sudo lctl list_nids
+```
+
+If not configured, run
+```sh
+sudo modprobe lnet
+sudo lctl network configure
+```
+
 ### Prepare a CDF
 
 To start the cluster for the first time you will need a cluster
@@ -109,8 +104,18 @@ modifications.
 cp /opt/seagate/eos/hare/share/cfgen/examples/ees-cluster.yaml ~/CDF.yaml
 vi ~/CDF.yaml
 ```
+Make sure interface used for configuration parameter `data_iface` is
+configured for lnet.
+`sudo lctl list_nids` should show IP address of data_iface.
 
 See `cfgen --help-schema` for the description of CDF format.
+
+### Disable s3auth server
+
+<!-- XXX REVISEME: Provisioning should take care of this. -->
+```sh
+/opt/seagate/eos/hare/libexec/s3auth-disable
+```
 
 ## Hare we go
 
@@ -145,6 +150,27 @@ See `cfgen --help-schema` for the description of CDF format.
   ```sh
   hctl shutdown
   ```
+
+## Troubleshooting
+
+### RC Leader cannot be elected
+
+If `hctl bootstrap` cannot complete and keeps printing dots similarly to the output below,
+```
+2020-01-14 10:57:25: Generating cluster configuration... Ok.
+2020-01-14 10:57:26: Starting Consul server agent on this node.......... Ok.
+2020-01-14 10:57:34: Importing configuration into the KV Store... Ok.
+2020-01-14 10:57:35: Starting Consul agents on remaining cluster nodes... Ok.
+2020-01-14 10:57:35: Update Consul agents configs from the KV Store... Ok.
+2020-01-14 10:57:36: Install Mero configuration files... Ok.
+2020-01-14 10:57:36: Waiting for the RC Leader to get elected..................[goes on forever]
+```
+try the following commands
+```sh
+hctl shutdown
+sudo systemctl reset-failed hare-hax
+```
+and bootstrap again.
 
 ## Contributing
 
