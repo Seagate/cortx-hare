@@ -7,7 +7,7 @@ import sys
 from socket import gethostname
 from typing import Dict, List, NamedTuple, Set
 
-from consul import Consul
+from consul import Consul, ConsulException
 
 Process = NamedTuple('Process', [('name', str), ('fidk', int), ('ep', str)])
 
@@ -109,4 +109,7 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except ConsulException as err:
+        print("Consul Error: %s" % err)
