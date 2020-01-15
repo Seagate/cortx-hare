@@ -81,7 +81,11 @@ class ConsulUtil:
         we want to invoke Consul.kv.get()
         """
         assert key
-        return self.cns.kv.get(key, **kwargs)[1]
+        try:
+            return self.cns.kv.get(key, **kwargs)[1]
+        except ConsulException as e:
+            raise HAConsistencyException('Could not access Consul KV')\
+                from e
 
     def _catalog_service_get(self, svc_name: str) -> List[Dict[str, Any]]:
         try:
