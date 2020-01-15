@@ -15,4 +15,5 @@ fi
 # Generate configuration files and validate them by bootstrapping the cluster.
 hctl bootstrap --mkfs "$1"
 
+hctl status
 hctl shutdown
