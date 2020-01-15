@@ -2,7 +2,7 @@
 #
 
 variables:
-  CENTOS_RELEASE: '7.6'
+  CENTOS_RELEASE: 7
 
   # Mero git reference to build and use.
   #
