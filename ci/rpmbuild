@@ -21,7 +21,7 @@ time make rpm
 # CI jobs.
 mkdir -vp $RPMSYNC_DIR
 cp -v \
-   /root/rpmbuild/RPMS/x86_64/* \
+   /root/rpmbuild/RPMS/x86_64/hare*.rpm \
    $latest_release_dir/mero{,-devel}-[0-9]*.rpm \
    $latest_release_dir/s3server-[0-9]*.rpm \
    /releases/eos/s3server_uploads/log4cxx_eos{,-devel}-[0-9]*.rpm \
