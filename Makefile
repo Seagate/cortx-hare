@@ -138,14 +138,8 @@ install: install-dirs install-cfgen install-hax install-systemd install-vendor
 	@install --verbose --directory $(DESTDIR)/usr/bin
 	@ln -sf /$(PREFIX)/bin/hctl $(DESTDIR)/usr/bin
 
-$(DESTDIR)/var/lib/hare:
-	@install --verbose --directory --mode=0775 $@
-	@groupadd --force hare
-	@chgrp hare $@
-	@chmod --changes g+w $@
-
 .PHONY: install-dirs
-install-dirs: $(DESTDIR)/var/lib/hare
+install-dirs:
 	@for d in $(HARE_CONF) \
                   $(HARE_LIBEXEC) \
 	          $(DESTDIR)/var/log/hare \
@@ -153,6 +147,7 @@ install-dirs: $(DESTDIR)/var/lib/hare
 	 do \
 	     install --verbose --directory $$d; \
 	 done
+	@install --verbose --directory --mode=0775 $(DESTDIR)/var/lib/hare
 
 .PHONY: unpack-dhall-prelude
 unpack-dhall-prelude:
@@ -222,6 +217,12 @@ devinstall: install-dirs devinstall-cfgen devinstall-hax devinstall-systemd devi
 	@$(call _log,linking hctl -> $(DESTDIR)/usr/bin)
 	@install --verbose --directory $(DESTDIR)/usr/bin
 	@ln -sf $(TOP_SRC_DIR)hctl $(DESTDIR)/usr/bin
+	@$(call _log,creating hare group)
+	@groupadd --force hare
+	@$(call _log,changing permission of $(DESTDIR)/var/lib/hare)
+	@chgrp hare $(DESTDIR)/var/lib/hare 
+	@chmod --changes g+w $(DESTDIR)/var/lib/hare
+
 
 .PHONY: devinstall-cfgen
 devinstall-cfgen: CFGEN_INSTALL_CMD = ln -sf

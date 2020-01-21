@@ -63,7 +63,7 @@ systemctl daemon-reload
 install --directory --mode=0775 /var/lib/hare
 groupadd --force hare
 chgrp hare /var/lib/hare
-chmod g+w /var/lib/hare
+chmod --changes g+w /var/lib/hare
 
 %postun
 systemctl daemon-reload
