@@ -18,7 +18,7 @@ from typing import Any, Callable, Dict, Iterator, List, NamedTuple, Set, \
 import yaml
 
 
-__version__ = '0.3.1'
+__version__ = '0.3.2'
 
 
 def parse_opts(argv):
@@ -137,7 +137,7 @@ def main(argv=None):
 def die(msg: str, status: int = 1):
     assert msg
     assert status != 0
-    print(msg, file=sys.stderr)
+    print(os.path.basename(sys.argv[0]) + ': ' + msg, file=sys.stderr)
     sys.exit(status)
 
 
