@@ -66,7 +66,8 @@ fi
 # start hax.service: Unit not found" error message.  That error
 # message is misleading, because hax.service _is_ installed, it is
 # one of its dependencies - mero-kernel.service - which isn't.
-systemctl list-unit-files | grep -qE '^mero-kernel\.service\>' ||
+systemctl list-unit-files mero-kernel.service |
+    grep -qE '^mero-kernel\.service\>' ||
     die "'mero-kernel' systemd service is not installed"
 
 . update-consul-conf --dry-run  # import CONFD_IDs, IOS_IDs, id2fid()
