@@ -281,9 +281,7 @@ uninstall:
 	          $(EASY_INST_PTH) \
 	          $(CONSUL_LIBEXEC) $(CONSUL_SHARE) \
 	          $(SYSTEMD_CONFIG_DIR)/hare*.service \
-	          $(DESTDIR)/$(PREFIX)/bin/hctl \
-	          $(DESTDIR)/$(PREFIX)/bin/consul \
-	          $(DESTDIR)/$(PREFIX)/bin/*dhall* \
+	          $(DESTDIR)/$(PREFIX) \
 	          $(DESTDIR)/usr/bin/hctl \
 	          $(DESTDIR)/var/lib/hare \
 	          $(DESTDIR)/var/log/hare \
