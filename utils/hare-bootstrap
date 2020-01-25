@@ -133,10 +133,10 @@ then re-login and try to bootstrap again.
 EOF
         exit 1
     fi
-    say 'Generating cluster configuration... '
+    say 'Generating cluster configuration...'
     cfgen -o $cfgen_out $cluster_descr
     dhall text < $cfgen_out/confd.dhall | m0confgen > $cfgen_out/confd.xc
-    echo 'Ok.'
+    echo ' OK'
 fi
 
 # Get my IP address (the one that the other agents will join to).
@@ -144,7 +144,7 @@ read _ join_ip <<< $(get_server_nodes | grep -w $HOSTNAME)
 
 [[ $join_ip ]] || die 'Bootstrap should be run from a server node only'
 
-say 'Starting Consul server agent on this node... '
+say 'Starting Consul server agent on this node...'
 # $join_ip is our bind_ip address
 mk-consul-env --mode server --bind $join_ip \
               --extra-options '-ui -bootstrap-expect 1'
@@ -157,14 +157,14 @@ while ! consul info 2>/dev/null | grep -q 'leader.*true'; do
     sleep 1
     echo -n '.'
 done
-echo 'Ok.'
+echo ' OK'
 
-say 'Importing configuration into the KV store... '
+say 'Importing configuration into the KV store...'
 jq '[.[] | {key, value: (.value | @base64)}]' < $cfgen_out/consul-kv.json |
     consul kv import - > /dev/null
-echo 'Ok.'
+echo ' OK'
 
-say 'Starting Consul agents on other cluster nodes... '
+say 'Starting Consul agents on other cluster nodes...'
 pids=()
 while read node bind_ip; do
     ssh $node "$(which mk-consul-env) --mode server --bind $bind_ip --join $join_ip &&
@@ -193,9 +193,9 @@ while (( $(get_ready_agents_nr) != $agents_nr )); do
     sleep 1
     (( count++ ))
 done
-echo 'Ok.'
+echo ' OK'
 
-say 'Updating Consul agents configs from the KV store... '
+say 'Updating Consul agents configs from the KV store...'
 update-consul-conf &
 pids=($!)
 while read node _; do
@@ -203,15 +203,15 @@ while read node _; do
     pids+=($!)
 done < <(get_all_nodes | grep -vw $HOSTNAME || true)
 wait4 ${pids[@]}
-echo 'Ok.'
+echo ' OK'
 
-say 'Installing Mero configuration files... '
+say 'Installing Mero configuration files...'
 while read node _; do
     scp -q $cfgen_out/confd.xc $node:$cfgen_out
 done < <(get_server_nodes | grep -vw $HOSTNAME || true)
-echo 'Ok.'
+echo ' OK'
 
-say 'Waiting for the RC Leader to get elected... '
+say 'Waiting for the RC Leader to get elected...'
 wait_rc_leader
 sid=$(get_session)
 # There is always the serfHealth check in the session. But
@@ -223,7 +223,7 @@ while (( $(get_session_checks_nr $sid) == 1 )); do
     wait_rc_leader
     sid=$(get_session)
 done
-echo 'Ok.'
+echo ' OK'
 
 get_nodes() {
     local phase=$1
@@ -240,7 +240,7 @@ start_mero() {
     local op=$1
     local phase=$2
 
-    say "Starting Mero ($phase, $op)... "
+    say "Starting Mero ($phase, $op)..."
     [[ $op == 'mkfs' ]] && op='--mkfs-only' || op=
     bootstrap-node $op --phase $phase &
     pids=($!)
@@ -250,7 +250,7 @@ start_mero() {
         pids+=($!)
     done < <(get_nodes $phase | grep -vw $HOSTNAME || true)
     wait4 ${pids[@]}
-    echo 'Ok.'
+    echo ' OK'
 }
 
 # Start Mero in two phases: 1st confd-s, then ios-es.
@@ -272,7 +272,7 @@ bootstrap_nodes phase2
 . update-consul-conf --dry-run  # import S3_IDs
 if [[ -n $S3_IDs ]]; then
     # Now the 3rd phase (s3servers).
-    say 'Starting S3 servers (phase3)... '
+    say 'Starting S3 servers (phase3)...'
     bootstrap-node --phase phase3 &
     pids=($!)
 
@@ -281,10 +281,10 @@ if [[ -n $S3_IDs ]]; then
         pids+=($!)
     done < <(get_all_nodes | grep -vw $HOSTNAME || true)
     wait4 ${pids[@]}
-    echo 'Ok.'
+    echo ' OK'
 fi
 
-say 'Checking health of the services... '
+say 'Checking health of the services...'
 check_service() {
     local svc=$1
     curl -s http://127.0.0.1:8500/v1/health/service/$svc |
@@ -305,4 +305,4 @@ for svc in confd ios s3service; do
         svc_not_ready=$(check_service $svc)
     done
 done
-echo 'Ok.'
+echo ' OK'
