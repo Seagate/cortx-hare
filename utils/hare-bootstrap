@@ -115,6 +115,24 @@ if sudo systemctl --quiet is-active hare-consul-agent; then
 fi
 
 if ! [[ $conf_dir ]]; then
+    if ! [[ -d $cfgen_out ]]; then
+        cat <<EOF >&2
+$cfgen_out directory does not exist.
+Try reinstalling hare.
+EOF
+        exit 1
+    fi
+    if ! [[ -w $cfgen_out ]]; then
+        cat <<EOF >&2
+Cannot write to $cfgen_out directory.
+
+Did you forget to add current user ($USER) to 'hare' group?
+If so, run
+    sudo usermod --append --groups hare $USER
+then re-login and try to bootstrap again.
+EOF
+        exit 1
+    fi
     say 'Generating cluster configuration... '
     cfgen -o $cfgen_out $cluster_descr
     sudo mkdir -p /etc/mero
@@ -125,10 +143,7 @@ fi
 # Get my IP address (the one that the other agents will join to).
 read _ join_ip <<< $(get_server_nodes | grep -w $HOSTNAME)
 
-[[ $join_ip ]] || {
-    echo 'Bootstrap should be run from the server node only' >&2
-    exit 1
-}
+[[ $join_ip ]] || die 'Bootstrap should be run from a server node only'
 
 say 'Starting Consul server agent on this node...'
 # $join_ip is our bind_ip address
@@ -170,7 +185,7 @@ agents_nr=$(( ${#pids[@]} + 1 ))
 count=1
 while (( $(get_ready_agents_nr) != $agents_nr )); do
     if (( $count > 5 )); then
-        echo 'Some agent(s) failed to start in a due time:' >&2
+        echo 'Some agent(s) failed to start in due time:' >&2
         diff <(get_ready_agents | sort) \
              <(get_all_nodes | awk '{print $1}' | sort) | sed 1d >&2
         exit 1
