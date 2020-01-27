@@ -10,7 +10,7 @@ import os
 from pprint import pprint
 import random
 import re
-from socket import gethostname
+import socket
 import subprocess
 import sys
 from typing import Any, Callable, Dict, Iterator, List, NamedTuple, Set, \
@@ -18,7 +18,7 @@ from typing import Any, Callable, Dict, Iterator, List, NamedTuple, Set, \
 import yaml
 
 
-__version__ = '0.3.2'
+__version__ = '0.4.0'
 
 
 def parse_opts(argv):
@@ -196,22 +196,32 @@ def ipaddr_key(iface: str) -> str:
 
 
 def enrich_cluster_desc(desc: Dict[str, Any], mock_p: bool) -> None:
+    use_fqdn = False
     for node in desc['nodes']:
         # The fact names used here correspond to version 2.4.1 of `facter`.
         # See https://puppet.com/docs/puppet/6.6/core_facts.html#legacy-facts
+        #
+        # XXX-TODO: Use `salt` instead of `facter`;
+        # e.g., `salt eosnode-[1,2] grains.get host`.
         node['facts'] = get_facts(node['hostname'], mock_p,
-                                  'hostname',
-                                  'processorcount',
-                                  'memorysize_mb',
+                                  'hostname', 'fqdn',
+                                  'processorcount', 'memorysize_mb',
                                   ipaddr_key(node['data_iface']))
         node['facts']['_memsize_MB'] = int(float(
             node['facts']['memorysize_mb']))
+
+        use_fqdn = use_fqdn or \
+            '.' in node['hostname'] or \
+            '.' in run_command(node['hostname'], 'hostname')
 
         for m0d in node['m0_servers']:
             m0d.setdefault('runs_confd', False)
             disks = m0d.setdefault('io_disks', {'path_glob': None})
             disks['items'] = get_disks(node['hostname'], mock_p,
                                        disks['path_glob'])
+    if use_fqdn:
+        for node in desc['nodes']:
+            node['facts']['hostname'] = node['facts']['fqdn']
 
 
 def validate_cluster_desc(desc: Dict[str, Any]) -> None:
@@ -252,8 +262,8 @@ def validate_cluster_desc(desc: Dict[str, Any]) -> None:
 
 
 def is_localhost(hostname: str) -> bool:
-    name = gethostname()
-    return hostname in ('localhost', '127.0.0.1', name, f'{name}.local')
+    return hostname in ('localhost', '127.0.0.1', socket.gethostname(),
+                        socket.getfqdn())
 
 
 def run_command(hostname: str, *args: str) -> str:
@@ -271,8 +281,10 @@ def get_facts(hostname: str, mock_p: bool, *args: str) -> Dict[str, Any]:
 
 def fabricate_facts(hostname: str, *args: str) -> Dict[str, Any]:
     rng = random.randrange
+    hostname = re.sub('[^@]*@', '', hostname)  # drop 'user@' part
     fabricated = {
-        'hostname': re.sub('[^@]*@', '', hostname),
+        'hostname': hostname,
+        'fqdn': hostname + '.localdomain',
         'processorcount': rng(1, 21),
         'memorysize_mb': '{:.2f}'.format(random.uniform(512, 16000)),
         'ipaddress_eth1': '.'.join(str(n) for n in [
