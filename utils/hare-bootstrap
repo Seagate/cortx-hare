@@ -142,7 +142,15 @@ fi
 # Get my IP address (the one that the other agents will join to).
 read _ join_ip <<< $(get_server_nodes | grep -w $HOSTNAME)
 
-[[ $join_ip ]] || die 'Bootstrap should be run from a server node only'
+if [[ -z $join_ip ]]; then
+    cat <<'EOF' >&2
+Bootstrap should be executed on a Consul server node.
+
+"Consul server nodes" are the nodes with 'runs_confd: true' in the CDF
+(cluster description file).
+EOF
+    exit 1
+fi
 
 m0d_services=$(systemctl list-units 'm0d@*' | awk '/^m0d@/ { print $1 }')
 for svc in $m0d_services hare-{hax,consul-agent}.service; do
