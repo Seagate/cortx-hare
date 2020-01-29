@@ -16,8 +16,8 @@ fi
 
 kh=~/.ssh/known_hosts
 for host in "$@"; do
-    ssh-keyscan -t rsa $host >>$kh
-done >$kh
+    ssh-keyscan -t rsa $host
+done >>$kh
 chmod 0600 $kh
 sudo mkdir -p /root/.ssh
 sudo cp $kh /root/.ssh/
