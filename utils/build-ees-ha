@@ -250,7 +250,7 @@ sudo sed -e 's/hare-consul-agent.service/hare-consul-agent-c1.service/' \
          -e '/ExecStart=/aExecStopPost=/bin/umount -l /var/mero' \
          -i /usr/lib/systemd/system/hare-hax-c1.service
 sudo sed -e 's/hare-consul-agent.service/hare-consul-agent-c2.service/' \
-         -e '/ExecStart/iEnvironmentFile=$hare_dir/hax-env-c2' \
+         -e "/ExecStart/iEnvironmentFile=$hare_dir/hax-env-c2" \
          -e "/ExecStart=/iExecStartPre=/bin/mount $sdc /var/mero2" \
          -e '/ExecStart=/aExecStopPost=/bin/umount -l /var/mero2' \
          -i /usr/lib/systemd/system/hare-hax-c2.service
