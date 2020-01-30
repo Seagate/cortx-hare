@@ -34,8 +34,6 @@ if ! sudo systemctl start iscsi-initiator-cmu; then
     sudo systemctl start iscsi-initiator-cmu
 fi
 
-sudo yum install -y pacemaker pcs
-
 # https://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/2.0/html/Clusters_from_Scratch/_enable_pcs_daemon.html
 sudo systemctl start pcsd
 sudo systemctl enable pcsd
