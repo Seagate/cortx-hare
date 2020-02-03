@@ -18,7 +18,7 @@ from typing import Any, Callable, Dict, Iterator, List, NamedTuple, Set, \
 import yaml
 
 
-__version__ = '0.5.0'
+__version__ = '0.6.0'
 
 
 def parse_opts(argv):
@@ -197,6 +197,10 @@ def ipaddr_key(iface: str) -> str:
     return 'ipaddress_' + iface.replace(':', '_')
 
 
+def looks_like_ipaddr(s: str) -> bool:
+    return re.fullmatch(r'\d+(\.\d+){3}', s) is not None
+
+
 def enrich_cluster_desc(desc: Dict[str, Any], mock_p: bool) -> None:
     use_fqdn = False
     for node in desc['nodes']:
@@ -213,7 +217,8 @@ def enrich_cluster_desc(desc: Dict[str, Any], mock_p: bool) -> None:
             node['facts']['memorysize_mb']))
 
         use_fqdn = use_fqdn or \
-            '.' in node['hostname'] or \
+            ('.' in node['hostname'] and
+             not looks_like_ipaddr(node['hostname'])) or \
             '.' in run_command(node['hostname'], 'hostname')
 
         for m0d in node['m0_servers']:
@@ -236,33 +241,38 @@ def validate_cluster_desc(desc: Dict[str, Any]) -> None:
     total_nr_confds = total_nr_disks = 0
 
     for node in desc['nodes']:
-        def err(msg: str) -> str:
-            return '{}: {}'.format(node['hostname'], msg)
+        node_id = node['hostname']
+
+        if looks_like_ipaddr(node_id):
+            iface = node['data_iface']
+            iface_ip = node['facts'][ipaddr_key(iface)]
+            assert node_id == iface_ip, \
+                f'hostname ({node_id}) != IP of {iface} ({iface_ip})'
 
         assert node['hostname']
         assert node['data_iface']
 
         nr_confds = sum(1 for m0d in node['m0_servers'] if m0d['runs_confd'])
-        assert nr_confds < 2, err('Too many confd services')
+        assert nr_confds < 2, f'{node_id}: Too many confd services'
         total_nr_confds += nr_confds
 
         for m0d in node['m0_servers']:
             assert m0d['runs_confd'] or m0d['io_disks']['path_glob'], \
-                err("Either 'runs_confd' or 'io_disks' must be set")
+                f"{node_id}: Either 'runs_confd' or 'io_disks' must be set"
 
         disks: List[Disk] = []
         for m0d in node['m0_servers']:
             disks.extend(m0d['io_disks']['items'])
-        assert all_unique(disks), err('Same disk used by several IO services')
+        assert all_unique(disks), \
+            f'{node_id}: Same disk used by several IO services'
         total_nr_disks += len(disks)
 
         assert (nr_confds + node['m0_clients']['s3']
                 + node['m0_clients']['other'] > 0), \
-            err('At least one Mero server or client is required')
+            f'{node_id}: At least one Mero server or client is required'
 
     assert total_nr_confds > 0, 'At least one confd is required'
     assert total_nr_disks > 0, 'No disks found'
-
     assert desc['pools'], 'List of pools must not be empty'
 
 
