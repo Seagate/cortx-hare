@@ -27,14 +27,17 @@ Mandatory Parameters:
 
 Options:
   -i, --interface <if>  Data Network interface (default: eth1)
-  --left-node  <n1>     Left Node hostname  (default: pod-c1)
+  --left-node  <n1>     Left  Node hostname (default: pod-c1)
   --right-node <n2>     Right Node hostname (default: pod-c2)
+  --left-volume  <lv>   Left  Node /var/mero volume (default: /dev/sdb)
+  --right-volume <rv>   Right Node /var/mero volume (default: /dev/sdc)
 
 EOF
 }
 
 TEMP=$(getopt --options h,i: \
               --longoptions help,ip1:,ip2:,interface:,left-node:,right-node: \
+              --longoptions left-volume:,right-volume: \
               --name "$PROG" -- "$@" || true)
 
 (($? == 0)) || { usage >&2; exit 1; }
@@ -46,6 +49,8 @@ ip2=
 iface=eth1
 lnode=pod-c1
 rnode=pod-c2
+lvolume=/dev/sdb
+rvolume=/dev/sdc
 
 while true; do
     case "$1" in
@@ -55,6 +60,8 @@ while true; do
         -i|--interface)      iface=$2; shift 2 ;;
         --left-node)         lnode=$2; shift 2 ;;
         --right-node)        rnode=$2; shift 2 ;;
+        --left-volume)       lvolume=$2; shift 2 ;;
+        --right-volume)      rvolume=$2; shift 2 ;;
         --)                  shift; break ;;
         *)                   break ;;
     esac
@@ -106,11 +113,11 @@ mkfs_ext4() {
     sudo mkfs.ext4 -q $dev &>/dev/null < <(echo y)
 }
 
-mkfs_ext4 /dev/sdb
-mkfs_ext4 /dev/sdc
+mkfs_ext4 $lvolume
+mkfs_ext4 $rvolume
 
-mkdir -p /var/mero && sudo mount /dev/sdb /var/mero
-ssh $rnode 'mkdir -p /var/mero && sudo mount /dev/sdc /var/mero'
+mkdir -p /var/mero && sudo mount $lvolume /var/mero
+ssh $rnode "mkdir -p /var/mero && sudo mount $rvolume /var/mero"
 
 hctl bootstrap --mkfs $cdf
 hctl shutdown
@@ -128,19 +135,19 @@ hctl bootstrap -c $hare_dir/
 hctl shutdown
 
 sudo mkdir -p /var/mero2
-sudo mount /dev/sdc /var/mero2
+sudo mount $rvolume /var/mero2
 sudo ln -s /var/mero2/m0d-0x7200000000000001\:0x2? \
            /var/mero/
 sudo umount /var/mero2
 sudo umount /var/mero
 
-cmd='
+cmd="
 sudo mkdir -p /var/mero1 &&
-sudo mount /dev/sdb /var/mero1 &&
+sudo mount $lvolume /var/mero1 &&
 sudo ln -sf /var/mero1/m0d-0x7200000000000001\:0x?
            /var/mero/ &&
 sudo umount /var/mero1 &&
-sudo umount /var/mero'
+sudo umount /var/mero"
 ssh $rnode $cmd
 
 echo 'Preparing Consul agents config files...'
@@ -249,20 +256,20 @@ get_sd_id() {
     ls -l /dev/disk/by-id/ | grep "$sd_name$" | head -1 | awk '{print $9}'
 }
 
-sdb="/dev/disk/by-id/$(get_sd_id sdb)"
-sdc="/dev/disk/by-id/$(get_sd_id sdc)"
+lvid="/dev/disk/by-id/$(get_sd_id $(basename $lvolume))"
+rvid="/dev/disk/by-id/$(get_sd_id $(basename $rvolume))"
 
 sudo cp /usr/lib/systemd/system/hare-hax.service \
         /usr/lib/systemd/system/hare-hax-c1.service
 sudo cp /usr/lib/systemd/system/hare-hax.service \
         /usr/lib/systemd/system/hare-hax-c2.service
 sudo sed -e 's/hare-consul-agent.service/hare-consul-agent-c1.service/' \
-         -e "/ExecStart=/iExecStartPre=/bin/mount $sdb /var/mero" \
+         -e "/ExecStart=/iExecStartPre=/bin/mount $lvid /var/mero" \
          -e '/ExecStart=/aExecStopPost=/bin/umount -l /var/mero' \
          -i /usr/lib/systemd/system/hare-hax-c1.service
 sudo sed -e 's/hare-consul-agent.service/hare-consul-agent-c2.service/' \
          -e "/ExecStart/iEnvironmentFile=$hare_dir/hax-env-c2" \
-         -e "/ExecStart=/iExecStartPre=/bin/mount $sdc /var/mero2" \
+         -e "/ExecStart=/iExecStartPre=/bin/mount $rvid /var/mero2" \
          -e '/ExecStart=/aExecStopPost=/bin/umount -l /var/mero2' \
          -i /usr/lib/systemd/system/hare-hax-c2.service
 echo 'HARE_HAX_NODE_NAME=$rnode' | sudo tee $hare_dir/hax-env-c2 > /dev/null
@@ -272,13 +279,13 @@ sudo cp /usr/lib/systemd/system/hare-hax.service
         /usr/lib/systemd/system/hare-hax-c1.service &&
 sudo sed -e 's/hare-consul-agent.service/hare-consul-agent-c1.service/'
          -e '/ExecStart/iEnvironmentFile=$hare_dir/hax-env-c1'
-         -e '/ExecStart=/iExecStartPre=/bin/mount $sdb /var/mero1'
+         -e '/ExecStart=/iExecStartPre=/bin/mount $lvid /var/mero1'
          -e '/ExecStart=/aExecStopPost=/bin/umount -l /var/mero1'
          -i /usr/lib/systemd/system/hare-hax-c1.service &&
 sudo cp /usr/lib/systemd/system/hare-hax.service
         /usr/lib/systemd/system/hare-hax-c2.service &&
 sudo sed -e 's/hare-consul-agent.service/hare-consul-agent-c2.service/'
-         -e '/ExecStart=/iExecStartPre=/bin/mount $sdc /var/mero'
+         -e '/ExecStart=/iExecStartPre=/bin/mount $rvid /var/mero'
          -e '/ExecStart=/aExecStopPost=/bin/umount -l /var/mero'
          -i /usr/lib/systemd/system/hare-hax-c2.service &&
 echo 'HARE_HAX_NODE_NAME=$lnode' | sudo tee $hare_dir/hax-env-c1 > /dev/null"
