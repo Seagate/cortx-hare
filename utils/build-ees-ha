@@ -12,25 +12,29 @@ Usage: $PROG [OPTS] --ip1 <addr> --ip2 <addr> <CDF>
 Configures EES-HA by preparing the configuration files and
 adding resources into the Pacemaker.
 
-Note: make sure the provided roaming IP addresses belong to
-the local sub-network and are not used by anyone else.
+Here are some prerequisites/guidelines:
 
-Note2: for the script to work - make sure Pacemaker is
-started and the cluster is running.
+* Pacemaker should be started & configured with a
+  clean (without resources) cluser. Check with 'pcs status'.
 
-Note3: the script should be run from the "left" node.
+* Password-less ssh access between the nodes is required.
 
-Mandatory Parameters:
+* The script should be run from the "left" node.
+
+* Make sure the provided roaming IP addresses belong to
+  the local sub-network and are not used by anyone else.
+
+Mandatory parameters:
   --ip1 <addr>         1st roaming IP address
   --ip2 <addr>         2nd roaming IP address.
         <CDF>          Hare Cluster Description File
 
-Options:
+Optional parameters:
   -i, --interface <if>  Data Network interface (default: eth1)
-  --left-node  <n1>     Left  Node hostname (default: pod-c1)
-  --right-node <n2>     Right Node hostname (default: pod-c2)
-  --left-volume  <lv>   Left  Node /var/mero volume (default: /dev/sdb)
-  --right-volume <rv>   Right Node /var/mero volume (default: /dev/sdc)
+  --left-node     <n1>  Left  Node hostname (default: pod-c1)
+  --right-node    <n2>  Right Node hostname (default: pod-c2)
+  --left-volume   <lv>  Left  Node /var/mero volume (default: /dev/sdb)
+  --right-volume  <rv>  Right Node /var/mero volume (default: /dev/sdc)
 
 EOF
 }
@@ -189,7 +193,7 @@ sudo systemctl daemon-reload"
 ssh $rnode $cmd
 
 sudo cp $hare_dir/consul-env $hare_dir/consul-env-c1
-sudo scp $rnode:$hare_dir/consul-env $hare_dir/consul-env-c2
+scp $rnode:$hare_dir/consul-env $hare_dir/consul-env-c2
 sudo sed -r \
   -e 's/server$/server-c1/' \
   -e "s/JOIN=/&-retry-join $ip2 /" \
@@ -201,7 +205,7 @@ sudo sed -r \
 
 cmd="
 sudo cp $hare_dir/consul-env $hare_dir/consul-env-c2 &&
-sudo scp $lnode:$hare_dir/consul-env $hare_dir/consul-env-c1 &&
+scp $lnode:$hare_dir/consul-env $hare_dir/consul-env-c1 &&
 sudo sed -r \
   -e 's/server$/server-c1/' \
   -e 's/127.0.0.1 //' \
@@ -222,7 +226,7 @@ cp $hare_dir/consul-server-c1-conf.json \
 sudo sed -e '/server/a\ \ "node_name": "$lnode",' \
          -e '/server/a\ \ "leave_on_terminate": true,' \
          -i /tmp/consul-server-c1-conf.json
-sudo scp /tmp/consul-server-c1-conf.json $rnode:$hare_dir/
+scp /tmp/consul-server-c1-conf.json $rnode:$hare_dir/
 
 cmd="
 sudo cp $hare_dir/consul-server-conf.json \
@@ -234,7 +238,7 @@ cp $hare_dir/consul-server-c2-conf.json \
 sudo sed -e '/server/a\ \ \"node_name\": \"$rnode\",' \
          -e '/server/a\ \ \"leave_on_terminate\": true,' \
          -i /tmp/consul-server-c2-conf.json &&
-sudo scp /tmp/consul-server-c2-conf.json $lnode:$hare_dir/"
+scp /tmp/consul-server-c2-conf.json $lnode:$hare_dir/"
 ssh $rnode $cmd
 
 echo 'Adding Consul to Pacemaker...'
