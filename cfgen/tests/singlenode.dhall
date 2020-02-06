@@ -4,6 +4,7 @@ in
 { nodes =
     [ { hostname = "localhost"
       , data_iface = "eth1"
+      , data_iface_type = None types.Protocol
       , m0_servers =
           [ { runs_confd = Some True
             , io_disks = None { path_glob : Text }

@@ -111,7 +111,7 @@ let node = types.Obj.Node
   }
 
 let endpoints =
-    let ep = utils.tcpEndpoint "172.28.128.3"
+    let ep = utils.endpoint types.Protocol.tcp "172.28.128.3"
     in
       { process_24 = ep 34 101
       , process_27 = ep 44 101

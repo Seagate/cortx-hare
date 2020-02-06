@@ -51,5 +51,5 @@ let Addr = ./Addr.dhall
 in
 < lo
 | tcp : { tcp : Addr }
-| ib : { ib : Addr }
+| o2ib : { o2ib : Addr }
 >

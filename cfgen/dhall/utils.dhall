@@ -1,4 +1,3 @@
-{ tcpEndpoint = ./utils/tcpEndpoint.dhall
-, ibEndpoint = ./utils/ibEndpoint.dhall
+{ endpoint = ./utils/endpoint.dhall
 , zoid = ./utils/zoid.dhall
 }

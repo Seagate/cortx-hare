@@ -16,6 +16,7 @@
 { Addr        = ./types/Addr.dhall
 , Endpoint    = ./types/Endpoint.dhall
 , NetId       = ./types/NetId.dhall
+, Protocol    = ./types/Protocol.dhall
 
 , ClusterDesc = ./types/ClusterDesc.dhall
 , FailVec     = ./types/FailVec.dhall

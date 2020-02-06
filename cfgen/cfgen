@@ -18,7 +18,7 @@ from typing import Any, Callable, Dict, Iterator, List, NamedTuple, Set, \
 import yaml
 
 
-__version__ = '0.4.0'
+__version__ = '0.5.0'
 
 
 def parse_opts(argv):
@@ -70,7 +70,9 @@ class ShowSchema(argparse.Action):
 ---  # start of the document (optional)
 nodes:
   - hostname: <str>    # [user@]hostname; e.g., localhost, pod-c1
-    data_iface: <str>  # name of network device; e.g., eth1, eth1:c1, eth1_c1
+    data_iface: <str>  # name of network interface; e.g., eth1, eth1:c1
+    data_iface_type: tcp|o2ib  # type of network interface;
+                             # optional, defaults to "tcp"
     m0_servers:
       - runs_confd: <bool>  # optional, defaults to false
         #io_disks: null                 # no IO service
@@ -237,6 +239,9 @@ def validate_cluster_desc(desc: Dict[str, Any]) -> None:
         def err(msg: str) -> str:
             return '{}: {}'.format(node['hostname'], msg)
 
+        assert node['hostname']
+        assert node['data_iface']
+
         nr_confds = sum(1 for m0d in node['m0_servers'] if m0d['runs_confd'])
         assert nr_confds < 2, err('Too many confd services')
         total_nr_confds += nr_confds
@@ -379,10 +384,15 @@ def oids_to_dhall(oids: List[Oid]) -> str:
     return '[ {} ]'.format(', '.join(oid_to_dhall(x) for x in oids))
 
 
-class BaseEndpoint:
+NetProtocol = Enum('NetProtocol', 'tcp o2ib')
+
+
+class Endpoint:
     _tmids: Dict[Tuple[str, int], int] = {}
 
-    def __init__(self, ipaddr: str, portal: int, tmid: int = None):
+    def __init__(self, proto: NetProtocol, ipaddr: str, portal: int,
+                 tmid: int = None):
+        self.proto = proto
         assert ipaddr
         self.ipaddr = ipaddr
         assert portal > 0
@@ -394,37 +404,21 @@ class BaseEndpoint:
             assert tmid > 0
             self.tmid = tmid
 
-    def _protocol_name(self):
-        raise NotImplementedError()
-
-    def to_dhall(self):
-        raise NotImplementedError()
-
     def __repr__(self):
-        args = ', '.join([f'ipaddr={self.ipaddr!r}',
+        args = ', '.join([f'proto={self.proto!r}',
+                          f'ipaddr={self.ipaddr!r}',
                           f'portal={self.portal}'
                           f'tmid={self.tmid}'])
         return f'{self.__class__.__name__}({args})'
 
+    def to_dhall(self):
+        return f'utils.endpoint types.Protocol.{self.proto.name}' \
+            f' "{self.ipaddr}" {self.portal} {self.tmid}'
+
     def __str__(self):
-        protocol = self._protocol_name()
-        return f'{self.ipaddr}@{protocol}:12345:{self.portal}:{self.tmid}'
-
-
-class TcpEndpoint(BaseEndpoint):
-    def _protocol_name(self):
-        return 'tcp'
-
-    def to_dhall(self):
-        return f'utils.tcpEndpoint "{self.ipaddr}" {self.portal} {self.tmid}'
-
-
-class IbEndpoint(BaseEndpoint):
-    def _protocol_name(self):
-        return 'o2ib'
-
-    def to_dhall(self):
-        return f'utils.ibEndpoint "{self.ipaddr}" {self.portal} {self.tmid}'
+        ip = self.ipaddr
+        proto = self.proto.name
+        return f'{ip}@{proto}:12345:{self.portal}:{self.tmid}'
 
 
 class ToDhall(metaclass=abc.ABCMeta):
@@ -538,7 +532,7 @@ class ConfProcess(ToDhall):
     _objt = ObjT.process
     _downlinks = {Downlink('services', ObjT.service)}
 
-    def __init__(self, nr_cpu: int, memsize_MB: int, endpoint: BaseEndpoint,
+    def __init__(self, nr_cpu: int, memsize_MB: int, endpoint: Endpoint,
                  services: List[Oid]):
         assert nr_cpu > 0
         self.nr_cpu = nr_cpu
@@ -565,54 +559,26 @@ class ConfProcess(ToDhall):
         return '{ %s }' % args
 
     @classmethod
-    def _get_protocol_by_interface(cls, iface: str, conf_file: str) -> str:
-        with open(conf_file, 'r') as f:
-            config_content = f.read()
-
-        parser = LnetConfigParser()
-        interfaces = parser.parse(config_content)
-
-        assert iface in interfaces, \
-            f'LNet is not configured for interface {iface}'
-
-        protocol = interfaces[iface]
-        return protocol
-
-    @classmethod
-    def _create_endpoint(cls, iface: str, proc_t: ProcT,
-                         facts: Dict[str, Any]) -> BaseEndpoint:
-        ipaddr = facts[ipaddr_key(iface)]
-        assert ipaddr, 'No IP address found. Please check the network '\
-                       'settings in the CDF file'
-        conf_file = '/etc/modprobe.d/lnet.conf'
-        if not os.path.isfile(conf_file):
-            # No 'lnet.conf' file found. Assume TCP by default.
-            protocol = 'tcp'
-        else:
-            protocol = cls._get_protocol_by_interface(iface, conf_file)
-
-        endpoint_types = {'tcp': TcpEndpoint, 'o2ib': IbEndpoint}
-        assert protocol in endpoint_types, "Can't build the endpoint:" \
-            f' unsupported protocol found in LNet configuration: {protocol}'
-
-        return endpoint_types[protocol](ipaddr=ipaddr, portal=proc_t.value)
-
-    @classmethod
-    def build(cls, m0conf: Dict[Oid, Any], parent: Oid,
-              facts: Dict[str, Any],
-              iface: str,
+    def build(cls,
+              m0conf: Dict[Oid, Any],
+              parent: Oid,
+              node_desc: Dict[str, Any],
               proc_t: ProcT,
               proc_desc: Dict[str, Any] = None,
               ctrl: Oid = None) -> Oid:
         assert parent.type is ObjT.node
-        assert iface
         assert ctrl is None or ctrl.type is ObjT.controller
 
-        ep = cls._create_endpoint(iface, proc_t, facts)
+        facts = node_desc['facts']
+        proto = node_desc.get('data_iface_type', 'tcp')
+        ep = Endpoint(proto=NetProtocol[proto],
+                      ipaddr=facts[ipaddr_key(node_desc['data_iface'])],
+                      portal=proc_t.value)
         proc_id = new_oid(ObjT.process)
         m0conf[proc_id] = cls(nr_cpu=facts['processorcount'],
                               memsize_MB=facts['_memsize_MB'],
-                              endpoint=ep, services=[])
+                              endpoint=ep,
+                              services=[])
         m0conf[parent].processes.append(proc_id)
 
         for stype in service_types(proc_t, proc_desc):
@@ -679,7 +645,7 @@ class ConfService(ToDhall):
     _objt = ObjT.service
     _downlinks = {Downlink('sdevs', ObjT.sdev)}
 
-    def __init__(self, stype: SvcT, endpoint: BaseEndpoint, sdevs: List[Oid]):
+    def __init__(self, stype: SvcT, endpoint: Endpoint, sdevs: List[Oid]):
         self.type = stype
         self.endpoint = endpoint
         assert all(x.type is ObjT.sdev for x in sdevs)
@@ -701,7 +667,7 @@ class ConfService(ToDhall):
 
     @classmethod
     def build(cls, m0conf: Dict[Oid, Any], parent: Oid,
-              stype: SvcT, endpoint: BaseEndpoint) -> Oid:
+              stype: SvcT, endpoint: Endpoint) -> Oid:
         assert parent.type is ObjT.process
         svc_id = new_oid(ObjT.service)
         m0conf[svc_id] = cls(stype, endpoint, sdevs=[])
@@ -1223,7 +1189,7 @@ def generate_consul_kv(cluster: Cluster, dhall_dir: str) -> str:
     m0conf = cluster.m0conf
 
     ConsulService = NamedTuple('ConsulService', [
-        ('node_name', str), ('proc_id', Oid), ('ep', BaseEndpoint),
+        ('node_name', str), ('proc_id', Oid), ('ep', Endpoint),
         ('svc_id', Oid), ('stype', str)])
 
     def profile() -> str:
@@ -1325,34 +1291,32 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
 
     for node in cluster_desc['nodes']:
         facts = node['facts']
-        iface = node['data_iface']
 
         node_id = ConfNode.build(conf, root_id, facts)
-        ctrl_id = ConfController.build(conf,
-                                       ConfEnclosure.build(conf, rack_id),
-                                       node_id) \
-            if any(m0d['io_disks']['items'] for m0d in node['m0_servers']) \
-            else None
+        ctrl_id = None
+        if any(m0d['io_disks']['items'] for m0d in node['m0_servers']):
+            ctrl_id = ConfController.build(conf,
+                                           ConfEnclosure.build(conf, rack_id),
+                                           node_id)
 
-        ConfProcess.build(conf, node_id, facts, iface, ProcT.hax)
+        ConfProcess.build(conf, node_id, node, ProcT.hax)
 
         confd_p = False
         for m0d in node['m0_servers']:
-            ConfProcess.build(conf, node_id, facts, iface, ProcT.m0_server,
-                              m0d, ctrl_id)
+            ConfProcess.build(conf, node_id, node, ProcT.m0_server, m0d,
+                              ctrl_id)
             if m0d['runs_confd']:
                 confd_p = True
 
         (cluster.consul_servers if confd_p else cluster.consul_clients).\
             append(ConsulAgent(hostname=facts['hostname'],
                                # XXX use 'mgmt_iface' for consul?
-                               ipaddr=facts[ipaddr_key(iface)]))
+                               ipaddr=facts[ipaddr_key(node['data_iface'])]))
 
         for client_t, proc_t in [('s3', ProcT.m0_client_s3),
                                  ('other', ProcT.m0_client_other)]:
             for _ in range(node['m0_clients'][client_t]):
-                proc_id = ConfProcess.build(conf, node_id, facts, iface,
-                                            proc_t)
+                proc_id = ConfProcess.build(conf, node_id, node, proc_t)
                 cluster.m0_clients[proc_id] = new_oid(ObjT.service)
 
     # XXX-TODO: support multiple profiles
@@ -1417,54 +1381,6 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
     assert all_unique(x.ipaddr
                       for x in cluster.consul_servers + cluster.consul_clients)
     return cluster
-
-
-class LnetConfigParser:
-    def parse(self, content: str) -> Dict[str, str]:
-        lines = self._get_lines(content)
-        result: Dict[str, str] = {}
-        for line in lines:
-            match = re.match(r'^\s*options\s+lnet\s+networks=([^\s]*)\s+.*$',
-                             line)
-            if match:
-                result.update(self._extract_ifaces(match.group(1)))
-        return result
-
-    def _extract_ifaces(self, ifaces: str) -> Dict[str, str]:
-        '''
-        Parses the string like this: 'tcp(eth1),tcp1(eth0)' into dicts of the
-        following structure: {'eth1': 'tcp', 'eth0': tcp1}
-        '''
-        iface_map: Dict[str, str] = {}
-        for iface_def in ifaces.split(','):
-            # Match strings like this: tcp(eth1)
-            match = re.match(r'^([^\(]+)\(([^\)]+)\)', iface_def)
-            assert match
-            iface_map[match.group(2)] = match.group(1)
-        return iface_map
-
-    def _get_lines(self, whole_text: str) -> List[str]:
-        '''
-        Returns the meaningful list of lines (comments excluded) with line
-        conjunctions (with backslash at the end) processed.
-        '''
-        result: List[str] = []
-        raw_lines = whole_text.splitlines()
-        i = 0
-        while i < len(raw_lines):
-            s = ''
-            if re.match(r'^[\s]*#', raw_lines[i]):
-                i += 1
-                continue
-
-            while raw_lines[i].endswith('\\'):
-                # Add the current line with the very last character cut out
-                s += raw_lines[i][:-1]
-                i += 1
-            s += raw_lines[i]
-            result.append(s)
-            i += 1
-        return result
 
 
 if __name__ == '__main__':

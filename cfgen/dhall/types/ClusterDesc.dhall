@@ -7,6 +7,7 @@ let M0Server =
 let Node =
   { hostname : Text
   , data_iface : Text
+  , data_iface_type: Optional ./Protocol.dhall
   , m0_servers : List M0Server
   , m0_clients : { s3 : Natural, other : Natural }
   }
