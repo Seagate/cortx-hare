@@ -98,7 +98,7 @@ sudo pcs constraint order lnet-clone then ip-c2
 
 cmd='
 sudo mkdir -p /usr/lib/ocf/resource.d/seagate &&
-sudo ln -sf /data/hare/pacemaker/lnet
+sudo ln -sf /opt/seagate/eos/hare/libexec/lnet
            /usr/lib/ocf/resource.d/seagate/lnet
 '
 pdsh -w $lnode,$rnode $cmd
@@ -223,8 +223,8 @@ sudo sed -e 's/"--hax"/"--svc", "hare-hax-c1"/' \
          -i $hare_dir/consul-server-c1-conf.json
 cp $hare_dir/consul-server-c1-conf.json \
    /tmp/consul-server-c1-conf.json
-sudo sed -e '/server/a\ \ "node_name": "$lnode",' \
-         -e '/server/a\ \ "leave_on_terminate": true,' \
+sudo sed -e '/\"server\"/a\ \ "node_name": "$lnode",' \
+         -e '/\"server\"/a\ \ "leave_on_terminate": true,' \
          -i /tmp/consul-server-c1-conf.json
 scp /tmp/consul-server-c1-conf.json $rnode:$hare_dir/
 
@@ -235,8 +235,8 @@ sudo sed -e 's/\"--hax\"/\"--svc\", \"hare-hax-c2\"/' \
          -i $hare_dir/consul-server-c2-conf.json &&
 cp $hare_dir/consul-server-c2-conf.json \
    /tmp/consul-server-c2-conf.json &&
-sudo sed -e '/server/a\ \ \"node_name\": \"$rnode\",' \
-         -e '/server/a\ \ \"leave_on_terminate\": true,' \
+sudo sed -e '/\"server\"/a\ \ \"node_name\": \"$rnode\",' \
+         -e '/\"server\"/a\ \ \"leave_on_terminate\": true,' \
          -i /tmp/consul-server-c2-conf.json &&
 scp /tmp/consul-server-c2-conf.json $lnode:$hare_dir/"
 ssh $rnode $cmd
@@ -339,3 +339,87 @@ sudo pcs -f mcfg resource group add c2 mero-ios-c2
 sudo pcs -f mcfg constraint order mero-confd-c1 then mero-ios-c2
 sudo pcs -f mcfg constraint order mero-confd-c2 then mero-ios-c1
 sudo pcs cluster cib-push mcfg --config
+
+echo 'Adding ldap to Pacemaker...'
+pcs resource create ldap-$lnode systemd:slapd op monitor interval=30s
+pcs resource create ldap-$rnode systemd:slapd op monitor interval=30s
+pcs constraint location ldap-$lnode prefers $lnode=INFINITY
+pcs constraint location ldap-$lnode prefers $rnode=-INFINITY
+pcs constraint location ldap-$rnode prefers $rnode=INFINITY
+pcs constraint location ldap-$rnode prefers $lnode=-INFINITY
+
+echo 'Adding s3authserver to Pacemaker...'
+pcs resource create s3auth-$lnode systemd:s3authserver op monitor interval=30
+pcs constraint location s3auth-$lnode prefers $lnode=INFINITY
+pcs constraint location s3auth-$lnode prefers $rnode=-INFINITY
+pcs resource create s3auth-$rnode systemd:s3authserver op monitor interval=30
+pcs constraint location s3auth-$rnode prefers $rnode=INFINITY
+pcs constraint location s3auth-$rnode prefers $lnode=-INFINITY
+
+echo 'Adding colocation constraint for s3authserver and ldap...'
+pcs constraint colocation add s3auth-$lnode with ldap-$lnode score=INFINITY
+pcs constraint colocation add s3auth-$rnode with ldap-$rnode score=INFINITY
+
+echo 'Adding elastic search to Pacemaker..'
+pcs resource create els-search-$lnode systemd:elasticsearch op monitor interval=30s
+pcs resource create els-search-$rnode systemd:elasticsearch op monitor interval=30s
+pcs constraint location els-search-$lnode prefers $lnode=INFINITY
+pcs constraint location els-search-$lnode prefers $rnode=-INFINITY
+pcs constraint location els-search-$rnode prefers $rnode=INFINITY
+pcs constraint location els-search-$rnode prefers $lnode=-INFINITY
+
+echo 'Adding statsd to Pacemaker...'
+pcs resource create statsd-$lnode systemd:statsd op monitor interval=30s
+pcs resource create statsd-$rnode systemd:statsd op monitor interval=30s
+pcs constraint location statsd-$lnode prefers $lnode=INFINITY
+pcs constraint location statsd-$lnode prefers $rnode=-INFINITY
+pcs constraint location statsd-$rnode prefers $rnode=INFINITY
+pcs constraint location statsd-$rnode prefers $lnode=-INFINITY
+
+echo 'Adding statsd and elasticsearch colocation constraint...'
+pcs constraint colocation add statsd-$lnode with els-search-$lnode score=INFINITY
+pcs constraint colocation add statsd-$rnode with els-search-$rnode score=INFINITY
+
+echo 'Adding haproxy to pacemaker...'
+
+pcs resource create haproxy-$lnode systemd:haproxy
+pcs constraint location haproxy-$lnode prefers $lnode=INFINITY
+pcs constraint location haproxy-$lnode prefers $rnode=-INFINITY
+
+pcs resource create haproxy-$rnode systemd:haproxy
+pcs constraint location haproxy-$rnode prefers $rnode=INFINITY
+pcs constraint location haproxy-$rnode prefers $lnode=-INFINITY
+
+pcs resource create s3backcons-$lnode systemd:s3backgroundconsumer
+pcs resource create s3backprod-$lnode systemd:s3backgroundproducer
+pcs resource create s3backcons-$rnode systemd:s3backgroundconsumer
+pcs resource create s3backprod-$rnode systemd:s3backgroundproducer
+
+echo 'Adding S3server to Pacemaker...'
+
+get_s3_svc() {
+    local cfg=$1
+    local svc=$2
+    jq -r '.services[] | "\(.name) \(.checks[].args[])"' $cfg |
+        awk "/$svc.s3server@/ {print \$2}"
+}
+
+
+s3_resource_add() {
+   local conf_file=$1
+   local node=$2
+   local coregroup=$3
+   local count=1
+   local s3server_fids=$(get_s3_svc $hare_dir/$conf_file s3service)
+
+   for i in ${s3server_fids[@]}
+   do
+      pcs resource create s3server-$count-$node systemd:$i op stop timeout=600
+      pcs constraint location s3server-$count-$node prefers $node=INFINITY
+      pcs constraint colocation add s3server-$count-$node with s3auth-$node score=INFINITY
+      (( count++ ))
+   done
+}
+
+s3_resource_add consul-server-c1-conf.json $lnode c1
+s3_resource_add consul-server-c2-conf.json $rnode c2
