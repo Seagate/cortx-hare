@@ -54,11 +54,12 @@ ci_init_m0vg() (
 
     if [[ ! -x $M0VG ]]; then
         # Get `m0vg` script.
-        # Note that we download the latest Mero, disregarding
-        # `MERO_COMMIT_REF`.
-        git clone --recursive --depth 1 \
-            http://gitlab.mero.colo.seagate.com/mero/mero.git \
-            ${M0VG%/scripts/m0vg}
+        #
+        # Notes:
+        # 1. We download the latest Mero, disregarding `MERO_COMMIT_REF`.
+        # 2. We use no `--recursive`, because we don't need submodules.
+        git clone --depth 1 http://gitlab.mero.colo.seagate.com/mero/mero.git \
+            ${M0VG%%/*}
     fi
 
     $M0VG env add <<EOF
