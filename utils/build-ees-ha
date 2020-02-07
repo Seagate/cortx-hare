@@ -98,7 +98,7 @@ sudo pcs constraint order lnet-clone then ip-c2
 
 cmd='
 sudo mkdir -p /usr/lib/ocf/resource.d/seagate &&
-sudo ln -sf /opt/seagate/eos/hare/libexec/lnet
+sudo ln -sf /opt/seagate/eos/hare/pacemaker/lnet
            /usr/lib/ocf/resource.d/seagate/lnet
 '
 pdsh -w $lnode,$rnode $cmd

@@ -115,6 +115,7 @@ CONSUL_LIBEXEC     = $(DESTDIR)/$(PREFIX)/libexec/consul
 CONSUL_SHARE       = $(DESTDIR)/$(PREFIX)/share/consul
 HARE_CONF          = $(DESTDIR)/$(PREFIX)/conf
 HARE_LIBEXEC       = $(DESTDIR)/$(PREFIX)/libexec
+HARE_PACEMAKER     = $(DESTDIR)/$(PREFIX)/pacemaker
 HAX_EXE            = $(DESTDIR)/$(PREFIX)/bin/hax
 HAX_EGG_LINK       = $(DESTDIR)/$(PREFIX)/lib/python3.$(PY3_VERSION_MINOR)/site-packages/hax.egg-link
 SYSTEMD_CONFIG_DIR = $(DESTDIR)/usr/lib/systemd/system
@@ -126,6 +127,11 @@ install: install-dirs install-cfgen install-hax install-systemd install-vendor
 	@for f in utils/*; do \
 	     $(call _log,copying $$f -> $(HARE_LIBEXEC)); \
 	     install $$f $(HARE_LIBEXEC); \
+	 done
+	@$(call _info,Installing pacemaker scripts)
+	@for f in pacemaker/*; do \
+	     $(call _log,copying $$f -> $(HARE_PACEMAKER)); \
+	     install $$f $(HARE_PACEMAKER); \
 	 done
 	@$(call _info,Installing hare provisioning)
 	@for f in provisioning/*; do \
@@ -142,6 +148,7 @@ install: install-dirs install-cfgen install-hax install-systemd install-vendor
 install-dirs:
 	@for d in $(HARE_CONF) \
                   $(HARE_LIBEXEC) \
+                  $(HARE_PACEMAKER) \
 	          $(DESTDIR)/var/log/hare \
 	          $(DESTDIR)/var/mero/hax; \
 	 do \
@@ -207,10 +214,15 @@ install-vendor: vendor/consul-bin/current/consul \
 # devinstall {{{2
 .PHONY: devinstall
 devinstall: install-dirs devinstall-cfgen devinstall-hax devinstall-systemd devinstall-vendor
-	@$(call _info,Installing hare utils)
+	@$(call _info,linking hare utils)
 	@for f in utils/*; do \
 	     $(call _log,linking $$f -> $(HARE_LIBEXEC)); \
 	     ln -sf $(TOP_SRC_DIR)$$f $(HARE_LIBEXEC); \
+	 done
+	@$(call _info,linking pacemaker scripts)
+	@for f in pacemaker/*; do \
+	     $(call _log,linking $$f -> $(HARE_PACEMAKER)); \
+	     ln -sf $(TOP_SRC_DIR)$$f $(HARE_PACEMAKER); \
 	 done
 	@$(call _log,linking hctl -> $(DESTDIR)/$(PREFIX)/bin)
 	@ln -sf $(TOP_SRC_DIR)hctl $(DESTDIR)/$(PREFIX)/bin
