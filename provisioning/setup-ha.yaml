@@ -1,0 +1,23 @@
+hare:
+  post_install:
+    script: null
+    args: null
+  init:
+    script: /opt/seagate/eos/hare/libexec/build-ees-ha
+    args:
+      ip1: null
+      ip2: null
+      interface: null
+      left-node: null
+      right-node: null
+      left-volume: null
+      right-volume: null 
+  config:
+    script: null
+    args: null
+  test:
+    script: null
+    args: null
+  reset:
+    script: null
+    args: null
