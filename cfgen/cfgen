@@ -18,7 +18,7 @@ from typing import Any, Callable, Dict, Iterator, List, NamedTuple, Set, \
 import yaml
 
 
-__version__ = '0.6.0'
+__version__ = '0.6.1'
 
 
 def parse_opts(argv):
@@ -250,7 +250,11 @@ def validate_cluster_desc(desc: Dict[str, Any]) -> None:
                 f'hostname ({node_id}) != IP of {iface} ({iface_ip})'
 
         assert node['hostname']
-        assert node['data_iface']
+        iface = node['data_iface']
+        assert iface
+        assert node['facts'][ipaddr_key(iface)], \
+            f"""{node_id}: {iface!r} interface has no IP address
+Make sure the value of data_iface in the CDF is correct."""
 
         nr_confds = sum(1 for m0d in node['m0_servers'] if m0d['runs_confd'])
         assert nr_confds < 2, f'{node_id}: Too many confd services'
