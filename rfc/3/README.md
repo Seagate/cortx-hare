@@ -33,7 +33,9 @@ CDF is a YAML file with the following schema:
 ```yaml
 nodes:
   - hostname: <str>    # [user@]hostname; e.g., localhost, pod-c1
-    data_iface: <str>  # name of network device; e.g., eth1, eth1:c1, eth1_c1
+    data_iface: <str>  # name of network interface; e.g., eth1, eth1:c1
+    data_iface_type: tcp|o2ib  # type of network interface;
+                               # optional, defaults to "tcp"
     m0_servers:
       - runs_confd: <bool>  # optional, defaults to false
         #io_disks: null                 # no IO service
