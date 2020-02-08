@@ -4,14 +4,7 @@ hare:
     args: null
   init:
     script: /opt/seagate/eos/hare/libexec/build-ees-ha
-    args:
-      ip1: null
-      ip2: null
-      interface: null
-      left-node: null
-      right-node: null
-      left-volume: null
-      right-volume: null 
+    args: /var/lib/hare/build-ees-ha-args.yaml
   config:
     script: null
     args: null
