@@ -68,7 +68,6 @@ def run_server(thread_to_wait=None,
                server_class=HTTPServer,
                port=8008,
                halink=None):
-    port = 8008
     addr = ConsulUtil().get_hax_ip_address()
     server_address: Tuple[str, int] = (addr, port)
     httpd = server_class(server_address, KVHandler)
