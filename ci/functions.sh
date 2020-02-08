@@ -56,7 +56,7 @@ ci_init_m0vg() (
         # Get `m0vg` script.
         # Note that we download the latest Mero, disregarding
         # `MERO_COMMIT_REF`.
-        git clone --recursive --depth 1 --shallow-submodules \
+        git clone --recursive --depth 1 \
             http://gitlab.mero.colo.seagate.com/mero/mero.git \
             ${M0VG%/scripts/m0vg}
     fi
