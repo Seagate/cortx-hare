@@ -81,6 +81,58 @@ get_ready_agents_nr() {
     consul members | sed 1d | wc -l
 }
 
+abort_if_RC_leader_election_is_impossible() {
+    local ssh node confd_id svc cmd
+    local status_commands=()
+
+    # This code assumes that there is at most one confd server per node.
+    # This assumption is enforced by `cfgen`.
+    while IFS=/ read node confd_id; do
+        local ok=true
+        confd_id="m0d@$(printf 0x7200000000000001:0x%x $confd_id)"
+        if [[ $node == $HOSTNAME ]]; then
+            ssh=
+        else
+            ssh="ssh $node"
+        fi
+
+        for svc in hare-hax $confd_id; do
+            if $ssh sudo systemctl --quiet --state=failed is-failed $svc; then
+                ok=false
+                status_commands+=(
+                    "${ssh:+$ssh }sudo systemctl status $svc"
+                )
+            fi
+        done
+        if $ok; then
+            # RC Leader session can be created on at least one Consul server
+            # node.
+            return 0
+        fi
+    done < <(jq -r '.[] | .key' $cfgen_out/consul-kv.json |
+                grep '/services/confd$' |
+                # m0conf/nodes/<hostname>/processes/<process_id>/services/confd
+                cut -d/ -f3,5
+            )
+    cat >&2 <<EOF
+**ERROR** RC leader election is guaranteed to fail.
+
+The RC leader can only be elected if there is a Consul server node
+on which both hare-hax and confd m0d@ service are in "non-failed" state.
+
+To see details, type
+$(for cmd in "${status_commands[@]}"; do
+    echo "    $cmd"
+done)
+
+To reset the "failed" state, type
+$(for cmd in "${status_commands[@]}"; do
+    echo "    ${cmd/ status/ reset-failed}"
+done)
+EOF
+    exit 1
+}
+
 TEMP=$(getopt --options hc: \
               --longoptions help,mkfs,conf-dir: \
               --name "$PROG" -- "$@" || true)
@@ -111,7 +163,7 @@ cluster_descr=${1:-}
 cfgen_out=${conf_dir:-'/var/lib/hare'}
 
 if sudo systemctl --quiet is-active hare-consul-agent; then
-    die 'Consul agent is active ==> cluster is already running'
+    die 'hare-consul-agent is active ==> cluster is already running'
 fi
 
 if ! [[ $conf_dir ]]; then
@@ -139,6 +191,8 @@ EOF
     echo ' OK'
 fi
 
+abort_if_RC_leader_election_is_impossible
+
 # Get my IP address (the one that the other agents will join to).
 read _ join_ip <<< $(get_server_nodes | grep -w $HOSTNAME)
 
@@ -151,19 +205,6 @@ Bootstrap should be executed on a Consul server node.
 EOF
     exit 1
 fi
-
-m0d_services=$(systemctl list-units 'm0d@*' | awk '/^m0d@/ { print $1 }')
-for svc in $m0d_services hare-{hax,consul-agent}.service; do
-    if sudo systemctl is-failed --quiet --state=failed $svc; then
-        cat <<EOF >&2
-*WARNING* $svc is in failed state.
-To see details, type
-    systemctl status $svc
-To reset the "failed" state, type
-    sudo systemctl reset-failed $svc
-EOF
-    fi
-done
 
 say 'Starting Consul server agent on this node...'
 # $join_ip is our bind_ip address
