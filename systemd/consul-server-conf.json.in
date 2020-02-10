@@ -13,7 +13,7 @@
       "service": "confd",
       "handler_type": "http",
       "http_handler_config": {
-        "path": "http://localhost:8080",
+        "path": "http://localhost:8008",
         "method": "POST",
         "timeout": "10s"
       }
@@ -30,7 +30,7 @@
       "service": "ios",
       "handler_type": "http",
       "http_handler_config": {
-        "path": "http://localhost:8080",
+        "path": "http://localhost:8008",
         "method": "POST",
         "timeout": "10s"
       }
