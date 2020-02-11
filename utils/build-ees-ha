@@ -96,12 +96,18 @@ sudo pcs resource clone lnet
 sudo pcs constraint order lnet-clone then ip-c1
 sudo pcs constraint order lnet-clone then ip-c2
 
+run_on_both() {
+    local cmd=$*
+    eval $cmd
+    ssh $rnode $cmd
+}
+
 cmd='
 sudo mkdir -p /usr/lib/ocf/resource.d/seagate &&
 sudo ln -sf /opt/seagate/eos/hare/pacemaker/lnet
            /usr/lib/ocf/resource.d/seagate/lnet
 '
-pdsh -w $lnode,$rnode $cmd
+run_on_both $cmd
 
 sudo pcs resource create lnet-c1 ocf:seagate:lnet \
                                  iface=$iface:c1 op monitor interval=30s
@@ -166,7 +172,7 @@ for i in c{1,2}; do
     sudo sed "/ExecStart=/aExecStartPost=/bin/sleep 5"
              -i /usr/lib/systemd/system/hare-consul-agent-$i.service;
 done'
-pdsh -w $lnode,$rnode $cmd
+run_on_both $cmd
 
 cmd_deregister_node() {
     local node=$1
@@ -309,7 +315,7 @@ cmd='
 sudo sed "s/TimeoutStopSec=.*/TimeoutStopSec=15sec/"
          -i /usr/lib/systemd/system/m0d@.service &&
 sudo systemctl daemon-reload'
-pdsh -w $lnode,$rnode $cmd
+run_on_both $cmd
 
 get_fid() {
     local cfg=$1
