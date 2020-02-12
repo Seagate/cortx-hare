@@ -87,24 +87,20 @@ argsfile=${2:-}
 
 hare_dir=/var/lib/hare
 
-get_arg_value() {
-   local arg_name=$1
-   local arg_value=$(shyaml get-value $arg_name < $argsfile)
-
-   if [[ $arg_value == None || $arg_value == null ]]; then
-       arg_value=
-   fi
-   echo "$arg_value"
-}
-
-if [[ -n $argsfile ]] && [[ -f $argsfile ]]; then
-    ip1=$(get_arg_value ip1)
-    ip2=$(get_arg_value ip2)
-    iface=$(get_arg_value interface)
-    lnode=$(get_arg_value left-node)
-    rnode=$(get_arg_value right-node)
-    lvolume=$(get_arg_value left-volume)
-    rvolume=$(get_arg_value right-volume)
+if [[ -f $argsfile ]]; then
+    while IFS=': ' read name value; do
+       case $name in
+           ip1)          ip1=$value     ;;
+           ip2)          ip2=$value     ;;
+           iface)        iface=$value   ;;
+           left-node)    lnode=$value   ;;
+           right-node)   rnode=$value   ;;
+           left-volume)  lvolume=$value ;;
+           right-volume) rvolume=$value ;;
+           *) echo "Invalid parameter in $argsfile"
+              usage >&2; exit 1 ;;
+       esac
+    done < $argsfile
 fi
 
 [[ $ip1 ]] && [[ $ip2 ]] && [[ $cdf ]]  || {
