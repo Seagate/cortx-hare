@@ -97,7 +97,7 @@ if [[ -f $argsfile ]]; then
            right-node)   rnode=$value   ;;
            left-volume)  lvolume=$value ;;
            right-volume) rvolume=$value ;;
-           *) echo "Invalid parameter in $argsfile"
+           *) echo "Invalid parameter '$name' in $argsfile" >&2
               usage >&2; exit 1 ;;
        esac
     done < $argsfile
