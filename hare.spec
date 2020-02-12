@@ -32,7 +32,6 @@ Requires: mero = %{h_mero_version}
 Requires: pacemaker
 Requires: pcs
 Requires: python36
-Requires: shyaml
 
 Conflicts: halon
 
