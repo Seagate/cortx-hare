@@ -1,12 +1,17 @@
+# Cluster Description File (CDF).
+# See `cfgen --help-schema` for the format description.
+
 nodes:
-  - hostname: localhost
-    data_iface: eth1
+  - hostname: localhost     # [user@]hostname
+    data_iface: eth1        # name of data network interface
+    #data_iface_type: o2ib  # type of network interface (optional);
+                            # supported values: "tcp" (default), "o2ib"
     m0_servers:
       - runs_confd: true
       - io_disks: { path_glob: "/dev/loop[0-9]*" }
     m0_clients:
-      s3: 0
-      other: 2
+      s3: 0         # number of S3 servers to start
+      other: 2      # max quantity of other Mero clients this host may have
 pools:
   - name: the pool
     disks: all
