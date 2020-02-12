@@ -35,6 +35,7 @@ Optional parameters:
   --right-node    <n2>  Right Node hostname (default: pod-c2)
   --left-volume   <lv>  Left  Node /var/mero volume (default: /dev/sdb)
   --right-volume  <rv>  Right Node /var/mero volume (default: /dev/sdc)
+  --skip-mkfs           Don't mkfs /var/mero
 
 Note: parameters can be specified either directly via cmd-line options
 or via a yaml file, e.g.:
@@ -46,6 +47,7 @@ or via a yaml file, e.g.:
   right-node: <rnode>
   left-volume: <lvolume>
   right-volume: <rvolume>
+  skip-mkfs: true
 
 EOF
 }
@@ -66,6 +68,7 @@ lnode=pod-c1
 rnode=pod-c2
 lvolume=/dev/sdb
 rvolume=/dev/sdc
+skip_mkfs=false
 
 while true; do
     case "$1" in
@@ -77,6 +80,7 @@ while true; do
         --right-node)        rnode=$2; shift 2 ;;
         --left-volume)       lvolume=$2; shift 2 ;;
         --right-volume)      rvolume=$2; shift 2 ;;
+        --skip-mkfs)         skip_mkfs=true; shift 1 ;;
         --)                  shift; break ;;
         *)                   break ;;
     esac
@@ -97,6 +101,7 @@ if [[ -f $argsfile ]]; then
            right-node)   rnode=$value   ;;
            left-volume)  lvolume=$value ;;
            right-volume) rvolume=$value ;;
+           skip-mkfs)    skip_mkfs=true ;;
            *) echo "Invalid parameter '$name' in $argsfile" >&2
               usage >&2; exit 1 ;;
        esac
@@ -151,11 +156,13 @@ mkfs_ext4() {
     sudo mkfs.ext4 -q $dev &>/dev/null < <(echo y)
 }
 
-mkfs_ext4 $lvolume
-mkfs_ext4 $rvolume
+if ! [[ $skip_mkfs ]]; do
+    mkfs_ext4 $lvolume
+    mkfs_ext4 $rvolume
 
-mkdir -p /var/mero && sudo mount $lvolume /var/mero
-ssh $rnode "mkdir -p /var/mero && sudo mount $rvolume /var/mero"
+    mkdir -p /var/mero && sudo mount $lvolume /var/mero
+    ssh $rnode "mkdir -p /var/mero && sudo mount $rvolume /var/mero"
+done
 
 hctl bootstrap --mkfs $cdf
 hctl shutdown
@@ -289,25 +296,17 @@ sudo pcs constraint order lnet-c2 then mero-kernel-clone
 
 echo 'Adding Hax to Pacemaker...'
 
-get_sd_id() {
-    local sd_name=$1
-    ls -l /dev/disk/by-id/ | grep "$sd_name$" | head -1 | awk '{print $9}'
-}
-
-lvid="/dev/disk/by-id/$(get_sd_id $(basename $lvolume))"
-rvid="/dev/disk/by-id/$(get_sd_id $(basename $rvolume))"
-
 sudo cp /usr/lib/systemd/system/hare-hax.service \
         /usr/lib/systemd/system/hare-hax-c1.service
 sudo cp /usr/lib/systemd/system/hare-hax.service \
         /usr/lib/systemd/system/hare-hax-c2.service
 sudo sed -e 's/hare-consul-agent.service/hare-consul-agent-c1.service/' \
-         -e "/ExecStart=/iExecStartPre=/bin/mount $lvid /var/mero" \
+         -e "/ExecStart=/iExecStartPre=/bin/mount $lvolume /var/mero" \
          -e '/ExecStart=/aExecStopPost=/bin/umount -l /var/mero' \
          -i /usr/lib/systemd/system/hare-hax-c1.service
 sudo sed -e 's/hare-consul-agent.service/hare-consul-agent-c2.service/' \
          -e "/ExecStart/iEnvironmentFile=$hare_dir/hax-env-c2" \
-         -e "/ExecStart=/iExecStartPre=/bin/mount $rvid /var/mero2" \
+         -e "/ExecStart=/iExecStartPre=/bin/mount $rvolume /var/mero2" \
          -e '/ExecStart=/aExecStopPost=/bin/umount -l /var/mero2' \
          -i /usr/lib/systemd/system/hare-hax-c2.service
 echo 'HARE_HAX_NODE_NAME=$rnode' | sudo tee $hare_dir/hax-env-c2 > /dev/null
@@ -317,13 +316,13 @@ sudo cp /usr/lib/systemd/system/hare-hax.service
         /usr/lib/systemd/system/hare-hax-c1.service &&
 sudo sed -e 's/hare-consul-agent.service/hare-consul-agent-c1.service/'
          -e '/ExecStart/iEnvironmentFile=$hare_dir/hax-env-c1'
-         -e '/ExecStart=/iExecStartPre=/bin/mount $lvid /var/mero1'
+         -e '/ExecStart=/iExecStartPre=/bin/mount $lvolume /var/mero1'
          -e '/ExecStart=/aExecStopPost=/bin/umount -l /var/mero1'
          -i /usr/lib/systemd/system/hare-hax-c1.service &&
 sudo cp /usr/lib/systemd/system/hare-hax.service
         /usr/lib/systemd/system/hare-hax-c2.service &&
 sudo sed -e 's/hare-consul-agent.service/hare-consul-agent-c2.service/'
-         -e '/ExecStart=/iExecStartPre=/bin/mount $rvid /var/mero'
+         -e '/ExecStart=/iExecStartPre=/bin/mount $rvolume /var/mero'
          -e '/ExecStart=/aExecStopPost=/bin/umount -l /var/mero'
          -i /usr/lib/systemd/system/hare-hax-c2.service &&
 echo 'HARE_HAX_NODE_NAME=$lnode' | sudo tee $hare_dir/hax-env-c1 > /dev/null"
