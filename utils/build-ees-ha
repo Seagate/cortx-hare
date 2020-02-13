@@ -151,6 +151,9 @@ sudo pcs resource group add c2 ip-c2 lnet-c2
 
 
 echo 'Preparing Hare configuration files...'
+
+sleep 5 # Allow Pacemaker to configure the IPs
+
 mkfs_ext4() {
     local dev=$1
     sudo mkfs.ext4 -q $dev &>/dev/null < <(echo y)
