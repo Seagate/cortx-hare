@@ -156,13 +156,13 @@ mkfs_ext4() {
     sudo mkfs.ext4 -q $dev &>/dev/null < <(echo y)
 }
 
-if ! [[ $skip_mkfs ]]; do
+if ! [[ $skip_mkfs ]]; then
     mkfs_ext4 $lvolume
     mkfs_ext4 $rvolume
 
     mkdir -p /var/mero && sudo mount $lvolume /var/mero
     ssh $rnode "mkdir -p /var/mero && sudo mount $rvolume /var/mero"
-done
+fi
 
 hctl bootstrap --mkfs $cdf
 hctl shutdown
