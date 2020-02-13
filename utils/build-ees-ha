@@ -184,7 +184,7 @@ hctl shutdown
 
 sudo mkdir -p /var/mero2
 sudo mount $rvolume /var/mero2
-sudo ln -s /var/mero2/m0d-0x7200000000000001\:0x2? \
+sudo ln -sf /var/mero2/m0d-0x7200000000000001\:0x2? \
            /var/mero/
 sudo umount /var/mero2
 sudo umount /var/mero
