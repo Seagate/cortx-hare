@@ -330,14 +330,16 @@ sudo sed -e 's/hare-consul-agent.service/hare-consul-agent-c2.service/'
 echo 'HARE_HAX_NODE_NAME=$lnode' | sudo tee $hare_dir/hax-env-c1 > /dev/null"
 ssh $rnode $cmd
 
-sudo pcs resource create hax-c1 systemd:hare-hax-c1
-sudo pcs resource create hax-c2 systemd:hare-hax-c2
-sudo pcs resource group add c1 hax-c1
-sudo pcs resource group add c2 hax-c2
-sudo pcs constraint order mero-kernel-clone then hax-c1
-sudo pcs constraint order mero-kernel-clone then hax-c2
-sudo pcs constraint order consul-c2 then hax-c1
-sudo pcs constraint order consul-c1 then hax-c2
+sudo pcs cluster cib mcfg
+sudo pcs -f mcfg resource create hax-c1 systemd:hare-hax-c1
+sudo pcs -f mcfg resource create hax-c2 systemd:hare-hax-c2
+sudo pcs -f mcfg resource group add c1 hax-c1
+sudo pcs -f mcfg resource group add c2 hax-c2
+sudo pcs -f mcfg constraint order mero-kernel-clone then hax-c1
+sudo pcs -f mcfg constraint order mero-kernel-clone then hax-c2
+sudo pcs -f mcfg constraint order consul-c2 then hax-c1
+sudo pcs -f mcfg constraint order consul-c1 then hax-c2
+sudo pcs cluster cib-push mcfg --config
 
 echo 'Adding Mero to Pacemaker...'
 cmd='
@@ -447,13 +449,15 @@ s3_resource_add() {
    local count=1
    local s3server_fids=$(get_s3_svc $hare_dir/$conf_file s3service)
 
+   pcs cluster cib mcfg
    for i in ${s3server_fids[@]}
    do
-      pcs resource create s3server-$count-$node systemd:$i op stop timeout=600
-      pcs constraint location s3server-$count-$node prefers $node=INFINITY
-      pcs constraint colocation add s3server-$count-$node with s3auth-$node score=INFINITY
+      pcs -f mcfg resource create s3server-$node-$count systemd:$i op stop timeout=600
+      pcs -f mcfg constraint location s3server-$node-$count prefers $node=INFINITY
+      pcs -f mcfg constraint colocation add s3server-$node-$count with s3auth-$node score=INFINITY
       (( count++ ))
    done
+   pcs cluster cib-push mcfg --config
 }
 
 s3_resource_add consul-server-c1-conf.json $lnode c1
