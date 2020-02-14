@@ -51,12 +51,14 @@ def processes_by_consul_svc_name(cns: Consul) -> Dict[str, List[Process]]:
                             systemd_name=get_systemd_name(fidk, svc_name),
                             fidk=fidk,
                             status=svc['Status']))
+        consul_status = 'passing' if consul_is_active_at(node['Node']) \
+            else 'offline'
         processes.setdefault('consul', []).append(
             Process(node=node['Node'],
                     consul_name='consul',
                     systemd_name='hare-consul-agent',
                     fidk=0,
-                    status=consul_status(node['Node'])))
+                    status=consul_status))
     return processes
 
 
@@ -70,10 +72,10 @@ def ssh_prefix(hostname: str) -> str:
     return '' if is_localhost(hostname) else f'ssh {hostname} '
 
 
-def consul_status(hostname: str) -> str:
-    cmd = ssh_prefix(hostname) \
-        + 'sudo systemctl is-active --quiet hare-consul-agent'
-    return 'passing' if os.system(cmd) == 0 else 'offline'
+def consul_is_active_at(hostname: str) -> bool:
+    cmd = ssh_prefix(hostname) + \
+        'sudo systemctl is-active --quiet hare-consul-agent'
+    return os.system(cmd) == 0
 
 
 def exec(cmd: str) -> None:
@@ -93,7 +95,7 @@ def process_stop(proc: Process) -> None:
 
 
 def main() -> None:
-    if consul_status('localhost') != 'passing':
+    if not consul_is_active_at('localhost'):
         exit('Cluster is not running')
 
     cns = Consul()
