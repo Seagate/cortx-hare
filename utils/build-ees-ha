@@ -378,59 +378,46 @@ sudo pcs -f mcfg constraint order mero-confd-c2 then mero-ios-c1
 sudo pcs cluster cib-push mcfg --config
 
 echo 'Adding ldap to Pacemaker...'
-pcs resource create ldap-$lnode systemd:slapd op monitor interval=30s
-pcs resource create ldap-$rnode systemd:slapd op monitor interval=30s
-pcs constraint location ldap-$lnode prefers $lnode=INFINITY
-pcs constraint location ldap-$lnode prefers $rnode=-INFINITY
-pcs constraint location ldap-$rnode prefers $rnode=INFINITY
-pcs constraint location ldap-$rnode prefers $lnode=-INFINITY
+pcs resource create ldap-c1 systemd:slapd op monitor interval=30s
+pcs resource create ldap-c2 systemd:slapd op monitor interval=30s
+pcs constraint location ldap-c1 prefers $lnode=INFINITY
+pcs constraint location ldap-c1 prefers $rnode=-INFINITY
+pcs constraint location ldap-c2 prefers $rnode=INFINITY
+pcs constraint location ldap-c2 prefers $lnode=-INFINITY
 
 echo 'Adding s3authserver to Pacemaker...'
-pcs resource create s3auth-$lnode systemd:s3authserver op monitor interval=30
-pcs constraint location s3auth-$lnode prefers $lnode=INFINITY
-pcs constraint location s3auth-$lnode prefers $rnode=-INFINITY
-pcs resource create s3auth-$rnode systemd:s3authserver op monitor interval=30
-pcs constraint location s3auth-$rnode prefers $rnode=INFINITY
-pcs constraint location s3auth-$rnode prefers $lnode=-INFINITY
-
-echo 'Adding colocation constraint for s3authserver and ldap...'
-pcs constraint colocation add s3auth-$lnode with ldap-$lnode score=INFINITY
-pcs constraint colocation add s3auth-$rnode with ldap-$rnode score=INFINITY
+pcs resource create s3auth-c1 systemd:s3authserver op monitor interval=30
+pcs resource create s3auth-c2 systemd:s3authserver op monitor interval=30
+pcs constraint colocation add s3auth-c1 with ldap-c1 score=INFINITY
+pcs constraint colocation add s3auth-c2 with ldap-c2 score=INFINITY
 
 echo 'Adding elastic search to Pacemaker..'
-pcs resource create els-search-$lnode systemd:elasticsearch op monitor interval=30s
-pcs resource create els-search-$rnode systemd:elasticsearch op monitor interval=30s
-pcs constraint location els-search-$lnode prefers $lnode=INFINITY
-pcs constraint location els-search-$lnode prefers $rnode=-INFINITY
-pcs constraint location els-search-$rnode prefers $rnode=INFINITY
-pcs constraint location els-search-$rnode prefers $lnode=-INFINITY
+pcs resource create els-search-c1 systemd:elasticsearch op monitor interval=30s
+pcs resource create els-search-c2 systemd:elasticsearch op monitor interval=30s
+pcs constraint location els-search-c1 prefers $lnode=INFINITY
+pcs constraint location els-search-c1 prefers $rnode=-INFINITY
+pcs constraint location els-search-c2 prefers $rnode=INFINITY
+pcs constraint location els-search-c2 prefers $lnode=-INFINITY
 
 echo 'Adding statsd to Pacemaker...'
-pcs resource create statsd-$lnode systemd:statsd op monitor interval=30s
-pcs resource create statsd-$rnode systemd:statsd op monitor interval=30s
-pcs constraint location statsd-$lnode prefers $lnode=INFINITY
-pcs constraint location statsd-$lnode prefers $rnode=-INFINITY
-pcs constraint location statsd-$rnode prefers $rnode=INFINITY
-pcs constraint location statsd-$rnode prefers $lnode=-INFINITY
-
-echo 'Adding statsd and elasticsearch colocation constraint...'
-pcs constraint colocation add statsd-$lnode with els-search-$lnode score=INFINITY
-pcs constraint colocation add statsd-$rnode with els-search-$rnode score=INFINITY
+pcs resource create statsd-c1 systemd:statsd op monitor interval=30s
+pcs resource create statsd-c2 systemd:statsd op monitor interval=30s
+pcs constraint colocation add statsd-c1 with els-search-c1 score=INFINITY
+pcs constraint colocation add statsd-c2 with els-search-c2 score=INFINITY
 
 echo 'Adding haproxy to pacemaker...'
+pcs resource create haproxy-c1 systemd:haproxy
+pcs constraint location haproxy-c1 prefers $lnode=INFINITY
+pcs constraint location haproxy-c1 prefers $rnode=-INFINITY
 
-pcs resource create haproxy-$lnode systemd:haproxy
-pcs constraint location haproxy-$lnode prefers $lnode=INFINITY
-pcs constraint location haproxy-$lnode prefers $rnode=-INFINITY
+pcs resource create haproxy-c2 systemd:haproxy
+pcs constraint location haproxy-c2 prefers $rnode=INFINITY
+pcs constraint location haproxy-c2 prefers $lnode=-INFINITY
 
-pcs resource create haproxy-$rnode systemd:haproxy
-pcs constraint location haproxy-$rnode prefers $rnode=INFINITY
-pcs constraint location haproxy-$rnode prefers $lnode=-INFINITY
-
-pcs resource create s3backcons-$lnode systemd:s3backgroundconsumer
-pcs resource create s3backprod-$lnode systemd:s3backgroundproducer
-pcs resource create s3backcons-$rnode systemd:s3backgroundconsumer
-pcs resource create s3backprod-$rnode systemd:s3backgroundproducer
+pcs resource create s3backcons-c1 systemd:s3backgroundconsumer
+pcs resource create s3backprod-c1 systemd:s3backgroundproducer
+pcs resource create s3backcons-c2 systemd:s3backgroundconsumer
+pcs resource create s3backprod-c2 systemd:s3backgroundproducer
 
 echo 'Adding S3server to Pacemaker...'
 
@@ -445,7 +432,6 @@ get_s3_svc() {
 s3_resource_add() {
    local conf_file=$1
    local node=$2
-   local coregroup=$3
    local count=1
    local s3server_fids=$(get_s3_svc $hare_dir/$conf_file s3service)
 
@@ -461,5 +447,5 @@ s3_resource_add() {
    pcs cluster cib-push mcfg --config
 }
 
-s3_resource_add consul-server-c1-conf.json $lnode c1
-s3_resource_add consul-server-c2-conf.json $rnode c2
+s3_resource_add consul-server-c1-conf.json c1
+s3_resource_add consul-server-c2-conf.json c2
