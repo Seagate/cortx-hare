@@ -455,6 +455,7 @@ s3_resource_add() {
       pcs -f mcfg resource create s3server-$node-$count systemd:$i op stop timeout=600
       pcs -f mcfg constraint location s3server-$node-$count prefers $node=INFINITY
       pcs -f mcfg constraint colocation add s3server-$node-$count with s3auth-$node score=INFINITY
+      pcs -f mcfg constraint order mero-kernel-clone then s3server-$node-$count
       (( count++ ))
    done
    pcs cluster cib-push mcfg --config
