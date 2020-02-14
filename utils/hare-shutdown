@@ -66,6 +66,7 @@ def is_localhost(hostname: str) -> bool:
 
 
 def ssh_prefix(hostname: str) -> str:
+    assert hostname
     return '' if is_localhost(hostname) else f'ssh {hostname} '
 
 
@@ -104,8 +105,9 @@ def main() -> None:
         if svc in processes:
             for proc in processes[svc]:
                 process_stop(proc)
-    print(f'Killing RC Leader at {leader_node}... ', end='', flush=True)
-    exec(ssh_prefix(leader_node) + 'sudo pkill --exact -KILL consul')
+    if leader_node:
+        print(f'Killing RC Leader at {leader_node}... ', end='', flush=True)
+        exec(ssh_prefix(leader_node) + 'sudo pkill --exact -KILL consul')
 
 
 if __name__ == '__main__':
