@@ -149,7 +149,6 @@ sudo pcs resource create lnet-c2 ocf:seagate:lnet \
 sudo pcs resource group add c1 ip-c1 lnet-c1
 sudo pcs resource group add c2 ip-c2 lnet-c2
 
-
 echo 'Preparing Hare configuration files...'
 
 sleep 5 # Allow Pacemaker to configure the IPs
@@ -162,10 +161,10 @@ mkfs_ext4() {
 if ! [[ $skip_mkfs ]]; then
     mkfs_ext4 $lvolume
     mkfs_ext4 $rvolume
-
-    mkdir -p /var/mero && sudo mount $lvolume /var/mero
-    ssh $rnode "mkdir -p /var/mero && sudo mount $rvolume /var/mero"
 fi
+
+mkdir -p /var/mero && sudo mount $lvolume /var/mero
+ssh $rnode "mkdir -p /var/mero && sudo mount $rvolume /var/mero"
 
 hctl bootstrap --mkfs $cdf
 hctl shutdown
