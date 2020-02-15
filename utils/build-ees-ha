@@ -381,9 +381,9 @@ echo 'Adding ldap to Pacemaker...'
 pcs resource create ldap-c1 systemd:slapd op monitor interval=30s
 pcs resource create ldap-c2 systemd:slapd op monitor interval=30s
 pcs constraint location ldap-c1 prefers $lnode=INFINITY
-pcs constraint location ldap-c1 prefers $rnode=-INFINITY
+pcs constraint location ldap-c1 avoids  $rnode=INFINITY
 pcs constraint location ldap-c2 prefers $rnode=INFINITY
-pcs constraint location ldap-c2 prefers $lnode=-INFINITY
+pcs constraint location ldap-c2 avoids  $lnode=INFINITY
 
 echo 'Adding s3authserver to Pacemaker...'
 pcs resource create s3auth-c1 systemd:s3authserver op monitor interval=30
@@ -395,9 +395,9 @@ echo 'Adding elastic search to Pacemaker..'
 pcs resource create els-search-c1 systemd:elasticsearch op monitor interval=30s
 pcs resource create els-search-c2 systemd:elasticsearch op monitor interval=30s
 pcs constraint location els-search-c1 prefers $lnode=INFINITY
-pcs constraint location els-search-c1 prefers $rnode=-INFINITY
+pcs constraint location els-search-c1 avoids  $rnode=INFINITY
 pcs constraint location els-search-c2 prefers $rnode=INFINITY
-pcs constraint location els-search-c2 prefers $lnode=-INFINITY
+pcs constraint location els-search-c2 avoids  $lnode=INFINITY
 
 echo 'Adding statsd to Pacemaker...'
 pcs resource create statsd-c1 systemd:statsd op monitor interval=30s
@@ -408,11 +408,11 @@ pcs constraint colocation add statsd-c2 with els-search-c2 score=INFINITY
 echo 'Adding haproxy to pacemaker...'
 pcs resource create haproxy-c1 systemd:haproxy
 pcs constraint location haproxy-c1 prefers $lnode=INFINITY
-pcs constraint location haproxy-c1 prefers $rnode=-INFINITY
+pcs constraint location haproxy-c1 avoids  $rnode=INFINITY
 
 pcs resource create haproxy-c2 systemd:haproxy
 pcs constraint location haproxy-c2 prefers $rnode=INFINITY
-pcs constraint location haproxy-c2 prefers $lnode=-INFINITY
+pcs constraint location haproxy-c2 avoids  $lnode=INFINITY
 
 pcs resource create s3backcons-c1 systemd:s3backgroundconsumer
 pcs resource create s3backprod-c1 systemd:s3backgroundproducer
