@@ -70,17 +70,16 @@ out_systemctl=$(systemctl list-unit-files mero-kernel.service)
 if ! grep -qE '^mero-kernel\.service\>' <<< "$out_systemctl"; then
     cat >&2 <<EOF
 **********************************************************************
-Congratulations!  You've stumbled on a problem.
+SNAP!  You've stumbled on an insufficiently tested branch of code.
 
-bootstrap-node script would believe that 'mero-kernel' is not installed
-and would abort here.  Sometimes it does this even when 'mero-kernel'
-*is* installed.
+bootstrap-node script believes that 'mero-kernel' is not installed.
+Oftentimes this belief is contradicted by reality.
 
 EES developers need your help.
 
 Please add a comment to
 http://gitlab.mero.colo.seagate.com/mero/hare/issues/242
-and add this output:
+with the following output:
 
 ----------BEGIN OUTPUT----------
 HOSTNAME=$HOSTNAME
