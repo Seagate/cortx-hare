@@ -66,9 +66,34 @@ fi
 # start hax.service: Unit not found" error message.  That error
 # message is misleading, because hax.service _is_ installed, it is
 # one of its dependencies - mero-kernel.service - which isn't.
-systemctl list-unit-files mero-kernel.service |
-    grep -qE '^mero-kernel\.service\>' ||
+out_systemctl=$(systemctl list-unit-files mero-kernel.service)
+if ! grep -qE '^mero-kernel\.service\>' <<< "$out_systemctl"; then
+    cat >&2 <<EOF
+**********************************************************************
+Congratulations!  You've stumbled on a problem.
+
+bootstrap-node script would believe that 'mero-kernel' is not installed
+and would abort here.  Sometimes it does this even when 'mero-kernel'
+*is* installed.
+
+EES developers need your help.
+
+Please add a comment to
+http://gitlab.mero.colo.seagate.com/mero/hare/issues/242
+and add this output:
+
+----------BEGIN OUTPUT----------
+HOSTNAME=$HOSTNAME
+
+\`systemctl list-unit-files mero-kernel.service\`:
+$out_systemctl
+----------END OUTPUT----------
+
+Thanks!  You're such a wonderful person. [But you got problems.]
+**********************************************************************
+EOF
     die "'mero-kernel' systemd service is not installed"
+fi
 
 . update-consul-conf --dry-run  # import CONFD_IDs, IOS_IDs, id2fid()
 
