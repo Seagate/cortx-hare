@@ -181,21 +181,25 @@ done
 hctl bootstrap -c $hare_dir/
 hctl shutdown
 
+# Prepare symlinks for the failover so that m0d processes
+# from both nodes could access their files at `/var/mero`:
+sudo mkdir -p /var/mero1
 sudo mkdir -p /var/mero2
+sudo mount $lvolume /var/mero1
 sudo mount $rvolume /var/mero2
-sudo ln -sf /var/mero2/m0d-0x7200000000000001\:0x2? \
-           /var/mero/
+sudo ln -sf $(find /var/mero2/m0d-* -maxdepth 0 -type d) \
+           /var/mero1/ || true
+sudo ln -sf $(find /var/mero1/m0d-* -maxdepth 0 -type d) \
+           /var/mero2/ || true
 sudo umount /var/mero2
+sudo umount /var/mero1
+sudo rm -r /var/mero1
+
+# We don't need `/var/mero` mounted anymore. `hax` systemd
+# unit will mount/umount it automatically on start/stop.
 sudo umount /var/mero
 
-cmd="
-sudo mkdir -p /var/mero1 &&
-sudo mount $lvolume /var/mero1 &&
-sudo ln -sf /var/mero1/m0d-0x7200000000000001\:0x?
-           /var/mero/ &&
-sudo umount /var/mero1 &&
-sudo umount /var/mero"
-ssh $rnode $cmd
+ssh $rnode 'sudo mkdir -p /var/mero1 && sudo umount /var/mero'
 
 echo 'Preparing Consul agents config files...'
 cmd='
