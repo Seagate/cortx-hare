@@ -255,9 +255,9 @@ sudo sed -r \
   -e 's/127.0.0.1 //' \
   -i $hare_dir/consul-env-c2
 
+scp $hare_dir/consul-env $rnode:$hare_dir/consul-env-c1
 cmd="
 sudo cp $hare_dir/consul-env $hare_dir/consul-env-c2 &&
-scp $lnode:$hare_dir/consul-env $hare_dir/consul-env-c1 &&
 sudo sed -r \
   -e 's/server$/server-c1/' \
   -e 's/127.0.0.1 //' \
@@ -289,9 +289,9 @@ cp $hare_dir/consul-server-c2-conf.json \
    /tmp/consul-server-c2-conf.json &&
 sudo sed -e '/\"server\"/a\ \ \"node_name\": \"$rnode\",' \
          -e '/\"server\"/a\ \ \"leave_on_terminate\": true,' \
-         -i /tmp/consul-server-c2-conf.json &&
-scp /tmp/consul-server-c2-conf.json $lnode:$hare_dir/"
+         -i /tmp/consul-server-c2-conf.json"
 ssh $rnode $cmd
+scp $rnode:/tmp/consul-server-c2-conf.json $hare_dir/
 
 echo 'Adding Consul to Pacemaker...'
 sudo pcs resource create consul-c1 systemd:hare-consul-agent-c1
