@@ -169,12 +169,14 @@ ssh $rnode "mkdir -p /var/mero && sudo mount $rvolume /var/mero"
 hctl bootstrap --mkfs $cdf
 hctl shutdown
 
+# LNet endpoints suffixes should be unique so that in case
+# of a failover all the Mero services (which would work on
+# the same node) could talk to each other.
+# (It is a workaround for Mero EOS-2799 issue.)
 for f in $hare_dir/{confd.xc,consul-kv.json}; do
-    sed -r -e 's/(102.tcp:12345:1):1/\1:2/' \
-           -e 's/(102.tcp:12345:2):1/\1:3/' \
-           -e 's/(102.tcp:12345:2):2/\1:4/' \
-           -e 's/(102.tcp:12345:4):1/\1:3/' \
-           -e 's/(102.tcp:12345:4):2/\1:4/' \
+    sed -r -e "s/($ip2.*:12345:1):1/\1:2/" \
+           -e "s/($ip2.*:12345:2):1/\1:3/" \
+           -e "s/($ip2.*:12345:2):2/\1:4/" \
         -i $f
 done
 
