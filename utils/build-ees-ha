@@ -30,12 +30,13 @@ Mandatory parameters:
         <CDF>          Hare Cluster Description File
 
 Optional parameters:
-  -i, --interface <if>  Data Network interface (default: eth1)
-  --left-node     <n1>  Left  Node hostname (default: pod-c1)
-  --right-node    <n2>  Right Node hostname (default: pod-c2)
-  --left-volume   <lv>  Left  Node /var/mero volume (default: /dev/sdb)
-  --right-volume  <rv>  Right Node /var/mero volume (default: /dev/sdc)
+  -i, --interface <if>  Data network interface (default: eth1)
+  --left-node     <n1>  Left  node hostname (default: pod-c1)
+  --right-node    <n2>  Right node hostname (default: pod-c2)
+  --left-volume   <lv>  Left  node /var/mero volume (default: /dev/sdb)
+  --right-volume  <rv>  Right node /var/mero volume (default: /dev/sdc)
   --skip-mkfs           Don't mkfs /var/mero
+  --net-type <tcp|o2ib> LNet network type (default: tcp)
 
 Note: parameters can be specified either directly via cmd-line options
 or via a yaml file, e.g.:
@@ -48,13 +49,14 @@ or via a yaml file, e.g.:
   left-volume: <lvolume>
   right-volume: <rvolume>
   skip-mkfs: true
+  net-type: <tcp|o2ib>
 
 EOF
 }
 
 TEMP=$(getopt --options h,i: \
               --longoptions help,ip1:,ip2:,interface:,left-node:,right-node: \
-              --longoptions left-volume:,right-volume: \
+              --longoptions left-volume:,right-volume:,skip-mkfs,net-type: \
               --name "$PROG" -- "$@" || true)
 
 (($? == 0)) || { usage >&2; exit 1; }
@@ -69,6 +71,7 @@ rnode=pod-c2
 lvolume=/dev/sdb
 rvolume=/dev/sdc
 skip_mkfs=false
+net_type=tcp
 
 while true; do
     case "$1" in
@@ -81,6 +84,7 @@ while true; do
         --left-volume)       lvolume=$2; shift 2 ;;
         --right-volume)      rvolume=$2; shift 2 ;;
         --skip-mkfs)         skip_mkfs=true; shift 1 ;;
+        --net-type)          net_type=$2; shift 2 ;;
         --)                  shift; break ;;
         *)                   break ;;
     esac
@@ -102,6 +106,7 @@ if [[ -f $argsfile ]]; then
            left-volume)  lvolume=$value ;;
            right-volume) rvolume=$value ;;
            skip-mkfs)    skip_mkfs=true ;;
+           net-type)     net_type=$value ;;
            *) echo "Invalid parameter '$name' in $argsfile" >&2
               usage >&2; exit 1 ;;
        esac
@@ -115,11 +120,9 @@ fi
 
 echo 'Adding the roaming IP addresses into Pacemaker...'
 sudo pcs resource create ip-c1 ocf:heartbeat:IPaddr2 \
-                               ip=$ip1 cidr_netmask=24 iflabel=c1 \
-                               op monitor interval=30s
+         ip=$ip1 cidr_netmask=24 iflabel=c1 op monitor interval=30s
 sudo pcs resource create ip-c2 ocf:heartbeat:IPaddr2 \
-                               ip=$ip2 cidr_netmask=24 iflabel=c2 \
-                               op monitor interval=30s
+         ip=$ip2 cidr_netmask=24 iflabel=c2 op monitor interval=30s
 sudo pcs constraint location ip-c1 prefers $lnode
 sudo pcs constraint location ip-c2 prefers $rnode
 
@@ -143,9 +146,9 @@ sudo ln -sf /opt/seagate/eos/hare/pacemaker/lnet
 run_on_both $cmd
 
 sudo pcs resource create lnet-c1 ocf:seagate:lnet \
-                                 iface=$iface:c1 op monitor interval=30s
+         iface=$iface:c1 nettype=$net_type op monitor interval=30s
 sudo pcs resource create lnet-c2 ocf:seagate:lnet \
-                                 iface=$iface:c2 op monitor interval=30s
+         iface=$iface:c2 nettype=$net_type op monitor interval=30s
 sudo pcs resource group add c1 ip-c1 lnet-c1
 sudo pcs resource group add c2 ip-c2 lnet-c2
 

@@ -34,8 +34,10 @@
 
 # Defaults
 OCF_RESKEY_iface_default=""
+OCF_RESKEY_nettype_default="tcp"
 
 : ${OCF_RESKEY_iface=${OCF_RESKEY_iface_default}}
+: ${OCF_RESKEY_nettype=${OCF_RESKEY_nettype_default}}
 
 #######################################################################
 
@@ -58,6 +60,13 @@ The network interface to add NID to.
 </longdesc>
 <shortdesc lang="en">Network interface</shortdesc>
 <content type="string" default="${OCF_RESKEY_iface_default}" />
+</parameter>
+<parameter name="nettype" unique="0" required="0">
+<longdesc lang="en">
+The network type (e.g. tcp, o2ib).
+</longdesc>
+<shortdesc lang="en">Network type</shortdesc>
+<content type="string" default="${OCF_RESKEY_nettype_default}" />
 </parameter>
 </parameters>
 
@@ -90,13 +99,13 @@ lnet_start() {
     if [ $? =  $OCF_SUCCESS ]; then
 	return $OCF_SUCCESS
     fi
-    lnetctl net add --net tcp0 --if ${OCF_RESKEY_iface}
+    lnetctl net add --net ${OCF_RESKEY_nettype} --if ${OCF_RESKEY_iface}
 }
 
 lnet_stop() {
     lnet_monitor
     if [ $? =  $OCF_SUCCESS ]; then
-        lnetctl net del --net tcp0 --if ${OCF_RESKEY_iface}
+        lnetctl net del --net ${OCF_RESKEY_nettype} --if ${OCF_RESKEY_iface}
     fi
     return $OCF_SUCCESS
 }
