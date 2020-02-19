@@ -3,18 +3,15 @@
 # :help: stop the cluster
 
 import os
+import re
 from socket import gethostname
 from typing import Dict, List, NamedTuple
 
 from consul import Consul
 
-Process = NamedTuple('Process', [
-    ('node', str),
-    ('consul_name', str),
-    ('systemd_name', str),
-    ('fidk', int),
-    ('status', str)
-])
+Process = NamedTuple('Process', [('node', str), ('consul_name', str),
+                                 ('systemd_name', str), ('fidk', int),
+                                 ('status', str)])
 shutdown_sequence = ('s3service', 'ios', 'confd', 'hax', 'consul')
 
 
@@ -67,6 +64,10 @@ def is_localhost(hostname: str) -> bool:
     return hostname in ('localhost', '127.0.0.1', name, f'{name}.local')
 
 
+def is_fake_leader_name(leader: str) -> bool:
+    return re.match(r'^elect[0-9]+$', leader) is not None
+
+
 def ssh_prefix(hostname: str) -> str:
     assert hostname
     return '' if is_localhost(hostname) else f'ssh {hostname} '
@@ -88,7 +89,8 @@ def process_stop(proc: Process) -> None:
         return
     label = f' ({proc.consul_name})' if proc.systemd_name.startswith('m0d@') \
         else ''
-    print(f'Stopping {proc.systemd_name}{label} at {proc.node}... ', end='',
+    print(f'Stopping {proc.systemd_name}{label} at {proc.node}... ',
+          end='',
           flush=True)
     exec('{}sudo systemctl stop --force {}'.format(ssh_prefix(proc.node),
                                                    proc.systemd_name))
@@ -107,7 +109,8 @@ def main() -> None:
         if svc in processes:
             for proc in processes[svc]:
                 process_stop(proc)
-    if leader_node:
+
+    if leader_node and not is_fake_leader_name(leader_node):
         print(f'Killing RC Leader at {leader_node}... ', end='', flush=True)
         exec(ssh_prefix(leader_node) + 'sudo pkill --exact -KILL consul')
 
