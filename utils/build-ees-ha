@@ -428,9 +428,17 @@ pcs constraint location haproxy-c2 prefers $rnode=INFINITY
 pcs constraint location haproxy-c2 avoids  $lnode=INFINITY
 
 pcs resource create s3backcons-c1 systemd:s3backgroundconsumer
+pcs constraint location s3backcons-c1 prefers $lnode=INFINITY
+pcs constraint location s3backcons-c1 avoids  $rnode=INFINITY
 pcs resource create s3backprod-c1 systemd:s3backgroundproducer
+pcs constraint location s3backprod-c1 prefers $lnode=INFINITY
+pcs constraint location s3backprod-c1 avoids  $rnode=INFINITY
 pcs resource create s3backcons-c2 systemd:s3backgroundconsumer
+pcs constraint location s3backcons-c2 prefers $rnode=INFINITY
+pcs constraint location s3backcons-c2 avoids  $lnode=INFINITY
 pcs resource create s3backprod-c2 systemd:s3backgroundproducer
+pcs constraint location s3backprod-c2 prefers $rnode=INFINITY
+pcs constraint location s3backprod-c2 avoids  $lnode=INFINITY
 
 echo 'Adding S3server to Pacemaker...'
 
