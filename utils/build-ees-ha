@@ -170,6 +170,12 @@ fi
 mkdir -p /var/mero && sudo mount $lvolume /var/mero
 ssh $rnode "mkdir -p /var/mero && sudo mount $rvolume /var/mero"
 
+# Update data_iface parameter with `_c1/2` suffixes in CDF (if needed):
+# 1st data_iface will be suffixed with `_c1`, second with `_c2`.
+sudo sed -E -e '0,/(data_iface: *[a-z]+[0-9])[^_][^c][^1]/s//\1_c1/' \
+            -e '0,/(data_iface: *[a-z]+[0-9])[^_][^c][^2]/s//\1_c2/' \
+            -i $cdf
+
 hctl bootstrap --mkfs $cdf
 hctl shutdown
 
