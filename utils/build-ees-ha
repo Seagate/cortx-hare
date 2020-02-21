@@ -7,6 +7,7 @@ PROG=${0##*/}
 
 usage() {
     cat <<EOF
+
 Usage: $PROG [OPTS] <CDF> [<params.yaml>]
 
 Configures EES-HA by preparing the configuration files and
@@ -100,7 +101,7 @@ if [[ -f $argsfile ]]; then
        case $name in
            ip1)          ip1=$value     ;;
            ip2)          ip2=$value     ;;
-           iface)        iface=$value   ;;
+           interface)    iface=$value   ;;
            left-node)    lnode=$value   ;;
            right-node)   rnode=$value   ;;
            left-volume)  lvolume=$value ;;
