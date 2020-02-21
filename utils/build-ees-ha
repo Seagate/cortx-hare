@@ -275,7 +275,7 @@ sudo sed -e 's/"--hax"/"--svc", "hare-hax-c1"/' \
          -i $hare_dir/consul-server-c1-conf.json
 cp $hare_dir/consul-server-c1-conf.json \
    /tmp/consul-server-c1-conf.json
-sudo sed -e '/\"server\"/a\ \ "node_name": "$lnode",' \
+sudo sed -e "/\"server\"/a\ \ \"node_name\": \"$lnode\"," \
          -e '/\"server\"/a\ \ "leave_on_terminate": true,' \
          -i /tmp/consul-server-c1-conf.json
 scp /tmp/consul-server-c1-conf.json $rnode:$hare_dir/
