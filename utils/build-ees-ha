@@ -170,10 +170,11 @@ fi
 mkdir -p /var/mero && sudo mount $lvolume /var/mero
 ssh $rnode "mkdir -p /var/mero && sudo mount $rvolume /var/mero"
 
-# Update data_iface parameter in CDF: 1st data_iface will be `${iface}_c1`,
-#                                     2nd data_iface will be `${iface}_c2`.
-sudo sed -E -e "0,/(data_iface: *)[a-z]+[0-9]([^_]|$)/s//\1${iface}_c1\2/" \
-            -e "0,/(data_iface: *)[a-z]+[0-9]([^_]|$)/s//\1${iface}_c2\2/" \
+# Update data_iface values in CDF: 1st data_iface will be `${iface}_c1`,
+#                                  2nd data_iface will be `${iface}_c2`.
+sudo sed -E -e "/[#].*data_iface/b ; # skip commented out data_iface lines
+                0,/(data_iface: *)[a-z]+[0-9]([^_]|$)/s//\1${iface}_c1/ ;
+                0,/(data_iface: *)[a-z]+[0-9]([^_]|$)/s//\1${iface}_c2/" \
             -i $cdf
 
 hctl bootstrap --mkfs $cdf
