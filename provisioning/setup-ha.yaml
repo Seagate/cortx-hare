@@ -4,6 +4,7 @@ hare:
     args: null
   init:
     script: /opt/seagate/eos/hare/libexec/build-ees-ha
+    args:
       - /var/lib/hare/cluster.yaml
       - /var/lib/hare/build-ees-ha-args.yaml
   config:
