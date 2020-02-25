@@ -2,17 +2,24 @@
 
 # :help: stop the cluster
 
+import logging
 import os
 import re
+import threading
+
 from socket import gethostname
 from typing import Dict, List, NamedTuple
-
+from queue import Queue
 from consul import Consul
 
 Process = NamedTuple('Process', [('node', str), ('consul_name', str),
                                  ('systemd_name', str), ('fidk', int),
                                  ('status', str)])
 shutdown_sequence = ('s3service', 'ios', 'confd', 'hax', 'consul')
+
+
+def _setup_logging():
+    logging.basicConfig(level=logging.INFO, format='%(message)s')
 
 
 def processfid2str(fidk: int) -> str:
@@ -79,9 +86,13 @@ def consul_is_active_at(hostname: str) -> bool:
     return os.system(cmd) == 0
 
 
+def exec_silent(cmd: str) -> bool:
+    return os.system(cmd) == 0
+
+
 def exec(cmd: str) -> None:
     assert cmd
-    print('done' if os.system(cmd) == 0 else '**ERROR**')
+    print('done' if exec_silent(cmd) else '**ERROR**')
 
 
 def process_stop(proc: Process) -> None:
@@ -89,14 +100,65 @@ def process_stop(proc: Process) -> None:
         return
     label = f' ({proc.consul_name})' if proc.systemd_name.startswith('m0d@') \
         else ''
-    print(f'Stopping {proc.systemd_name}{label} at {proc.node}... ',
-          end='',
-          flush=True)
-    exec('{}sudo systemctl stop --force {}'.format(ssh_prefix(proc.node),
-                                                   proc.systemd_name))
+    logging.info(f'Stopping {proc.systemd_name}{label} at {proc.node}... ')
+    ok = exec_silent('{}sudo systemctl stop --force {}'.format(
+        ssh_prefix(proc.node), proc.systemd_name))
+    if ok:
+        logging.info(f'Stopped {proc.systemd_name}{label} at {proc.node}')
+    else:
+        logging.error(f'**ERROR** Failed to stop {proc.systemd_name}{label}'
+                      f' at {proc.node}')
+
+
+class StopProcess:
+    def __init__(self, process: Process):
+        self.process = process
+
+
+class QuitMessage:
+    pass
+
+
+class Worker(threading.Thread):
+    def __init__(self, queue: Queue):
+        super().__init__(target=self._do_work,
+                         args=(queue, ))
+
+    def _do_work(self, queue):
+        logging.debug('Started thread')
+        while True:
+            msg = queue.get()
+            if isinstance(msg, StopProcess):
+                process_stop(msg.process)
+            if isinstance(msg, QuitMessage):
+                logging.debug('Exiting thread')
+                return
+
+
+def _stop_parallel(process_list: List[Process], thread_count: int = 8) -> None:
+    size = len(process_list)
+
+    if not size:
+        return
+    q: Queue = Queue(maxsize=size)
+    thread_count = min(thread_count, size)
+
+    worker_pool: List[Worker] = [Worker(q) for i in range(thread_count)]
+
+    for w in worker_pool:
+        w.start()
+
+    for proc in process_list:
+        q.put(StopProcess(process=proc))
+    for i in range(thread_count):
+        q.put(QuitMessage())
+
+    for worker in worker_pool:
+        worker.join()
 
 
 def main() -> None:
+    _setup_logging()
     if not consul_is_active_at('localhost'):
         exit('Cluster is not running')
 
@@ -107,8 +169,7 @@ def main() -> None:
     for svc in shutdown_sequence:
         # Some processes may be not started as per configuration
         if svc in processes:
-            for proc in processes[svc]:
-                process_stop(proc)
+            _stop_parallel([proc for proc in processes[svc]])
 
     if leader_node and not is_fake_leader_name(leader_node):
         print(f'Killing RC Leader at {leader_node}... ', end='', flush=True)
