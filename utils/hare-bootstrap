@@ -249,6 +249,7 @@ while (( $(get_ready_agents_nr) != $agents_nr )); do
         echo 'Some agent(s) failed to start in due time:' >&2
         diff <(get_ready_agents | sort) \
              <(get_all_nodes | awk '{print $1}' | sort) | sed 1d >&2
+        echo 'Check connectivity and firewall (Consul ports must be opened)' >&2
         exit 1
     fi
     echo -n '.'
