@@ -46,12 +46,12 @@ PY3_VERSION_MINOR := $(shell grep -o . <<<$(PY3_VERSION) | tail -n1)
 #
 
 .PHONY: build
-build: hax
+build: hax pcswrap
 	@$(MAKE) --quiet check
 
 .PHONY: hax
-HAX_VERSION := $(shell cat VERSION)
-HAX_WHL     := hax/dist/hax-$(HAX_VERSION)-cp$(PY3_VERSION)-cp$(PY3_VERSION)m-linux_x86_64.whl
+HARE_VERSION := $(shell cat VERSION)
+HAX_WHL      := hax/dist/hax-$(HARE_VERSION)-cp$(PY3_VERSION)-cp$(PY3_VERSION)m-linux_x86_64.whl
 hax: $(HAX_WHL)
 
 HAX_SRC := $(wildcard hax/setup.py hax/hax/*.py hax/hax/*.[ch])
@@ -59,7 +59,16 @@ $(HAX_WHL): $(PY_VENV_DIR) $(HAX_SRC)
 	@$(call _info,Building hax .whl package)
 	@cd hax && $(SETUP_PY) bdist_wheel
 
-$(PY_VENV_DIR): $(patsubst %,%/requirements.txt,cfgen hax)
+.PHONY: pcswrap
+PCSWRAP_WHL := pcswrap/dist/pcswrap-$(HARE_VERSION)-py3-none-any.whl
+pcswrap: $(PCSWRAP_WHL)
+
+PCSWRAP_SRC := $(shell find pcswrap -type f -name '*.py')
+$(PCSWRAP_WHL): $(PY_VENV_DIR) $(PCSWRAP_SRC)
+	@$(call _info,Building pcswrap .whl package)
+	@cd pcswrap && $(SETUP_PY) bdist_wheel
+
+$(PY_VENV_DIR): $(patsubst %,%/requirements.txt,cfgen hax pcswrap)
 	@$(call _info,Initializing virtual env in $(PY_VENV_DIR))
 	@$(PYTHON) -m venv $@
 	@$(call _info,Installing pip modules in virtual env)
@@ -80,7 +89,7 @@ distclean: clean
 	 fi
 
 .PHONY: clean
-clean: clean-hax clean-mypy clean-dhall-prelude
+clean: clean-hax clean-mypy clean-dhall-prelude clean-pcswrap
 
 .PHONY: clean-hax
 clean-hax:
@@ -105,6 +114,17 @@ clean-mypy:
 clean-dhall-prelude:
 	$(MAKE) --quiet -C cfgen clean-dhall-prelude
 
+.PHONY: clean-pcswrap
+clean-pcswrap:
+	@$(call _info,Cleaning pcswrap)
+	@rm -rvf pcswrap/{build,dist,pcswrap.egg-info}
+	@find pcswrap -name '__pycache__' | while read d; do \
+	     if [[ -e $$d ]]; then \
+	         $(call _log,removing $$d); \
+	         rm -rf $$d; \
+	     fi; \
+	 done
+
 # Install --------------------------------------------- {{{1
 #
 
@@ -118,11 +138,13 @@ HARE_LIBEXEC       = $(DESTDIR)/$(PREFIX)/libexec
 HARE_PACEMAKER     = $(DESTDIR)/$(PREFIX)/pacemaker
 HAX_EXE            = $(DESTDIR)/$(PREFIX)/bin/hax
 HAX_EGG_LINK       = $(DESTDIR)/$(PREFIX)/lib/python3.$(PY3_VERSION_MINOR)/site-packages/hax.egg-link
+PCSWRAP_EXE        = $(DESTDIR)/$(PREFIX)/bin/PCSWRAP
+PCSWRAP_EGG_LINK   = $(DESTDIR)/$(PREFIX)/lib/python3.$(PY3_VERSION_MINOR)/site-packages/pcswrap.egg-link
 SYSTEMD_CONFIG_DIR = $(DESTDIR)/usr/lib/systemd/system
 
 # install {{{2
 .PHONY: install
-install: install-dirs install-cfgen install-hax install-systemd install-vendor
+install: install-dirs install-cfgen install-hax install-pcswrap install-systemd install-vendor
 	@$(call _info,Installing hare utils)
 	@for f in utils/*; do \
 	     $(call _log,copying $$f -> $(HARE_LIBEXEC)); \
@@ -204,6 +226,14 @@ $(HAX_EGG_LINK) $(HAX_EXE): $(HAX_WHL)
 	@$(call _info,Installing hax with '$(HAX_INSTALL_CMD)')
 	@cd hax && $(HAX_INSTALL_CMD)
 
+.PHONY: install-pcswrap
+install-pcswrap: PCSWRAP_INSTALL_CMD = $(PIP) install --ignore-installed --prefix $(DESTDIR)/$(PREFIX) $(PCSWRAP_WHL:pcswrap/%=%)
+install-pcswrap: $(PCSWRAP_EXE)
+
+$(PCSWRAP_EGG_LINK) $(PCSWRAP_EXE): $(PCSWRAP_WHL)
+	@$(call _info,Installing pcswrap with '$(PCSWRAP_INSTALL_CMD)')
+	@cd pcswrap && $(PCSWRAP_INSTALL_CMD)
+
 .PHONY: install-vendor
 install-vendor: vendor/consul-bin/current/consul \
                 $(wildcard vendor/dhall-bin/current/*)
@@ -213,7 +243,7 @@ install-vendor: vendor/consul-bin/current/consul \
 
 # devinstall {{{2
 .PHONY: devinstall
-devinstall: install-dirs devinstall-cfgen devinstall-hax devinstall-systemd devinstall-vendor
+devinstall: install-dirs devinstall-cfgen devinstall-hax devinstall-pcswrap devinstall-systemd devinstall-vendor
 	@$(call _info,linking hare utils)
 	@for f in utils/*; do \
 	     $(call _log,linking $$f -> $(HARE_LIBEXEC)); \
@@ -232,7 +262,7 @@ devinstall: install-dirs devinstall-cfgen devinstall-hax devinstall-systemd devi
 	@$(call _log,creating hare group)
 	@groupadd --force hare
 	@$(call _log,changing permission of $(DESTDIR)/var/lib/hare)
-	@chgrp hare $(DESTDIR)/var/lib/hare 
+	@chgrp hare $(DESTDIR)/var/lib/hare
 	@chmod --changes g+w $(DESTDIR)/var/lib/hare
 
 
@@ -270,6 +300,11 @@ devinstall-hax: HAX_INSTALL_CMD = $(SETUP_PY) develop --prefix $(DESTDIR)/$(PREF
 devinstall-hax: export PYTHONPATH = $(DESTDIR)/$(PREFIX)/lib/python3.$(PY3_VERSION_MINOR)/site-packages
 devinstall-hax: $(HAX_EGG_LINK)
 
+.PHONY: devinstall-pcswrap
+devinstall-pcswrap: PCSWRAP_INSTALL_CMD = $(SETUP_PY) develop --prefix $(DESTDIR)/$(PREFIX)
+devinstall-pcswrap: export PYTHONPATH = $(DESTDIR)/$(PREFIX)/lib/python3.$(PY3_VERSION_MINOR)/site-packages
+devinstall-pcswrap: $(PCSWRAP_EGG_LINK)
+
 .PHONY: devinstall-vendor
 devinstall-vendor: vendor/consul-bin/current/consul \
                    $(wildcard vendor/dhall-bin/current/*)
@@ -280,9 +315,11 @@ devinstall-vendor: vendor/consul-bin/current/consul \
 # Uninstall ------------------------------------------- {{{1
 #
 
-HAX_EGG       = $(wildcard $(DESTDIR)/$(PREFIX)/lib/python3.$(PY3_VERSION_MINOR)/site-packages/hax-*.egg)
-HAX_MODULE    = $(wildcard $(DESTDIR)/$(PREFIX)/lib64/python3.$(PY3_VERSION_MINOR)/site-packages/*hax*)
-EASY_INST_PTH = $(DESTDIR)/$(PREFIX)/lib/python3.$(PY3_VERSION_MINOR)/site-packages/easy-install.pth
+HAX_EGG        = $(wildcard $(DESTDIR)/$(PREFIX)/lib/python3.$(PY3_VERSION_MINOR)/site-packages/hax-*.egg)
+HAX_MODULE     = $(wildcard $(DESTDIR)/$(PREFIX)/lib64/python3.$(PY3_VERSION_MINOR)/site-packages/*hax*)
+PCSWRAP_EGG    = $(wildcard $(DESTDIR)/$(PREFIX)/lib/python3.$(PY3_VERSION_MINOR)/site-packages/pcswrap-*.egg)
+PCSWRAP_MODULE = $(wildcard $(DESTDIR)/$(PREFIX)/lib64/python3.$(PY3_VERSION_MINOR)/site-packages/pcswrap*)
+EASY_INST_PTH  = $(DESTDIR)/$(PREFIX)/lib/python3.$(PY3_VERSION_MINOR)/site-packages/easy-install.pth
 
 .PHONY: uninstall
 uninstall:
@@ -290,6 +327,7 @@ uninstall:
 	@for d in $(CFGEN_EXE) $(CFGEN_SHARE) \
 	          $(HARE_CONF) \
 	          $(HAX_EXE) $(HAX_EGG_LINK) $(HAX_EGG) $(HAX_MODULE) \
+	          $(PCSWRAP_EXE) $(PCSWRAP_EGG_LINK) $(PCSWRAP_EGG) $(PCSWRAP_MODULE) \
 	          $(EASY_INST_PTH) \
 	          $(CONSUL_LIBEXEC) $(CONSUL_SHARE) \
 	          $(SYSTEMD_CONFIG_DIR)/hare*.service \
@@ -311,7 +349,7 @@ uninstall:
 PYTHON_SCRIPTS := utils/hare-shutdown utils/hare-status
 
 .PHONY: check
-check: check-cfgen check-hax flake8 mypy
+check: check-cfgen check-hax check-pcswrap flake8 mypy
 
 .PHONY: check-cfgen
 check-cfgen: $(PY_VENV_DIR)
@@ -324,6 +362,13 @@ check-hax: $(PY_VENV_DIR)
 	@cd hax &&\
 	  $(PY_VENV) &&\
 	  MYPYPATH=../stubs $(PYTHON) setup.py flake8 mypy
+
+.PHONY: check-pcswrap
+check-pcswrap: $(PY_VENV_DIR)
+	@$(call _info,Checking pcswrap)
+	@cd pcswrap &&\
+	  $(PY_VENV) &&\
+	  MYPYPATH=../stubs $(PYTHON) setup.py flake8 mypy test
 
 .PHONY: flake8
 flake8: $(PYTHON_SCRIPTS)
