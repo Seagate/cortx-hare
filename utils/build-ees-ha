@@ -108,6 +108,7 @@ if [[ -f $argsfile ]]; then
            right-volume) rvolume=$value ;;
            skip-mkfs)    skip_mkfs=true ;;
            net-type)     net_type=$value ;;
+           '')           ;;
            *) echo "Invalid parameter '$name' in $argsfile" >&2
               usage >&2; exit 1 ;;
        esac
