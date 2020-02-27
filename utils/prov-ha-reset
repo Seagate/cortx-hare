@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+set -eu -o pipefail
+export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
+# set -x
+
+hare_dir=/var/lib/hare
+
+count_s3servers() {
+    local conf=$1
+    if [[ -f $conf ]]; then
+        jq -r '.services[] | "\(.name)"' $conf | grep -c '^s3service$'
+    else
+        echo 0  # XXX-TODO: parse `pcs status` output
+    fi
+}
+
+for node_id in 2 1; do
+    n=$(count_s3servers $hare_dir/consul-server-c${node_id}-conf.json)
+    for i in $(seq 1 $n); do
+        pcs resource delete s3server-c${node_id}-$i || true
+    done
+done
+
+resources=(
+    s3back{prod,cons}-c2
+    s3back{prod,cons}-c1
+    haproxy-c{2,1}
+    statsd-c{2,1}
+    els-search-c{2,1}
+    s3auth-c{2,1}
+    ldap-c{2,1}
+    c{2,1}
+    mero-kernel
+    lnet
+)
+for r in ${resources[@]}; do
+    pcs resource delete $r || true
+done

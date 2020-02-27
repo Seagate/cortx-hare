@@ -14,5 +14,5 @@ hare:
     script: null
     args: null
   reset:
-    script: null
+    script: /opt/seagate/eos/hare/libexec/prov-ha-reset
     args: null
