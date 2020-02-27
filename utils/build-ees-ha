@@ -121,18 +121,22 @@ fi
 }
 
 echo 'Adding the roaming IP addresses into Pacemaker...'
-sudo pcs resource create ip-c1 ocf:heartbeat:IPaddr2 \
+sudo pcs cluster cib icfg
+sudo pcs -f icfg resource create ip-c1 ocf:heartbeat:IPaddr2 \
          ip=$ip1 cidr_netmask=24 iflabel=c1 op monitor interval=30s
-sudo pcs resource create ip-c2 ocf:heartbeat:IPaddr2 \
+sudo pcs -f icfg resource create ip-c2 ocf:heartbeat:IPaddr2 \
          ip=$ip2 cidr_netmask=24 iflabel=c2 op monitor interval=30s
-sudo pcs constraint location ip-c1 prefers $lnode
-sudo pcs constraint location ip-c2 prefers $rnode
+sudo pcs -f icfg constraint location ip-c1 prefers $lnode
+sudo pcs -f icfg constraint location ip-c2 prefers $rnode
+sudo pcs cluster cib-push icfg --config
 
 echo 'Adding LNet...'
-sudo pcs resource create lnet systemd:lnet
-sudo pcs resource clone lnet
-sudo pcs constraint order lnet-clone then ip-c1
-sudo pcs constraint order lnet-clone then ip-c2
+sudo pcs cluster cib lcfg
+sudo pcs -f lcfg resource create lnet systemd:lnet
+sudo pcs -f lcfg resource clone lnet
+sudo pcs -f lcfg constraint order lnet-clone then ip-c1
+sudo pcs -f lcfg constraint order lnet-clone then ip-c2
+sudo pcs cluster cib-push lcfg --config
 
 run_on_both() {
     local cmd=$*
@@ -147,12 +151,14 @@ sudo ln -sf /opt/seagate/eos/hare/pacemaker/lnet
 '
 run_on_both $cmd
 
-sudo pcs resource create lnet-c1 ocf:seagate:lnet \
+sudo pcs cluster cib lcfg
+sudo pcs -f lcfg resource create lnet-c1 ocf:seagate:lnet \
          iface=$iface:c1 nettype=$net_type op monitor interval=30s
-sudo pcs resource create lnet-c2 ocf:seagate:lnet \
+sudo pcs -f lcfg resource create lnet-c2 ocf:seagate:lnet \
          iface=$iface:c2 nettype=$net_type op monitor interval=30s
-sudo pcs resource group add c1 ip-c1 lnet-c1
-sudo pcs resource group add c2 ip-c2 lnet-c2
+sudo pcs -f lcfg resource group add c1 ip-c1 lnet-c1
+sudo pcs -f lcfg resource group add c2 ip-c2 lnet-c2
+sudo pcs cluster cib-push lcfg --config
 
 echo 'Preparing Hare configuration files...'
 
