@@ -28,11 +28,12 @@ BuildRequires: python36-devel
 BuildRequires: python36-pip
 BuildRequires: python36-setuptools
 
+Requires: facter
 Requires: mero = %{h_mero_version}
 Requires: pacemaker
 Requires: pcs
 Requires: python36
-Requires: facter
+Requires: rsync
 
 Conflicts: halon
 # puppet-agent provides `facter` but doesn't install it in the default PATH,
