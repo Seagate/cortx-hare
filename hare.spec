@@ -36,12 +36,6 @@ Requires: python36
 Requires: rsync
 
 Conflicts: halon
-# puppet-agent provides `facter` but doesn't install it in the default PATH,
-# rendering it anavailable for Hare. If puppet-agent already installed in the
-# system, it will prevent installation of normal `facter` package, defacto
-# leaving Hare w/o `facter`, even though from the yum/rpm standpoint all Hare's
-# dependencies are satisfied.
-Conflicts: puppet-agent
 
 %description
 Cluster monitoring and recovery for high-availability.
