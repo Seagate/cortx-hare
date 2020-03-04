@@ -1,0 +1,128 @@
+#!/bin/bash
+set -eu -o pipefail
+export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
+# set -x
+
+PROG=${0##*/}
+
+usage() {
+    cat <<EOF
+Usage: $PROG [OPTS] [<params.yaml>]
+
+Configures CSM HA by preparing the configuration files and
+adding resources into the Pacemaker.
+
+Caveats:
+
+* The script expects Pacemaker to be started and have no resources configured.
+  Check with 'pcs status'.
+
+* Passwordless SSH access between the nodes is required.
+
+* The script should be executed from the "left" node.
+
+* Ensure that the provided roaming IP address belongs to
+  the management network interface and local subnetwork, which
+  are not used.
+
+* Consul should be started on all cluster nodes.
+
+* Elastic search should be started on all cluster nodes.
+
+Mandatory parameters:
+  --vip <addr>          CSM roaming IP address
+  -i, --interface <if>  Management network interface (default: eth1)
+  --left-node     <n1>  Left node hostname (default: pod-c1)
+  --right-node    <n2>  Right node hostname (default: pod-c2)
+
+Note: parameters can be specified either directly via command line options
+or via YAML file, e.g.:
+
+  vip: <vip>
+  interface: <iface>
+  left-node: <lnode>
+  right-node: <rnode>
+EOF
+}
+
+TEMP=$(getopt --options h,i: \
+              --longoptions help,vip:,interface:,left-node:,right-node: \
+              --name "$PROG" -- "$@" || true)
+
+(($? == 0)) || { usage >&2; exit 1; }
+
+eval set -- "$TEMP"
+
+vip=
+iface=eth1
+lnode=pod-c1
+rnode=pod-c2
+
+while true; do
+    case "$1" in
+        -h|--help)           usage; exit ;;
+        --vip)               vip=$2; shift 2 ;;
+        -i|--interface)      iface=$2; shift 2 ;;
+        --left-node)         lnode=$2; shift 2 ;;
+        --right-node)        rnode=$2; shift 2 ;;
+        --)                  shift; break ;;
+        *)                   break ;;
+    esac
+done
+
+cdf=${1:-}
+argsfile=${2:-}
+
+if [[ -f $argsfile ]]; then
+    while IFS=': ' read name value; do
+       case $name in
+           vip)          vip=$value     ;;
+           interface)    iface=$value   ;;
+           left-node)    lnode=$value   ;;
+           right-node)   rnode=$value   ;;
+           *) echo "Invalid parameter '$name' in $argsfile" >&2
+              usage >&2; exit 1 ;;
+       esac
+    done < $argsfile
+fi
+
+[[ $vip ]] || {
+    usage >&2
+    exit 1
+}
+
+warn() {
+    echo "*WARNING* $@" >&2
+}
+
+systemctl is-active --quiet hare-consul-agent-c1 ||
+    warn "Consul is not running on $lnode"
+ssh $rnode "systemctl is-active --quiet hare-consul-agent-c2" ||
+    echo "Consul is not running on $rnode"
+
+systemctl is-active --quiet elasticsearch ||
+    warn "elasticsearch is not running on $lnode"
+ssh $rnode "systemctl is-active --quiet elasticsearch" ||
+    warn "elasticsearch is not running on $rnode"
+
+echo 'Adding csm resources...'
+pcs resource create csm-agent systemd:csm_agent op monitor interval=30s
+pcs resource create csm-web systemd:csm_web op monitor interval=30s
+
+echo 'Adding kibana resources...'
+pcs resource create kibana-vip ocf:heartbeat:IPaddr2 \
+    ip=$vip cidr_netmask=24 nic=eth0 iflabel=v1 \
+    op start   interval=0s timeout=60s \
+    op monitor interval=5s timeout=20s \
+    op stop    interval=0s timeout=60s
+pcs resource create kibana systemd:kibana op monitor interval=30s
+
+pcs resource group add csm-kib kibana-vip kibana csm-web csm-agent
+
+echo 'Adding rabbit-mq resources and constraints...'
+pcs resource create rabbit-mq-c1 systemd:rabbitmq-server op monitor interval=30s
+pcs resource create rabbit-mq-c2 systemd:rabbitmq-server op monitor interval=30s
+pcs constraint location rabbit-mq-c1 prefers $lnode=INFINITY
+pcs constraint location rabbit-mq-c1 avoids $rnode=INFINITY
+pcs constraint location rabbit-mq-c2 prefers $rnode=INFINITY
+pcs constraint location rabbit-mq-c2 avoids $lnode=INFINITY
