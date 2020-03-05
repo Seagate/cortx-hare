@@ -91,23 +91,20 @@ fi
     exit 1
 }
 
-warn() {
-    echo "*WARNING* $@" >&2
+die() {
+    echo "[$HOSTNAME] $PROG: $*" >&2
+    exit 1
 }
 
 systemctl is-active --quiet hare-consul-agent-c1 ||
-    warn "Consul is not running on $lnode"
+    die 'No active Consul instance found'
 ssh $rnode "systemctl is-active --quiet hare-consul-agent-c2" ||
-    echo "Consul is not running on $rnode"
+    die 'No active Consul instance found'
 
 systemctl is-active --quiet elasticsearch ||
-    warn "elasticsearch is not running on $lnode"
+    die 'No active elasticsearch instance found'
 ssh $rnode "systemctl is-active --quiet elasticsearch" ||
-    warn "elasticsearch is not running on $rnode"
-
-echo 'Adding csm resources...'
-pcs resource create csm-agent systemd:csm_agent op monitor interval=30s
-pcs resource create csm-web systemd:csm_web op monitor interval=30s
+    die 'No active elasticsearch instance found'
 
 echo 'Adding kibana resources...'
 pcs resource create kibana-vip ocf:heartbeat:IPaddr2 \
@@ -117,12 +114,14 @@ pcs resource create kibana-vip ocf:heartbeat:IPaddr2 \
     op stop    interval=0s timeout=60s
 pcs resource create kibana systemd:kibana op monitor interval=30s
 
+echo 'Adding csm resources and constraints...'
+pcs resource create csm-agent systemd:csm_agent op monitor interval=30s
+pcs resource create csm-web systemd:csm_web op monitor interval=30s
+
 pcs resource group add csm-kib kibana-vip kibana csm-web csm-agent
+pcs constraint colocation add csm-kib with els-search-clone score=INFINITY
+pcs constraint colocation add csm-kib with consul-c1 score=INFINITY
 
 echo 'Adding rabbit-mq resources and constraints...'
-pcs resource create rabbit-mq-c1 systemd:rabbitmq-server op monitor interval=30s
-pcs resource create rabbit-mq-c2 systemd:rabbitmq-server op monitor interval=30s
-pcs constraint location rabbit-mq-c1 prefers $lnode=INFINITY
-pcs constraint location rabbit-mq-c1 avoids $rnode=INFINITY
-pcs constraint location rabbit-mq-c2 prefers $rnode=INFINITY
-pcs constraint location rabbit-mq-c2 avoids $lnode=INFINITY
+pcs resource create rabbitmq systemd:rabbitmq-server clone op monitor interval=30s
+pcs constraint colocation add csm-kib with rabbitmq-clone score=INFINITY
