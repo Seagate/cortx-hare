@@ -174,8 +174,11 @@ if ! [[ $skip_mkfs ]]; then
     mkfs_ext4 $rvolume
 fi
 
-mkdir -p /var/mero && sudo mount $lvolume /var/mero
-ssh $rnode "mkdir -p /var/mero && sudo mount $rvolume /var/mero"
+# Mount /var/mero (if not mounted).
+mkdir -p /var/mero &&
+  ! mountpoint -q /var/mero && sudo mount $lvolume /var/mero || true
+ssh $rnode "mkdir -p /var/mero &&
+  ! mountpoint -q /var/mero && sudo mount $rvolume /var/mero || true"
 
 # Update data_iface values in CDF: 1st data_iface will be `${iface}_c1`,
 #                                  2nd data_iface will be `${iface}_c2`.
