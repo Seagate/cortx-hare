@@ -3,8 +3,8 @@ hare:
     script: null
     args: null
   init:
-    script: /opt/seagate/eos/hare/libexec/prov-init
-    args: /var/lib/hare/cluster.yaml
+    script: null
+    args: null
   config:
     script: null
     args: null
