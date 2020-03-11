@@ -10,7 +10,7 @@ if [[ -z ${MERO_COMMIT_REF:-} ]]; then
     yum-config-manager --add-repo="http://$repo"
     tee -a /etc/yum.repos.d/${repo//\//_}.repo <<< 'gpgcheck=0'
 
-    yum install -y hare mero-devel
+    yum install -y eos-hare mero-devel
 fi
 
 make test

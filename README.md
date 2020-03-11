@@ -40,8 +40,8 @@ ensure that
   ```bash
   (set -eu
 
-  if ! rpm -q hare s3server; then
-      if ! sudo yum install -y hare s3server; then
+  if ! rpm -q eos-hare s3server; then
+      if ! sudo yum install -y eos-hare s3server; then
           for x in 'integration/centos-7.7.1908/last_successful' 's3server_uploads'
           do
               repo="ci-storage.mero.colo.seagate.com/releases/eos/$x"
@@ -50,7 +50,7 @@ ensure that
 	  done
 	  unset repo x
 
-          sudo yum install -y hare s3server
+          sudo yum install -y eos-hare s3server
       fi
   fi
   )

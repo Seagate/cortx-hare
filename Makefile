@@ -353,7 +353,7 @@ test-cfgen: $(PY_VENV_DIR)
 
 VERSION   := $(shell cat VERSION)
 GITREV     = git$(shell git rev-parse --short HEAD)
-DIST_FILE := hare-$(VERSION).tar.gz
+DIST_FILE := eos-hare-$(VERSION).tar.gz
 
 RPMBUILD_DIR    := $(HOME)/rpmbuild
 RPMBUILD_TOPDIR := $(abspath $(RPMBUILD_DIR))
@@ -364,9 +364,9 @@ RPMSPECS_DIR    := $(RPMBUILD_DIR)/SPECS
 dist:
 	@$(call _info,Generating dist archive)
 	@rm -f $(DIST_FILE)
-	@git archive -v --prefix=hare/ HEAD -o $(DIST_FILE:.gz=)
+	@git archive -v --prefix=eos-hare/ HEAD -o $(DIST_FILE:.gz=)
 	git submodule foreach --recursive \
-	     "git archive --prefix=hare/\$$path/ --output=\$$sha1.tar HEAD \
+	     "git archive --prefix=eos-hare/\$$path/ --output=\$$sha1.tar HEAD \
 	      && tar --concatenate --file=$$(pwd)/$(DIST_FILE:.gz=) \$$sha1.tar \
 	      && rm \$$sha1.tar"
 	@gzip $(DIST_FILE:.gz=)
