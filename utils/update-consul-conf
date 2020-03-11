@@ -49,6 +49,14 @@ id2fid() {
 }
 
 HAX_ID=$(get_service_ids 'grep -iw ha')
+[[ $HAX_ID ]] || {
+    cat >&2 <<.
+Cannot get information about Hax from Consul for this host ($HOSTNAME).
+Please verify that the hostname matches the one stored in Consul.
+.
+    usage >&2
+    exit 1
+}
 CONFD_IDs=$(get_service_ids 'grep -iw confd')
 IOS_IDs=$(get_service_ids 'grep -iw ios | grep -iwv confd')
 S3_IDs=$(get_service_ids 'grep -iw m0_client_s3')
