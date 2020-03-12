@@ -184,7 +184,8 @@ ssh $rnode "mkdir -p /var/mero &&
 #                                  2nd data_iface will be `${iface}_c2`.
 sudo sed -E -e "/[#].*data_iface/b ; # skip commented out data_iface lines
                 0,/(data_iface: *)[a-z0-9]+\b/s//\1${iface}_c1/ ;
-                0,/(data_iface: *)[a-z0-9]+\b/s//\1${iface}_c2/" \
+                0,/(data_iface: *)[a-z0-9]+\b/s//\1${iface}_c2/ ;
+                s/(${iface})_(c[12])/\1:\2/" \
             -i $cdf
 
 # Make sure mero-kernel is not loaded.

@@ -193,8 +193,7 @@ def validate_cdf_schema(cdf: str, cdf_path: str, schema_path: str) -> None:
 
 
 def ipaddr_key(iface: str) -> str:
-    # `facter` converts "eth1:c1" to "eth1_c1".
-    return 'ipaddress_' + iface.replace(':', '_')
+    return 'ipaddress_' + iface
 
 
 def looks_like_ipaddr(s: str) -> bool:
