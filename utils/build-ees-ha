@@ -190,6 +190,17 @@ sudo sed -E -e "/[#].*data_iface/b ; # skip commented out data_iface lines
 # Make sure mero-kernel is not loaded.
 run_on_both 'sudo systemctl stop mero-kernel'
 
+# Check IPs
+ip a | grep -q $ip1 || {
+    echo 'ERROR: the IP address on the left node is not configured' >&2
+    usage >&2; exit 1;
+}
+
+ssh $rnode "ip a | grep -q $ip2" || {
+    echo 'ERROR: the IP address on the right node is not configured' >&2
+    usage >&2; exit 1;
+}
+
 hctl bootstrap --mkfs $cdf
 hctl shutdown
 
