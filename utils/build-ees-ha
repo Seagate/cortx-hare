@@ -164,6 +164,25 @@ echo 'Preparing Hare configuration files...'
 
 sleep 5 # Allow Pacemaker to configure the IPs
 
+# Check the IPs
+ip a | grep -q $ip1 || {
+    cat >&2 <<.
+ERROR: the IP address on the $lnode failed to be configured.
+Check the networking configuration, make sure the netmask of
+the main IP on $iface interface is <= 24 bits.
+.
+    exit 1;
+}
+
+ssh $rnode "ip a | grep -q $ip2" || {
+    cat >&2 <<.
+ERROR: the IP address on the $rnode failed to be configured.
+Check the networking configuration, make sure the netmask of
+the main IP on $iface interface is <= 24 bits.
+.
+    exit 1;
+}
+
 mkfs_ext4() {
     local dev=$1
     sudo mkfs.ext4 -q $dev &>/dev/null < <(echo y)
@@ -190,17 +209,6 @@ sudo sed -E -e "/[#].*data_iface/b ; # skip commented out data_iface lines
 
 # Make sure mero-kernel is not loaded.
 run_on_both 'sudo systemctl stop mero-kernel'
-
-# Check IPs
-ip a | grep -q $ip1 || {
-    echo 'ERROR: the IP address on the left node is not configured' >&2
-    usage >&2; exit 1;
-}
-
-ssh $rnode "ip a | grep -q $ip2" || {
-    echo 'ERROR: the IP address on the right node is not configured' >&2
-    usage >&2; exit 1;
-}
 
 hctl bootstrap --mkfs $cdf
 hctl shutdown
