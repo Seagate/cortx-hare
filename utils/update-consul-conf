@@ -22,14 +22,15 @@ esac
 
 get_service_ids() {
     local filter=$1
-    local cmd="consul kv get -recurse m0conf/nodes/$HOSTNAME/processes/ |
+    local host=$(hostname --fqdn)
+    local cmd="consul kv get -recurse m0conf/nodes/$host/processes/ |
                   $filter | sed 's/.*processes.//' | cut -d/ -f1"
     eval $cmd || true
 }
 
 get_service_ep() {
     local id=$1
-    consul kv get m0conf/nodes/$HOSTNAME/processes/$id/endpoint
+    consul kv get m0conf/nodes/$(hostname --fqdn)/processes/$id/endpoint
 }
 
 get_service_addr() {
@@ -51,8 +52,8 @@ id2fid() {
 HAX_ID=$(get_service_ids 'grep -iw ha')
 [[ $HAX_ID ]] || {
     cat >&2 <<.
-Cannot get information about Hax from Consul for this host ($HOSTNAME).
-Please verify that the hostname matches the one stored in Consul.
+Cannot get information about Hax from Consul for this host ($(hostname --fqdn)).
+Please verify that the host name matches the one stored in the Consul KV.
 .
     usage >&2
     exit 1

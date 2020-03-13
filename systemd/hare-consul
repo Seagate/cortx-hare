@@ -7,8 +7,9 @@ HARE_BASE_DIR=/opt/seagate/eos/hare
 PATH="$HARE_BASE_DIR/libexec:$PATH"
 PATH="$HARE_BASE_DIR/bin:$PATH"
 export PATH
+NODE=`hostname -f`
 
 # TODO: should it be `consul` and PATH=/opt/seagate/eos/hare/bin:$PATH ?
-exec consul agent -bind $BIND -client "$CLIENT" $JOIN \
+exec consul agent -node "$NODE" -bind $BIND -client "$CLIENT" $JOIN \
      -config-file=/var/lib/hare/consul-$MODE-conf.json \
      -data-dir=/var/lib/hare/consul-$BIND $EXTRA_OPTS

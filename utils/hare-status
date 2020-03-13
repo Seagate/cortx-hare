@@ -36,7 +36,6 @@ def sns_pools(cns: Consul) -> List[str]:
 def hosts(cns: Consul) -> Set[str]:
     data = cns.kv.get('m0conf/nodes', recurse=True)[1]
     host_names = {(x['Key'].split('/'))[2] for x in data}
-
     return host_names
 
 
