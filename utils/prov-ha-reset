@@ -22,13 +22,14 @@ for node_id in 2 1; do
 done
 
 resources=(
-    s3back{prod,cons}-c2
-    s3back{prod,cons}-c1
-    haproxy-c{2,1}
-    statsd-c{2,1}
-    els-search-c{2,1}
-    s3auth-c{2,1}
-    ldap-c{2,1}
+    s3back{prod,cons}
+    s3back{prod,cons}
+    haproxy
+    statsd
+    els-search
+    s3auth
+    ldap
+    rabbitmq
     c{2,1}
     mero-kernel
     lnet
