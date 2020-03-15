@@ -500,22 +500,23 @@ get_s3_svc() {
 
 s3_resource_add() {
    local conf_file=$1
-   local node=$2
+   local suffix=$2
+   local node=$3
    local count=1
    local s3server_fids=$(get_s3_svc $hare_dir/$conf_file s3service)
 
    pcs cluster cib mcfg
    for i in ${s3server_fids[@]}
    do
-      pcs -f mcfg resource create s3server-$node-$count systemd:$i op stop timeout=600
-      pcs -f mcfg constraint location s3server-$node-$count prefers $node=INFINITY
-      pcs -f mcfg constraint colocation add s3server-$node-$count with s3auth-$node score=INFINITY
-      pcs -f mcfg constraint order mero-ios-c1 then s3server-$node-$count
-      pcs -f mcfg constraint order mero-ios-c2 then s3server-$node-$count
+      pcs -f mcfg resource create s3server-$suffix-$count systemd:$i op stop timeout=600
+      pcs -f mcfg constraint location s3server-$suffix-$count prefers $node=INFINITY
+      pcs -f mcfg constraint colocation add s3server-$suffix-$count with s3auth-$suffix score=INFINITY
+      pcs -f mcfg constraint order mero-ios-c1 then s3server-$suffix-$count
+      pcs -f mcfg constraint order mero-ios-c2 then s3server-$suffix-$count
       (( count++ ))
    done
    pcs cluster cib-push mcfg --config
 }
 
-s3_resource_add consul-server-c1-conf.json c1
-s3_resource_add consul-server-c2-conf.json c2
+s3_resource_add consul-server-c1-conf.json c1 $lnode
+s3_resource_add consul-server-c2-conf.json c2 $rnode
