@@ -38,5 +38,5 @@ for r in ${resources[@]}; do
     pcs resource delete $r || true
 done
 
-umount -l /var/mero2 || true
-umount -l /var/mero1 || true
+umount --lazy /var/mero2 || true
+umount --lazy /var/mero1 || true
