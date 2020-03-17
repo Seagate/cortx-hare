@@ -160,28 +160,35 @@ sudo pcs -f lcfg resource group add c1 ip-c1 lnet-c1
 sudo pcs -f lcfg resource group add c2 ip-c2 lnet-c2
 sudo pcs cluster cib-push lcfg --config
 
-echo 'Preparing Hare configuration files...'
-
 sleep 5 # Allow Pacemaker to configure the IPs
 
 # Check the IPs
+check_net_msg() {
+    cat >&2 <<.
+Check the following:
+ 1) Make sure the netmask of the main IP on $iface interface is <= 24 bits.
+ 2) Run 'pcs status' and make sure LNet is configured.
+ 3) STONITH is configured or disabled in Pacemaker.
+.
+}
+
 ip a | grep -q $ip1 || {
     cat >&2 <<.
-ERROR: the IP address on the $lnode failed to be configured.
-Check the networking configuration, make sure the netmask of
-the main IP on $iface interface is <= 24 bits.
+ERROR: the IP address ($ip1) on the $lnode failed to be configured.
 .
+    check_net_msg
     exit 1;
 }
 
 ssh $rnode "ip a | grep -q $ip2" || {
     cat >&2 <<.
-ERROR: the IP address on the $rnode failed to be configured.
-Check the networking configuration, make sure the netmask of
-the main IP on $iface interface is <= 24 bits.
+ERROR: the IP address ($ip2) on the $rnode failed to be configured.
 .
+    check_net_msg
     exit 1;
 }
+
+echo 'Preparing Hare configuration files...'
 
 mkfs_ext4() {
     local dev=$1
