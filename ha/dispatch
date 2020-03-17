@@ -1,0 +1,90 @@
+#!/usr/bin/env bash
+set -eu -o pipefail
+export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
+# set -x
+
+### OCF resource agent.
+###
+### See the OCF Resource Agent Developer's Guide
+### https://github.com/ClusterLabs/resource-agents/blob/master/doc/dev-guides/ra-dev-guide.asc
+
+[[ -n ${OCF_ROOT:-} ]] || OCF_ROOT=/usr/lib/ocf
+set +eu
+. $OCF_ROOT/lib/heartbeat/ocf-shellfuncs
+set -eu
+
+metadata() {
+    cat <<'EOF'
+<?xml version="1.0"?>
+<!DOCTYPE resource-agent SYSTEM "ra-api-1.dtd">
+<resource-agent name="ha-check">
+  <version>0.1</version>
+  <longdesc lang="en">EES HA resource agent.</longdesc>
+  <shortdesc lang="en">EES HA resource agent.</shortdesc>
+  <parameters>
+    <parameter name="check" unique="0" required="1">
+      <shortdesc lang="en">Check ID</shortdesc>
+      <longdesc lang="en">Check identifier</longdesc>
+      <content type="string" />
+    </parameter>
+  </parameters>
+  <actions>
+    <action name="start" timeout="20" />
+    <action name="stop" timeout="20" />
+    <action name="monitor" timeout="20" interval="10" depth="0" />
+    <action name="meta-data" timeout="5" />
+  </actions>
+</resource-agent>
+EOF
+}
+
+usage() {
+    cat <<END
+Usage: $0 {start|stop|monitor|meta-data|help}
+
+Expects a fully populated OCF RA-compliant set of environment variables.
+END
+}
+
+start() {
+    if ! monitor; then
+        $OCF_RESKEY_check start
+    fi
+}
+
+stop() {
+    if monitor; then
+        $OCF_RESKEY_check stop
+    fi
+}
+
+monitor() {
+    $OCF_RESKEY_check monitor
+}
+
+case $OCF_RESKEY_check in
+    foo|bar|baz)  # supported checks
+        ;;
+    *)
+        ocf_log err "Unsupported check id: $OCF_RESKEY_check"
+        exit $OCF_ERR_ARGS
+        ;;
+esac
+
+PATH="$(dirname $(readlink -f $0))/checks:$PATH"
+
+case $__OCF_ACTION in
+    start|stop|monitor)
+        $__OCF_ACTION
+        ;;
+    meta-data)
+        metadata
+        ;;
+    help|usage)
+        usage
+        ;;
+    *)
+        usage >&2
+        exit $OCF_ERR_UNIMPLEMENTED
+        ;;
+esac

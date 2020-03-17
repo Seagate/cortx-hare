@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+set -eu -o pipefail
+export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
+# set -x
+
+[[ -n ${OCF_ROOT:-} ]] || OCF_ROOT=/usr/lib/ocf
+set +eu
+. $OCF_ROOT/lib/heartbeat/ocf-shellfuncs
+set -eu
+
+run_dir=/run/eos
+state=$run_dir/check-${0##*/}.state
+
+start() {
+    sudo mkdir --parents $run_dir
+    touch $state
+}
+
+stop() {
+    rm $state
+    sudo rmdir --parents --ignore-fail-on-non-empty $run_dir
+}
+
+monitor() {
+    [[ -e $state ]] || return $OCF_NOT_RUNNING
+}
+
+case ${1:-} in
+    start|stop|monitor)
+        $1
+        ;;
+    *)
+        echo 'Invalid argument' >&2
+        exit $OCF_ERR_GENERIC
+        ;;
+esac
