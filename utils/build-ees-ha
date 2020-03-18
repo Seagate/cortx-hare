@@ -120,6 +120,16 @@ fi
     exit 1
 }
 
+[[ -b $lvolume ]] || {
+    echo "ERROR: meta-data volume $lvolume is not available" >&2
+    exit 1
+}
+
+[[ -b $rvolume ]] || {
+    echo "ERROR: meta-data volume $rvolume is not available" >&2
+    exit 1
+}
+
 echo 'Adding the roaming IP addresses into Pacemaker...'
 sudo pcs cluster cib icfg
 sudo pcs -f icfg resource create ip-c1 ocf:heartbeat:IPaddr2 \
