@@ -406,10 +406,10 @@ sudo pcs -f mcfg constraint order consul-c1 then hax-c2
 sudo pcs cluster cib-push mcfg --config
 
 echo 'Adding Mero to Pacemaker...'
-cmd='
-sudo sed "s/TimeoutStopSec=.*/TimeoutStopSec=15sec/"
-         -i /usr/lib/systemd/system/m0d@.service &&
-sudo systemctl daemon-reload'
+
+cmd='sudo sed "s/TimeoutStopSec=.*/TimeoutStopSec=15sec/"
+              -i /usr/lib/systemd/system/m0d@.service &&
+     sudo systemctl daemon-reload'
 run_on_both $cmd
 
 get_fid() {
@@ -497,6 +497,11 @@ s3_resource_add() {
    done
    pcs cluster cib-push s3cfg --config
 }
+
+cmd='sudo sed "s/TimeoutStopSec=.*/TimeoutStopSec=15sec/"
+              -i /usr/lib/systemd/system/s3server@.service &&
+     sudo systemctl daemon-reload'
+run_on_both $cmd
 
 s3_resource_add consul-server-c1-conf.json c1 $lnode $rnode
 s3_resource_add consul-server-c2-conf.json c2 $rnode $lnode
