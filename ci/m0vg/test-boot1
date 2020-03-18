@@ -23,10 +23,12 @@ test_cluster() {
 
     time hctl bootstrap --mkfs $cdf
     do_io
+    hctl reportbug
     _time hctl shutdown
 
     time hctl bootstrap --conf-dir /var/lib/hare  # bootstrap on existing conf
     do_io
+    hctl reportbug bundle-id /tmp
     _time hctl shutdown
 }
 

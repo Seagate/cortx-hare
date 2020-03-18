@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+set -eu -o pipefail
+export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
+# set -x
+
+# :help: generate archive with Hare forensics data (logs and configuration)
+
+PROG=${0##*/}
+DEFAULT_DEST_DIR=/tmp
+
+usage() {
+    cat <<EOF
+Usage: $PROG <bundle-id> <dest-dir>
+       $PROG [-h | --help]
+
+Collect Hare forensics data (logs and configuration) and pack it into
+'<dest-dir>/hare_<bundle-id>.tar.gz' archive.
+
+Positional arguments:
+  dest-dir    Target directory; defaults to '$DEFAULT_DEST_DIR'.
+  bundle-id   Support bundle ID; defaults to the local host name
+              (`hostname`).
+
+Options:
+  -h, --help   Show this help and exit.
+EOF
+}
+
+die() {
+    echo "$PROG: $*" >&2
+    exit 1
+}
+
+case "${1:-}" in
+    -h|--help) usage; exit;;
+esac
+
+if (($? != 0 && $? != 2)); then
+    die "Wrong number of arguments. Type '$PROG --help' for usage."
+fi
+
+bundle_id=${1:-$HOSTNAME}
+dest_dir=${2:-$DEFAULT_DEST_DIR}
+
+if [[ -z $bundle_id || -z $dest_dir ]]; then
+    die "Invalid argument. Type '$PROG --help' for usage."
+fi
+
+if [[ -a $dest_dir && ! -d $dest_dir ]]; then
+    die "$dest_dir is not a directory"
+fi
+dest_dir=$(readlink -f "$dest_dir")
+
+mkdir -p "$dest_dir/hare/$HOSTNAME"
+cd "$dest_dir/hare/$HOSTNAME"
+
+exec 2> >(tee "$dest_dir/hare/$HOSTNAME/reportbug.stderr" >&2)
+
+sudo journalctl --no-pager --full --utc --boot --output short-precise \
+     > syslog.txt || true
+
+sudo systemctl --all --full --no-pager status {hare,m0,mero,s3}\* \
+     > systemctl-status.txt || true
+
+[[ -f /opt/seagate/eos-prvsnr/pillar/components/cluster.sls ]] && \
+    cp /opt/seagate/eos-prvsnr/pillar/components/cluster.sls .
+[[ -f /var/lib/hare/cluster.yaml ]] && \
+    cp --parents /var/lib/hare/cluster.yaml .
+
+cp --parents /var/lib/hare/*.{yaml,json} . || true
+cp -r --parents /var/log/hare/ . || true
+
+cd ..
+tar --remove-files -czf "hare_${bundle_id}.tar.gz" $HOSTNAME
