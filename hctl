@@ -80,7 +80,7 @@ done
 # process commands
 case $cmd in
     help)  _help stdout ;;
-    bootstrap|shutdown|status)
+    bootstrap|shutdown|status|reportbug)
         if [[ -d $M0_SRC_DIR/utils ]]; then
             PATH="$M0_SRC_DIR/utils:$PATH"
         fi
