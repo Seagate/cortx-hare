@@ -14,3 +14,6 @@ hare:
   reset:
     script: null
     args: null
+
+support_bundle:
+    - /opt/seagate/eos/hare/bin/hctl reportbug
