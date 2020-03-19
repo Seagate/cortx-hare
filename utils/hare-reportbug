@@ -3,7 +3,7 @@ set -eu -o pipefail
 export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
 # set -x
 
-# :help: generate archive with Hare forensics data (logs and configuration)
+# :help: gather Hare forensic data
 
 PROG=${0##*/}
 DEFAULT_DEST_DIR=/tmp
@@ -13,8 +13,9 @@ usage() {
 Usage: $PROG <bundle-id> <dest-dir>
        $PROG [-h | --help]
 
-Collect Hare forensics data (logs and configuration) and pack it into
-'<dest-dir>/hare_<bundle-id>.tar.gz' archive.
+Create '<dest-dir>/hare/hare_<bundle-id>.tar.gz' archive with Hare
+forensic data --- logs and configuration files, which can be used for
+reporting and researching Hare bugs.
 
 Positional arguments:
   dest-dir    Target directory; defaults to '$DEFAULT_DEST_DIR'.
@@ -49,12 +50,13 @@ fi
 if [[ -a $dest_dir && ! -d $dest_dir ]]; then
     die "$dest_dir is not a directory"
 fi
-dest_dir=$(readlink -f "$dest_dir")
 
+# XXX The intermediate `hare` directory is required by the
+# CSM Support Bundle spec-ification.
 mkdir -p "$dest_dir/hare/$HOSTNAME"
 cd "$dest_dir/hare/$HOSTNAME"
 
-exec 2> >(tee "$dest_dir/hare/$HOSTNAME/reportbug.stderr" >&2)
+exec 2> >(tee _reportbug.stderr >&2)
 
 sudo journalctl --no-pager --full --utc --boot --output short-precise \
      > syslog.txt || true
@@ -62,13 +64,11 @@ sudo journalctl --no-pager --full --utc --boot --output short-precise \
 sudo systemctl --all --full --no-pager status {hare,m0,mero,s3}\* \
      > systemctl-status.txt || true
 
-[[ -f /opt/seagate/eos-prvsnr/pillar/components/cluster.sls ]] && \
+[[ -f /opt/seagate/eos-prvsnr/pillar/components/cluster.sls ]] &&
     cp /opt/seagate/eos-prvsnr/pillar/components/cluster.sls .
-[[ -f /var/lib/hare/cluster.yaml ]] && \
-    cp --parents /var/lib/hare/cluster.yaml .
 
-cp --parents /var/lib/hare/*.{yaml,json} . || true
-cp -r --parents /var/log/hare/ . || true
+cp --parents /var/lib/hare/*.{yaml,json} . 2>/dev/null || true
+cp -r --parents /var/log/hare/ . 2>/dev/null || true
 
 cd ..
 tar --remove-files -czf "hare_${bundle_id}.tar.gz" $HOSTNAME
