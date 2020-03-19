@@ -120,15 +120,13 @@ fi
     exit 1
 }
 
-[[ -b $lvolume ]] || {
-    echo "ERROR: meta-data volume $lvolume is not available" >&2
+die() {
+    echo "$PROG: ERROR: $*" >&2
     exit 1
 }
 
-[[ -b $rvolume ]] || {
-    echo "ERROR: meta-data volume $rvolume is not available" >&2
-    exit 1
-}
+[[ -b $lvolume ]] || die "meta-data volume $lvolume is not available"
+[[ -b $rvolume ]] || die "meta-data volume $rvolume is not available"
 
 echo 'Adding the roaming IP addresses into Pacemaker...'
 sudo pcs cluster cib icfg
@@ -173,30 +171,17 @@ sudo pcs cluster cib-push lcfg --config
 sleep 5 # Allow Pacemaker to configure the IPs
 
 # Check the IPs
-check_net_msg() {
-    cat >&2 <<.
+check_msg="
 Check the following:
  1) Make sure the netmask of the main IP on $iface interface is <= 24 bits.
  2) Run 'pcs status' and make sure LNet is configured.
- 3) STONITH is configured or disabled in Pacemaker.
-.
-}
+ 3) STONITH is configured or disabled in Pacemaker."
 
-ip a | grep -q $ip1 || {
-    cat >&2 <<.
-ERROR: the IP address ($ip1) on the $lnode failed to be configured.
-.
-    check_net_msg
-    exit 1;
-}
+ip a | grep -q $ip1 ||
+  die "the IP address ($ip1) on the $lnode failed to be configured. $check_msg"
 
-ssh $rnode "ip a | grep -q $ip2" || {
-    cat >&2 <<.
-ERROR: the IP address ($ip2) on the $rnode failed to be configured.
-.
-    check_net_msg
-    exit 1;
-}
+ssh $rnode "ip a | grep -q $ip2" ||
+  die "the IP address ($ip2) on the $rnode failed to be configured. $check_msg"
 
 echo 'Preparing Hare configuration files...'
 
