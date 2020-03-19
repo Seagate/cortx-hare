@@ -85,7 +85,7 @@ def process_status(cns: Consul, host: str, proc: Process) -> str:
 
 
 def consul_status(host: str) -> str:
-    cmd = '{}sudo systemctl is-active --quiet hare-consul-agent'.format(
+    cmd = '{}sudo systemctl is-active --quiet hare-consul-agent*'.format(
         '' if is_localhost(host) else f'ssh {host} ')
     return 'passing' if os.system(cmd) == 0 else 'offline'
 
