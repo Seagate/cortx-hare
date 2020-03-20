@@ -1,0 +1,98 @@
+#!/bin/bash
+set -eu -o pipefail
+export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
+# set -x
+
+PROG=${0##*/}
+
+usage() {
+    cat <<EOF
+Usage: $PROG [OPTS] [<params.yaml>]
+
+Configures SSPL HA by preparing and adding resources into the Pacemaker.
+
+Caveats:
+
+* The script expects Pacemaker to be started and have consul and rabbitmq configured.
+  Check with 'pcs status'.
+
+* Passwordless SSH access between the nodes is required.
+
+* The script should be executed from the "left" node.
+
+* Consul should be started on all cluster nodes.
+
+* Rabbitmq should be started on all cluster nodes.
+
+
+Mandatory parameters:
+  --left-node     <n1>  Left node hostname (default: pod-c1)
+  --right-node    <n2>  Right node hostname (default: pod-c2)
+
+Note: parameters can be specified either directly via command line options
+or via YAML file, e.g.:
+  left-node: <lnode>
+  right-node: <rnode>
+EOF
+}
+
+TEMP=$(getopt --options h: \
+              --longoptions help,left-node:,right-node: \
+              --name "$PROG" -- "$@" || true)
+
+(($? == 0)) || { usage >&2; exit 1; }
+
+eval set -- "$TEMP"
+
+lnode=pod-c1
+rnode=pod-c2
+
+while true; do
+    case "$1" in
+        -h|--help)           usage; exit ;;
+        --left-node)         lnode=$2; shift 2 ;;
+        --right-node)        rnode=$2; shift 2 ;;
+        --)                  shift; break ;;
+        *)                   break ;;
+    esac
+done
+
+argsfile=${1:-}
+
+if [[ -f $argsfile ]]; then
+    while IFS=': ' read name value; do
+       case $name in
+           left-node)    lnode=$value   ;;
+           right-node)   rnode=$value   ;;
+       esac
+    done < $argsfile
+fi
+
+[[ $lnode ]] && [[ $rnode ]] || {
+    usage >&2
+    exit 1
+}
+
+die() {
+    echo "[$HOSTNAME] $PROG: $*" >&2
+    exit 1
+}
+
+systemctl is-active --quiet hare-consul-agent-c1 ||
+    die 'No active Consul instance found'
+ssh $rnode "systemctl is-active --quiet hare-consul-agent-c2" ||
+    die 'No active Consul instance found'
+
+systemctl is-active --quiet rabbitmq-server ||
+    die 'No active rabbitmq instance found'
+ssh $rnode "systemctl is-active --quiet rabbitmq-server" ||
+    die 'No active rabbitmq instance found'
+
+echo 'Adding sspl resource and constraints...'
+
+pcs cluster cib ssplcfg
+pcs -f ssplcfg resource create sspl ocf:seagate:sspl_stateful_resource_agent master \
+    meta migration-threshold=10s failure-timeout=10s is-managed=true
+pcs -f ssplcfg constraint order --force consul-c1 then sspl
+pcs -f ssplcfg constraint order --force consul-c2 then sspl
+pcs cluster cib-push ssplcfg --config
