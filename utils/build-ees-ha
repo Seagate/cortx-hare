@@ -402,7 +402,7 @@ sudo pcs cluster cib-push mcfg --config
 
 echo 'Adding Mero to Pacemaker...'
 
-cmd='sudo sed "s/TimeoutStopSec=.*/TimeoutStopSec=15sec/"
+cmd='sudo sed "s/TimeoutStopSec=.*/TimeoutStopSec=5sec/"
               -i /usr/lib/systemd/system/m0d@.service &&
      sudo systemctl daemon-reload'
 run_on_both $cmd
@@ -493,7 +493,7 @@ s3_resource_add() {
    pcs cluster cib-push s3cfg --config
 }
 
-cmd='sudo sed "s/TimeoutStopSec=.*/TimeoutStopSec=15sec/"
+cmd='sudo sed "s/TimeoutStopSec=.*/TimeoutStopSec=5sec/"
               -i /usr/lib/systemd/system/s3server@.service &&
      sudo systemctl daemon-reload'
 run_on_both $cmd
