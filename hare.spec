@@ -14,7 +14,7 @@
 Summary: Hare (Halon replacement)
 Name: eos-hare
 Version: %{h_version}
-Release: %{h_build_num}_%{h_gitrev}_m0%{h_mero_gitrev}%{?dist}
+Release: %{h_build_num}_%{h_gitrev}%{?dist}
 License: Seagate
 Group: System Environment/Daemons
 Source: %{name}-%{h_version}.tar.gz
