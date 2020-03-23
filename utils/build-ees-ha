@@ -280,7 +280,7 @@ consul_c1_cfg_dir=$hare_dir/consul-$ip1
 
 sudo sed \
  -e "/ExecStart=/iExecStartPre=/bin/rm -rf $consul_c2_cfg_dir" \
- -e "/ExecStart=/iExecStartPre=/opt/seagate/eos/hare/bin/consul force-leave $rnode" \
+ -e "/ExecStart=/iExecStartPre=-/opt/seagate/eos/hare/bin/consul force-leave $rnode" \
  -e "/ExecStartPost=/aExecStartPost=$(cmd_deregister_node $rnode)" \
  -i /usr/lib/systemd/system/hare-consul-agent-c2.service
 sudo systemctl daemon-reload
@@ -288,7 +288,7 @@ sudo systemctl daemon-reload
 cmd="
 sudo sed
  -e '/ExecStart=/iExecStartPre=/bin/rm -rf $consul_c1_cfg_dir'
- -e '/ExecStart=/iExecStartPre=/opt/seagate/eos/hare/bin/consul force-leave $lnode'
+ -e '/ExecStart=/iExecStartPre=-/opt/seagate/eos/hare/bin/consul force-leave $lnode'
  -e \"/ExecStartPost=/aExecStartPost=$(cmd_deregister_node $lnode)\"
  -i /usr/lib/systemd/system/hare-consul-agent-c1.service &&
 sudo systemctl daemon-reload"
