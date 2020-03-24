@@ -13,7 +13,6 @@ from typing import NamedTuple
 
 __all__ = ['main']
 
-
 HL_Fids = NamedTuple('HL_Fids', [('hax_ep', str), ('hax_fid', Fid),
                                  ('ha_fid', Fid), ('rm_fid', Fid)])
 
@@ -36,11 +35,7 @@ def _get_halink_fids(util: ConsulUtil) -> HL_Fids:
     hax_fid: Fid = util.get_hax_fid()
     ha_fid: Fid = util.get_ha_fid()
     rm_fid: Fid = util.get_rm_fid()
-    return HL_Fids(
-            hax_ep,
-            hax_fid,
-            ha_fid,
-            rm_fid)
+    return HL_Fids(hax_ep, hax_fid, ha_fid, rm_fid)
 
 
 def main():
