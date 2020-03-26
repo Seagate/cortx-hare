@@ -2,7 +2,14 @@ from typing import List, NamedTuple
 from abc import ABC, abstractmethod
 
 Node = NamedTuple('Node', [('name', str), ('online', bool), ('shutdown', bool),
-                           ('standby', bool)])
+                           ('standby', bool), ('unclean', bool)])
+
+Resource = NamedTuple('Resource', [('id', str), ('resource_agent', str),
+                                   ('role', str), ('target_role', str),
+                                   ('active', bool), ('orphaned', bool),
+                                   ('blocked', bool), ('managed', bool),
+                                   ('failed', bool), ('failure_ignored', bool),
+                                   ('nodes_running_on', int)])
 
 
 class PcsConnector(ABC):
@@ -32,4 +39,20 @@ class PcsConnector(ABC):
 
     @abstractmethod
     def shutdown_node(self, node_name: str) -> None:
+        pass
+
+    @abstractmethod
+    def get_resources(self) -> List[Resource]:
+        pass
+
+    @abstractmethod
+    def get_stonith_resources(self) -> List[Resource]:
+        pass
+
+    @abstractmethod
+    def disable_resource(self, resource: Resource) -> None:
+        pass
+
+    @abstractmethod
+    def enable_resource(self, resource: Resource) -> None:
         pass

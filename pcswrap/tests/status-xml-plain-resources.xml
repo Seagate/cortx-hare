@@ -1,0 +1,67 @@
+<?xml version="1.0"?>
+<crm_mon version="1.1.20">
+    <summary>
+        <stack type="corosync" />
+        <current_dc present="true" version="1.1.20-5.el7_7.2-3c4c782f70" name="ssc-vm-c-259.colo.seagate.com" id="1" with_quorum="true" />
+        <last_update time="Thu Mar 26 06:05:30 2020" />
+        <last_change time="Thu Mar 26 05:58:43 2020" user="root" client="cibadmin" origin="ssc-vm-c-260.colo.seagate.com" />
+        <nodes_configured number="2" expected_votes="unknown" />
+        <resources_configured number="3" disabled="2" blocked="0" />
+        <cluster_options stonith-enabled="true" symmetric-cluster="true" no-quorum-policy="ignore" maintenance-mode="false" />
+    </summary>
+    <nodes>
+        <node name="ssc-vm-c-259.colo.seagate.com" id="1" online="true" standby="false" standby_onfail="false" maintenance="false" pending="false" unclean="false" shutdown="false" expected_up="true" is_dc="true" resources_running="0" type="member" />
+        <node name="ssc-vm-c-260.colo.seagate.com" id="2" online="true" standby="true" standby_onfail="false" maintenance="false" pending="false" unclean="true" shutdown="false" expected_up="true" is_dc="false" resources_running="1" type="member" />
+    </nodes>
+    <resources>
+        <resource id="c-259.stonith" resource_agent="stonith:fence_dummy" role="Stopped" target_role="Stopped" active="false" orphaned="false" blocked="false" managed="true" failed="false" failure_ignored="false" nodes_running_on="0" />
+        <resource id="c-260.stonith" resource_agent="stonith:fence_dummy" role="Stopped" target_role="Stopped" active="false" orphaned="false" blocked="false" managed="true" failed="false" failure_ignored="false" nodes_running_on="0" />
+        <resource id="MyResource" resource_agent="ocf::heartbeat:anything" role="Started" active="true" orphaned="false" blocked="false" managed="true" failed="true" failure_ignored="false" nodes_running_on="1" >
+            <node name="ssc-vm-c-260.colo.seagate.com" id="2" cached="false"/>
+        </resource>
+    </resources>
+    <node_attributes>
+        <node name="ssc-vm-c-259.colo.seagate.com">
+        </node>
+        <node name="ssc-vm-c-260.colo.seagate.com">
+        </node>
+    </node_attributes>
+    <node_history>
+        <node name="ssc-vm-c-260.colo.seagate.com">
+            <resource_history id="c-259.stonith" orphan="false" migration-threshold="1000000">
+                <operation_history call="15" task="monitor" interval="10000ms" last-rc-change="Wed Mar 25 09:07:05 2020" exec-time="56ms" queue-time="0ms" rc="0" rc_text="ok" />
+                <operation_history call="120" task="stop" last-rc-change="Thu Mar 26 05:51:41 2020" last-run="Thu Mar 26 05:51:41 2020" exec-time="0ms" queue-time="0ms" rc="0" rc_text="ok" />
+            </resource_history>
+            <resource_history id="MyResource" orphan="false" migration-threshold="1000000" fail-count="1000000" last-failure="Thu Mar 26 05:59:03 2020">
+                <operation_history call="118" task="monitor" interval="10000ms" last-rc-change="Thu Mar 26 05:10:51 2020" exec-time="13ms" queue-time="0ms" rc="0" rc_text="ok" />
+                <operation_history call="122" task="stop" last-rc-change="Thu Mar 26 05:58:43 2020" last-run="Thu Mar 26 05:58:43 2020" exec-time="20004ms" queue-time="0ms" rc="1" rc_text="unknown error" />
+                <operation_history call="122" task="stop" last-rc-change="Thu Mar 26 05:58:43 2020" last-run="Thu Mar 26 05:58:43 2020" exec-time="20004ms" queue-time="0ms" rc="1" rc_text="unknown error" />
+            </resource_history>
+        </node>
+        <node name="ssc-vm-c-259.colo.seagate.com">
+            <resource_history id="c-260.stonith" orphan="false" migration-threshold="1000000">
+                <operation_history call="15" task="monitor" interval="10000ms" last-rc-change="Wed Mar 25 09:06:36 2020" exec-time="53ms" queue-time="0ms" rc="0" rc_text="ok" />
+                <operation_history call="22" task="stop" last-rc-change="Thu Mar 26 05:51:47 2020" last-run="Thu Mar 26 05:51:47 2020" exec-time="1ms" queue-time="0ms" rc="0" rc_text="ok" />
+            </resource_history>
+            <resource_history id="MyResource" orphan="false" migration-threshold="1000000">
+                <operation_history call="13" task="probe" last-rc-change="Wed Mar 25 09:06:36 2020" last-run="Wed Mar 25 09:06:36 2020" exec-time="17ms" queue-time="0ms" rc="1" rc_text="unknown error" />
+                <operation_history call="18" task="monitor" interval="10000ms" last-rc-change="Wed Mar 25 09:06:36 2020" exec-time="13ms" queue-time="0ms" rc="0" rc_text="ok" />
+                <operation_history call="20" task="stop" last-rc-change="Wed Mar 25 09:07:05 2020" last-run="Wed Mar 25 09:07:05 2020" exec-time="19ms" queue-time="0ms" rc="0" rc_text="ok" />
+            </resource_history>
+        </node>
+    </node_history>
+    <failures>
+        <failure op_key="MyResource_stop_0" node="ssc-vm-c-260.colo.seagate.com" exitstatus="unknown error" exitreason="" exitcode="1" call="122" status="Timed Out" last-rc-change="Thu Mar 26 05:58:43 2020" queued="0" exec="20004" interval="0" task="stop" />
+        <failure op_key="MyResource_monitor_0" node="ssc-vm-c-259.colo.seagate.com" exitstatus="unknown error" exitreason="" exitcode="1" call="13" status="complete" last-rc-change="Wed Mar 25 09:06:36 2020" queued="0" exec="17" interval="0" task="monitor" />
+    </failures>
+    <fence_history>
+        <fence_event target="ssc-vm-c-260.colo.seagate.com" action="reboot" state="failed" origin="ssc-vm-c-259.colo.seagate.com" client="crmd.16818" completed="Thu Mar 26 05:59:04 2020" />
+        <fence_event target="ssc-vm-c-260.colo.seagate.com" action="reboot" state="success" origin="ssc-vm-c-260.colo.seagate.com" client="crmd.18402" delegate="ssc-vm-c-259.colo.seagate.com" completed="Wed Mar 25 09:06:35 2020" />
+    </fence_history>
+    <tickets>
+    </tickets>
+    <bans>
+        <ban id="location-c-259.stonith-ssc-vm-c-259.colo.seagate.com--INFINITY" resource="c-259.stonith" node="ssc-vm-c-259.colo.seagate.com" weight="-1000000" master_only="false" />
+        <ban id="location-c-260.stonith-ssc-vm-c-260.colo.seagate.com--INFINITY" resource="c-260.stonith" node="ssc-vm-c-260.colo.seagate.com" weight="-1000000" master_only="false" />
+    </bans>
+</crm_mon>

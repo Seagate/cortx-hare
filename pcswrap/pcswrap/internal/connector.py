@@ -1,3 +1,4 @@
+import logging
 import re
 from subprocess import PIPE, Popen
 from typing import Any, List
@@ -5,7 +6,11 @@ from typing import Any, List
 import defusedxml.ElementTree as ET
 
 from pcswrap.exception import CliException, PcsNoStatusException
-from pcswrap.types import Node, PcsConnector
+from pcswrap.types import Resource, Node, PcsConnector
+
+
+def _to_bool(value: str) -> bool:
+    return 'true' == value
 
 
 class CliExecutor:
@@ -30,15 +35,22 @@ class CliExecutor:
     def shutdown_node(self, node_name: str) -> None:
         self._execute(['pcs', 'stonith', 'fence', node_name, '--off'])
 
+    def set_enabled(self, resource_name: str, enabled: bool) -> None:
+        command = 'enable'
+        if not enabled:
+            command = 'disable'
+        self._execute(['pcs', 'resource', command, resource_name])
+
     def _execute(self, cmd: List[str]) -> str:
         process = Popen(cmd,
                         stdin=PIPE,
                         stdout=PIPE,
                         stderr=PIPE,
                         encoding='utf8')
-
+        logging.debug('Issuing CLI command: %s', cmd)
         out, err = process.communicate()
         exit_code = process.returncode
+        logging.debug('Finished. Exit code: %d', exit_code)
         if exit_code:
             raise CliException(out, err, exit_code)
         return out
@@ -49,11 +61,14 @@ class CliConnector(PcsConnector):
         self.executor: CliExecutor = executor or CliExecutor()
 
     def get_nodes(self) -> List[Node]:
+        b = _to_bool
+
         def to_node(tag) -> Node:
             return Node(name=tag.attrib['name'],
-                        online='true' == tag.attrib['online'],
-                        shutdown='true' == tag.attrib['shutdown'],
-                        standby='true' == tag.attrib['standby'])
+                        online=b(tag.attrib['online']),
+                        shutdown=b(tag.attrib['shutdown']),
+                        unclean=b(tag.attrib['unclean']),
+                        standby=b(tag.attrib['standby']))
 
         xml_str = self.executor.get_full_status_xml()
         xml = self._parse_xml(xml_str)
@@ -94,3 +109,43 @@ class CliConnector(PcsConnector):
 
     def shutdown_node(self, node_name: str) -> None:
         self.executor.shutdown_node(node_name)
+
+    def get_resources(self) -> List[Resource]:
+        return self._get_all_resources()
+
+    def get_stonith_resources(self) -> List[Resource]:
+        def is_stonith(rsr: Resource) -> bool:
+            match = re.match(r'^stonith:', rsr.resource_agent)
+            return match is not None
+
+        return [x for x in self._get_all_resources() if is_stonith(x)]
+
+    def disable_resource(self, resource: Resource) -> None:
+        self.executor.set_enabled(resource.id, False)
+
+    def enable_resource(self, resource: Resource) -> None:
+        self.executor.set_enabled(resource.id, True)
+
+    def _get_all_resources(self) -> List[Resource]:
+        xml_str = self.executor.get_full_status_xml()
+        xml = self._parse_xml(xml_str)
+
+        def to_resource(tag):
+            b = _to_bool
+            return Resource(id=tag.attrib['id'],
+                            resource_agent=tag.attrib['resource_agent'],
+                            role=tag.get('role'),
+                            target_role=tag.get('target_role'),
+                            active=b(tag.attrib['active']),
+                            orphaned=b(tag.attrib['orphaned']),
+                            blocked=b(tag.attrib['blocked']),
+                            managed=b(tag.attrib['managed']),
+                            failed=b(tag.attrib['failed']),
+                            failure_ignored=b(tag.attrib['failure_ignored']),
+                            nodes_running_on=int(
+                                tag.attrib['nodes_running_on']))
+
+        result: List[Resource] = [
+            to_resource(tag) for tag in xml.findall('./resources//resource')
+        ]
+        return result

@@ -1,99 +1,25 @@
 # flake8: noqa
-import unittest
 import sys
 sys.path.insert(0, '..')
-from pcswrap.internal.connector import CliExecutor, CliConnector
-from pcswrap.exception import PcsNoStatusException
-from pcswrap.client import Client
 from unittest.mock import Mock, MagicMock
+from pcswrap.client import Client
+from pcswrap.exception import PcsNoStatusException
+from pcswrap.internal.connector import CliExecutor, CliConnector
+import unittest
+import os
 
-GOOD_XML = '''<?xml version="1.0"?>
-<crm_mon version="1.1.20">
-    <summary>
-        <stack type="corosync" />
-        <current_dc present="true" version="1.1.20-5.el7_7.1-3c4c782f70" name="smc8-m11" id="2" with_quorum="true" />
-        <last_update time="Wed Feb 26 14:07:26 2020" />
-        <last_change time="Tue Feb 25 20:08:36 2020" user="root" client="cibadmin" origin="smc7-m11" />
-        <nodes_configured number="2" expected_votes="unknown" />
-        <resources_configured number="6" disabled="0" blocked="0" />
-        <cluster_options stonith-enabled="false" symmetric-cluster="true" no-quorum-policy="ignore" maintenance-mode="false" />
-    </summary>
-    <nodes>
-        <node name="smc7-m11" id="1" online="true" standby="false" standby_onfail="false" maintenance="false" pending="false" unclean="false" shutdown="false" expected_up="true" is_dc="false" resources_running="3" type="member" />
-        <node name="smc8-m11" id="2" online="false" standby="false" standby_onfail="false" maintenance="false" pending="false" unclean="false" shutdown="false" expected_up="true" is_dc="true" resources_running="3" type="member" />
-    </nodes>
-    <resources>
-        <clone id="lnet-clone" multi_state="false" unique="false" managed="true" failed="false" failure_ignored="false" >
-            <resource id="lnet" resource_agent="systemd:lnet" role="Started" active="true" orphaned="false" blocked="false" managed="true" failed="false" failure_ignored="false" nodes_running_on="1" >
-                <node name="smc8-m11" id="2" cached="false"/>
-            </resource>
-            <resource id="lnet" resource_agent="systemd:lnet" role="Started" active="true" orphaned="false" blocked="false" managed="true" failed="false" failure_ignored="false" nodes_running_on="1" >
-                <node name="smc7-m11" id="1" cached="false"/>
-            </resource>
-        </clone>
-        <group id="c1" number_resources="2" >
-             <resource id="ip-c1" resource_agent="ocf::heartbeat:IPaddr2" role="Started" active="true" orphaned="false" blocked="false" managed="true" failed="false" failure_ignored="false" nodes_running_on="1" >
-                 <node name="smc7-m11" id="1" cached="false"/>
-             </resource>
-             <resource id="lnet-c1" resource_agent="ocf::seagate:lnet" role="Started" active="true" orphaned="false" blocked="false" managed="true" failed="false" failure_ignored="false" nodes_running_on="1" >
-                 <node name="smc7-m11" id="1" cached="false"/>
-             </resource>
-        </group>
-        <group id="c2" number_resources="2" >
-             <resource id="ip-c2" resource_agent="ocf::heartbeat:IPaddr2" role="Started" active="true" orphaned="false" blocked="false" managed="true" failed="false" failure_ignored="false" nodes_running_on="1" >
-                 <node name="smc8-m11" id="2" cached="false"/>
-             </resource>
-             <resource id="lnet-c2" resource_agent="ocf::seagate:lnet" role="Started" active="true" orphaned="false" blocked="false" managed="true" failed="false" failure_ignored="false" nodes_running_on="1" >
-                 <node name="smc8-m11" id="2" cached="false"/>
-             </resource>
-        </group>
-    </resources>
-    <node_attributes>
-        <node name="smc7-m11">
-        </node>
-        <node name="smc8-m11">
-        </node>
-    </node_attributes>
-    <node_history>
-        <node name="smc8-m11">
-            <resource_history id="ip-c2" orphan="false" migration-threshold="1000000">
-                <operation_history call="29" task="start" last-rc-change="Tue Feb 25 19:55:33 2020" last-run="Tue Feb 25 19:55:33 2020" exec-time="107ms" queue-time="0ms" rc="0" rc_text="ok" />
-                <operation_history call="30" task="monitor" interval="30000ms" last-rc-change="Tue Feb 25 19:55:33 2020" exec-time="63ms" queue-time="0ms" rc="0" rc_text="ok" />
-            </resource_history>
-            <resource_history id="lnet" orphan="false" migration-threshold="1000000">
-                <operation_history call="15" task="probe" last-rc-change="Tue Feb 25 19:55:27 2020" last-run="Tue Feb 25 19:55:27 2020" exec-time="4ms" queue-time="0ms" rc="0" rc_text="ok" />
-                <operation_history call="25" task="start" last-rc-change="Tue Feb 25 19:55:31 2020" last-run="Tue Feb 25 19:55:31 2020" exec-time="2117ms" queue-time="0ms" rc="0" rc_text="ok" />
-                <operation_history call="28" task="monitor" interval="60000ms" last-rc-change="Tue Feb 25 19:55:33 2020" exec-time="1ms" queue-time="0ms" rc="0" rc_text="ok" />
-            </resource_history>
-            <resource_history id="lnet-c2" orphan="false" migration-threshold="1000000">
-                <operation_history call="31" task="start" last-rc-change="Tue Feb 25 19:55:33 2020" last-run="Tue Feb 25 19:55:33 2020" exec-time="42ms" queue-time="0ms" rc="0" rc_text="ok" />
-                <operation_history call="32" task="monitor" interval="30000ms" last-rc-change="Tue Feb 25 19:55:33 2020" exec-time="22ms" queue-time="0ms" rc="0" rc_text="ok" />
-            </resource_history>
-        </node>
-        <node name="smc7-m11">
-            <resource_history id="ip-c1" orphan="false" migration-threshold="1000000">
-                <operation_history call="61" task="start" last-rc-change="Tue Feb 25 20:08:36 2020" last-run="Tue Feb 25 20:08:36 2020" exec-time="80ms" queue-time="0ms" rc="0" rc_text="ok" />
-                <operation_history call="62" task="monitor" interval="30000ms" last-rc-change="Tue Feb 25 20:08:36 2020" exec-time="49ms" queue-time="0ms" rc="0" rc_text="ok" />
-            </resource_history>
-            <resource_history id="lnet" orphan="false" migration-threshold="1000000">
-                <operation_history call="15" task="probe" last-rc-change="Tue Feb 25 19:55:27 2020" last-run="Tue Feb 25 19:55:27 2020" exec-time="4ms" queue-time="0ms" rc="0" rc_text="ok" />
-                <operation_history call="25" task="start" last-rc-change="Tue Feb 25 19:55:31 2020" last-run="Tue Feb 25 19:55:31 2020" exec-time="2097ms" queue-time="1ms" rc="0" rc_text="ok" />
-                <operation_history call="28" task="monitor" interval="60000ms" last-rc-change="Tue Feb 25 19:55:33 2020" exec-time="2ms" queue-time="0ms" rc="0" rc_text="ok" />
-            </resource_history>
-            <resource_history id="lnet-c1" orphan="false" migration-threshold="1000000">
-                <operation_history call="63" task="start" last-rc-change="Tue Feb 25 20:08:36 2020" last-run="Tue Feb 25 20:08:36 2020" exec-time="35ms" queue-time="0ms" rc="0" rc_text="ok" />
-                <operation_history call="64" task="monitor" interval="30000ms" last-rc-change="Tue Feb 25 20:08:36 2020" exec-time="20ms" queue-time="0ms" rc="0" rc_text="ok" />
-            </resource_history>
-        </node>
-    </node_history>
-    <fence_history>
-    </fence_history>
-    <tickets>
-    </tickets>
-    <bans>
-    </bans>
-</crm_mon>
-'''
+
+def contents(filename: str) -> str:
+    dirname = os.path.dirname(os.path.realpath(__file__))
+    fullpath = f'{dirname}/{filename}'
+    assert os.path.isfile(fullpath), f'No such file: {fullpath}'
+    with open(fullpath) as f:
+        s = f.read()
+    return s
+
+
+GOOD_XML = contents('status-xml-w-clones.xml')
+XML_PLAIN_RESOURCES = contents('status-xml-plain-resources.xml')
 
 GOOD_STATUS_TEXT = '''Cluster name: mycluster
 
@@ -155,6 +81,32 @@ class PcsExecutorTest(unittest.TestCase):
             side_effect=[GOOD_STATUS_TEXT])
         connector = CliConnector(executor=stub_executor)
         self.assertEqual('mycluster', connector.get_cluster_name())
+
+    def test_get_resources_works(self):
+        stub_executor = CliExecutor()
+        stub_executor.get_full_status_xml = MagicMock(side_effect=[GOOD_XML])
+        connector = CliConnector(executor=stub_executor)
+        resources = connector.get_resources()
+        self.assertEqual(6, len(resources))
+
+    def test_plain_resources_parsed_also(self):
+        stub_executor = CliExecutor()
+        stub_executor.get_full_status_xml = MagicMock(
+            side_effect=[XML_PLAIN_RESOURCES])
+        connector = CliConnector(executor=stub_executor)
+        resources = connector.get_resources()
+        self.assertEqual(3, len(resources))
+        self.assertEqual(['c-259.stonith', 'c-260.stonith', 'MyResource'],
+                         [x.id for x in resources])
+
+    def test_get_stonith_resources_works(self):
+        stub_executor = CliExecutor()
+        stub_executor.get_full_status_xml = MagicMock(
+            side_effect=[XML_PLAIN_RESOURCES])
+        connector = CliConnector(executor=stub_executor)
+        resources = connector.get_stonith_resources()
+        self.assertEqual(['c-259.stonith', 'c-260.stonith'],
+                         [x.id for x in resources])
 
 
 class ClientTest(unittest.TestCase):
