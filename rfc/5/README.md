@@ -31,15 +31,15 @@ The code of `hax` consists of C and Python parts.
 
 [m0_ha_msg_type][] | Reaction of `hax`
 --- | ---
-M0_HA_MSG_STOB_IOQ | `m0_panic()`
+M0_HA_MSG_STOB_IOQ | Call `m0_mero_iem()` to generate an IEM (Interesting Event Message).
 M0_HA_MSG_NVEC | Build the reply based on Consul data; see the [details below](#4-handling-of-nvec-get-request).
 M0_HA_MSG_FAILURE_VEC_REQ | Reply with stub data &mdash; empty vector for fid `M0_FID_TINIT('o', 2, 9)`.
 M0_HA_MSG_FAILURE_VEC_REP | Reply with stub data &mdash; empty vector for fid `M0_FID_TINIT('o', 2, 9)`.
 M0_HA_MSG_KEEPALIVE_REQ | `m0_panic()`
 M0_HA_MSG_KEEPALIVE_REP | `m0_panic()`
 M0_HA_MSG_EVENT_PROCESS | Update the status in Consul KV; see the [details below](#3-handling-of-m0-ha-msg-event-process-message).
-M0_HA_MSG_EVENT_SERVICE | None.
-M0_HA_MSG_EVENT_RPC | None.
+M0_HA_MSG_EVENT_SERVICE | Ignore.
+M0_HA_MSG_EVENT_RPC | Ignore.
 M0_HA_MSG_BE_IO_ERR | `m0_panic()`
 M0_HA_MSG_SNS_ERR | `m0_panic()`
 

@@ -33,6 +33,7 @@
 #include "lib/string.h"          /* m0_strdup */
 #include "lib/trace.h"           /* M0_LOG, M0_DEBUG */
 #include "mero/version.h"        /* M0_VERSION_GIT_REV_ID */
+#include "mero/iem.h"
 #include "ha/msg.h"
 #include "ha/link.h"
 #include "hax.h"
@@ -400,6 +401,27 @@ static void handle_process_event(const struct hax_msg *hm)
 	PyGILState_Release(gstate);
 }
 
+static void handle_stob_ioq(const struct hax_msg *hm)
+{
+	const struct m0_stob_ioq_error *ioq_err =
+		&hm->hm_msg.hm_data.u.hed_stob_ioq;
+	char buf[512] = {0};
+
+	snprintf(buf, sizeof(buf)-1, "%x|"FID_F"|"FID_F"|"FID_F"|%"PRIx64
+		 "|%"PRIx64"|%"PRIx64"|%"PRIx64"|%"PRIx64"|%"PRIx32,
+		 m0_ha_msg_type_get(&hm->hm_msg),
+		 FID_P(&ioq_err->sie_conf_sdev),
+		 FID_P(&ioq_err->sie_stob_id.si_domain_fid),
+		 FID_P(&ioq_err->sie_stob_id.si_fid),
+		 ioq_err->sie_fd, ioq_err->sie_opcode, ioq_err->sie_rc,
+		 ioq_err->sie_offset, ioq_err->sie_size, ioq_err->sie_bshift);
+
+	M0_MERO_IEM_DESC(M0_MERO_IEM_SEVERITY_E,
+			 M0_MERO_IEM_MODULE_IO,
+			 M0_MERO_IEM_EVENT_IOQ,
+			 "stob_ioq_error [%s]", buf);
+}
+
 static void _dummy_handle(const struct hax_msg *msg)
 {
 	/*
@@ -416,7 +438,7 @@ static void _impossible(const struct hax_msg *hm)
 }
 
 static void (*hax_action[])(const struct hax_msg *hm) = {
-	[M0_HA_MSG_STOB_IOQ]        = _impossible,
+	[M0_HA_MSG_STOB_IOQ]        = handle_stob_ioq,
 	[M0_HA_MSG_NVEC]            = handle_nvec,
 	[M0_HA_MSG_FAILURE_VEC_REQ] = handle_failvec,
 	[M0_HA_MSG_FAILURE_VEC_REP] = handle_failvec,
