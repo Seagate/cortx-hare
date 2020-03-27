@@ -24,6 +24,7 @@ Key | Value | Description
 `processes/<fid>` | `{ "state": "<HA state>" }` | The items are created and updated by `hax` processes.  Supported values of \<HA state\>: `M0_CONF_HA_PROCESS_STARTING`, `M0_CONF_HA_PROCESS_STARTED`, `M0_CONF_HA_PROCESS_STOPPING`, `M0_CONF_HA_PROCESS_STOPPED`.
 `profile` | fid | Profile fid in string format.  Example: `"0x7000000000000001:0x4"`.
 `profile/pools` | fids | Space-separated list of fids of SNS pools.
+`sspl.SYSTEM_INFORMATION.log_level` | | This key is used by SSPL.
 `timeout` | YYYYmmddHHMM.SS | This value is used by the RC timeout mechanism.
 
 **Note:** Fid keys are non-negative integers, base 10.
@@ -53,4 +54,10 @@ Key | Value | Description
   ever needed, consider the following format of pool entries:
 
   `m0conf/pools/<pool_fidk>` | `{ "name": <pool name>, ...N K failvec... }`
+-->
+<!--
+  XXX 'sspl.SYSTEM_INFORMATION.log_level' does not conform to the naming
+  convention used for other entries.  It would be nice to rename that key
+  to 'sspl/log-level'.
+  See https://jts.seagate.com/browse/EOS-6473?focusedCommentId=1818633&page=com.atlassian.jira.plugin.system.issuetabpanels:comment-tabpanel#comment-1818633
 -->
