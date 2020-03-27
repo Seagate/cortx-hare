@@ -28,20 +28,20 @@ ensure that
 --- | --- | ---
 1 | passwordless `sudo` works for \<user\> | all machines
 2 | \<user\> can `ssh` from \<origin\> to other machines | \<origin\>
-3 | `hare` and `s3server` rpms are installed | all machines
+3 | `eos-hare` and `eos-s3server` rpms are installed | all machines
 4 | `/opt/seagate/eos/hare/bin` is in \<user\>'s PATH | all machines
 5 | \<user\> is a member of `hare` group | all machines
 6 | CDF exists and reflects actual cluster configuration | \<origin\>
 
 ### Install rpm packages
 
-* Install `hare` and `s3server` packages by running these commands on
-  every machine of the cluster:
+* Install `eos-hare` and `eos-s3server` packages by running these commands
+  on every machine of the cluster:
   ```bash
   (set -eu
 
-  if ! rpm -q eos-hare s3server; then
-      if ! sudo yum install -y eos-hare s3server; then
+  if ! rpm -q eos-hare eos-s3server; then
+      if ! sudo yum install -y eos-hare eos-s3server; then
           for x in 'integration/centos-7.7.1908/last_successful' 's3server_uploads'
           do
               repo="ci-storage.mero.colo.seagate.com/releases/eos/$x"
@@ -50,7 +50,7 @@ ensure that
 	  done
 	  unset repo x
 
-          sudo yum install -y eos-hare s3server
+          sudo yum install -y eos-hare eos-s3server
       fi
   fi
   )
