@@ -10,8 +10,7 @@ DEFAULT_DEST_DIR=/tmp
 
 usage() {
     cat <<EOF
-Usage: $PROG <bundle-id> <dest-dir>
-       $PROG [-h | --help]
+Usage: $PROG [-h | --help] [<bundle-id> <dest-dir>]
 
 Create '<dest-dir>/hare/hare_<bundle-id>.tar.gz' archive with Hare
 forensic data --- logs and configuration files, which can be used for
