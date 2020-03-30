@@ -17,7 +17,7 @@ processes.
   * [5/HAX](5/README.md) — HAlink eXchange
   * [7/FAIL](7/README.md) — Failure Handling
   * [10/GLOSS](10/README.md) — Hare User's Glossary
-  * [12/CHECK] (12/README.md) - EES HA Health Checks
+  * [12/CHECK](12/README.md) - EES HA Health Checks
 * Draft
   * [3/CFGEN](3/README.md) — Configuration Generation
   * [4/KV](4/README.md) — Consul KV Schema
