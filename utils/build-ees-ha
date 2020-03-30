@@ -322,11 +322,11 @@ ssh $rnode $cmd
 sudo cp $hare_dir/consul-server-conf.json \
         $hare_dir/consul-server-c1-conf.json
 sudo sed -e 's/"--hax"/"--svc", "hare-hax-c1"/' \
+         -e "/\"server\"/a\ \ \"node_name\": \"$lnode\"," \
          -i $hare_dir/consul-server-c1-conf.json
 cp $hare_dir/consul-server-c1-conf.json \
    /tmp/consul-server-c1-conf.json
-sudo sed -e "/\"server\"/a\ \ \"node_name\": \"$lnode\"," \
-         -e '/\"server\"/a\ \ "leave_on_terminate": true,' \
+sudo sed -e '/\"server\"/a\ \ "leave_on_terminate": true,' \
          -i /tmp/consul-server-c1-conf.json
 scp /tmp/consul-server-c1-conf.json $rnode:$hare_dir/
 
@@ -334,11 +334,11 @@ cmd="
 sudo cp $hare_dir/consul-server-conf.json \
         $hare_dir/consul-server-c2-conf.json &&
 sudo sed -e 's/\"--hax\"/\"--svc\", \"hare-hax-c2\"/' \
+         -e '/\"server\"/a\ \ \"node_name\": \"$rnode\",' \
          -i $hare_dir/consul-server-c2-conf.json &&
 cp $hare_dir/consul-server-c2-conf.json \
    /tmp/consul-server-c2-conf.json &&
-sudo sed -e '/\"server\"/a\ \ \"node_name\": \"$rnode\",' \
-         -e '/\"server\"/a\ \ \"leave_on_terminate\": true,' \
+sudo sed -e '/\"server\"/a\ \ \"leave_on_terminate\": true,' \
          -i /tmp/consul-server-c2-conf.json"
 ssh $rnode $cmd
 scp $rnode:/tmp/consul-server-c2-conf.json $hare_dir/
