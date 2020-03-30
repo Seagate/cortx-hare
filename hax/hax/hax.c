@@ -416,7 +416,7 @@ static void handle_stob_ioq(const struct hax_msg *hm)
 		 ioq_err->sie_fd, ioq_err->sie_opcode, ioq_err->sie_rc,
 		 ioq_err->sie_offset, ioq_err->sie_size, ioq_err->sie_bshift);
 
-	M0_MERO_IEM_DESC(M0_MERO_IEM_SEVERITY_E,
+	M0_MERO_IEM_DESC(M0_MERO_IEM_SEVERITY_E_ERROR,
 			 M0_MERO_IEM_MODULE_IO,
 			 M0_MERO_IEM_EVENT_IOQ,
 			 "stob_ioq_error [%s]", buf);
