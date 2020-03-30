@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -eu -o pipefail
+export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
+# set -x
+
+# Default s3server configuration is optimized for hardware setups
+# and may cause OOM on virtual machines.  This script modifies s3server
+# configuration file, reducing memory consumption of s3server.
+# Run this script after installing `eos-s3server` RPM.
+
+sudo sed -E -i.orig \
+     -e 's/\<(S3_DAEMON_DO_REDIRECTION): 1.*/\1: 0/' \
+     -e 's/\<(S3_ENABLE_STATS): true.*/\1: false/' \
+     -e 's/\<(S3_CLOVIS_READ_POOL_MAX_THRESHOLD):.*/\1: 524288000/' \
+     -e 's/\<(S3_LIBEVENT_POOL_INITIAL_SIZE):.*/\1: 209715200/' \
+     -e 's/\<(S3_LIBEVENT_POOL_MAX_THRESHOLD):.*/\1: 524288000/' \
+     -e 's/\<(S3_LIBEVENT_POOL_RESERVE_SIZE):.*/\1: 1048576/' \
+     /opt/seagate/s3/conf/s3config.yaml

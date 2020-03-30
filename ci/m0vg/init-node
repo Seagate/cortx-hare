@@ -27,7 +27,7 @@ else
         sudo tee -a /etc/yum.repos.d/${repo//\//_}.repo <<< 'gpgcheck=0'
     fi
     sudo yum install -y eos-hare eos-s3server s3cmd
-    /data/hare/ci/m0vg/patch-s3server-config
+    /data/hare/ci/m0vg/modify-s3server-config
 fi
 
 # Current user should be able to write to /var/lib/hare/ directory,
