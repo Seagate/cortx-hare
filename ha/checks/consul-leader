@@ -1,0 +1,92 @@
+#!/usr/bin/env bash
+set -eu -o pipefail
+#set -x
+
+[[ -n ${OCF_ROOT:-} ]] || OCF_ROOT=/usr/lib/ocf
+set +eu
+. $OCF_ROOT/lib/heartbeat/ocf-shellfuncs
+set -eu
+
+run_dir=/run/eos
+state=$run_dir/check-${0##*/}.state
+
+start() {
+    sudo mkdir --parents $run_dir
+    touch $state
+}
+
+stop() {
+    rm $state
+    sudo rmdir --parents --ignore-fail-on-non-empty $run_dir
+}
+
+export PATH="$PATH:/opt/seagate/eos/hare/bin"
+
+PROG=${0##*/}
+
+# move this to some library if you are copying this 3rd time
+log() {
+    logger -s -t "$PROG" "$@"
+}
+
+die() {
+    log "$@"
+    exit 1
+}
+
+usage() {
+    cat <<EOF
+Usage: $PROG <timeout>
+       $PROG [-h | --help]
+
+Check that cluster leader can be requrested via consul command.
+Uses timeout to wait before termination in case internal command freezes for
+some reason. Returns error if timeout was triggered.
+Script expectes that consul writes errors to stderr and data to
+stdout.
+
+Positional arguments:
+  timeout   Natural number of seconds to wait before kill leader request.
+
+Options:
+  -h, --help   Show this help and exit.
+EOF
+}
+
+case "${1:-none}" in
+    -h|--help) usage; exit;;
+    0) die "Zero timeout is not allowed" ;;
+    none) die "Timeout is mandatory. Check -h option." ;;
+esac
+
+tout_sec=$1
+log_file="$(mktemp)"
+
+exec 5>&2
+exec 2> >(logger -s -t $PROG >&2)
+
+consul kv get leader 1> $log_file &
+consul_pid=$!
+exec 2>&5
+consul_cmd=$(ps -q $consul_pid -o comm=)
+
+# check once in a second whether command is finished
+consul_stuck=0
+for ((i=1; i<=$tout_sec; i++)); do
+    sleep 1
+    ps -p $consul_pid &> /dev/null && consul_stuck=1 || consul_stuck=0
+    [[ $consul_stuck -eq 0 ]] && break
+done
+
+if [[ $consul_stuck -eq 1 ]]; then
+    log "killing $consul_pid : $consul_cmd"
+    kill -9 $consul_pid
+    exit 1
+fi
+
+result=
+[[ -f $log_file ]] && result=$(<$log_file)
+
+rm -f $log_file 2>/dev/null
+
+[[ -n "$result" ]]
