@@ -3,10 +3,10 @@
 
 # mero git revision
 #   assume that Mero package release has format 'buildnum_gitid_kernelver'
-%define h_mero_gitrev %(rpm -q --queryformat '%{RELEASE}' mero | cut -f2 -d_)
+%define h_mero_gitrev %(rpm -q --whatprovides mero | xargs rpm -q --queryformat '%{RELEASE}' | cut -f2 -d_)
 
 # mero version
-%define h_mero_version %(rpm -q --queryformat '%{VERSION}-%{RELEASE}' mero)
+%define h_mero_version %(rpm -q --whatprovides mero | xargs rpm -q --queryformat '%{VERSION}-%{RELEASE}')
 
 # parallel build jobs
 %define h_build_jobs_opt  %(test -n "$build_jobs" && echo "-j$build_jobs" || echo '')
