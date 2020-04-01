@@ -13,6 +13,9 @@ set +eu
 . $OCF_ROOT/lib/heartbeat/ocf-shellfuncs
 set -eu
 
+RUN_DIR=/tmp/eos  #XXX /var/run/eos
+STATE_PATH=$RUN_DIR/$OCF_RESKEY_check.state
+
 metadata() {
     cat <<'EOF'
 <?xml version="1.0"?>
@@ -47,23 +50,30 @@ END
 }
 
 start() {
-    if ! monitor; then
-        $OCF_RESKEY_check start
+    if [[ ! -e $STATE_PATH ]]; then
+        mkdir -p $RUN_DIR
+        touch $STATE_PATH
     fi
 }
 
 stop() {
-    if monitor; then
-        $OCF_RESKEY_check stop
+    if [[ -e $STATE_PATH ]]; then
+        rm $STATE_PATH
+        rmdir -p $RUN_DIR 2>/dev/null || true
     fi
 }
 
 monitor() {
-    $OCF_RESKEY_check monitor
+    if [[ ! -e $STATE_PATH ]]; then
+        return $OCF_NOT_RUNNING
+    fi
+    if ! $OCF_RESKEY_check; then
+        return $OCF_ERR_GENERIC
+    fi
 }
 
 case $OCF_RESKEY_check in
-    foo|bar|baz)  # supported checks
+    foo|bar|baz)  # XXX-TODO: the list of supported checks can be generated
         ;;
     *)
         ocf_log err "Unsupported check id: $OCF_RESKEY_check"
