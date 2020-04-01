@@ -13,7 +13,7 @@ set +eu
 . $OCF_ROOT/lib/heartbeat/ocf-shellfuncs
 set -eu
 
-RUN_DIR=/tmp/eos  #XXX /var/run/eos
+RUN_DIR=/tmp/eos  #XXX /run/eos
 STATE_PATH=$RUN_DIR/$OCF_RESKEY_check.state
 
 metadata() {
