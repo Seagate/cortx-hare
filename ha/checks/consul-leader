@@ -9,7 +9,7 @@ DEFAULT_TIMEOUT=5
 
 # move this to some library if you are copying this 3rd time
 log() {
-    logger -s -t "$PROG" "$@"
+    logger --stderr --tag "$PROG" "$@"
 }
 
 die() {
@@ -19,14 +19,12 @@ die() {
 
 usage() {
     cat <<EOF
-Usage: $PROG [timeout]
-       $PROG [-h | --help]
+Usage: $PROG [-h | --help] [<timeout>]
 
-Check that cluster leader can be requrested via consul command.
-Uses timeout to wait before termination in case internal command freezes for
-some reason. Returns error if timeout was triggered.
-The script expects that consul writes errors to stderr and data to
-stdout.
+Check that cluster leader can be fetched with 'consul' command.
+Uses timeout to wait before termination in case internal command freezes
+for any reason. Returns error if timeout was triggered.
+The script expects that consul writes errors to stderr and data to stdout.
 
 Positional arguments:
   timeout   Natural number of seconds to wait before kill leader request.
@@ -39,28 +37,26 @@ EOF
 
 case ${1:-none} in
     -h|--help) usage; exit;;
-    0) die "Zero timeout is not allowed" ;;
+    0) die 'Zero timeout is not allowed';;
 esac
 
 timeout_sec=${1:-$DEFAULT_TIMEOUT}
-hare_log_file="$(mktemp)"
-raft_log_file="$(mktemp)"
+cli_out=$(mktemp)
+api_out=$(mktemp)
 
 exec 5>&2
-exec 2> >(logger -s -t $PROG >&2)
-timeout --signal SIGKILL $timeout_sec consul kv get leader > $hare_log_file  &
-timeout --signal SIGKILL $timeout_sec curl --silent --max-time $timeout_sec http://127.0.0.1:8500/v1/status/leader > $raft_log_file &
+exec 2> >(logger --stderr --tag $PROG >&2)
+timeout --signal SIGKILL $timeout_sec consul kv get leader > $cli_out &
+timeout --signal SIGKILL $timeout_sec curl --silent --max-time $timeout_sec \
+        http://127.0.0.1:8500/v1/status/leader > $api_out &
 exec 2>&5
 
 wait
 
-hare_result=
-raft_result=
-[[ -f $hare_log_file ]] && hare_result=$(<$hare_log_file)
-[[ -f $raft_log_file ]] && raft_result=$(<$raft_log_file)
-rm $hare_log_file $raft_log_file 2>/dev/null
+[[ -s $cli_out ]] && hare_leader_p=true || hare_leader_p=false
+[[ -s $api_out ]] && consul_leader_p=true || consul_leader_p=false
 
-[[ -n $hare_result ]] || log "No HA elected leader reported by consul"
-[[ -n $raft_result ]] || log "No Raft leader reported by consul"
+$hare_leader_p || log 'Hare leader not elected'
+$consul_leader_p || log 'Consul (Raft) leader not elected'
 
-[[ -n $hare_result && -n $raft_result ]]
+$hare_leader_p && $consul_leader_p
