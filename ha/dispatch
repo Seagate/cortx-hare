@@ -70,10 +70,11 @@ monitor() {
     if ! $OCF_RESKEY_check; then
         return $OCF_ERR_GENERIC
     fi
+    checks/$OCF_RESKEY_check
 }
 
 case $OCF_RESKEY_check in
-    foo|bar|baz)  # XXX-TODO: the list of supported checks can be generated
+    foo|bar|baz|consul-leader)  # XXX-TODO: the list of supported checks can be generated
         ;;
     *)
         ocf_log err "Unsupported check id: $OCF_RESKEY_check"
