@@ -508,6 +508,7 @@ echo 'Adding s3background services...'
 pcs cluster cib s3bcfg
 pcs -f s3bcfg resource create s3backcons systemd:s3backgroundconsumer clone
 pcs -f s3bcfg constraint order rabbitmq-clone then s3backcons-clone
-pcs -f s3bcfg resource create s3backprod systemd:s3backgroundproducer clone
-pcs -f s3bcfg constraint order s3backcons-clone then s3backprod-clone
+pcs -f s3bcfg resource create s3backprod systemd:s3backgroundproducer op monitor interval=30s
+pcs -f s3bcfg constraint order s3backcons-clone then s3backprod
+pcs -f s3bcfg constraint colocation add s3backprod with s3backcons-clone
 pcs cluster cib-push s3bcfg --config
