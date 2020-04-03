@@ -17,9 +17,9 @@ forensic data --- logs and configuration files, which can be used for
 reporting and researching Hare bugs.
 
 Positional arguments:
-  dest-dir    Target directory; defaults to '$DEFAULT_DEST_DIR'.
   bundle-id   Support bundle ID; defaults to the local host name
-              (`hostname`).
+              (${HOSTNAME%%.*}).
+  dest-dir    Target directory; defaults to '$DEFAULT_DEST_DIR'.
 
 Options:
   -h, --help   Show this help and exit.
@@ -39,7 +39,7 @@ if (($? != 0 && $? != 2)); then
     die "Wrong number of arguments. Type '$PROG --help' for usage."
 fi
 
-bundle_id=${1:-$HOSTNAME}
+bundle_id=${1:-${HOSTNAME%%.*}}
 dest_dir=${2:-$DEFAULT_DEST_DIR}
 
 if [[ -z $bundle_id || -z $dest_dir ]]; then
@@ -64,8 +64,19 @@ sudo journalctl --no-pager --full --utc --boot --output short-precise \
 sudo systemctl --all --full --no-pager status {hare,m0,mero,s3}\* \
      > systemctl-status.txt || true
 
-[[ -f /opt/seagate/eos-prvsnr/pillar/components/cluster.sls ]] &&
-    cp /opt/seagate/eos-prvsnr/pillar/components/cluster.sls .
+extra_files=(
+    /etc/sysconfig/mero
+    /opt/seagate/eos-prvsnr/pillar/components/cluster.sls
+    /opt/seagate/s3/conf/s3config.yaml
+    $(if [[ -r /etc/corosync/corosync.conf ]]; then
+          awk '$1 == "logfile:" { print $2 }' /etc/corosync/corosync.conf
+      fi)
+)
+for f in ${extra_files[@]}; do
+    if [[ -f $f ]]; then
+        cp --parents $f . || true
+    fi
+done
 
 cp --parents /var/lib/hare/*.{yaml,json} . 2>/dev/null || true
 cp -r --parents /var/log/hare/ . 2>/dev/null || true
@@ -74,4 +85,8 @@ cd ..
 
 # Close copied stderr to avoid usage of $HOSTNAME directory
 exec 2>&5
+
+[[ -s $HOSTNAME/_reportbug.stderr ]] || rm $HOSTNAME/_reportbug.stderr
+
 tar --remove-files -czf "hare_${bundle_id}.tar.gz" $HOSTNAME
+echo "Created $dest_dir/hare/hare_${bundle_id}.tar.gz"
