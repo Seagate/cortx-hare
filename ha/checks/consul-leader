@@ -7,11 +7,13 @@ export PATH="$PATH:/opt/seagate/eos/hare/bin"
 PROG=${0##*/}
 DEFAULT_TIMEOUT=5
 
-# move this to some library if you are copying this 3rd time
+# XXX Extract this function into some library once it is copied 3 times.
+# See https://wiki.c2.com/?ThreeStrikesAndYouRefactor .
 log() {
-    logger --stderr --tag "$PROG" "$@"
+    logger --stderr --tag "check-$PROG" "$@"
 }
 
+# XXX ditto
 die() {
     log "$@"
     exit 1
