@@ -226,9 +226,14 @@ $(HAX_EGG_LINK) $(HAX_EXE): $(HAX_WHL)
 	@$(call _info,Installing hax with '$(HAX_INSTALL_CMD)')
 	@cd hax && $(HAX_INSTALL_CMD)
 
+.PHONY: install-pcswrap-deps
+install-pcswrap-deps: pcswrap/requirements.txt $(PY_VENV_DIR)
+	@$(call _info,Installing pcswrap dependencies)
+	@$(PIP) install --ignore-installed --prefix $(DESTDIR)/$(PREFIX) -r $<
+
 .PHONY: install-pcswrap
 install-pcswrap: PCSWRAP_INSTALL_CMD = $(PIP) install --ignore-installed --prefix $(DESTDIR)/$(PREFIX) $(PCSWRAP_WHL:pcswrap/%=%)
-install-pcswrap: $(PCSWRAP_EXE)
+install-pcswrap: install-pcswrap-deps $(PCSWRAP_EXE)
 
 $(PCSWRAP_EGG_LINK) $(PCSWRAP_EXE): $(PCSWRAP_WHL)
 	@$(call _info,Installing pcswrap with '$(PCSWRAP_INSTALL_CMD)')
