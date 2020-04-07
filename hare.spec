@@ -61,6 +61,7 @@ rm -rf %{buildroot}
 %{_sharedstatedir}/hare/
 %{_localstatedir}/mero/hax/
 /opt/seagate/eos/hare/*
+/usr/lib/ocf/resource.d/eos/*
 
 %post
 systemctl daemon-reload

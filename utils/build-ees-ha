@@ -7,7 +7,6 @@ PROG=${0##*/}
 
 usage() {
     cat <<EOF
-
 Usage: $PROG [OPTS] <CDF> [<params.yaml>]
 
 Configures EES-HA by preparing the configuration files and
@@ -152,17 +151,10 @@ run_on_both() {
     ssh $rnode $cmd
 }
 
-cmd='
-sudo mkdir -p /usr/lib/ocf/resource.d/seagate &&
-sudo ln -sf /opt/seagate/eos/hare/pacemaker/lnet
-           /usr/lib/ocf/resource.d/seagate/lnet
-'
-run_on_both $cmd
-
 sudo pcs cluster cib lcfg
-sudo pcs -f lcfg resource create lnet-c1 ocf:seagate:lnet \
+sudo pcs -f lcfg resource create lnet-c1 ocf:eos:lnet \
          iface=$iface:c1 nettype=$net_type op monitor interval=30s
-sudo pcs -f lcfg resource create lnet-c2 ocf:seagate:lnet \
+sudo pcs -f lcfg resource create lnet-c2 ocf:eos:lnet \
          iface=$iface:c2 nettype=$net_type op monitor interval=30s
 sudo pcs -f lcfg resource group add c1 ip-c1 lnet-c1
 sudo pcs -f lcfg resource group add c2 ip-c2 lnet-c2
@@ -486,7 +478,7 @@ s3_resource_add() {
       pcs -f s3cfg constraint location s3server-$suffix-$count avoids $node_remote=INFINITY
       # Order constraint adds the startup dependency of s3server on s3authserver
       pcs -f s3cfg constraint order s3auth-clone then s3server-$suffix-$count
-      # Colocation constraint will add a s3server's liveness dependency on the local s3authserver 
+      # Colocation constraint will add a s3server's liveness dependency on the local s3authserver
       pcs -f s3cfg constraint colocation add s3server-$suffix-$count with s3auth-clone score=INFINITY
       (( count++ ))
    done

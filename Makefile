@@ -135,9 +135,10 @@ CONSUL_LIBEXEC     = $(DESTDIR)/$(PREFIX)/libexec/consul
 CONSUL_SHARE       = $(DESTDIR)/$(PREFIX)/share/consul
 HARE_CONF          = $(DESTDIR)/$(PREFIX)/conf
 HARE_LIBEXEC       = $(DESTDIR)/$(PREFIX)/libexec
-HARE_PACEMAKER     = $(DESTDIR)/$(PREFIX)/pacemaker
+HA_CHECKS          = $(HARE_LIBEXEC)/ha-checks
 HAX_EXE            = $(DESTDIR)/$(PREFIX)/bin/hax
 HAX_EGG_LINK       = $(DESTDIR)/$(PREFIX)/lib/python3.$(PY3_VERSION_MINOR)/site-packages/hax.egg-link
+OCF_RESOURCES      = $(DESTDIR)/usr/lib/ocf/resource.d/eos
 PCSWRAP_EXE        = $(DESTDIR)/$(PREFIX)/bin/PCSWRAP
 PCSWRAP_EGG_LINK   = $(DESTDIR)/$(PREFIX)/lib/python3.$(PY3_VERSION_MINOR)/site-packages/pcswrap.egg-link
 SYSTEMD_CONFIG_DIR = $(DESTDIR)/usr/lib/systemd/system
@@ -150,10 +151,15 @@ install: install-dirs install-cfgen install-hax install-pcswrap install-systemd 
 	     $(call _log,copying $$f -> $(HARE_LIBEXEC)); \
 	     install $$f $(HARE_LIBEXEC); \
 	 done
-	@$(call _info,Installing pacemaker scripts)
+	@$(call _info,Installing OCF resource agents)
 	@for f in pacemaker/*; do \
-	     $(call _log,copying $$f -> $(HARE_PACEMAKER)); \
-	     install $$f $(HARE_PACEMAKER); \
+	     $(call _log,copying $$f -> $(OCF_RESOURCES)); \
+	     install $$f $(OCF_RESOURCES); \
+	 done
+	@$(call _info,Installing HA checks)
+	@for f in ha-checks/*; do \
+	     $(call _log,copying $$f -> $(HA_CHECKS)); \
+	     install $$f $(HA_CHECKS); \
 	 done
 	@$(call _info,Installing hare provisioning)
 	@for f in provisioning/*; do \
@@ -169,10 +175,12 @@ install: install-dirs install-cfgen install-hax install-pcswrap install-systemd 
 .PHONY: install-dirs
 install-dirs:
 	@for d in $(HARE_CONF) \
-                  $(HARE_LIBEXEC) \
-                  $(HARE_PACEMAKER) \
-	          $(DESTDIR)/var/log/hare \
-	          $(DESTDIR)/var/mero/hax; \
+		  $(HARE_LIBEXEC) \
+		  $(HA_CHECKS) \
+		  $(OCF_RESOURCES) \
+		  $(DESTDIR)/run/eos \
+		  $(DESTDIR)/var/log/hare \
+		  $(DESTDIR)/var/mero/hax; \
 	 do \
 	     install --verbose --directory $$d; \
 	 done
@@ -254,10 +262,15 @@ devinstall: install-dirs devinstall-cfgen devinstall-hax devinstall-pcswrap devi
 	     $(call _log,linking $$f -> $(HARE_LIBEXEC)); \
 	     ln -sf $(TOP_SRC_DIR)$$f $(HARE_LIBEXEC); \
 	 done
-	@$(call _info,linking pacemaker scripts)
+	@$(call _info,linking OCF resource agents)
 	@for f in pacemaker/*; do \
-	     $(call _log,linking $$f -> $(HARE_PACEMAKER)); \
-	     ln -sf $(TOP_SRC_DIR)$$f $(HARE_PACEMAKER); \
+	     $(call _log,linking $$f -> $(OCF_RESOURCES)); \
+	     ln -sf $(TOP_SRC_DIR)$$f $(OCF_RESOURCES); \
+	 done
+	@$(call _info,Linking HA checks)
+	@for f in ha-checks/*; do \
+	     $(call _log,copying $$f -> $(HA_CHECKS)); \
+	     ln -sf $(TOP_SRC_DIR)$$f $(HA_CHECKS); \
 	 done
 	@$(call _log,linking hctl -> $(DESTDIR)/$(PREFIX)/bin)
 	@ln -sf $(TOP_SRC_DIR)hctl $(DESTDIR)/$(PREFIX)/bin
@@ -454,9 +467,9 @@ __rpm_srpm:
 
 .PHONY: rpm
 rpm:
-	@$(MAKE) --quiet __rpm_pre
-	@$(MAKE) --quiet __rpm
-	@$(MAKE) --quiet __rpm_post
+	@$(MAKE) __rpm_pre
+	@$(MAKE) __rpm
+	@$(MAKE) __rpm_post
 
 .PHONY: srpm
 srpm:

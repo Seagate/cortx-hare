@@ -13,8 +13,14 @@ set +eu
 . $OCF_ROOT/lib/heartbeat/ocf-shellfuncs
 set -eu
 
-RUN_DIR=/tmp/eos  #XXX /run/eos
-STATE_PATH=$RUN_DIR/$OCF_RESKEY_check.state
+HA_CHECKS_DIR=/opt/seagate/eos/hare/libexec/ha-checks
+RUN_DIR=/run/eos
+
+# XXX Extract this function into some library once it is copied 3 times.
+# See https://wiki.c2.com/?ThreeStrikesAndYouRefactor .
+log() {
+    logger --stderr --tag "${0##*/}" "$@"
+}
 
 metadata() {
     cat <<'EOF'
@@ -34,7 +40,7 @@ metadata() {
   <actions>
     <action name="start" timeout="20" />
     <action name="stop" timeout="20" />
-    <action name="monitor" timeout="20" interval="10" depth="0" />
+    <action name="monitor" timeout="20" interval="30" depth="0" />
     <action name="meta-data" timeout="5" />
   </actions>
 </resource-agent>
@@ -50,42 +56,41 @@ END
 }
 
 start() {
-    if [[ ! -e $STATE_PATH ]]; then
+    if [[ ! -e $RUN_DIR/$OCF_RESKEY_check ]]; then
         mkdir -p $RUN_DIR
-        touch $STATE_PATH
+        touch $RUN_DIR/$OCF_RESKEY_check
     fi
 }
 
 stop() {
-    if [[ -e $STATE_PATH ]]; then
-        rm $STATE_PATH
+    if [[ -e $RUN_DIR/$OCF_RESKEY_check ]]; then
+        rm $RUN_DIR/$OCF_RESKEY_check
         rmdir -p $RUN_DIR 2>/dev/null || true
     fi
 }
 
 monitor() {
-    if [[ ! -e $STATE_PATH ]]; then
+    if [[ ! -e $RUN_DIR/$OCF_RESKEY_check ]]; then
+        log "*WARNING* $OCF_RESKEY_check is not running"
         return $OCF_NOT_RUNNING
     fi
-    if ! $OCF_RESKEY_check; then
+    local check=$HA_CHECKS_DIR/$OCF_RESKEY_check
+    local rc=0
+    $check || rc=$?
+    if ((rc != 0)); then
+        log "**ERROR** $check exited with code $rc"
         return $OCF_ERR_GENERIC
     fi
-    checks/$OCF_RESKEY_check
 }
 
-case $OCF_RESKEY_check in
-    foo|bar|baz|consul-leader)  # XXX-TODO: the list of supported checks can be generated
-        ;;
-    *)
-        ocf_log err "Unsupported check id: $OCF_RESKEY_check"
-        exit $OCF_ERR_ARGS
-        ;;
-esac
-
-PATH="$(dirname $(readlink -f $0))/checks:$PATH"
+log "{DEBUG} action='$__OCF_ACTION' check='${OCF_RESKEY_check:-}'"
 
 case $__OCF_ACTION in
     start|stop|monitor)
+        if [[ ! -x $HA_CHECKS_DIR/$OCF_RESKEY_check ]]; then
+            log "**ERROR** Unsupported check id: $OCF_RESKEY_check"
+            exit $OCF_ERR_ARGS
+        fi
         $__OCF_ACTION
         ;;
     meta-data)
@@ -95,7 +100,7 @@ case $__OCF_ACTION in
         usage
         ;;
     *)
-        usage >&2
+        log "**ERROR** Unsupported action: $__OCF_ACTION"
         exit $OCF_ERR_UNIMPLEMENTED
         ;;
 esac
