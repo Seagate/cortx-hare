@@ -314,7 +314,6 @@ ssh $rnode $cmd
 sudo cp $hare_dir/consul-server-conf.json \
         $hare_dir/consul-server-c1-conf.json
 sudo sed -e 's/"--hax"/"--svc", "hare-hax-c1"/' \
-         -e "/\"server\"/a\ \ \"node_name\": \"$lnode\"," \
          -i $hare_dir/consul-server-c1-conf.json
 cp $hare_dir/consul-server-c1-conf.json \
    /tmp/consul-server-c1-conf.json
@@ -326,7 +325,6 @@ cmd="
 sudo cp $hare_dir/consul-server-conf.json \
         $hare_dir/consul-server-c2-conf.json &&
 sudo sed -e 's/\"--hax\"/\"--svc\", \"hare-hax-c2\"/' \
-         -e '/\"server\"/a\ \ \"node_name\": \"$rnode\",' \
          -i $hare_dir/consul-server-c2-conf.json &&
 cp $hare_dir/consul-server-c2-conf.json \
    /tmp/consul-server-c2-conf.json &&

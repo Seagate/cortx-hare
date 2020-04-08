@@ -20,17 +20,18 @@ case "$*" in
     *) usage >&2; exit 1;;
 esac
 
+node_name=$(hostname --fqdn)
+
 get_service_ids() {
     local filter=$1
-    local host=$(hostname --fqdn)
-    local cmd="consul kv get -recurse m0conf/nodes/$host/processes/ |
+    local cmd="consul kv get -recurse m0conf/nodes/$node_name/processes/ |
                   $filter | sed 's/.*processes.//' | cut -d/ -f1"
     eval $cmd || true
 }
 
 get_service_ep() {
     local id=$1
-    consul kv get m0conf/nodes/$(hostname --fqdn)/processes/$id/endpoint
+    consul kv get m0conf/nodes/$node_name/processes/$id/endpoint
 }
 
 get_service_addr() {
@@ -52,7 +53,7 @@ id2fid() {
 HAX_ID=$(get_service_ids 'grep -iw ha')
 [[ $HAX_ID ]] || {
     cat >&2 <<.
-Cannot get information about Hax from Consul for this host ($(hostname --fqdn)).
+Cannot get information about Hax from Consul for this host ($node_name).
 Please verify that the host name matches the one stored in the Consul KV.
 .
     usage >&2
@@ -202,7 +203,8 @@ done
 
 tmpfile=$(mktemp /tmp/${CONF_FILE##*/}.XXXXXX)
 trap "rm -f $tmpfile" EXIT # delete automatically on exit
-jq ".services = [$SVCS_CONF]" <$CONF_FILE >$tmpfile
+jq ".services = [$SVCS_CONF] |
+    .node_name = \"$node_name\"" <$CONF_FILE >$tmpfile
 sudo cp $tmpfile $CONF_FILE
 
 sudo sed -r "s;(http://)localhost;\1$(get_service_ip_addr $HAX_EP);" \
