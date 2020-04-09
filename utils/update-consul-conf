@@ -211,3 +211,5 @@ sudo sed -r "s;(http://)localhost;\1$(get_service_ip_addr $HAX_EP);" \
          -i $CONF_FILE
 
 consul reload > /dev/null
+
+echo $node_name > /var/lib/hare/node-name
