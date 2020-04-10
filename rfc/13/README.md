@@ -41,4 +41,4 @@ Sequence of events:
 
 - [EESv1_M4_Architecture slides][m4-arc-slides]
 
-[m4-arc-slides]: https://seagatetechnology-my.sharepoint.com/:p:/r/personal/ujjwal_lanjewar_seagate_com/_layouts/15/guestaccess.aspx?e=4%3AEcSrmG&at=9&CID=a60887cb-880f-9b62-0fb6-e7a0e4f44415&share=EQejLLrH9VxLtmHOsiG8dcoB0J9LtyGmThjm_ZFH7AcooQ)
+[m4-arc-slides]: https://seagatetechnology-my.sharepoint.com/:p:/r/personal/ujjwal_lanjewar_seagate_com/_layouts/15/guestaccess.aspx?e=4%3AEcSrmG&at=9&CID=a60887cb-880f-9b62-0fb6-e7a0e4f44415&share=EQejLLrH9VxLtmHOsiG8dcoB0J9LtyGmThjm_ZFH7AcooQ
