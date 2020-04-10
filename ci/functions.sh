@@ -71,6 +71,7 @@ M0_VM_HOSTNAME_PREFIX=$(ci_vm_name_prefix)
 EOF
     if [[ $CI_JOB_NAME == 'test-pcs' ]]; then
         $M0VG env add M0_VM_POD_SIMULATION=yes M0_VM_POD_DISKS=10
+        $M0VG env add M0_VM_DISABLE_PACKAGES_UPGRADE=yes
     fi
 
     local host=
