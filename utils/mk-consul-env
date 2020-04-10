@@ -69,6 +69,8 @@ fi
 
 # Prepare for consul-agent startup:
 sudo rm -rf /var/lib/hare/consul-$bind_addr
-# TODO: '/opt/seagate/eos/hare' prefix can be different
-sudo cp /opt/seagate/eos/hare/share/consul/consul-$mode-conf.json.in \
-        /var/lib/hare/consul-$mode-conf.json
+
+conf_dir=consul-$mode-conf
+sudo mkdir -p /var/lib/hare/$conf_dir
+sudo cp /opt/seagate/eos/hare/share/consul/$conf_dir.json.in \
+     /var/lib/hare/$conf_dir/$conf_dir.json

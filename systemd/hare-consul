@@ -10,5 +10,5 @@ export PATH
 
 # TODO: should it be `consul` and PATH=/opt/seagate/eos/hare/bin:$PATH ?
 exec consul agent -bind $BIND -client "$CLIENT" $JOIN \
-     -config-file=/var/lib/hare/consul-$MODE-conf.json \
+     -config-dir=/var/lib/hare/consul-$MODE-conf \
      -data-dir=/var/lib/hare/consul-$BIND $EXTRA_OPTS

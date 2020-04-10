@@ -14,10 +14,11 @@ count_s3servers() {
     fi
 }
 
-for node_id in 2 1; do
-    n=$(count_s3servers $hare_dir/consul-server-c${node_id}-conf.json)
-    for i in $(seq 1 $n); do
-        pcs resource delete s3server-c${node_id}-$i || true
+for ctrl in c2 c1; do
+    conf_dir=consul-server-$ctrl-conf
+    for i in $(seq 1 \
+                   $(count_s3servers "$hare_dir/$conf_dir/$conf_dir.json")); do
+        pcs resource delete s3server-$ctrl-$i || true
     done
 done
 

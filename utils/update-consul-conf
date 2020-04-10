@@ -70,9 +70,9 @@ fi
 # --------------------------------------------------------------------
 
 if [[ $CONFD_IDs ]]; then
-    CONF_FILE=/var/lib/hare/consul-server-conf.json
+    CONF_FILE=/var/lib/hare/consul-server-conf/consul-server-conf.json
 else
-    CONF_FILE=/var/lib/hare/consul-client-conf.json
+    CONF_FILE=/var/lib/hare/consul-client-conf/consul-client-conf.json
 fi
 
 SVCS_CONF=''

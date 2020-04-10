@@ -320,27 +320,38 @@ sudo sed -r \
   -i $hare_dir/consul-env-c2"
 ssh $rnode $cmd
 
-sudo cp $hare_dir/consul-server-conf.json \
-        $hare_dir/consul-server-c1-conf.json
+run_on_both "sudo mkdir -p $hare_dir/consul-server-c{1,2}-conf"
+
+conf_dir=consul-server-c1-conf
+
+sudo cp $hare_dir/consul-server-conf/consul-server-conf.json \
+        $hare_dir/$conf_dir/$conf_dir.json
 sudo sed -e 's/"--hax"/"--svc", "hare-hax-c1"/' \
-         -i $hare_dir/consul-server-c1-conf.json
-cp $hare_dir/consul-server-c1-conf.json \
-   /tmp/consul-server-c1-conf.json
+         -i $hare_dir/$conf_dir/$conf_dir.json
+
+cp $hare_dir/$conf_dir/$conf_dir.json /tmp/$conf_dir.json
 sudo sed -e '/\"server\"/a\ \ "leave_on_terminate": true,' \
-         -i /tmp/consul-server-c1-conf.json
-scp /tmp/consul-server-c1-conf.json $rnode:$hare_dir/
+         -i /tmp/$conf_dir.json
+scp /tmp/$conf_dir.json $rnode:$hare_dir/$conf_dir/
+rm /tmp/$conf_dir.json
+
+conf_dir=consul-server-c2-conf
 
 cmd="
-sudo cp $hare_dir/consul-server-conf.json \
-        $hare_dir/consul-server-c2-conf.json &&
+sudo cp $hare_dir/consul-server-conf/consul-server-conf.json \
+        $hare_dir/$conf_dir/$conf_dir.json &&
 sudo sed -e 's/\"--hax\"/\"--svc\", \"hare-hax-c2\"/' \
-         -i $hare_dir/consul-server-c2-conf.json &&
-cp $hare_dir/consul-server-c2-conf.json \
-   /tmp/consul-server-c2-conf.json &&
+         -i $hare_dir/$conf_dir/$conf_dir.json &&
+
+cp $hare_dir/$conf_dir/$conf_dir.json /tmp/$conf_dir.json &&
 sudo sed -e '/\"server\"/a\ \ \"leave_on_terminate\": true,' \
-         -i /tmp/consul-server-c2-conf.json"
+         -i /tmp/$conf_dir.json"
+
 ssh $rnode $cmd
-scp $rnode:/tmp/consul-server-c2-conf.json $hare_dir/
+scp $rnode:/tmp/$conf_dir.json $hare_dir/$conf_dir/
+ssh $rnode "rm /tmp/$conf_dir.json"
+
+unset conf_dir
 
 echo 'Adding Consul to Pacemaker...'
 sudo pcs resource create consul-c1 systemd:hare-consul-agent-c1
@@ -401,34 +412,38 @@ sudo pcs cluster cib-push mcfg --config
 
 echo 'Adding Mero to Pacemaker...'
 
-cmd='sudo sed "s/TimeoutStopSec=.*/TimeoutStopSec=5sec/"
-              -i /usr/lib/systemd/system/m0d@.service &&
-     sudo systemctl daemon-reload'
+cmd='
+sudo sed "s/TimeoutStopSec=.*/TimeoutStopSec=5sec/"
+    -i /usr/lib/systemd/system/m0d@.service &&
+sudo systemctl daemon-reload'
 run_on_both $cmd
 
 get_fid() {
-    local cfg=$1
+    local node=$1
     local svc=$2
-    jq -r '.services[] | "\(.name) \(.checks[].args[])"' $cfg |
-        awk "/$svc.0x/ {print \$2}"
+
+    local conf_dir=consul-server-$node-conf
+
+    jq -r '.services[] | "\(.name) \(.checks[].args[])"' \
+       $hare_dir/$conf_dir/$conf_dir.json | awk "/$svc.0x/ {print \$2}"
 }
 
-confd_c1_fid=$(get_fid $hare_dir/consul-server-c1-conf.json confd)
-confd_c2_fid=$(get_fid $hare_dir/consul-server-c2-conf.json confd)
-ios_c1_fid=$(get_fid $hare_dir/consul-server-c1-conf.json ios)
-ios_c2_fid=$(get_fid $hare_dir/consul-server-c2-conf.json ios)
+c1_confd=$(get_fid c1 confd)
+c2_confd=$(get_fid c2 confd)
+c1_ios=$(get_fid c1 ios)
+c2_ios=$(get_fid c2 ios)
 
 sudo pcs cluster cib mcfg
-sudo pcs -f mcfg resource create mero-confd-c1 \
-                 systemd:m0d@$confd_c1_fid op stop timeout=600
-sudo pcs -f mcfg resource create mero-ios-c1 \
-                 systemd:m0d@$ios_c1_fid op stop timeout=600
+sudo pcs -f mcfg resource create mero-confd-c1 systemd:m0d@$c1_confd op stop \
+     timeout=600
+sudo pcs -f mcfg resource create mero-ios-c1 systemd:m0d@$c1_ios op stop \
+     timeout=600
 sudo pcs -f mcfg resource group add c1 mero-confd-c1
 sudo pcs -f mcfg resource group add c1 mero-ios-c1
-sudo pcs -f mcfg resource create mero-confd-c2 \
-                 systemd:m0d@$confd_c2_fid op stop timeout=600
-sudo pcs -f mcfg resource create mero-ios-c2 \
-                 systemd:m0d@$ios_c2_fid op stop timeout=600
+sudo pcs -f mcfg resource create mero-confd-c2 systemd:m0d@$c2_confd op stop \
+     timeout=600
+sudo pcs -f mcfg resource create mero-ios-c2 systemd:m0d@$c2_ios op stop \
+     timeout=600
 sudo pcs -f mcfg resource group add c2 mero-confd-c2
 sudo pcs -f mcfg resource group add c2 mero-ios-c2
 sudo pcs -f mcfg constraint order mero-confd-c1 then mero-ios-c2
@@ -471,14 +486,15 @@ get_s3_svc() {
 }
 
 s3_resource_add() {
-   local conf_file=$1
-   local suffix=$2
-   local node_local=$3
-   local node_remote=$4
-   local count=1
-   local s3server_fids=$(get_s3_svc $hare_dir/$conf_file s3service)
+   local suffix=$1
+   local node_local=$2
+   local node_remote=$3
 
+   local conf_dir=consul-server-$suffix-conf
+   local s3server_fids=$(get_s3_svc $hare_dir/$conf_dir/$conf_dir.json \
+                                    s3service)
    pcs cluster cib s3cfg
+   local count=1
    for i in ${s3server_fids[@]}; do
       pcs -f s3cfg resource create s3server-$suffix-$count systemd:$i op \
           stop timeout=600
@@ -503,8 +519,8 @@ sudo sed "s/TimeoutStopSec=.*/TimeoutStopSec=7sec/"
 sudo systemctl daemon-reload'
 run_on_both $cmd
 
-s3_resource_add consul-server-c1-conf.json c1 $lnode $rnode
-s3_resource_add consul-server-c2-conf.json c2 $rnode $lnode
+s3_resource_add c1 $lnode $rnode
+s3_resource_add c2 $rnode $lnode
 
 echo 'Adding rabbit-mq resources and constraints...'
 pcs resource create rabbitmq systemd:rabbitmq-server clone op \
