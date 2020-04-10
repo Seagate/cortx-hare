@@ -41,6 +41,10 @@ class CliExecutor:
             command = 'disable'
         self._execute(['pcs', 'resource', command, resource_name])
 
+    def authorize(self, username: str, password: str) -> None:
+        self._execute(
+            ['pcs', 'client', 'local-auth', '-u', username, '-p', password])
+
     def _execute(self, cmd: List[str]) -> str:
         process = Popen(cmd,
                         stdin=PIPE,
@@ -85,8 +89,8 @@ class CliConnector(PcsConnector):
             m = re.match(regex, line)
             if m:
                 return m.group(1)
-        raise PcsNoStatusException('Failed to find cluster name: pcs status'
-                                   ' command output was not recognized')
+        raise PcsNoStatusException('Failed to find cluster name: pcs status '
+                                   'command output was not recognized')
 
     def _parse_xml(self, xml_str: str) -> Any:
         try:
@@ -149,3 +153,11 @@ class CliConnector(PcsConnector):
             to_resource(tag) for tag in xml.findall('./resources//resource')
         ]
         return result
+
+    def ensure_authorized(self) -> None:
+        c = self.get_credentials()
+        if not c:
+            logging.debug('Skipping pcsd authentication as no credentials '
+                          'were provided')
+            return
+        self.executor.authorize(c.username, c.password)

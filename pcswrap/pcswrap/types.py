@@ -1,5 +1,7 @@
-from typing import List, NamedTuple
+from typing import List, NamedTuple, Optional
 from abc import ABC, abstractmethod
+
+Credentials = NamedTuple('Credentials', [('username', str), ('password', str)])
 
 Node = NamedTuple('Node', [('name', str), ('online', bool), ('shutdown', bool),
                            ('standby', bool), ('unclean', bool)])
@@ -13,6 +15,8 @@ Resource = NamedTuple('Resource', [('id', str), ('resource_agent', str),
 
 
 class PcsConnector(ABC):
+    credentials = None
+
     @abstractmethod
     def get_nodes(self) -> List[Node]:
         pass
@@ -56,3 +60,13 @@ class PcsConnector(ABC):
     @abstractmethod
     def enable_resource(self, resource: Resource) -> None:
         pass
+
+    @abstractmethod
+    def ensure_authorized(self) -> None:
+        pass
+
+    def set_credentials(self, credentials: Credentials):
+        self.credentials = credentials
+
+    def get_credentials(self) -> Optional[Credentials]:
+        return self.credentials

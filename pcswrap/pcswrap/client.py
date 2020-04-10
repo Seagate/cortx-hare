@@ -7,7 +7,7 @@ from typing import List
 
 from pcswrap.exception import CliException, MaintenanceFailed, TimeoutException
 from pcswrap.internal.connector import CliConnector
-from pcswrap.types import Resource, Node, PcsConnector
+from pcswrap.types import Resource, Node, PcsConnector, Credentials
 from pcswrap.internal.waiter import Waiter
 
 __all__ = ['Client', 'main']
@@ -24,8 +24,16 @@ def non_standby_nodes(node_list: List[Node]) -> bool:
 
 
 class Client():
-    def __init__(self, connector: PcsConnector = None):
+    def __init__(self,
+                 connector: PcsConnector = None,
+                 credentials: Credentials = None):
+        self.credentials = credentials
         self.connector: PcsConnector = connector or CliConnector()
+
+        if credentials:
+            self.connector.set_credentials(credentials)
+
+        self.connector.ensure_authorized()
         self._ensure_sane()
 
     def _ensure_sane(self) -> None:
@@ -104,6 +112,21 @@ def parse_opts(argv: List[str]):
                    default=False,
                    dest='verbose')
 
+    p.add_argument('--username',
+                   help='Username for local authentication at pcsd.'
+                   f' This setting must be specified if {prog_name} is '
+                   ' invoked with non-root privileges.',
+                   dest='username',
+                   nargs=1,
+                   type=str)
+
+    p.add_argument('--password',
+                   help='Password for local authentication at pcsd.'
+                   ' Makes sense if --username is specified.',
+                   dest='password',
+                   nargs=1,
+                   type=str)
+
     subparsers = p.add_subparsers()
     status_parser = subparsers.add_parser(
         'status',
@@ -177,10 +200,6 @@ def parse_opts(argv: List[str]):
     return opts
 
 
-def _get_client() -> Client:
-    return Client()
-
-
 def _setup_logging(verbose: bool) -> None:
     level = logging.DEBUG if verbose else logging.INFO
     logging.basicConfig(level=level,
@@ -188,8 +207,7 @@ def _setup_logging(verbose: bool) -> None:
                         format='%(asctime)s [%(levelname)s] %(message)s')
 
 
-def _cluster_maintenance(timeout: int = 120):
-    client = Client()
+def _cluster_maintenance(client: Client, timeout: int = 120):
     logging.info('Disabling stonith resources first')
 
     try:
@@ -205,8 +223,7 @@ def _cluster_maintenance(timeout: int = 120):
     logging.info('All nodes are in standby mode now')
 
 
-def _cluster_unmaintenance(timeout: int = 120):
-    client = Client()
+def _cluster_unmaintenance(client: Client, timeout: int = 120):
     client.unstandby_all(timeout=timeout)
     logging.info('All nodes are back to normal mode.')
     client.enable_stonith(timeout=timeout)
@@ -216,6 +233,16 @@ def _cluster_unmaintenance(timeout: int = 120):
 def _run(args) -> None:
     is_verbose = args.verbose
     _setup_logging(is_verbose)
+
+    def _get_client() -> Client:
+        creds = None
+        if args.username:
+            if not args.password:
+                raise RuntimeError('--password argument is required'
+                                   ' when --username is given')
+            creds = Credentials(username=args.username[0],
+                                password=args.password[0])
+        return Client(credentials=creds)
 
     if hasattr(args, 'standby_node'):
         if hasattr(args, 'standby_node_all'):
@@ -235,9 +262,9 @@ def _run(args) -> None:
         node = args.shutdown_node[0]
         _get_client().shutdown_node(node)
     elif hasattr(args, 'maintenance_all'):
-        _cluster_maintenance(timeout=args.timeout_sec)
+        _cluster_maintenance(_get_client(), timeout=args.timeout_sec)
     elif hasattr(args, 'unmaintenance_all'):
-        _cluster_unmaintenance(timeout=args.timeout_sec)
+        _cluster_unmaintenance(_get_client(), timeout=args.timeout_sec)
 
 
 def main() -> None:
