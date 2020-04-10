@@ -483,7 +483,7 @@ s3_resource_add() {
    pcs cluster cib-push s3cfg --config
 }
 
-cmd='sudo sed "s/TimeoutStopSec=.*/TimeoutStopSec=5sec/"
+cmd='sudo sed "s/TimeoutStopSec=.*/TimeoutStopSec=7sec/"
               -i /usr/lib/systemd/system/s3server@.service &&
      sudo systemctl daemon-reload'
 run_on_both $cmd
