@@ -88,6 +88,8 @@ systemctl is-active --quiet rabbitmq-server ||
 ssh $rnode "systemctl is-active --quiet rabbitmq-server" ||
     die 'No active rabbitmq instance found'
 
+hare_dir=/var/lib/hare
+
 echo 'Adding sspl resource and constraints...'
 
 pcs cluster cib ssplcfg
@@ -96,3 +98,15 @@ pcs -f ssplcfg resource create sspl ocf:seagate:sspl_stateful_resource_agent \
 pcs -f ssplcfg constraint order --force consul-c1 then sspl
 pcs -f ssplcfg constraint order --force consul-c2 then sspl
 pcs cluster cib-push ssplcfg --config
+
+echo 'Copying Consul configuration files...'
+
+sudo cp /opt/seagate/eos/sspl/bin/consul_config.json \
+        $hare_dir/consul-server-c1-conf/
+cmd="
+cp /opt/seagate/eos/sspl/bin/consul_config.json \
+   $hare_dir/consul-server-c2-conf/"
+ssh $rnode $cmd
+
+echo 'Reloading Consul...'
+/opt/seagate/eos/hare/bin/consul reload
