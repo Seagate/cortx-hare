@@ -13,8 +13,8 @@ Configures SSPL HA by preparing and adding resources into the Pacemaker.
 
 Caveats:
 
-* The script expects Pacemaker to be started and have consul and rabbitmq configured.
-  Check with 'pcs status'.
+* The script expects Pacemaker to be started and have consul and rabbitmq
+  configured. Check with 'pcs status'.
 
 * Passwordless SSH access between the nodes is required.
 
@@ -91,8 +91,8 @@ ssh $rnode "systemctl is-active --quiet rabbitmq-server" ||
 echo 'Adding sspl resource and constraints...'
 
 pcs cluster cib ssplcfg
-pcs -f ssplcfg resource create sspl ocf:seagate:sspl_stateful_resource_agent master \
-    meta migration-threshold=10s failure-timeout=10s is-managed=true
+pcs -f ssplcfg resource create sspl ocf:seagate:sspl_stateful_resource_agent \
+    master meta migration-threshold=10s failure-timeout=10s is-managed=true
 pcs -f ssplcfg constraint order --force consul-c1 then sspl
 pcs -f ssplcfg constraint order --force consul-c2 then sspl
 pcs cluster cib-push ssplcfg --config
