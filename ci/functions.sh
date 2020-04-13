@@ -12,21 +12,9 @@ _time() {
 }
 
 ci_vm_name_prefix() {
-    local job_name=
-    case $# in
-        0)
-            job_name=$CI_JOB_NAME
-            ;;
-        1)  # "m0vg" environment
-            [[ -z ${CI_JOB_NAME:-} ]] ||
-                die "${FUNCNAME[0]}: CI_JOB_NAME is not expected to be set"
-            job_name=$1
-            ;;
-        *)
-            die "${FUNCNAME[0]}: Too many arguments"
-            ;;
-    esac
-    echo "${WORKSPACE_NAME}-$job_name"
+    # XXX Here we rely on the fact that the script that sources
+    # functions.sh has the same name as the CI job.  This is fragile.
+    echo "${WORKSPACE_NAME}-${CI_JOB_NAME:-${0##*/}}"
 }
 
 ci_init_m0vg() (

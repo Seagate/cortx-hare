@@ -105,9 +105,7 @@ test-boot1:
 test-boot2:
   <<: *test_boot_definition
 
-# `test-pcs` doesn't let CI pipelines pass.  Disable it temporarily
-# until http://gitlab.mero.colo.seagate.com/mero/hare/issues/274 is solved.
-.test-pcs:  # XXX RESTOREME
+test-pcs:
   <<: *test_boot_definition
 
 test-utils:

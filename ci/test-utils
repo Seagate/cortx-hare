@@ -3,9 +3,9 @@ set -eu -o pipefail
 export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
 set -x
 
-cd $WORKSPACE_DIR
+. ci/functions.sh  # ci_vm_name_prefix
 
-. hare/ci/functions.sh  # ci_vm_name_prefix
+cd $WORKSPACE_DIR
 
 time docker run --rm --name $(ci_vm_name_prefix) -v $PWD:/data -w /data/hare \
      $DOCKER_REGISTRY/mero/hare:$CENTOS_RELEASE ci/docker/test-utils

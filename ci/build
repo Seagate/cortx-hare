@@ -5,25 +5,11 @@ set -x
 
 . ci/functions.sh  # ci_vm_name_prefix, die
 
-ci_docker() {
-    (($# > 0)) || die "${FUNCNAME[0]}: Arguments expected"
-
-    [[ $PWD == $WORKSPACE_DIR ]] ||
-        die "${FUNCNAME[0]}: Wrong working directory"
-
-    _time docker run --rm --name $(ci_vm_name_prefix) -v $PWD:/data \
-        -w /data/hare $DOCKER_REGISTRY/mero/hare:$CENTOS_RELEASE "$@"
-
-    # Containers run commands as 'root' user.  Restore the ownership.
-    sudo chown -R $(id -u):$(id -g) .
-}
-
 # Make sure that the build image is up to date.
 docker pull $DOCKER_REGISTRY/mero/hare:$CENTOS_RELEASE
 
-if [[ -d $WORKSPACE_DIR ]]; then
+[[ -d $WORKSPACE_DIR ]] &&
     die "${FUNCNAME[0]}: \$WORKSPACE_DIR is not expected to exist"
-fi
 mkdir -p $WORKSPACE_DIR
 cp -a $CI_PROJECT_DIR $WORKSPACE_DIR/
 
@@ -46,13 +32,29 @@ set -\$_orig_set_flags
 unset _orig_set_flags
 EOF
 
-if [[ -n ${MERO_COMMIT_REF:-} ]]; then
-    git clone --recursive http://gitlab.mero.colo.seagate.com/mero/mero.git
-    cd mero
-    git checkout $MERO_COMMIT_REF
-    cd -
+[[ -z ${MERO_COMMIT_REF:-} ]] && exit
 
-    ci_docker ci/docker/build-mero
-    #ci_docker ci/docker/build-s3server  # XXX-FIXME issue #216
-    ci_docker make build  # build Hare
-fi
+# --------------------------------------------------------------------
+# $MERO_COMMIT_REF is non-empty
+
+ci_docker() {
+    (($# > 0)) || die "${FUNCNAME[0]}: Arguments expected"
+
+    [[ $PWD == $WORKSPACE_DIR ]] ||
+        die "${FUNCNAME[0]}: Wrong working directory"
+
+    _time docker run --rm --name $(ci_vm_name_prefix) -v $PWD:/data \
+        -w /data/hare $DOCKER_REGISTRY/mero/hare:$CENTOS_RELEASE "$@"
+
+    # Containers run commands as 'root' user.  Restore the ownership.
+    sudo chown -R $(id -u):$(id -g) .
+}
+
+git clone --recursive http://gitlab.mero.colo.seagate.com/mero/mero.git
+cd mero
+git checkout $MERO_COMMIT_REF
+cd -
+
+ci_docker ci/docker/build-mero
+#ci_docker ci/docker/build-s3server  # XXX-FIXME issue #216
+ci_docker make build  # build Hare
