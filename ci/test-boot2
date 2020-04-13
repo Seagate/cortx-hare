@@ -3,7 +3,7 @@ set -eu -o pipefail
 export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
 set -x
 
-. ci/functions.sh  # _time, ci_init_m0vg, ci_vm_name_prefix, ci_success
+. ci/functions.sh  # _time, ci_init_m0vg, ci_success, ci_vm_name_prefix
 
 cd $WORKSPACE_DIR
 

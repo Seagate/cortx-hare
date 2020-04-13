@@ -8,9 +8,8 @@ cd /data/hare/
 . ci/functions.sh  # ci_vm_name_prefix, die
 . ci/_env  # WORKSPACE_NAME (used by ci_vm_name_prefix)
 
-[[ $(hostname) == $(ci_vm_name_prefix test-pcs)-pod-c1 ]] || die 'Wrong host'
-
-hosts=($(ci_vm_name_prefix test-pcs)-pod-c{1,2})
+hosts=($(ci_vm_name_prefix)-pod-c{1,2})
+[[ $(hostname) == ${hosts[0]} ]] || die 'Wrong host'
 
 [[ -s $PASS_FILE ]] || die "Cannot get password from $PASS_FILE"
 
@@ -34,22 +33,75 @@ sudo pcs property set stonith-enabled=false
 # https://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/2.0/html/Clusters_from_Scratch/_explore_the_existing_configuration.html
 sudo crm_verify --live-check --verbose
 
-# Generate roaming IP addresses.
-ips=($(awk '/pod-c/ {print $1}' /etc/hosts))
+ips=( $(awk '/pod-c/ {print $1}' /etc/hosts) )
 ((${#ips[@]} == 2)) ||
     die "/etc/hosts: 2 'pod-c' lines expected, got ${#ips[@]}"
 [[ ${ips[0]%.*} == ${ips[1]%.*} ]] ||
     die "IP addresses are not from the same /24 network: ${ips[@]}"
-net=${ips[0]%.*}
-roaming_ips=($net.101 $net.102)  # K.I.S.S.
-(($(echo ${ips[@]} ${roaming_ips[@]} | tr ' ' \\n | sort -u | wc -l) == 4)) ||
-    die 'Cannot generate roaming IP addresses'
+subnet=${ips[0]%.*}
 
-for ((i = 1; i <= ${#roaming_ips[@]}; ++i)); do
-    sudo pcs resource create ip-c$i ocf:heartbeat:IPaddr2 \
-         ip=${roaming_ips[$((i-1))]} cidr_netmask=24 iflabel=c$i op monitor \
-         interval=30s
-    sudo pcs constraint location ip-c$i prefers \
-         $(ci_vm_name_prefix test-pcs)-pod-c$i
+# Generate roaming IP addresses.
+last_byte=101
+while true; do
+    roaming_ips=(
+        $subnet.$last_byte
+        $subnet.$((last_byte + 1))
+    )
+    (( $(echo ${ips[@]} ${roaming_ips[@]} | tr ' ' \\n | sort -u | wc -l)
+       == 4 )) && break
+    ((last_byte += 2))
 done
-sudo pcs status
+
+data_iface=$(ip -4 -oneline address | grep -m1 -F $subnet | awk '{print $2}')
+disks=(/dev/disk/by-id/scsi-*)
+
+cdf() {
+    [[ $# == 3 ]] || die "${FUNCNAME[0]}: Invalid usage"
+    local hosts=(${!1})
+    local data_iface=$2
+    local disks=(${!3})
+    local io_disks=(${disks[@]:2})
+    local disks_per_node=$(( ${#io_disks[@]} / 2 ))
+
+    cat <<EOF
+nodes:
+  - hostname: ${hosts[0]}
+    data_iface: $data_iface
+    m0_servers:
+      - runs_confd: true
+        io_disks: []
+      - io_disks:
+$(echo ${io_disks[@]::$disks_per_node} | tr ' ' \\n | sed 's/^/          - /')
+    m0_clients:
+        s3: 2
+        other: 2
+  - hostname: ${hosts[1]}
+    data_iface: $data_iface
+    m0_servers:
+      - runs_confd: true
+        io_disks: []
+      - io_disks:
+$(echo ${io_disks[@]:$disks_per_node} | tr ' ' \\n | sed 's/^/          - /')
+    m0_clients:
+        s3: 2
+        other: 2
+pools:
+  - name: the pool
+    disks: all
+    data_units: 1
+    parity_units: 0
+    # allowed_failures: { site: 0, rack: 0, encl: 0, ctrl: 0, disk: 0 }
+EOF
+}
+
+cdf 'hosts[@]' $data_iface 'disks[@]' > ci/m0vg/_test-pcs.yaml
+
+bash -x /opt/seagate/eos/hare/libexec/build-ees-ha \
+    --ip1 ${roaming_ips[0]} \
+    --ip2 ${roaming_ips[1]} \
+    --interface $data_iface \
+    --left-node  ${hosts[0]} \
+    --right-node ${hosts[1]} \
+    --left-volume ${disks[0]} \
+    --right-volume ${disks[1]} \
+    ci/m0vg/_test-pcs.yaml
