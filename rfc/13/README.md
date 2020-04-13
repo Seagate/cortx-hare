@@ -1,7 +1,7 @@
 ---
 domain: gitlab.mero.colo.seagate.com
-shortname: 13/UHA
-name: Universal EES HA
+shortname: 13/HALC
+name: EES HA, Loosely Coupled
 status: draft
 editor: Valery V. Vorotyntsev <valery.vorotyntsev@seagate.com>
 ---
