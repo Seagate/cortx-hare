@@ -127,12 +127,15 @@ die() {
 [[ -b $lvolume ]] || die "meta-data volume $lvolume is not available"
 [[ -b $rvolume ]] || die "meta-data volume $rvolume is not available"
 
+netmask=$(ip -oneline -4 address show dev $iface |
+              awk '{print $4}' | cut -d/ -f2)
+
 echo 'Adding the roaming IP addresses into Pacemaker...'
 sudo pcs cluster cib icfg
 sudo pcs -f icfg resource create ip-c1 ocf:heartbeat:IPaddr2 \
-         ip=$ip1 cidr_netmask=24 iflabel=c1 op monitor interval=30s
+         ip=$ip1 cidr_netmask=$netmask iflabel=c1 op monitor interval=30s
 sudo pcs -f icfg resource create ip-c2 ocf:heartbeat:IPaddr2 \
-         ip=$ip2 cidr_netmask=24 iflabel=c2 op monitor interval=30s
+         ip=$ip2 cidr_netmask=$netmask iflabel=c2 op monitor interval=30s
 sudo pcs -f icfg constraint location ip-c1 prefers $lnode
 sudo pcs -f icfg constraint location ip-c2 prefers $rnode
 sudo pcs cluster cib-push icfg --config
