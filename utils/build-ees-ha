@@ -247,9 +247,9 @@ sudo rm -r /var/mero1
 
 # We don't need `/var/mero` mounted anymore. `hax` systemd
 # unit will mount/umount it automatically on start/stop.
-sudo umount /var/mero
+sudo umount --lazy /var/mero
 
-ssh $rnode 'sudo mkdir -p /var/mero1 && sudo umount /var/mero'
+ssh $rnode 'sudo mkdir -p /var/mero1 && sudo umount --lazy /var/mero'
 
 echo 'Preparing Consul agents config files...'
 cmd='
