@@ -144,8 +144,8 @@ echo 'Adding LNet...'
 sudo pcs cluster cib lcfg
 sudo pcs -f lcfg resource create lnet systemd:lnet
 sudo pcs -f lcfg resource clone lnet
-sudo pcs -f lcfg constraint order lnet-clone then ip-c1
-sudo pcs -f lcfg constraint order lnet-clone then ip-c2
+sudo pcs -f lcfg constraint order ip-c1 then lnet-clone
+sudo pcs -f lcfg constraint order ip-c2 then lnet-clone
 sudo pcs cluster cib-push lcfg --config
 
 run_on_both() {
@@ -161,6 +161,8 @@ sudo pcs -f lcfg resource create lnet-c2 ocf:eos:lnet \
          iface=$iface:c2 nettype=$net_type op monitor interval=30s
 sudo pcs -f lcfg resource group add c1 ip-c1 lnet-c1
 sudo pcs -f lcfg resource group add c2 ip-c2 lnet-c2
+sudo pcs -f lcfg constraint order lnet-clone then lnet-c1
+sudo pcs -f lcfg constraint order lnet-clone then lnet-c2
 sudo pcs cluster cib-push lcfg --config
 
 sleep 5 # Allow Pacemaker to configure the IPs
@@ -320,7 +322,7 @@ sudo sed -r \
   -i $hare_dir/consul-env-c2"
 ssh $rnode $cmd
 
-run_on_both "sudo mkdir -p $hare_dir/consul-server-c{1,2}-conf"
+run_on_both "mkdir -p $hare_dir/consul-server-c{1,2}-conf"
 
 conf_dir=consul-server-c1-conf
 
