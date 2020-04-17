@@ -94,7 +94,7 @@ echo 'Adding sspl resource and constraints...'
 
 pcs cluster cib ssplcfg
 pcs -f ssplcfg resource create sspl ocf:seagate:sspl_stateful_resource_agent \
-    master meta migration-threshold=10s failure-timeout=10s is-managed=true
+    master meta migration-threshold=10 failure-timeout=10s is-managed=true
 pcs -f ssplcfg constraint order --force consul-c1 then sspl
 pcs -f ssplcfg constraint order --force consul-c2 then sspl
 pcs cluster cib-push ssplcfg --config
