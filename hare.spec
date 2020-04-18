@@ -29,6 +29,7 @@ BuildRequires: python36-pip
 BuildRequires: python36-setuptools
 
 Requires: facter
+Requires: jq
 Requires: mero = %{h_mero_version}
 Requires: pacemaker
 Requires: pcs
