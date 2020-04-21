@@ -95,6 +95,11 @@ argsfile=${2:-}
 
 hare_dir=/var/lib/hare
 
+die() {
+    echo "$PROG: ERROR: $*" >&2
+    exit 1
+}
+
 if [[ -f $argsfile ]]; then
     while IFS=': ' read name value; do
        case $name in
@@ -105,7 +110,11 @@ if [[ -f $argsfile ]]; then
            right-node)   rnode=$value   ;;
            left-volume)  lvolume=$value ;;
            right-volume) rvolume=$value ;;
-           skip-mkfs)    skip_mkfs=true ;;
+           skip-mkfs)
+               [[ $value == true || $value == false ]] ||
+                   die 'Invalid value of `skip-mkfs` parameter.
+Supported values: true, false'
+               skip_mkfs=$value ;;
            net-type)     net_type=$value ;;
            '')           ;;
            *) echo "Invalid parameter '$name' in $argsfile" >&2
@@ -116,11 +125,6 @@ fi
 
 [[ $ip1 ]] && [[ $ip2 ]] && [[ $cdf ]]  || {
     usage >&2
-    exit 1
-}
-
-die() {
-    echo "$PROG: ERROR: $*" >&2
     exit 1
 }
 
