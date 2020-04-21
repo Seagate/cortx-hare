@@ -7,6 +7,7 @@ from hax.ffi import HaxFFI
 from hax.halink import HaLink
 from hax.handler import ConsumerThread
 from hax.server import run_server
+from hax.filestats import FsStatsUpdater
 from hax.types import Fid
 from hax.util import ConsulUtil, repeat_if_fails
 from typing import NamedTuple
@@ -23,8 +24,14 @@ def _setup_logging():
         format='%(asctime)s [%(levelname)s] {%(threadName)s} %(message)s')
 
 
-def _run_qconsumer_thread(queue: Queue, ffi: HaxFFI):
+def _run_qconsumer_thread(queue: Queue, ffi: HaxFFI) -> ConsumerThread:
     thread = ConsumerThread(queue, ffi)
+    thread.start()
+    return thread
+
+
+def _run_stats_updater_thread(halink: HaLink) -> FsStatsUpdater:
+    thread = FsStatsUpdater(halink)
     thread.start()
     return thread
 
@@ -63,7 +70,7 @@ def main():
 
     ffi = HaxFFI()
     halink = HaLink(queue=q, rm_fid=cfg.rm_fid, ffi=ffi)
-    thread = _run_qconsumer_thread(q, ffi)
+    consumer = _run_qconsumer_thread(q, ffi)
 
     try:
         halink.start(cfg.hax_ep,
@@ -71,9 +78,10 @@ def main():
                      ha_service=cfg.ha_fid,
                      rm_service=cfg.rm_fid)
         logging.info('ha_link connection has been established')
+        stats_updater = _run_stats_updater_thread(halink)
         # [KN] This is a blocking call. It will work until the program is
         # terminated by signal
-        run_server(thread_to_wait=thread, halink=halink)
+        run_server(threads_to_wait=[consumer, stats_updater], halink=halink)
     finally:
         halink.close()
 

@@ -26,6 +26,7 @@
 #include "conf/obj.h"            /* M0_CONF_OBJ_TYPES */
 #include "fid/fid.h"             /* M0_FID_TINIT */
 #include "ha/halon/interface.h"  /* m0_halon_interface */
+#include "spiel/spiel.h"  /* m0_spiel, m0_spiel_filesystem_stats_fetch */
 #include "module/instance.h"
 #include "lib/assert.h"          /* M0_ASSERT */
 #include "lib/memory.h"          /* M0_ALLOC_ARR */
@@ -167,6 +168,38 @@ M0_INTERNAL void m0_ha_entrypoint_reply_send(unsigned long long        epr,
 					    confd_eps_data, confd_quorum,
 					    rm_fid, rm_eps);
 	m0_free(hep);
+}
+
+/*
+ * To be invoked from python land.
+ */
+PyObject *m0_ha_filesystem_stats_fetch(unsigned long long ctx)
+{
+	PyGILState_STATE gstate;
+	gstate = PyGILState_Ensure();
+
+	struct hax_context        *hc    = (struct hax_context *)ctx;
+	struct m0_halon_interface *hi    = hc->hc_hi;
+	struct m0_spiel           *spiel = m0_halon_interface_spiel(hi);
+
+	struct m0_fs_stats stats;
+	Py_BEGIN_ALLOW_THREADS
+	int rc = m0_spiel_filesystem_stats_fetch(spiel, &stats);
+	M0_ASSERT(rc == 0);
+	Py_END_ALLOW_THREADS
+	PyObject *hax_mod = getModule("hax.types");
+	PyObject *fs_stats = PyObject_CallMethod(hax_mod, "FsStats",
+						 "(KKKKKkk)",
+						 stats.fs_free_seg,
+						 stats.fs_total_seg,
+						 stats.fs_free_disk,
+						 stats.fs_avail_disk,
+						 stats.fs_total_disk,
+						 stats.fs_svc_total,
+						 stats.fs_svc_replied);
+	Py_DECREF(hax_mod);
+	PyGILState_Release(gstate);
+	return fs_stats;
 }
 
 static void handle_failvec(const struct hax_msg *hm)
@@ -576,6 +609,12 @@ void destroy_halink(unsigned long long ctx)
 
 	hc->hc_alive = false;
 	Py_DECREF(hc->hc_handler);
+	if (hc->hc_rconfc_initialized)
+	{
+		struct m0_spiel *spiel = m0_halon_interface_spiel(hc0->hc_hi);
+		m0_spiel_rconfc_stop(spiel);
+	}
+
 	m0_halon_interface_stop(hc->hc_hi);
 	m0_halon_interface_fini(hc->hc_hi);
 	m0_mutex_fini(&hc->hc_mutex);
@@ -592,23 +631,58 @@ int start(unsigned long long   ctx,
 	struct m0_halon_interface *hi = hc->hc_hi;
 
 	M0_LOG(M0_INFO, "Starting hax interface..\n");
-	return m0_halon_interface_start(
-		hi, local_rpc_endpoint,
-		&M0_FID_TINIT('r', process_fid->f_container,
-			      process_fid->f_key),
-		&M0_FID_TINIT('s', ha_service_fid->f_container,
-			      ha_service_fid->f_key),
-		&M0_FID_TINIT('s', rm_service_fid->f_container,
-			      rm_service_fid->f_key),
-		entrypoint_request_cb,
-		msg_received_cb,
-		msg_is_delivered_cb,
-		msg_is_not_delivered_cb,
-		link_connected_cb,
-		link_reused_cb,
-		link_absent_cb,
-		link_is_disconnecting_cb,
-		link_disconnected_cb);
+	int rc = m0_halon_interface_start(
+			hi, local_rpc_endpoint,
+			&M0_FID_TINIT('r', process_fid->f_container,
+				      process_fid->f_key),
+			&M0_FID_TINIT('s', ha_service_fid->f_container,
+				      ha_service_fid->f_key),
+			&M0_FID_TINIT('s', rm_service_fid->f_container,
+				      rm_service_fid->f_key),
+			entrypoint_request_cb,
+			msg_received_cb,
+			msg_is_delivered_cb,
+			msg_is_not_delivered_cb,
+			link_connected_cb,
+			link_reused_cb,
+			link_absent_cb,
+			link_is_disconnecting_cb,
+			link_disconnected_cb);
+	if (rc != 0)
+	{
+		M0_LOG(M0_ERROR, "Failed to start m0_halon_interface");
+	}
+	return rc;
+}
+
+
+int start_rconfc(unsigned long long   ctx,
+		 const struct m0_fid *process_fid)
+{
+	struct hax_context        *hc = (struct hax_context *)ctx;
+
+	struct m0_spiel *spiel = m0_halon_interface_spiel(hc->hc_hi);
+	char fid_str[M0_FID_STR_LEN];
+
+	struct m0_fid *process_fid_copy = &M0_FID_TINIT(
+		'r', process_fid->f_container,
+		process_fid->f_key);
+
+	m0_fid_print(fid_str, M0_FID_STR_LEN, process_fid_copy);
+	int rc = m0_spiel_cmd_profile_set(spiel, fid_str);
+	if (rc != 0)
+	{
+		M0_LOG(M0_ERROR, "Failed to set spiel profile");
+		return rc;
+	}
+	rc = m0_spiel_rconfc_start(spiel, NULL);
+	if (rc != 0)
+	{
+		M0_LOG(M0_ERROR, "Failed to start rconfc");
+		return rc;
+	}
+	hc->hc_rconfc_initialized = true;
+	return 0;
 }
 
 void test(unsigned long long ctx)

@@ -5,8 +5,8 @@ from typing import Any, List
 
 from hax.ffi import HaxFFI, make_array, make_c_str
 from hax.message import EntrypointRequest, HaNvecGetEvent, ProcessEvent
-from hax.types import (ConfHaProcess, Fid, FidStruct, HaNote, HaNoteStruct,
-                       HAState, ObjT)
+from hax.types import (ConfHaProcess, Fid, FidStruct, FsStats, HaNote,
+                       HaNoteStruct, HAState, ObjT)
 from hax.util import ConsulUtil
 
 
@@ -38,6 +38,7 @@ class HaLink:
     def start(self, rpc_endpoint: str, process: Fid, ha_service: Fid,
               rm_service: Fid):
         logging.debug('Starting m0_halon_interface')
+        self._process_fid = process
         result = self._ffi.start(self._ha_ctx, make_c_str(rpc_endpoint),
                                  process.to_c(), ha_service.to_c(),
                                  rm_service.to_c())
@@ -46,7 +47,17 @@ class HaLink:
                 'Cannot start ha_link. m0_halon_interface::start' +
                 ' returned non-zero code (%s)', result)
             raise RuntimeError('Cannot start m0_halon_interface.' +
-                               'Please check mero logs for more details.')
+                               'Please check Mero logs for more details.')
+
+    def start_rconfc(self) -> int:
+        logging.debug('Starting rconfc')
+        result: int = self._ffi.start_rconfc(self._ha_ctx,
+                                             self._process_fid.to_c())
+        if result:
+            raise RuntimeError('Cannot start rconfc.' +
+                               'Please check Mero logs for more details.')
+        logging.debug('rconfc started')
+        return result
 
     @log_exception
     def _entrypoint_request_cb(self, reply_context: Any, req_id: Any,
@@ -182,8 +193,12 @@ class HaLink:
         logging.debug('ha_link destroyed. Bye!')
 
     def adopt_mero_thread(self):
-        logging.debug('Adopting mero thread')
+        logging.debug('Adopting Mero thread')
         self._ffi.adopt_mero_thread()
 
     def shun_mero_thread(self):
         self._ffi.shun_mero_thread()
+
+    def get_filesystem_stats(self) -> FsStats:
+        stats: FsStats = self._ffi.filesystem_stats_fetch(self._ha_ctx)
+        return stats

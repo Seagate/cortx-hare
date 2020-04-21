@@ -1,20 +1,23 @@
 import logging
 import time
 from queue import Empty, Queue
-from threading import Thread
 
 from hax.ffi import HaxFFI
 from hax.message import EntrypointRequest, HaNvecGetEvent, ProcessEvent
 from hax.util import ConsulUtil, repeat_if_fails
+from hax.types import StoppableThread
 
 
-class ConsumerThread(Thread):
+class ConsumerThread(StoppableThread):
     def __init__(self, q: Queue, hax_ffi: HaxFFI):
         super().__init__(target=self._do_work,
                          name='qconsumer',
                          args=(q, hax_ffi))
         self.is_stopped = False
         self.consul = ConsulUtil()
+
+    def stop(self) -> None:
+        self.is_stopped = True
 
     def _do_work(self, q: Queue, ffi: HaxFFI):
         logging.info('Handler thread has started')

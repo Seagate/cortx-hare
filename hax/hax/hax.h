@@ -25,6 +25,7 @@
 #define __HAX_H__
 
 #include "lib/mutex.h"
+#include <Python.h>
 
 struct m0_halon_interface;
 
@@ -39,6 +40,7 @@ struct hax_context {
 	struct m0_tl               hc_links;
 	bool                       hc_alive;
 	PyObject                  *hc_handler;
+	bool                       hc_rconfc_initialized;
 };
 
 struct hax_link {
@@ -65,6 +67,8 @@ int start(unsigned long long ctx, const char *local_rpc_endpoint,
 	  const struct m0_fid *process_fid, const struct m0_fid *ha_service_fid,
 	  const struct m0_fid *rm_service_fid);
 
+int start_rconfc(unsigned long long   ctx,
+		 const struct m0_fid *process_fid);
 
 void test(unsigned long long ctx );
 void m0_ha_entrypoint_reply_send(unsigned long long epr,
@@ -81,6 +85,12 @@ void m0_ha_failvec_reply_send(unsigned long long hm, struct m0_fid *pool_fid,
 void m0_ha_nvec_reply_send(unsigned long long hm, struct m0_ha_note *notes, uint32_t nr_notes);
 void m0_ha_notify(unsigned long long ctx, struct m0_ha_note *notes, uint32_t nr_notes);
 void m0_ha_broadcast_test(unsigned long long ctx);
+
+/*
+ * Invokes m0_spiel_filesystem_stats_fetch() and returns a Python object of type
+ * hax.types.FsStats
+ */
+PyObject *m0_ha_filesystem_stats_fetch(unsigned long long ctx);
 
 /* __HAX_H__ */
 #endif

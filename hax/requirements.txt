@@ -3,4 +3,5 @@ mypy
 pkgconfig
 python-consul
 setuptools
+simplejson
 wheel

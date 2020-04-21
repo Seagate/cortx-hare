@@ -37,7 +37,7 @@ class MypyCmd(Command):
 
 def read(fname):
     return open(os.path.join(os.path.dirname(__file__), fname)) \
-           .read().rstrip('\n')
+        .read().rstrip('\n')
 
 
 def get_hax_version():
@@ -80,6 +80,11 @@ def get_mero_libs_dir():
     return libs_dir
 
 
+def get_galois_include_dir():
+    mero_dir = get_mero_dir()
+    return f'{mero_dir}/extra-libs/galois/include/'
+
+
 def get_mero_cflags():
     try:
         # Mero devel rpm takes precedence over M0_SRC_DIR
@@ -109,7 +114,7 @@ setup(
             name='libhax',
             sources=['hax/hax.c'],
             include_dirs=[get_mero_dir(),
-                          get_mero_dir() + '/extra-libs/galois/include'],
+                          get_galois_include_dir()],
             define_macros=[('M0_INTERNAL', ''), ('M0_EXTERN', 'extern')],
             library_dirs=[get_mero_libs_dir()],
             runtime_library_dirs=[get_mero_libs_dir()],

@@ -1,17 +1,18 @@
 import json
+import simplejson
 import logging
 import os
 import re
 from functools import wraps
 from time import sleep
-from typing import Any, Dict, List, NamedTuple
+from typing import Any, Dict, List, NamedTuple, Tuple
 
 from consul import Consul, ConsulException
 from requests.exceptions import RequestException
 from urllib3.exceptions import HTTPError
 
 from hax.exception import HAConsistencyException
-from hax.types import ConfHaProcess, Fid, ObjT
+from hax.types import ConfHaProcess, Fid, FsStatsWithTime, ObjT
 
 __all__ = ['ConsulUtil', 'create_process_fid']
 
@@ -87,6 +88,29 @@ class ConsulUtil:
             return self.cns.kv.get(key, **kwargs)[1]
         except (ConsulException, HTTPError, RequestException) as e:
             raise HAConsistencyException('Could not access Consul KV')\
+                from e
+
+    def _kv_put(self, key: str, data: str) -> None:
+        """
+        Helper method that should be used by default in this class whenver
+        we want to invoke Consul.kv.put()
+        """
+        assert key
+        try:
+            self.cns.kv.put(key, data)
+        except (ConsulException, HTTPError, RequestException) as e:
+            raise HAConsistencyException('Failed to put value to KV') from e
+
+    def _catalog_service_names(self) -> List[str]:
+        """
+        Return full list of service names currently registered in Consul
+        server.
+        """
+        try:
+            services: Dict[str, List[Any]] = self.cns.catalog.services()[1]
+            return list(services.keys())
+        except (ConsulException, HTTPError, RequestException) as e:
+            raise HAConsistencyException('Could not access Consul Catalog')\
                 from e
 
     def _catalog_service_get(self, svc_name: str) -> List[Dict[str, Any]]:
@@ -179,9 +203,38 @@ class ConsulUtil:
             raise HAConsistencyException('Failed to communicate to'
                                          ' Consul Agent') from e
 
-    def get_confd_list(self) -> List[ServiceData]:
-        services = self._catalog_service_get('confd')
+    def get_m0d_statuses(self) -> List[Tuple[ServiceData, str]]:
+        """
+        Return the list of all Mero service statuses according to Consul
+        watchers. The following services are considered: ios, confd.
+        """
+        def get_status(srv: ServiceData) -> str:
+            try:
+                key = f'processes/{srv.fid}'
+                raw_data = self._kv_get(key)
+                logging.debug('Raw value from KV: %s', raw_data)
+                data = raw_data['Value']
+                value: str = json.loads(data)['state']
+                return value
+            except Exception:
+                return 'Unknown'
+
+        m0d_services = set(['ios', 'confd'])
+        result = []
+        for service_name in self._catalog_service_names():
+            if service_name not in m0d_services:
+                continue
+            data = self.get_service_data_by_name(service_name)
+            result += [(item, get_status(item)) for item in data]
+        return result
+
+    def get_service_data_by_name(self, name: str) -> List[ServiceData]:
+        services = self._catalog_service_get(name)
+        logging.debug('Services "%s" received: %s', name, services)
         return list(map(mkServiceData, services))
+
+    def get_confd_list(self) -> List[ServiceData]:
+        return self.get_service_data_by_name('confd')
 
     def get_services_by_parent_process(self,
                                        process_fid: Fid) -> List[FidWithType]:
@@ -258,19 +311,17 @@ class ConsulUtil:
                            ip_addr=srv_ip_addr,
                            address=f'{srv_address}:{srv_port}')
 
+    def update_fs_stats(self, stats_data: FsStatsWithTime) -> None:
+        # TODO investigate whether we can replace json with simplejson in
+        # all the cases
+        data_str = simplejson.dumps(stats_data)
+        self._kv_put('stats/filesystem', data_str)
+
     def update_process_status(self, event: ConfHaProcess) -> None:
         assert 0 <= event.chp_event < len(ha_process_events), \
             f'Invalid event type: {event.chp_event}'
 
-        try:
-            # TODO [KN] improve type stubs!
-            data = json.dumps({'state': ha_process_events[event.chp_event]})
-            key = f'processes/{event.fid}'
-            logging.debug('Setting process status in KV: %s:%s', key, data)
-            self.cns.kv.put(  # type: ignore
-                # This `type:` directive prevents mypy error:
-                #     "KV" has no attribute "put"
-                key,
-                data)
-        except (ConsulException, HTTPError, RequestException) as e:
-            raise HAConsistencyException('Failed to put value to KV') from e
+        data = json.dumps({'state': ha_process_events[event.chp_event]})
+        key = f'processes/{event.fid}'
+        logging.debug('Setting process status in KV: %s:%s', key, data)
+        self._kv_put(key, data)
