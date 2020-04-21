@@ -78,7 +78,8 @@ for f in ${extra_files[@]}; do
     fi
 done
 
-cp --parents /var/lib/hare/*.{yaml,json} . 2>/dev/null || true
+cp --parents /var/lib/hare/* . 2>/dev/null || true
+cp -r --parents /var/lib/hare/consul-{env,server,client}-* . 2>/dev/null || true
 cp -r --parents /var/log/hare/ . 2>/dev/null || true
 
 cd ..
