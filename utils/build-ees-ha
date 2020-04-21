@@ -185,7 +185,7 @@ mkfs_ext4() {
     sudo mkfs.ext4 -q $dev &>/dev/null < <(echo y)
 }
 
-if ! [[ $skip_mkfs ]]; then
+if ! $skip_mkfs; then
     mkfs_ext4 $lvolume
     mkfs_ext4 $rvolume
 fi
