@@ -40,6 +40,10 @@ class HaxFFI:
 
         self.init_halink = lib.init_halink
         self.start = lib.start
+
+        lib.start_rconfc.argtypes = [c.c_void_p, c.POINTER(FidStruct)]
+        lib.start_rconfc.restype = c.c_int
+        self.start_rconfc = lib.start_rconfc
         self.destroy = py_func_proto(('destroy_halink', lib))
 
         lib.m0_ha_entrypoint_reply_send.argtypes = [
@@ -73,3 +77,7 @@ class HaxFFI:
         lib.adopt_mero_thread.restype = c.c_int
         self.adopt_mero_thread = lib.adopt_mero_thread
         self.shun_mero_thread = lib.shun_mero_thread
+
+        lib.m0_ha_filesystem_stats_fetch.argtypes = [c.c_void_p]
+        lib.m0_ha_filesystem_stats_fetch.restype = c.py_object
+        self.filesystem_stats_fetch = lib.m0_ha_filesystem_stats_fetch

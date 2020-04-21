@@ -3,7 +3,7 @@ import logging
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any, Dict, List, Tuple
 
-from hax.types import HAState
+from hax.types import HAState, StoppableThread
 from hax.util import ConsulUtil, create_process_fid
 
 
@@ -64,7 +64,7 @@ class KVHandler(BaseHTTPRequestHandler):
         ]
 
 
-def run_server(thread_to_wait=None,
+def run_server(threads_to_wait: List[StoppableThread] = [],
                server_class=HTTPServer,
                port=8008,
                halink=None):
@@ -77,7 +77,9 @@ def run_server(thread_to_wait=None,
     try:
         httpd.serve_forever()
     finally:
-        if thread_to_wait is not None:
-            thread_to_wait.is_stopped = True
-            thread_to_wait.join()
+        for thread in threads_to_wait:
+            thread.stop()
+        for thread in threads_to_wait:
+            thread.join()
+
         logging.info('The http server has stopped')

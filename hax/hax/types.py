@@ -1,4 +1,5 @@
 import ctypes as c
+from threading import Thread
 from enum import Enum
 from typing import NamedTuple
 
@@ -112,6 +113,20 @@ class Uint128:
         return Uint128Struct(self.hi, self.lo)
 
 
+FsStats = NamedTuple('FsStats', [('fs_free_seg', int), ('fs_total_seg', int),
+                                 ('fs_free_disk', int), ('fs_avail_disk', int),
+                                 ('fs_total_disk', int), ('fs_svc_total', int),
+                                 ('fs_svc_replied', int)])
+
+FsStatsWithTime = NamedTuple('FsStatsWithTime', [('stats', FsStats),
+                                                 ('timestamp', float),
+                                                 ('date', str)])
+
 HaNote = NamedTuple('HaNote', [('obj_t', str), ('note', HaNoteStruct)])
 
 HAState = NamedTuple('HAState', [('fid', Fid), ('status', str)])
+
+
+class StoppableThread(Thread):
+    def stop(self) -> None:
+        pass
