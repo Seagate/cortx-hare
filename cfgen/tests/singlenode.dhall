@@ -1,3 +1,4 @@
+let Prelude = ../dhall/Prelude.dhall
 let types = ../dhall/types.dhall
 
 in
@@ -7,10 +8,12 @@ in
       , data_iface_type = None types.Protocol
       , m0_servers =
           [ { runs_confd = Some True
-            , io_disks = None { path_glob : Text }
+            , io_disks = [] : List Text
             }
           , { runs_confd = None Bool
-            , io_disks = Some { path_glob = "/dev/loop[0-9]*" }
+            , io_disks =
+                let mkPath = \(i : Natural) -> "/dev/loop" ++ Natural/show i
+                in Prelude.List.generate 10 Text mkPath
             }
           ]
       , m0_clients =

@@ -4,7 +4,6 @@ import abc
 import argparse
 import ast
 from enum import Enum, auto
-from glob import glob
 import json
 import os
 from pprint import pprint
@@ -18,7 +17,7 @@ from typing import Any, Callable, Dict, Iterator, List, NamedTuple, Set, \
 import yaml
 
 
-__version__ = '0.6.1'
+__version__ = '0.7'
 
 
 def parse_opts(argv):
@@ -75,8 +74,8 @@ nodes:
                                # optional, defaults to "tcp"
     m0_servers:
       - runs_confd: <bool>  # optional, defaults to false
-        #io_disks: null                 # no IO service
-        io_disks: { path_glob: <str> }  # e.g. "/dev/loop[0-9]*"
+        io_disks: [ <str> ] # e.g. [ "/dev/loop0", "/dev/loop1", "/dev/loop2" ]
+                            # Empty list means no IO service.
     m0_clients:
         s3: <int>     # number of S3 servers to start
         other: <int>  # max quantity of other Mero clients this host may have
@@ -222,9 +221,8 @@ def enrich_cluster_desc(desc: Dict[str, Any], mock_p: bool) -> None:
 
         for m0d in node['m0_servers']:
             m0d.setdefault('runs_confd', False)
-            disks = m0d.setdefault('io_disks', {'path_glob': None})
-            disks['items'] = get_disks(node['hostname'], mock_p,
-                                       disks['path_glob'])
+            m0d['_io_disks'] = get_disks(node['hostname'], mock_p,
+                                         m0d.setdefault('io_disks', []))
     if use_fqdn:
         for node in desc['nodes']:
             node['facts']['hostname'] = node['facts']['fqdn']
@@ -260,12 +258,12 @@ Make sure the value of data_iface in the CDF is correct."""
         total_nr_confds += nr_confds
 
         for m0d in node['m0_servers']:
-            assert m0d['runs_confd'] or m0d['io_disks']['path_glob'], \
+            assert m0d['runs_confd'] or m0d['io_disks'], \
                 f"{node_id}: Either 'runs_confd' or 'io_disks' must be set"
 
         disks: List[Disk] = []
         for m0d in node['m0_servers']:
-            disks.extend(m0d['io_disks']['items'])
+            disks.extend(m0d['_io_disks'])
         assert all_unique(disks), \
             f'{node_id}: Same disk used by several IO services'
         total_nr_disks += len(disks)
@@ -317,13 +315,11 @@ Disk.blksize.__doc__ = 'Block size for file system I/O'
 
 
 # XXX see build_disk_info() in mero's `utils/m0genfacts`
-def get_disks(hostname: str, mock_p: bool, path_glob: str) -> List[Disk]:
-    if mock_p:
-        return fabricate_disks(hostname, path_glob)
-
-    paths: List[str] = glob(path_glob) if path_glob else []
+def get_disks(hostname: str, mock_p: bool, paths: List[str]) -> List[Disk]:
     if not paths:
         return []
+    if mock_p:
+        return fabricate_disks(hostname, paths)
 
     code = f"""\
 import io
@@ -348,12 +344,9 @@ print([dict(path=path,
                                          'sudo', 'python3', '-c', code))]
 
 
-def fabricate_disks(hostname: str, path_glob: str) -> List[Disk]:
-    if not path_glob:
-        return []
-    # XXX use `path_glob`
-    return [Disk(path=f'/mock/disk{i}', size=0, blksize=4096)
-            for i in range(10)]
+def fabricate_disks(hostname: str, paths: List[str]) -> List[Disk]:
+    assert paths
+    return [Disk(path=x, size=0, blksize=4096) for x in paths]
 
 
 ObjT = Enum('ObjT', 'root fdmi_flt_grp fdmi_filter'
@@ -598,7 +591,7 @@ class ConfProcess(ToDhall):
             svc_id = ConfService.build(m0conf, proc_id, stype, ep)
             if stype is SvcT.M0_CST_IOS:  # XXX What about M0_CST_CAS?
                 assert proc_desc is not None and ctrl is not None
-                for disk in proc_desc['io_disks']['items']:
+                for disk in proc_desc['_io_disks']:
                     ConfDrive.build(m0conf, ctrl,
                                     ConfSdev.build(m0conf, svc_id, disk))
         return proc_id
@@ -644,7 +637,7 @@ def service_types(proc_t: ProcT,
         assert proc_desc is not None
         if proc_desc.get('runs_confd'):
             ts.append(SvcT.M0_CST_CONFD)
-        if proc_desc['io_disks']['items']:
+        if proc_desc['_io_disks']:
             ts.extend([SvcT.M0_CST_IOS,
                        SvcT.M0_CST_SNS_REP,
                        SvcT.M0_CST_SNS_REB,
@@ -1307,7 +1300,7 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
 
         node_id = ConfNode.build(conf, root_id, facts)
         ctrl_id = None
-        if any(m0d['io_disks']['items'] for m0d in node['m0_servers']):
+        if any(m0d['_io_disks'] for m0d in node['m0_servers']):
             ctrl_id = ConfController.build(conf,
                                            ConfEnclosure.build(conf, rack_id),
                                            node_id)
