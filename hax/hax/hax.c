@@ -38,8 +38,8 @@
 #include "ha/link.h"
 #include "hax.h"
 
-static struct hax_context *hc0;
-static struct m0_thread    m0thread;
+static		struct hax_context *hc0;
+static __thread struct m0_thread    m0thread;
 
 static void __ha_failvec_reply_send(const struct hax_msg *hm,
 				    struct m0_fid *pool_fid,
