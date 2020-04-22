@@ -93,7 +93,7 @@ hare_dir=/var/lib/hare
 echo 'Adding sspl resource and constraints...'
 
 pcs cluster cib ssplcfg
-pcs -f ssplcfg resource create sspl ocf:seagate:sspl_stateful_resource_agent \
+pcs -f ssplcfg resource create sspl ocf:eos:sspl \
     master meta migration-threshold=10 failure-timeout=10s is-managed=true
 pcs -f ssplcfg constraint order consul-c1 then sspl-master
 pcs -f ssplcfg constraint order consul-c2 then sspl-master
