@@ -50,7 +50,6 @@ or via a yaml file, e.g.:
   right-volume: <rvolume>
   skip-mkfs: true
   net-type: <tcp|o2ib>
-
 EOF
 }
 
@@ -184,22 +183,15 @@ Check the following:
  2) Run 'pcs status' and make sure LNet is configured.
  3) STONITH is configured or disabled in Pacemaker."
 
-ip a | grep -q $ip1 ||
-  die "the IP address ($ip1) on the $lnode failed to be configured. $check_msg"
+ip a | grep -qF $ip1 ||
+    die "IP address $ip1 doesn't appear to be configured at $lnode. $check_msg"
 
-ssh $rnode "ip a | grep -q $ip2" ||
-  die "the IP address ($ip2) on the $rnode failed to be configured. $check_msg"
-
-echo 'Preparing Hare configuration files...'
-
-mkfs_ext4() {
-    local dev=$1
-    sudo mkfs.ext4 -q $dev &>/dev/null < <(echo y)
-}
+ssh $rnode "ip a | grep -qF $ip2" ||
+    die "IP address $ip2 doesn't appear to be configured at $rnode. $check_msg"
 
 if ! $skip_mkfs; then
-    mkfs_ext4 $lvolume
-    mkfs_ext4 $rvolume
+    sudo mkfs.ext4 -q $lvolume >/dev/null <<< y
+    sudo mkfs.ext4 -q $rvolume >/dev/null <<< y
 fi
 
 # Mount /var/mero (if not mounted).
@@ -207,6 +199,8 @@ mkdir -p /var/mero &&
   ! mountpoint -q /var/mero && sudo mount $lvolume /var/mero || true
 ssh $rnode "mkdir -p /var/mero &&
   ! mountpoint -q /var/mero && sudo mount $rvolume /var/mero || true"
+
+echo 'Preparing Hare configuration files...'
 
 # Update data_iface values in CDF: 1st data_iface will be `${iface}_c1`,
 #                                  2nd data_iface will be `${iface}_c2`.
