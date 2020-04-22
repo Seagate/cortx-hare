@@ -5,12 +5,6 @@ set -x
 
 . /data/hare/ci/_env  # MERO_COMMIT_REF, RPMSYNC_DIR
 
-sudo mkdir -p /var/mero
-for i in {0..9}; do
-    sudo dd if=/dev/zero of=/var/mero/disk$i.img bs=1M seek=9999 count=1
-    sudo losetup /dev/loop$i /var/mero/disk$i.img
-done
-
 if [[ -n ${MERO_COMMIT_REF:-} ]]; then
     # `systemctl start hare-hax` command, called by `bootstrap-node`,
     # will fail unless `mero-kernel` systemd service is installed.

@@ -33,5 +33,12 @@ test_cluster() {
 }
 
 cd /data/hare/
+
+sudo mkdir -p /var/mero
+for i in {0..9}; do
+    sudo dd if=/dev/zero of=/var/mero/disk$i.img bs=1M seek=9999 count=1
+    sudo losetup /dev/loop$i /var/mero/disk$i.img
+done
+
 test_cluster cfgen/examples/singlenode.yaml
 test_cluster cfgen/examples/ci-boot1-2ios.yaml
