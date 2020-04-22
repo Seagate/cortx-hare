@@ -41,8 +41,8 @@ The scripts in this repository constitute a middleware layer between [Consul](ht
 
 3. Edit `cfgen/examples/singlenode.yaml` file.
 
-   * Ensure that the disks referred to by `io_disks.path_glob` pattern
-     exist.  Create loop devices, if necessary:
+   * Ensure that the disks enumerated in the `io_disks` list exist.
+     Create loop devices, if necessary:
      ```bash
      sudo mkdir -p /var/mero
      for i in {0..9}; do

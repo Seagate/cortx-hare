@@ -4,8 +4,19 @@ nodes:
     data_iface_type: tcp
     m0_servers:
       - runs_confd: true
-      - io_disks: { path_glob: "/dev/loop[0-3]*" }
-      - io_disks: { path_glob: "/dev/loop[4-9]*" }
+        io_disks: []
+      - io_disks:
+          - /dev/loop0
+          - /dev/loop1
+          - /dev/loop2
+          - /dev/loop3
+      - io_disks:
+          - /dev/loop4
+          - /dev/loop5
+          - /dev/loop6
+          - /dev/loop7
+          - /dev/loop8
+          - /dev/loop9
     m0_clients:
         s3: 0
         other: 2

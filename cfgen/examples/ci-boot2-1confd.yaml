@@ -3,14 +3,27 @@ nodes:
     data_iface: eth1
     m0_servers:
       - runs_confd: true
-      - io_disks: { path_glob: "/dev/vd[b-g]*" }
+        io_disks: []
+      - io_disks:
+          - /dev/vdb
+          - /dev/vdc
+          - /dev/vdd
+          - /dev/vde
+          - /dev/vdf
+          - /dev/vdg
     m0_clients:
         s3: 0
         other: 2
   - hostname: ssu2
     data_iface: eth1
     m0_servers:
-      - io_disks: { path_glob: "/dev/vd[b-g]*" }
+      - io_disks:
+          - /dev/vdb
+          - /dev/vdc
+          - /dev/vdd
+          - /dev/vde
+          - /dev/vdf
+          - /dev/vdg
     m0_clients:
         s3: 0
         other: 2

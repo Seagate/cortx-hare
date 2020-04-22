@@ -8,7 +8,12 @@ nodes:
                             # supported values: "tcp" (default), "o2ib"
     m0_servers:
       - runs_confd: true
-      - io_disks: { path_glob: "/dev/sd[d-g]" }
+        io_disks: []
+      - io_disks:
+          - /dev/sdd
+          - /dev/sde
+          - /dev/sdf
+          - /dev/sdg
     m0_clients:
         s3: 0           # number of S3 servers to start
         other: 2        # max quantity of other Mero clients this node may have
@@ -17,7 +22,12 @@ nodes:
     data_iface_type: o2ib
     m0_servers:
       - runs_confd: true
-      - io_disks: { path_glob: "/dev/sd[h-k]" }
+        io_disks: []
+      - io_disks:
+          - /dev/sdh
+          - /dev/sdi
+          - /dev/sdj
+          - /dev/sdk
     m0_clients:
         s3: 0
         other: 2

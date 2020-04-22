@@ -1,7 +1,7 @@
 -- m0d process
 let M0Server =
   { runs_confd : Optional Bool
-  , io_disks : Optional { path_glob : Text }
+  , io_disks : List Text
   }
 
 let Node =
