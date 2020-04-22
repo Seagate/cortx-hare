@@ -95,9 +95,16 @@ echo 'Adding sspl resource and constraints...'
 pcs cluster cib ssplcfg
 pcs -f ssplcfg resource create sspl ocf:eos:sspl \
     master meta migration-threshold=10 failure-timeout=10s is-managed=true
-pcs -f ssplcfg constraint order consul-c1 then sspl-master
-pcs -f ssplcfg constraint order consul-c2 then sspl-master
+pcs -f ssplcfg constraint order consul-c1 then sspl-master kind=Optional
+pcs -f ssplcfg constraint order consul-c2 then sspl-master kind=Optional
+pcs -f ssplcfg constraint order consul-c1 then promote sspl-master kind=Optional
+pcs -f ssplcfg constraint order consul-c2 then promote sspl-master kind=Optional
 pcs cluster cib-push ssplcfg --config
+
+# failure-timeout "is not guaranteed to be checked more frequently than"
+# cluster-recheck-interval, see more at
+# https://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/1.1/html/Pacemaker_Explained/s-resource-options.html#_resource_meta_attributes
+pcs property set cluster-recheck-interval=10s
 
 echo 'Copying Consul configuration files...'
 

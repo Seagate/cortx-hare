@@ -1,27 +1,40 @@
 #!/bin/sh
 #
-# ocf:pacemaker:Stateful resource agent
+#	SSPL OCF Stateful master/slave RA.
 #
-# Copyright 2006-2019 the Pacemaker project contributors
+# Copyright (c) 2019-2020 Seagate Technology PLC
 #
-# The version control history for this file may have further details.
+#                    All Rights Reserved.
 #
-# This source code is licensed under the GNU General Public License version 2
-# or later (GPLv2+) WITHOUT ANY WARRANTY.
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of version 2 of the GNU General Public License as
+# published by the Free Software Foundation.
 #
+# This program is distributed in the hope that it would be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 #
-# Example of a stateful OCF Resource Agent
+# Further, this software is distributed without any warranty that it is
+# free of the rightful claim of any third person regarding infringement
+# or the like.  Any license provided herein, whether implied or
+# otherwise, applies only to this software file.  Patent licenses, if
+# any, provided herein do not apply to combinations of this program with
+# other software, or any other product whatsoever.
 #
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write the Free Software Foundation,
+# Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
+
 # Return codes and its menaning
 # 0: OCF_SUCESS: Successful Execution
 # 9: OCF_MASTER_FAILED: Resource is failed in Master mode
 # 7: OCF_NOT_RUNNING: Resource is safely stopped.
-#######################################################################
+
 # Initialization:
 : ${OCF_FUNCTIONS:="${OCF_ROOT}/resource.d/heartbeat/.ocf-shellfuncs"}
 . "${OCF_FUNCTIONS}"
 : ${__OCF_ACTION:="$1"}
-#######################################################################
+
 meta_data() {
     cat <<END
 <?xml version="1.0"?>
@@ -62,7 +75,7 @@ Location to store the sspl mode. [ Active, Degraded ]
 END
     exit $OCF_SUCCESS
 }
-#######################################################################
+
 stateful_usage() {
     cat <<END
 usage: $0 {start|stop|promote|demote|monitor|validate-all|meta-data}
@@ -70,9 +83,11 @@ Expects to have a fully populated OCF RA-compliant environment set.
 END
     exit $1
 }
+
 stateful_update() {
     echo $1 > "${OCF_RESKEY_state}"
 }
+
 stateful_check_state() {
     target="$1"
     if [ -f "${OCF_RESKEY_state}" ]; then
@@ -91,9 +106,7 @@ stateful_check_state() {
     # So that, pacemaker will take action to start it
     return 7
 }
-set_master_score() {
-    "${HA_SBIN_DIR}/crm_master" -l reboot -v "$1"
-}
+
 stateful_start() {
     stateful_check_state "master"
     if [ $? -eq 0 ]; then
@@ -102,10 +115,11 @@ stateful_start() {
         return $OCF_RUNNING_MASTER
     fi
     stateful_update "slave"
-    set_master_score "${slave_score}"
+    "${HA_SBIN_DIR}/crm_master" -l reboot -v 1
     systemctl start sspl-ll
     return $OCF_SUCCESS
 }
+
 stateful_demote() {
     stateful_monitor
     sspl_state=`systemctl is-active sspl-ll`
@@ -113,7 +127,6 @@ stateful_demote() {
        systemctl start sspl-ll
     fi
     stateful_update "slave"
-    set_master_score "${slave_score}"
 
     if [ -z $OCF_RESKEY_sspl_mode ]; then
         OCF_RESKEY_sspl_mode="/var/eos/sspl/data/state.txt"
@@ -122,19 +135,18 @@ stateful_demote() {
     echo "state=degrade" > /var/eos/sspl/data/state.txt
     return 0
 }
+
 stateful_promote() {
     sleep 5
     sspl_pid=`/sbin/pidof -s /usr/bin/sspl_ll_d`
     if [ -z $sspl_pid ]; then
-        "${HA_SBIN_DIR}/crm_master" -v
-        return stateful_monitor
+        return $(stateful_monitor)
     fi
     sspl_state=`systemctl is-active sspl-ll`
     if [ $sspl_state != 'active' ]; then
        systemctl start sspl-ll
     fi
     stateful_update "master"
-    set_master_score "${master_score}"
 
     if [ -z $OCF_RESKEY_sspl_mode ]; then
         OCF_RESKEY_sspl_mode="/var/eos/sspl/data/state.txt"
@@ -147,17 +159,17 @@ stateful_promote() {
     /usr/bin/kill -s SIGHUP $sspl_pid
     return 0
 }
+
 stateful_stop() {
-    "${HA_SBIN_DIR}/crm_master" -l reboot -D
     systemctl stop sspl-ll
     return $OCF_SUCESS
 }
+
 stateful_monitor() {
     sspl_state=`systemctl is-active sspl-ll`
     stateful_check_state "master"
     if [ $? -eq 0 ]; then
         # Restore the master setting during probes
-        set_master_score "${master_score}"
         case "$sspl_state" in
               active) return $OCF_RUNNING_MASTER;;
               failed) return $OCF_FAILED_MASTER;;
@@ -166,7 +178,6 @@ stateful_monitor() {
         esac
     fi
 
-    set_master_score "${slave_score}"
     case "$sspl_state" in
            active) return $OCF_SUCCESS;;
            failed) return $OCF_ERR_GENERIC;;
@@ -178,8 +189,6 @@ stateful_validate() {
     return $OCF_SUCCESS
 }
 
-: ${slave_score:=5}
-: ${master_score:=10}
 : ${OCF_RESKEY_CRM_meta_globally_unique:="false"}
 if [ -z "$OCF_RESKEY_state" ]; then
     if [ "${OCF_RESKEY_CRM_meta_globally_unique}" = "false" ]; then
@@ -190,6 +199,7 @@ if [ -z "$OCF_RESKEY_state" ]; then
         OCF_RESKEY_state="${HA_VARRUN%%/}/Stateful-${OCF_RESOURCE_INSTANCE}.state"
     fi
 fi
+
 case "$__OCF_ACTION" in
 meta-data)      meta_data;;
 start)          stateful_start;;
@@ -201,4 +211,5 @@ validate-all)   stateful_validate;;
 usage|help)     stateful_usage $OCF_SUCCESS;;
 *)              stateful_usage $OCF_ERR_UNIMPLEMENTED;;
 esac
+
 exit $?
