@@ -203,8 +203,7 @@ done
 
 tmpfile=$(mktemp /tmp/${CONF_FILE##*/}.XXXXXX)
 trap "rm -f $tmpfile" EXIT # delete automatically on exit
-jq ".services = [$SVCS_CONF] |
-    .node_name = \"$node_name\"" <$CONF_FILE >$tmpfile
+jq ".services = [$SVCS_CONF]" <$CONF_FILE >$tmpfile
 sudo cp $tmpfile $CONF_FILE
 
 sudo sed -r "s;(http://)localhost;\1$(get_service_ip_addr $HAX_EP);" \
