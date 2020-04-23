@@ -1,0 +1,39 @@
+#!/bin/bash
+set -eu -o pipefail
+export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
+# set -x
+
+PROG=${0##*/}
+
+usage() {
+    cat <<EOF
+Usage: $PROG [-h | --help]
+
+Configures UDS HA by adding resources to Pacemaker.
+
+Caveats:
+
+* The script expects that 'csm-web' resource is added to Pacemaker.
+  Check with 'pcs status'.
+EOF
+}
+
+TEMP=$(getopt --options h \
+              --longoptions help \
+              --name "$PROG" -- "$@" || true)
+
+eval set -- "$TEMP"
+
+while true; do
+    case "$1" in
+        -h|--help) usage; exit ;;
+        --)        shift; break ;;
+        *)         break ;;
+    esac
+done
+
+echo 'Adding UDS resource and constraints...'
+sudo pcs cluster cib udscfg
+sudo pcs -f udscfg resource create uds systemd:uds op monitor interval=30s
+sudo pcs -f udscfg constraint colocation add uds with csm-web score=INFINITY
+sudo pcs cluster cib-push udscfg --config
