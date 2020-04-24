@@ -23,9 +23,9 @@ for ctrl in c2 c1; do
 done
 
 resources=(
-    s3back{prod,cons}
-    s3back{prod,cons}
-    haproxy
+    s3backcons-c{2,1}
+    s3backprod
+    haproxy-c{2,1}
     statsd
     els-search
     s3auth
