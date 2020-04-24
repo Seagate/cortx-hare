@@ -34,6 +34,7 @@ resources=(
     c{2,1}
     mero-kernel
     lnet
+    pdifmon
 )
 for r in ${resources[@]}; do
     pcs resource delete $r || true
