@@ -462,6 +462,14 @@ sudo pcs -f mcfg constraint order mero-confd-c1 then mero-ios-c2
 sudo pcs -f mcfg constraint order mero-confd-c2 then mero-ios-c1
 sudo pcs cluster cib-push mcfg --config
 
+echo 'Configuring ClusterIP constrains in Pacemaker...'
+sudo pcs cluster cib clustercfg
+sudo pcs -f clustercfg constraint location ClusterIP-clone \
+         rule score=-INFINITY ethmonitor-enp175s0f1 ne 1
+sudo pcs -f clustercfg constraint order c1 then ClusterIP-clone
+sudo pcs -f clustercfg constraint order c2 then ClusterIP-clone
+sudo pcs cluster cib-push clustercfg --config
+
 # Copy only the updated files from each side.
 sudo rsync -u /etc/sysconfig/m0d-* $rnode:/etc/sysconfig/
 sudo rsync -u "$rnode:/etc/sysconfig/m0d-*" /etc/sysconfig/
