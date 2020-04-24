@@ -479,7 +479,8 @@ sudo pcs resource create statsd systemd:statsd clone op monitor interval=30s
 sudo pcs constraint order els-search-clone then statsd-clone
 
 echo 'Adding haproxy to pacemaker...'
-sudo pcs resource create haproxy systemd:haproxy clone op monitor interval=30s
+sudo pcs resource create haproxy-c1 systemd:haproxy op monitor interval=30s
+sudo pcs resource create haproxy-c2 systemd:haproxy op monitor interval=30s
 
 echo 'Adding S3server to Pacemaker...'
 get_s3_svc() {
@@ -489,10 +490,27 @@ get_s3_svc() {
         awk "/$svc.s3server@/ {print \$2}"
 }
 
+echo 'Adding rabbit-mq resources and constraints...'
+sudo pcs resource create rabbitmq systemd:rabbitmq-server clone op \
+    monitor interval=30s
+
+echo 'Adding s3background services...'
+sudo pcs cluster cib s3bcfg
+sudo pcs -f s3bcfg resource create s3backcons-c1 systemd:s3backgroundconsumer
+sudo pcs -f s3bcfg resource create s3backcons-c2 systemd:s3backgroundconsumer
+sudo pcs -f s3bcfg constraint order rabbitmq-clone then s3backcons-c1
+sudo pcs -f s3bcfg constraint order rabbitmq-clone then s3backcons-c2
+sudo pcs -f s3bcfg resource create s3backprod systemd:s3backgroundproducer op \
+    monitor interval=30s
+sudo pcs -f s3bcfg constraint colocation add s3backprod with s3backcons-c1 score=50000
+sudo pcs -f s3bcfg constraint colocation add s3backprod with s3backcons-c2 score=50000
+sudo pcs cluster cib-push s3bcfg --config
+
 s3_resource_add() {
    local suffix=$1
    local node_local=$2
    local node_remote=$3
+   local s3servers=""
 
    local conf_dir=consul-server-$suffix-conf
    local s3server_fids=$(get_s3_svc $hare_dir/$conf_dir/$conf_dir.json \
@@ -514,7 +532,12 @@ s3_resource_add() {
       sudo pcs -f s3cfg constraint colocation add s3server-$suffix-$count \
           with s3auth-clone score=INFINITY
       (( count++ ))
+      s3servers+=" s3server-$suffix-$count"
    done
+   sudo pcs constraint order set $s3servers require-all=false sequential=false \
+       set s3backcons-$suffix
+   sudo pcs constraint order set $s3servers require-all=false sequential=false \
+       set haproxy-$suffix
    sudo pcs cluster cib-push s3cfg --config
 }
 
@@ -526,17 +549,3 @@ run_on_both $cmd
 
 s3_resource_add c1 $lnode $rnode
 s3_resource_add c2 $rnode $lnode
-
-echo 'Adding rabbit-mq resources and constraints...'
-sudo pcs resource create rabbitmq systemd:rabbitmq-server clone op \
-    monitor interval=30s
-
-echo 'Adding s3background services...'
-sudo pcs cluster cib s3bcfg
-sudo pcs -f s3bcfg resource create s3backcons systemd:s3backgroundconsumer clone
-sudo pcs -f s3bcfg constraint order rabbitmq-clone then s3backcons-clone
-sudo pcs -f s3bcfg resource create s3backprod systemd:s3backgroundproducer op \
-    monitor interval=30s
-sudo pcs -f s3bcfg constraint order s3backcons-clone then s3backprod
-sudo pcs -f s3bcfg constraint colocation add s3backprod with s3backcons-clone
-sudo pcs cluster cib-push s3bcfg --config
