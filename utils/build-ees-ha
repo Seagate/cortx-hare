@@ -145,10 +145,10 @@ sudo pcs -f icfg resource create ip-c2 ocf:heartbeat:IPaddr2 \
          ip=$ip2 cidr_netmask=$netmask iflabel=c2 op monitor interval=0
 sudo pcs -f icfg constraint location ip-c1 prefers $lnode
 sudo pcs -f icfg constraint location ip-c1 rule score=-INFINITY \
-         ethmonitor-enp175s0f1 ne 1
+         ethmonitor-$iface ne 1
 sudo pcs -f icfg constraint location ip-c2 prefers $rnode
 sudo pcs -f icfg constraint location ip-c2 rule score=-INFINITY \
-         ethmonitor-enp175s0f1 ne 1
+         ethmonitor-$iface ne 1
 sudo pcs cluster cib-push icfg --config
 
 echo 'Adding LNet...'
@@ -459,7 +459,7 @@ sudo pcs cluster cib-push mcfg --config
 echo 'Configuring ClusterIP constrains in Pacemaker...'
 sudo pcs cluster cib clustercfg
 sudo pcs -f clustercfg constraint location ClusterIP-clone \
-         rule score=-INFINITY ethmonitor-enp175s0f1 ne 1
+         rule score=-INFINITY ethmonitor-$iface ne 1
 sudo pcs -f clustercfg constraint order c1 then ClusterIP-clone
 sudo pcs -f clustercfg constraint order c2 then ClusterIP-clone
 sudo pcs cluster cib-push clustercfg --config
