@@ -526,14 +526,17 @@ sudo pcs -f s3bcfg constraint colocation add s3backprod with s3backcons-c2 \
     score=50000
 sudo pcs cluster cib-push s3bcfg --config
 
-s3_resource_add() {
+add_s3server_resources() {
    local suffix=$1
    local node_local=$2
    local node_remote=$3
-   local s3servers=""
+   local s3servers=
 
    local conf_dir=consul-server-$suffix-conf
-   local s3server_fids=($(get_s3_svc $hare_dir/$conf_dir/$conf_dir.json s3service))
+   local s3server_fids=(
+       $(get_s3_svc $hare_dir/$conf_dir/$conf_dir.json s3service)
+   )
+   ((${#s3server_fids[@]} == 0)) && return
 
    sudo pcs cluster cib s3cfg
    local count=1
@@ -570,5 +573,5 @@ sudo sed "s/TimeoutStopSec=.*/TimeoutStopSec=7sec/"
 sudo systemctl daemon-reload'
 run_on_both $cmd
 
-s3_resource_add c1 $lnode $rnode
-s3_resource_add c2 $rnode $lnode
+add_s3server_resources c1 $lnode $rnode
+add_s3server_resources c2 $rnode $lnode
