@@ -6,8 +6,9 @@ from functools import wraps
 from time import sleep
 from typing import Any, Dict, List, NamedTuple
 
-import urllib3.exceptions as E
 from consul import Consul, ConsulException
+from requests.exceptions import RequestException
+from urllib3.exceptions import HTTPError
 
 from hax.exception import HAConsistencyException
 from hax.types import ConfHaProcess, Fid, ObjT
@@ -84,14 +85,14 @@ class ConsulUtil:
         assert key
         try:
             return self.cns.kv.get(key, **kwargs)[1]
-        except (ConsulException, E.HTTPError) as e:
+        except (ConsulException, HTTPError, RequestException) as e:
             raise HAConsistencyException('Could not access Consul KV')\
                 from e
 
     def _catalog_service_get(self, svc_name: str) -> List[Dict[str, Any]]:
         try:
             return self.cns.catalog.service(service=svc_name)[1]
-        except (ConsulException, E.HTTPError) as e:
+        except (ConsulException, HTTPError, RequestException) as e:
             raise HAConsistencyException('Could not access Consul Catalog')\
                 from e
 
@@ -110,7 +111,7 @@ class ConsulUtil:
         try:
             local_nodename = os.environ.get('HARE_HAX_NODE_NAME') or \
                 self.cns.agent.self()['Config']['NodeName']
-        except (ConsulException, E.HTTPError) as e:
+        except (ConsulException, HTTPError, RequestException) as e:
             raise HAConsistencyException('Failed to communicate '
                                          'to Consul Agent') from e
         return self._service_by_name(local_nodename, name)
@@ -241,7 +242,7 @@ class ConsulUtil:
         try:
             node_data = self.cns.health.node(node)[1]
             return str(node_data[0]['Status'])
-        except (ConsulException, E.HTTPError) as e:
+        except (ConsulException, HTTPError, RequestException) as e:
             raise HAConsistencyException(f'Failed to get {node} node health')\
                 from e
 
@@ -271,5 +272,5 @@ class ConsulUtil:
                 #     "KV" has no attribute "put"
                 key,
                 data)
-        except (ConsulException, E.HTTPError) as e:
+        except (ConsulException, HTTPError, RequestException) as e:
             raise HAConsistencyException('Failed to put value to KV') from e
