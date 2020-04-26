@@ -5,8 +5,10 @@ export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
 
 PROG=${BASH_SOURCE[0]##*/}
 
-# TODO: '/opt/seagate/eos/hare' prefix can be different
-ENV_TEMPLATE=/opt/seagate/eos/hare/share/consul/consul-env.in
+# XXX '/opt/seagate/eos/hare' prefix can be different
+HARE_DIR=/opt/seagate/eos/hare
+
+ENV_TEMPLATE=$HARE_DIR/share/consul/consul-env.in
 ENV_FILE=/var/lib/hare/consul-env
 
 usage() {
@@ -53,7 +55,9 @@ done
     exit 1
 }
 
-sed -r -e "s/^(NODE).*/\1=$(hostname --fqdn)/" \
+FQDN=$(hostname --fqdn)
+sed -r -e "s/^(NODE)[^(_ID)].*/\1=$FQDN/" \
+       -e "s/^(NODE_ID).*/\1=$($HARE_DIR/libexec/node-uuid $FQDN)/" \
        -e "s/^(MODE).*/\1=$mode/" \
        -e "s/^(BIND).*/\1=$bind_addr/" \
        -e "s/^(CLIENT).*/\1=127.0.0.1 $bind_addr/" $ENV_TEMPLATE |
@@ -73,5 +77,5 @@ sudo rm -rf /var/lib/hare/consul-$bind_addr
 
 conf_dir=consul-$mode-conf
 sudo mkdir -p /var/lib/hare/$conf_dir
-sudo cp /opt/seagate/eos/hare/share/consul/$conf_dir.json.in \
+sudo cp $HARE_DIR/share/consul/$conf_dir.json.in \
      /var/lib/hare/$conf_dir/$conf_dir.json
