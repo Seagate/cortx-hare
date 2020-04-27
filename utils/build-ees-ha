@@ -456,13 +456,20 @@ sudo pcs -f mcfg constraint order mero-confd-c1 then mero-ios-c2
 sudo pcs -f mcfg constraint order mero-confd-c2 then mero-ios-c1
 sudo pcs cluster cib-push mcfg --config
 
-echo 'Configuring ClusterIP constrains in Pacemaker...'
-sudo pcs cluster cib clustercfg
-sudo pcs -f clustercfg constraint location ClusterIP-clone \
+is_virtual() {
+    which facter &>/dev/null || return 1  # assume physical if facter is missing
+    [[ $(facter is_virtual) == true ]] && return 0 || return 1
+}
+
+if ! is_virtual; then
+    echo 'Configuring ClusterIP constrains in Pacemaker...'
+    sudo pcs cluster cib clustercfg
+    sudo pcs -f clustercfg constraint location ClusterIP-clone \
          rule score=-INFINITY ethmonitor-$iface ne 1
-sudo pcs -f clustercfg constraint order c1 then ClusterIP-clone
-sudo pcs -f clustercfg constraint order c2 then ClusterIP-clone
-sudo pcs cluster cib-push clustercfg --config
+    sudo pcs -f clustercfg constraint order c1 then ClusterIP-clone
+    sudo pcs -f clustercfg constraint order c2 then ClusterIP-clone
+    sudo pcs cluster cib-push clustercfg --config
+fi
 
 # Copy only the updated files from each side.
 sudo rsync -u /etc/sysconfig/m0d-* $rnode:/etc/sysconfig/
