@@ -135,7 +135,8 @@ netmask=$(ip -oneline -4 address show dev $iface |
 
 echo 'Adding private interface monitoring to Pacemaker...'
 sudo pcs resource create pdifmon ocf:heartbeat:ethmonitor \
-         interface=$iface link_status_only=true op monitor interval=10s clone
+         interface=$iface link_status_only=true op monitor interval=10s \
+         timeout=60s clone
 
 echo 'Adding the roaming IP addresses into Pacemaker...'
 sudo pcs cluster cib icfg
