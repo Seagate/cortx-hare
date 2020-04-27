@@ -568,10 +568,10 @@ add_s3server_resources() {
    sudo pcs cluster cib-push s3cfg --config
 
    sudo pcs cluster cib s3cfg
-   sudo pcs -f s3cfg constraint order set $s3servers require-all=false sequential=false \
-       set s3backcons-$suffix
-   sudo pcs -f s3cfg constraint order set $s3servers require-all=false sequential=false \
-       set haproxy-$suffix
+   sudo pcs -f s3cfg constraint order set $s3servers require-all=false \
+       sequential=false set s3backcons-$suffix
+   sudo pcs -f s3cfg constraint order set $s3servers require-all=false \
+       sequential=false set haproxy-$suffix
    sudo pcs cluster cib-push s3cfg --config
 }
 
@@ -583,3 +583,9 @@ run_on_both $cmd
 
 add_s3server_resources c1 $lnode $rnode
 add_s3server_resources c2 $rnode $lnode
+
+echo 'Adding mero-free-space-monitor to pacemaker...'
+sudo pcs resource create mero-free-space-mon systemd:mero-free-space-monitor op \
+    monitor interval=30s
+sudo pcs constraint order c1 then mero-free-space-mon
+sudo pcs constraint order c2 then mero-free-space-mon
