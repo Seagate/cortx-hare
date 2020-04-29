@@ -108,7 +108,8 @@ setup(
         Extension(
             name='libhax',
             sources=['hax/hax.c'],
-            include_dirs=[get_mero_dir()],
+            include_dirs=[get_mero_dir(),
+                          get_mero_dir() + '/extra-libs/galois/include'],
             define_macros=[('M0_INTERNAL', ''), ('M0_EXTERN', 'extern')],
             library_dirs=[get_mero_libs_dir()],
             runtime_library_dirs=[get_mero_libs_dir()],
