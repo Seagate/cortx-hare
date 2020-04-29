@@ -48,6 +48,16 @@ class Catalog:
         near: str = None,
         token: str = None,
     ) -> Tuple[int, List[Dict[str, Any]]]: ...
+    def services(
+        self,
+        index: int = None,
+        wait: str = None,
+        tag: str = None,
+        consistency: str = None,
+        dc: str = None,
+        near: str = None,
+        token: str = None,
+    ) -> Tuple[int, Dict[str, List[Any]]]: ...
 
 class Agent:
     def self(self) -> Dict[str, Any]: ...
