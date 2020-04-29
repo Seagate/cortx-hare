@@ -133,10 +133,6 @@ fi
 netmask=$(ip -oneline -4 address show dev $iface |
               awk '{print $4}' | cut -d/ -f2)
 
-echo 'Adding private interface monitoring to Pacemaker...'
-sudo pcs resource create pdifmon ocf:heartbeat:ethmonitor \
-         interface=$iface link_status_only=true op monitor interval=10s clone
-
 echo 'Adding the roaming IP addresses into Pacemaker...'
 sudo pcs cluster cib icfg
 sudo pcs -f icfg resource create ip-c1 ocf:heartbeat:IPaddr2 \
@@ -144,11 +140,7 @@ sudo pcs -f icfg resource create ip-c1 ocf:heartbeat:IPaddr2 \
 sudo pcs -f icfg resource create ip-c2 ocf:heartbeat:IPaddr2 \
          ip=$ip2 cidr_netmask=$netmask iflabel=c2 op monitor interval=0
 sudo pcs -f icfg constraint location ip-c1 prefers $lnode
-sudo pcs -f icfg constraint location ip-c1 rule score=-INFINITY \
-         ethmonitor-$iface ne 1
 sudo pcs -f icfg constraint location ip-c2 prefers $rnode
-sudo pcs -f icfg constraint location ip-c2 rule score=-INFINITY \
-         ethmonitor-$iface ne 1
 sudo pcs cluster cib-push icfg --config
 
 echo 'Adding LNet...'
@@ -464,8 +456,6 @@ is_virtual() {
 if ! is_virtual; then
     echo 'Configuring ClusterIP constrains in Pacemaker...'
     sudo pcs cluster cib clustercfg
-    sudo pcs -f clustercfg constraint location ClusterIP-clone \
-         rule score=-INFINITY ethmonitor-$iface ne 1
     sudo pcs -f clustercfg constraint order c1 then ClusterIP-clone
     sudo pcs -f clustercfg constraint order c2 then ClusterIP-clone
     sudo pcs cluster cib-push clustercfg --config
