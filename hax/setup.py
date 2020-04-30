@@ -7,7 +7,7 @@ from typing import List, Tuple
 
 import pkgconfig
 from mypy import api
-from setuptools import Extension, setup
+from setuptools import Extension, find_packages, setup
 
 
 class MypyCmd(Command):
@@ -105,9 +105,9 @@ setup(
     cmdclass={'mypy': MypyCmd},
     name='hax',
     version=get_hax_version(),
-    packages=['hax'],
+    packages=find_packages(),
     setup_requires=['flake8', 'mypy', 'pkgconfig'],
-    install_requires=['python-consul>=1.1.0'],
+    install_requires=['python-consul>=1.1.0', 'simplejson'],
     entry_points={'console_scripts': ['hax=hax.hax:main']},
     ext_modules=[
         Extension(
