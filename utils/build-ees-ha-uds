@@ -32,6 +32,9 @@ while true; do
     esac
 done
 
+# Abort (set -e) if `csm-web` resource does not exist.
+sudo pcs resource show csm-web >/dev/null
+
 echo 'Adding UDS resource and constraints...'
 sudo pcs cluster cib udscfg
 sudo pcs -f udscfg resource create uds systemd:uds op monitor interval=30s
