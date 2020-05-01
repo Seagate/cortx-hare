@@ -17,7 +17,7 @@ from typing import Any, Callable, Dict, Iterator, List, NamedTuple, Set, \
 import yaml
 
 
-__version__ = '0.7'
+__version__ = '0.7.1'
 
 
 def parse_opts(argv):
@@ -222,7 +222,7 @@ def enrich_cluster_desc(desc: Dict[str, Any], mock_p: bool) -> None:
         for m0d in node['m0_servers']:
             m0d.setdefault('runs_confd', False)
             m0d['_io_disks'] = get_disks(node['hostname'], mock_p,
-                                         m0d.setdefault('io_disks', []))
+                                         m0d['io_disks'])
     if use_fqdn:
         for node in desc['nodes']:
             node['facts']['hostname'] = node['facts']['fqdn']
