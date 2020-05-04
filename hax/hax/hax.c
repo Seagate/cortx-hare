@@ -182,7 +182,7 @@ PyObject *m0_ha_filesystem_stats_fetch(unsigned long long ctx)
 	M0_ASSERT(rc == 0);
 	Py_END_ALLOW_THREADS PyObject *hax_mod = getModule("hax.types");
 	PyObject *fs_stats = PyObject_CallMethod(
-	    hax_mod, "FsStats", "(KKKKKkk)", stats.fs_free_seg,
+	    hax_mod, "FsStats", "(KKKKKII)", stats.fs_free_seg,
 	    stats.fs_total_seg, stats.fs_free_disk, stats.fs_avail_disk,
 	    stats.fs_total_disk, stats.fs_svc_total, stats.fs_svc_replied);
 	Py_DECREF(hax_mod);

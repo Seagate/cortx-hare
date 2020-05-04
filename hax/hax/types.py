@@ -113,6 +113,7 @@ class Uint128:
         return Uint128Struct(self.hi, self.lo)
 
 
+# struct m0_fs_stats
 FsStats = NamedTuple('FsStats', [('fs_free_seg', int), ('fs_total_seg', int),
                                  ('fs_free_disk', int), ('fs_avail_disk', int),
                                  ('fs_total_disk', int), ('fs_svc_total', int),
