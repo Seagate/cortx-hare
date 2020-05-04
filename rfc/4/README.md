@@ -25,6 +25,7 @@ Key | Value | Description
 `profile` | fid | Profile fid in string format.  Example: `"0x7000000000000001:0x4"`.
 `profile/pools` | fids | Space-separated list of fids of SNS pools.
 `sspl.SYSTEM_INFORMATION.log_level` | | This key is used by SSPL.
+`stats/filesystem` | JSON object | See ['stats/filesystem' value](#statsfilesystem-value) below.
 `timeout` | YYYYmmddHHMM.SS | This value is used by the RC timeout mechanism.
 
 **Note:** Fid keys are non-negative integers, base 10.
@@ -61,3 +62,37 @@ Key | Value | Description
   to 'sspl/log-level'.
   See https://jts.seagate.com/browse/EOS-6473?focusedCommentId=1818633&page=com.atlassian.jira.plugin.system.issuetabpanels:comment-tabpanel#comment-1818633
 -->
+
+### 'stats/filesystem' value
+
+Example:
+
+```json
+{
+  "stats": {
+    "fs_free_seg": 71468251167696,
+    "fs_total_seg": 10995118312064,
+    "fs_free_disk": 429084411691008,
+    "fs_avail_disk": 429084411691008,
+    "fs_total_disk": 429084412739584,
+    "fs_svc_total": 4,
+    "fs_svc_replied": 4
+  },
+  "timestamp": 1588596031.468349,
+  "date": "2020-05-04T12:40:31.468349"
+}
+```
+
+Field | Description
+--- | ---
+`fs_free_seg`    | free bytes in BE segments
+`fs_total_seg`   | total bytes in BE segments
+`fs_free_disk`   | free bytes on drives
+`fs_avail_disk`  | available bytes on drives
+`fs_total_disk`  | total bytes on drives
+`fs_svc_total`   | total number of IOS, MDS, and CAS services
+`fs_svc_replied` | how many of them have replied
+
+Corresponding Mero structure: [`struct m0_fs_stats`][spiel/m0_fs_stats]
+
+[spiel/m0_fs_stats]: http://gitlab.mero.colo.seagate.com/mero/mero/blob/3c6e1148ff5fb18b81236700396bd7881ad61c18/spiel/spiel.h#L1251
