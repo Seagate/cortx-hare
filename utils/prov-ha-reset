@@ -31,6 +31,7 @@ resources=(
     s3auth
     ldap
     rabbitmq
+    mero-free-space-mon
     c{2,1}
     mero-kernel
     lnet
