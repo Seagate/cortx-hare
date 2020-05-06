@@ -2,18 +2,71 @@
 
 # :help: show cluster status
 
+import argparse
 import os
 import sys
 from socket import gethostname
-from typing import Dict, List, NamedTuple, Set
+from typing import Any, Dict, List, NamedTuple, Optional, Set
 
+import simplejson as j
 from consul import Consul, ConsulException
+from requests.exceptions import RequestException
+from urllib3.exceptions import HTTPError
 
-Process = NamedTuple('Process', [('name', str), ('fidk', int), ('ep', str)])
+
+class Fid:
+    def __init__(self, container: int, key: int):
+        self.container = container
+        self.key = key
+
+    @staticmethod
+    def to_process_fid(key: int):
+        return Fid(0x7200000000000001, key)
+
+    @staticmethod
+    def parse(val: str):
+        cont, key = tuple(int(s, 16) for s in val.split(':', 1))
+        return Fid(cont, key)
+
+    def __repr__(self):
+        return f'{self.container:#x}:{self.key:#x}'
+
+
+class FidEncoder(j.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, Fid):
+            return obj.__repr__()
+        return super().default(obj)
+
+
+Process = NamedTuple('Process', [('name', str), ('fid', Fid), ('ep', str),
+                                 ('status', str)])
+
+Host = NamedTuple('Host', [('name', str), ('svcs', List[Process])])
+
+
+class NoConsulError(RuntimeError):
+    pass
 
 
 def processfid2str(fidk: int) -> str:
     return '{:#x}:{:#x}'.format(ord('r') << 56 | 1, fidk)
+
+
+def get_kv_throwing(cns: Consul, key: str) -> Any:
+    """
+    Returns the given value from Consul KV. May throw NoConsulError in
+    case of an intermittent connection error or while Consul is re-electing
+    internal Raft leader. KeyError will be thrown if no key can be found.
+    """
+    try:
+        kv: Dict[str, Any] = cns.kv.get(key)[1]
+        if kv is None:
+            raise KeyError(kv)
+        return kv['Value']
+    except (ConsulException, HTTPError, RequestException) as e:
+        raise NoConsulError('Could not access Consul KV')\
+            from e
 
 
 def get_kv(cns: Consul, key: str) -> str:
@@ -37,6 +90,14 @@ def hosts(cns: Consul) -> Set[str]:
     data = cns.kv.get('m0conf/nodes', recurse=True)[1]
     host_names = {(x['Key'].split('/'))[2] for x in data}
     return host_names
+
+
+def get_fs_stats(cns: Consul) -> Optional[Any]:
+    try:
+        data = get_kv_throwing(cns, 'stats/filesystem')
+        return j.loads(data)
+    except KeyError:
+        return None
 
 
 def proc_id2name(cns: Consul, node: str, proc_id: int) -> str:
@@ -65,8 +126,9 @@ def processes(cns: Consul, host: str) -> List:
 
     return [
         Process(name=proc_id2name(cns, host, x),
-                fidk=int(x),
-                ep=get_kv(cns, f'm0conf/nodes/{host}/processes/{x}/endpoint'))
+                fid=Fid.to_process_fid(int(x)),
+                ep=get_kv(cns, f'm0conf/nodes/{host}/processes/{x}/endpoint'),
+                status=process_status(cns, host, Fid.to_process_fid(int(x))))
         for x in fidk_list
     ]
 
@@ -76,10 +138,10 @@ def is_localhost(hostname: str) -> bool:
     return hostname in ('localhost', '127.0.0.1', name, f'{name}.local')
 
 
-def process_status(cns: Consul, host: str, proc: Process) -> str:
+def process_status(cns: Consul, host: str, fidk: int) -> str:
     svcs_status = cns.health.node(host)
     for svc in svcs_status[1]:
-        if svc['ServiceID'] != '' and proc.fidk == int(svc['ServiceID']):
+        if svc['ServiceID'] != '' and fidk == int(svc['ServiceID']):
             return 'started' if svc['Status'] == 'passing' else 'offline'
     return 'unknown'
 
@@ -90,11 +152,40 @@ def consul_status(host: str) -> str:
     return 'passing' if os.system(cmd) == 0 else 'offline'
 
 
-def main():
+def get_cluster_status(cns: Consul) -> Dict[str, Any]:
+
+    nodes = [(Host(name=h, svcs=processes(cns, h)))._asdict()
+             for h in hosts(cns)]
+
+    return {
+        'profile': profile(cns),
+        'pools': [x for x in sns_pools(cns)],
+        'filesystem': get_fs_stats(cns),
+        'nodes': nodes
+    }
+
+
+def parse_opts(argv):
+    p = argparse.ArgumentParser(description='Show cluster status.',
+                                usage='%(prog)s [OPTION]')
+    p.add_argument('--json',
+                   help='show output in JSON format',
+                   action='store_true')
+    return p.parse_args(argv)
+
+
+def main(argv=None):
+    opts = parse_opts(argv)
+    cns = Consul()
     if consul_status(gethostname()) != 'passing':
         print('Cluster is not running.', file=sys.stderr)
-        return -1
-    cns = Consul()
+        return 1
+
+    if opts.json:
+        status = get_cluster_status(cns)
+        print(j.dumps(status, indent=2, cls=FidEncoder))
+        return 0
+
     print('Profile: ' + profile(cns))
     print('Data Pools:')
     for x in sns_pools(cns):
@@ -103,12 +194,13 @@ def main():
     for h in hosts(cns):
         print(f'    {h} {leader_tag(cns, h)}')
         for p in processes(cns, h):
-            print(f'    [{process_status(cns, h, p):<10}] {p.name:<20}\
- {processfid2str(p.fidk):<30} {p.ep:<30}')
+            fid: str = f'{p.fid}'
+            print(f'    [{p.status:<10}] {p.name:<20}\
+ {fid:<30} {p.ep:<30}')
 
 
 if __name__ == '__main__':
     try:
-        main()
-    except ConsulException as err:
-        print("Consul Error: %s" % err)
+        sys.exit(main())
+    except (ConsulException, NoConsulError) as err:
+        sys.exit(f'Consul Error: {err}')
