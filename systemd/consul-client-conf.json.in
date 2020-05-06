@@ -14,9 +14,22 @@
     {
       "type": "service",
       "service": "ios",
-      "args": [
-        "/opt/seagate/eos/hare/libexec/watch-service"
-      ]
+      "args": [ "/opt/seagate/eos/hare/libexec/watch-service" ]
+    },
+    {
+      "type": "service",
+      "service": "s3service",
+      "handler_type": "http",
+      "http_handler_config": {
+        "path": "http://localhost:8008",
+        "method": "POST",
+        "timeout": "10s"
+      }
+    },
+    {
+      "type": "service",
+      "service": "s3service",
+      "args": [ "/opt/seagate/eos/hare/libexec/watch-service" ]
     }
   ],
   "services": []
