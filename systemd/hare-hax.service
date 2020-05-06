@@ -5,6 +5,7 @@ After=hare-consul-agent.service mero-kernel.service
 
 [Service]
 # TODO: '/opt/seagate/eos/hare' prefix can be different, e.g. '/usr'
+SyslogIdentifier=hare-hax
 Environment=PYTHONPATH=/opt/seagate/eos/hare/lib64/python3.6/site-packages:/opt/seagate/eos/hare/lib/python3.6/site-packages
 ExecStart=/bin/sh -c 'cd /var/mero/hax && exec /opt/seagate/eos/hare/bin/hax'
 KillMode=process
