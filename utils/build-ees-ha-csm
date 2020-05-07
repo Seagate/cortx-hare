@@ -128,6 +128,11 @@ sudo pcs -f csmcfg resource create csm-web systemd:csm_web op \
 
 sudo pcs -f csmcfg resource group add \
      csm-kibana kibana-vip kibana csm-web csm-agent
+
+sudo pcs -f csmcfg constraint order consul-c1 then csm-web
+sudo pcs -f csmcfg constraint order consul-c2 then csm-web
+sudo pcs -f csmcfg constraint order els-search-clone then csm-kibana
+
 sudo pcs -f csmcfg constraint colocation add csm-kibana with els-search-clone \
     score=INFINITY
 sudo pcs -f csmcfg constraint colocation add csm-kibana with consul-c1 \
