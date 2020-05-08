@@ -443,6 +443,20 @@ fi
 sudo rsync -u /etc/sysconfig/m0d-* $rnode:/etc/sysconfig/
 sudo rsync -u "$rnode:/etc/sysconfig/m0d-*" /etc/sysconfig/
 
+echo 'Disabling some systemd units...'
+units_to_disable=(
+    elasticsearch
+    haproxy
+    rabbitmq-server
+    statsd
+    slapd
+    s3authserver
+)
+
+for u in ${units_to_disable[@]}; do
+    run_on_both "sudo systemctl stop $u && sudo systemctl disable $u"
+done
+
 echo 'Adding ldap to Pacemaker...'
 sudo pcs resource create ldap systemd:slapd clone op monitor interval=30s
 
