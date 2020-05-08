@@ -1,14 +1,14 @@
 import argparse
 import json
+import logging
 import os
 import sys
-import logging
-from typing import List
+from typing import Callable, List
 
 from pcswrap.exception import CliException, MaintenanceFailed, TimeoutException
 from pcswrap.internal.connector import CliConnector
-from pcswrap.types import Resource, Node, PcsConnector, Credentials
 from pcswrap.internal.waiter import Waiter
+from pcswrap.types import Credentials, Node, PcsConnector, Resource
 
 __all__ = ['Client', 'main']
 
@@ -21,6 +21,20 @@ def all_stopped(resource_list: List[Resource]) -> bool:
 def non_standby_nodes(node_list: List[Node]) -> bool:
     logging.debug('The following nodes are found: %s', node_list)
     return all([not n.standby for n in node_list])
+
+
+def has_no_resources(node_name: str) -> Callable[[List[Node]], bool]:
+    def fn(nodes: List[Node]) -> bool:
+        try:
+            node: Node = [x for x in nodes if x.name == node_name][0]
+            logging.debug('Node %s has %d resources running', node_name,
+                          node.resources_running)
+            return node.resources_running == 0
+        except IndexError:
+            logging.debug('No %s node was found', node_name)
+            return False
+
+    return fn
 
 
 class Client():
@@ -70,7 +84,13 @@ class Client():
                         predicate=non_standby_nodes)
         waiter.wait()
 
-    def shutdown_node(self, node_name: str) -> None:
+    def shutdown_node(self, node_name: str, timeout: int = 120) -> None:
+        self.connector.standby_node(node_name)
+        waiter = Waiter(title=f'resources are stopped at node {node_name}',
+                        timeout_seconds=timeout,
+                        provider_fn=self.connector.get_nodes,
+                        predicate=has_no_resources(node_name))
+        waiter.wait()
         self.connector.shutdown_node(node_name)
 
     def disable_stonith(self, timeout: int = 120) -> None:
@@ -165,6 +185,14 @@ def parse_opts(argv: List[str]):
                                  type=str,
                                  nargs=1,
                                  help='Name of the node to poweroff')
+    shutdown_parser.add_argument(
+        '--timeout-sec',
+        type=int,
+        dest='timeout_sec',
+        default=120,
+        help='Maximum time that this command will'
+        ' wait for any operation to complete before raising an error')
+
     maintenance_parser = subparsers.add_parser(
         'maintenance',
         help='Switch the cluster to maintenance mode',
@@ -260,7 +288,7 @@ def _run(args) -> None:
         print(json_str)
     elif hasattr(args, 'shutdown_node'):
         node = args.shutdown_node[0]
-        _get_client().shutdown_node(node)
+        _get_client().shutdown_node(node, timeout=args.timeout_sec)
     elif hasattr(args, 'maintenance_all'):
         _cluster_maintenance(_get_client(), timeout=args.timeout_sec)
     elif hasattr(args, 'unmaintenance_all'):
