@@ -3,10 +3,12 @@ import sys
 sys.path.insert(0, '..')
 from unittest.mock import Mock, MagicMock
 from pcswrap.client import Client
-from pcswrap.exception import PcsNoStatusException
+from pcswrap.exception import PcsNoStatusException, TimeoutException
 from pcswrap.internal.connector import CliExecutor, CliConnector
+from pcswrap.types import Node
 import unittest
 import os
+import logging
 
 
 def contents(filename: str) -> str:
@@ -110,6 +112,15 @@ class PcsExecutorTest(unittest.TestCase):
 
 
 class ClientTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        logging.basicConfig(level=logging.DEBUG,
+                            stream=sys.stdout,
+                            format='%(asctime)s [%(levelname)s] %(message)s')
+
+    def setUp(self):
+        logging.debug("----- Begin test %s  ----", self._testMethodName)
+
     def test_get_nodes_works(self):
         stub_executor = CliExecutor()
         stub_executor.get_full_status_xml = MagicMock()
@@ -131,3 +142,99 @@ class ClientTest(unittest.TestCase):
 
         nodes = client.get_online_nodes()
         self.assertEqual(1, len(nodes))
+
+    def test_before_shutdown_standby_invoked(self):
+        stub_executor = CliExecutor()
+        stub_executor.get_full_status_xml = MagicMock()
+        stub_executor.get_full_status_xml.return_value = GOOD_XML
+        stub_executor.shutdown_node = MagicMock()
+
+        connector = CliConnector(executor=stub_executor)
+
+        connector.get_nodes = MagicMock(
+            side_effect=[[
+                Node(name='test',
+                     online=True,
+                     shutdown=False,
+                     standby=False,
+                     unclean=False,
+                     resources_running=2)
+            ],
+                         [
+                             Node(name='test',
+                                  online=True,
+                                  shutdown=False,
+                                  standby=False,
+                                  unclean=False,
+                                  resources_running=2)
+                         ],
+                         [
+                             Node(name='test',
+                                  online=True,
+                                  shutdown=False,
+                                  standby=False,
+                                  unclean=False,
+                                  resources_running=0)
+                         ]])
+
+        connector.standby_node = MagicMock()
+
+        client = Client(connector=connector)
+
+        client.shutdown_node('test')
+
+        connector.standby_node.assert_called_with('test')
+        self.assertEqual(1, stub_executor.shutdown_node.call_count)
+
+    def test_if_standby_fails_timeout_exception_raised(self):
+        stub_executor = CliExecutor()
+        stub_executor.get_full_status_xml = MagicMock()
+        stub_executor.get_full_status_xml.return_value = GOOD_XML
+        stub_executor.shutdown_node = MagicMock()
+
+        connector = CliConnector(executor=stub_executor)
+
+        connector.get_nodes = MagicMock(return_value=[
+            Node(name='test',
+                 online=True,
+                 shutdown=False,
+                 standby=False,
+                 unclean=False,
+                 resources_running=2)
+        ])
+
+        connector.standby_node = MagicMock()
+
+        client = Client(connector=connector)
+
+        with self.assertRaises(TimeoutException):
+            client.shutdown_node('test', timeout=2)
+
+        connector.standby_node.assert_called_with('test')
+        self.assertFalse(stub_executor.shutdown_node.called)
+
+    def test_no_failure_when_nodename_invalid(self):
+        stub_executor = CliExecutor()
+        stub_executor.get_full_status_xml = MagicMock()
+        stub_executor.get_full_status_xml.return_value = GOOD_XML
+        stub_executor.shutdown_node = MagicMock()
+
+        connector = CliConnector(executor=stub_executor)
+
+        connector.get_nodes = MagicMock(return_value=[
+            Node(name='test',
+                 online=True,
+                 shutdown=False,
+                 standby=False,
+                 unclean=False,
+                 resources_running=2)
+        ])
+
+        connector.standby_node = MagicMock()
+
+        client = Client(connector=connector)
+
+        with self.assertRaises(TimeoutException):
+            client.shutdown_node('nonexistent', timeout=2)
+
+        self.assertFalse(stub_executor.shutdown_node.called)

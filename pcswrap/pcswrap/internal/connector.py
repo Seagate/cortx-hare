@@ -4,9 +4,8 @@ from subprocess import PIPE, Popen
 from typing import Any, List
 
 import defusedxml.ElementTree as ET
-
 from pcswrap.exception import CliException, PcsNoStatusException
-from pcswrap.types import Resource, Node, PcsConnector
+from pcswrap.types import Node, PcsConnector, Resource
 
 
 def _to_bool(value: str) -> bool:
@@ -72,7 +71,8 @@ class CliConnector(PcsConnector):
                         online=b(tag.attrib['online']),
                         shutdown=b(tag.attrib['shutdown']),
                         unclean=b(tag.attrib['unclean']),
-                        standby=b(tag.attrib['standby']))
+                        standby=b(tag.attrib['standby']),
+                        resources_running=int(tag.attrib['resources_running']))
 
         xml_str = self.executor.get_full_status_xml()
         xml = self._parse_xml(xml_str)
