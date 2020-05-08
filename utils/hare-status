@@ -3,9 +3,9 @@
 # :help: show cluster status
 
 import argparse
-import os
 import sys
 from socket import gethostname
+from subprocess import PIPE, Popen
 from typing import Any, Dict, List, NamedTuple, Optional, Set
 
 import simplejson as j
@@ -146,10 +146,12 @@ def process_status(cns: Consul, host: str, fidk: int) -> str:
     return 'unknown'
 
 
-def consul_status(host: str) -> str:
-    cmd = '{}sudo systemctl is-active --quiet hare-consul-agent*'.format(
-        '' if is_localhost(host) else f'ssh {host} ')
-    return 'passing' if os.system(cmd) == 0 else 'offline'
+def cluster_online() -> bool:
+    cmd = ['pgrep', '--full', '/opt/seagate/eos/hare/bin/hax']
+    process = Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE, encoding='utf8')
+    out, err = process.communicate()
+    exit_code = process.returncode
+    return exit_code == 0
 
 
 def get_cluster_status(cns: Consul) -> Dict[str, Any]:
@@ -177,7 +179,7 @@ def parse_opts(argv):
 def main(argv=None):
     opts = parse_opts(argv)
     cns = Consul()
-    if consul_status(gethostname()) != 'passing':
+    if not cluster_online():
         print('Cluster is not running.', file=sys.stderr)
         return 1
 
