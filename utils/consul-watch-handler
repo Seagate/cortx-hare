@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+set -eu -o pipefail
+
+# Log changes of status of Consul services (for debugging purposes).
+#
+# This script is invoked by Consul watch(es) of "service" type
+# [https://www.consul.io/docs/agent/watches.html#service].
+#
+# Example of a log entry:
+#
+#     2020-05-04 19:28:14 [
+#     2020-05-04 19:28:14   {
+#     2020-05-04 19:28:14     "Node": "smc23-m10.colo.seagate.com",
+#     2020-05-04 19:28:14     "ServiceID": "12",
+#     2020-05-04 19:28:14     "ServiceName": "ios",
+#     2020-05-04 19:28:14     "status": "online"
+#     2020-05-04 19:28:14   },
+#     2020-05-04 19:28:14   {
+#     2020-05-04 19:28:14     "Node": "smc24-m10.colo.seagate.com",
+#     2020-05-04 19:28:14     "ServiceID": "83",
+#     2020-05-04 19:28:14     "ServiceName": "ios",
+#     2020-05-04 19:28:14     "status": "online"
+#     2020-05-04 19:28:14   }
+#     2020-05-04 19:28:14 ]
+#
+# Dump current values to stdout:
+#
+#   $ consul watch -type=service -service=<ServiceName>
+#
+# Retrieve the list of services:
+#
+#   $ consul catalog services
+
+# Redirect all printouts to the log file with the timestamp prefix:
+exec &>> /var/log/hare/${0##*/}.log
+exec &> >(stdbuf -oL gawk '{ print strftime("%Y-%m-%d %H:%M:%S"), $0 }')
+
+jq '[.[] | { "Node": .Node.Node,
+             "ServiceID": .Service.ID,
+             "ServiceName": .Service.Service,
+             "status": (if ([.Checks|.[].Status=="passing"]|all)
+                          then "online"
+                          else "offline"
+                        end)
+           } ]'
