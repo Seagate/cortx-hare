@@ -9,6 +9,7 @@ from pcswrap.exception import CliException, MaintenanceFailed, TimeoutException
 from pcswrap.internal.connector import CliConnector
 from pcswrap.internal.waiter import Waiter
 from pcswrap.types import Credentials, Node, PcsConnector, Resource
+from systemd import journal
 
 __all__ = ['Client', 'main']
 
@@ -230,8 +231,10 @@ def parse_opts(argv: List[str]):
 
 def _setup_logging(verbose: bool) -> None:
     level = logging.DEBUG if verbose else logging.INFO
+    console = logging.StreamHandler(stream=sys.stderr)
+    journald = journal.JournaldLogHandler(identifier='pcswrap')
     logging.basicConfig(level=level,
-                        stream=sys.stderr,
+                        handlers=[console, journald],
                         format='%(asctime)s [%(levelname)s] %(message)s')
 
 
