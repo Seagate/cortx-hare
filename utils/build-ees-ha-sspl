@@ -78,6 +78,12 @@ die() {
     exit 1
 }
 
+run_on_both() {
+    local cmd=$*
+    eval $cmd
+    ssh $rnode $cmd
+}
+
 systemctl is-active --quiet hare-consul-agent-c1 ||
     die 'No active Consul instance found'
 ssh $rnode "systemctl is-active --quiet hare-consul-agent-c2" ||
@@ -89,6 +95,10 @@ ssh $rnode "systemctl is-active --quiet rabbitmq-server" ||
     die 'No active rabbitmq instance found'
 
 hare_dir=/var/lib/hare
+
+echo 'Disable sspl systemd unit...'
+cmd='sudo systemctl stop sspl-ll && sudo systemctl disable sspl-ll'
+run_on_both $cmd
 
 echo 'Adding sspl resource and constraints...'
 

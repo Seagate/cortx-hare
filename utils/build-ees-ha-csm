@@ -95,6 +95,12 @@ die() {
     exit 1
 }
 
+run_on_both() {
+    local cmd=$*
+    eval $cmd
+    ssh $rnode $cmd
+}
+
 systemctl is-active --quiet hare-consul-agent-c1 ||
     die 'No active Consul instance found'
 ssh $rnode "systemctl is-active --quiet hare-consul-agent-c2" ||
@@ -109,6 +115,17 @@ systemctl is-active --quiet rabbitmq-server ||
     die 'No active rabbitmq instance found'
 ssh $rnode "systemctl is-active --quiet rabbitmq-server" ||
     die 'No active rabbitmq instance found'
+
+echo 'Disabling csm and kibana systemd units...'
+units_to_disable=(
+    kibana
+    csm_web
+    csm_agent
+)
+
+for u in ${units_to_disable[@]}; do
+    run_on_both "sudo systemctl stop $u && sudo systemctl disable $u"
+done
 
 echo 'Adding kibana resources...'
 sudo pcs resource create kibana-vip ocf:heartbeat:IPaddr2 \
