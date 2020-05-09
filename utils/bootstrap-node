@@ -115,6 +115,15 @@ wait_active() {
     done
 }
 
+process_started() {
+    local fid=$1
+    case $(consul kv get processes/$fid |
+               jq '.state == "M0_CONF_HA_PROCESS_STARTED"' || true) in
+        true) return 0;;
+    esac
+    return 1
+}
+
 # m0d sends 'active' to systemd before the startup is actually finished,
 # so we need to parse the output of m0d this way to make sure it is
 # really started.
@@ -123,7 +132,7 @@ wait_m0d_started() {
     local timeout=$2  # seconds
     local count=0
 
-    while ! sudo systemctl status "m0d@$fid" | grep -q ': Started$'; do
+    while ! process_started $fid; do
         (($count < $timeout)) || die "Unable to start m0d@$fid service"
         sleep 1
         ((++count))
