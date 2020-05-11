@@ -40,5 +40,5 @@ for r in ${resources[@]}; do
     pcs resource delete $r || true
 done
 
-umount --lazy /var/mero2 || true
-umount --lazy /var/mero1 || true
+while ! umount /var/mero2; do sleep 1; done
+while ! umount /var/mero1; do sleep 1; done
