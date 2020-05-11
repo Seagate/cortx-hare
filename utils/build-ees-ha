@@ -576,5 +576,5 @@ add_s3server_resources c2 $rnode $lnode
 echo 'Adding mero-free-space-monitor to pacemaker...'
 sudo pcs resource create mero-free-space-mon systemd:mero-free-space-monitor \
      op monitor interval=30s
-sudo pcs constraint order c1 then mero-free-space-mon
-sudo pcs constraint order c2 then mero-free-space-mon
+sudo pcs constraint order mero-ios-c1 then mero-free-space-mon
+sudo pcs constraint order mero-ios-c2 then mero-free-space-mon
