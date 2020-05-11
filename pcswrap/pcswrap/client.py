@@ -16,12 +16,12 @@ __all__ = ['Client', 'main']
 
 def all_stopped(resource_list: List[Resource]) -> bool:
     logging.debug('The following resources are found: %s', resource_list)
-    return all([not r.active for r in resource_list])
+    return all(not r.active for r in resource_list)
 
 
 def non_standby_nodes(node_list: List[Node]) -> bool:
     logging.debug('The following nodes are found: %s', node_list)
-    return all([not n.standby for n in node_list])
+    return all(not n.standby for n in node_list)
 
 
 def has_no_resources(node_name: str) -> Callable[[List[Node]], bool]:
@@ -113,7 +113,7 @@ class Client():
         def all_started(resource_list: List[Resource]) -> bool:
             logging.debug('The following resources are found: %s',
                           resource_list)
-            return all([r.active for r in resource_list])
+            return all(r.active for r in resource_list)
 
         waiter = Waiter(title='stonith resources are enabled',
                         timeout_seconds=timeout,
