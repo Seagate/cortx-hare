@@ -130,8 +130,12 @@ fi
 [[ -b $lvolume ]] || die "meta-data volume $lvolume is not available"
 [[ -b $rvolume ]] || die "meta-data volume $rvolume is not available"
 
+# Sample output:
+#   $ ip -oneline -4 address show dev eno1
+#   2: eno1    inet 10.230.249.241/20 brd 10.230.255.255 scope global noprefixroute dynamic eno1\       valid_lft 327971sec preferred_lft 327971sec
+#   2: eno1    inet 10.230.255.1/24 brd 10.230.255.255 scope global eno1:v1\       valid_lft forever preferred_lft forever
 netmask=$(ip -oneline -4 address show dev $iface |
-              awk '{print $4}' | cut -d/ -f2)
+              awk '{print $4}' | cut -d/ -f2 | head -1)
 
 echo 'Adding the roaming IP addresses into Pacemaker...'
 sudo pcs cluster cib icfg
