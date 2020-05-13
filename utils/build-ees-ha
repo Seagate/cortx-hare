@@ -353,12 +353,14 @@ sudo cp /usr/lib/systemd/system/hare-hax.service \
         /usr/lib/systemd/system/hare-hax-c2.service
 sudo sed -e 's/hare-consul-agent.service/hare-consul-agent-c1.service/' \
          -e "/ExecStart=/iExecStartPre=/bin/mount $lvolume /var/mero" \
-         -e "/ExecStart=/aExecStopPost=/bin/sh -c 'while ! /bin/umount /var/mero; do sleep 1; done'" \
+         -e '/ExecStart=/aExecStartPost=/usr/sbin/attrd_updater -U 1 -n native-data-stack-present' \
+         -e '/ExecStart=/aExecStopPost=/usr/sbin/attrd_updater -U 0 -n native-data-stack-present' \
+         -e "/ExecStart=/aExecStopPost=/bin/sh -c '! mountpoint /var/mero || while ! /bin/umount /var/mero; do sleep 1; done'" \
          -i /usr/lib/systemd/system/hare-hax-c1.service
 sudo sed -e 's/hare-consul-agent.service/hare-consul-agent-c2.service/' \
          -e "/ExecStart/iEnvironmentFile=$hare_dir/hax-env-c2" \
          -e "/ExecStart=/iExecStartPre=/bin/mount $rvolume /var/mero2" \
-         -e "/ExecStart=/aExecStopPost=/bin/sh -c 'while ! /bin/umount /var/mero2; do sleep 1; done'" \
+         -e "/ExecStart=/aExecStopPost=/bin/sh -c '! mountpoint /var/mero2 || while ! /bin/umount /var/mero2; do sleep 1; done'" \
          -i /usr/lib/systemd/system/hare-hax-c2.service
 echo "HARE_HAX_NODE_NAME=$rnode" | sudo tee $hare_dir/hax-env-c2 > /dev/null
 
@@ -368,13 +370,15 @@ sudo cp /usr/lib/systemd/system/hare-hax.service
 sudo sed -e 's/hare-consul-agent.service/hare-consul-agent-c1.service/'
          -e '/ExecStart/iEnvironmentFile=$hare_dir/hax-env-c1'
          -e '/ExecStart=/iExecStartPre=/bin/mount $lvolume /var/mero1'
-         -e \"/ExecStart=/aExecStopPost=/bin/sh -c 'while ! /bin/umount /var/mero1; do sleep 1; done'\"
+         -e \"/ExecStart=/aExecStopPost=/bin/sh -c '! mountpoint /var/mero1 || while ! /bin/umount /var/mero1; do sleep 1; done'\"
          -i /usr/lib/systemd/system/hare-hax-c1.service &&
 sudo cp /usr/lib/systemd/system/hare-hax.service
         /usr/lib/systemd/system/hare-hax-c2.service &&
 sudo sed -e 's/hare-consul-agent.service/hare-consul-agent-c2.service/'
          -e '/ExecStart=/iExecStartPre=/bin/mount $rvolume /var/mero'
-         -e \"/ExecStart=/aExecStopPost=/bin/sh -c 'while ! /bin/umount /var/mero; do sleep 1; done'\"
+         -e '/ExecStart=/aExecStartPost=/usr/sbin/attrd_updater -U 1 -n native-data-stack-present' \
+         -e '/ExecStart=/aExecStopPost=/usr/sbin/attrd_updater -U 0 -n native-data-stack-present' \
+         -e \"/ExecStart=/aExecStopPost=/bin/sh -c '! mountpoint /var/mero || while ! /bin/umount /var/mero; do sleep 1; done'\"
          -i /usr/lib/systemd/system/hare-hax-c2.service &&
 echo 'HARE_HAX_NODE_NAME=$lnode' | sudo tee $hare_dir/hax-env-c1 > /dev/null"
 ssh $rnode $cmd
@@ -388,6 +392,12 @@ sudo pcs -f mcfg constraint order mero-kernel-clone then hax-c1
 sudo pcs -f mcfg constraint order mero-kernel-clone then hax-c2
 sudo pcs -f mcfg constraint order consul-c2 then hax-c1
 sudo pcs -f mcfg constraint order consul-c1 then hax-c2
+# Don't allow the foreign data-stack to start without
+# native data-stack present on the node:
+sudo pcs -f mcfg constraint location hax-c1 rule score=-INFINITY \
+                     '#uname' eq $rnode and native-data-stack-present ne 1
+sudo pcs -f mcfg constraint location hax-c2 rule score=-INFINITY \
+                     '#uname' eq $lnode and native-data-stack-present ne 1
 sudo pcs cluster cib-push mcfg --config
 
 echo 'Adding Mero to Pacemaker...'
