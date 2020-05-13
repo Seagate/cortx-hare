@@ -476,7 +476,7 @@ units_to_disable=(
 )
 
 for u in ${units_to_disable[@]}; do
-    run_on_both "sudo systemctl stop $u && sudo systemctl disable $u"
+    run_on_both "sudo systemctl stop $u && sudo systemctl disable $u" || true
 done
 
 echo 'Adding ldap to Pacemaker...'
