@@ -40,5 +40,8 @@ for i in {0..9}; do
     sudo losetup /dev/loop$i /var/mero/disk$i.img
 done
 
-test_cluster cfgen/examples/singlenode.yaml
-test_cluster cfgen/examples/ci-boot1-2ios.yaml
+for cdf in singlenode.yaml ci-boot1-2ios.yaml; do
+    sed "s/localhost/$(cat /etc/salt/minion_id)/" cfgen/examples/$cdf \
+        > ci/m0vg/_$cdf
+    test_cluster ci/m0vg/_$cdf
+done

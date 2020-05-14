@@ -1,0 +1,15 @@
+#!/usr/bin/env python3
+
+import argparse
+import uuid
+
+
+def main(argv=None):
+    p = argparse.ArgumentParser(
+        description='Generate UUID using provided seed value.')
+    p.add_argument('seed')
+    print(uuid.uuid3(uuid.NAMESPACE_DNS, p.parse_args(argv).seed))
+
+
+if __name__ == '__main__':
+    main()

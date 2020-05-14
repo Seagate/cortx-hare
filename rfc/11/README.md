@@ -35,11 +35,11 @@ Detailed list of commands can be seen below.
 
 |#|Use case|Command line|Sample output|
 |-|--------|------------|-------------|
-|1|Stop the node ('standby')|`hctl node standby <node-name>`| |
-|2|Start the node ('unstandby')|`hctl node unstandby <node-name>`| |
+|1|Stop the node ('standby')|`hctl node standby <node-id>`| |
+|2|Start the node ('unstandby')|`hctl node unstandby <node-id>`| |
 |3|Stop all nodes in cluster ('standby all')|`hctl node standby --all`| |
 |4|Start all nodes in cluster ('unstandby all')|`hctl node unstandby --all`| |
-|5|Shutdown a node|`hctl node shutdown <node-name>`| |
+|5|Shutdown a node|`hctl node shutdown <node-id>`| |
 |6|Get the status of all nodes in the cluster|`hctl node status`|`[{"name":"ssc-vm-0018", "online":true, "standby":false, "shutdown":false}, {"name":"ssc-vm-0019", "online":true, "standby":true, "shutdown":false}]`|
 |7|Enable "smart maintenance" mode |`hctl node --verbose maintenance --all --timeout-sec=120`| |
 |8|Disable "smart maintenance" mode |`hctl node --verbose unmaintenance --all --timeout-sec=120`| |
