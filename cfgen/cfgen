@@ -4,6 +4,7 @@ import abc
 import argparse
 import ast
 from enum import Enum, auto
+from functools import lru_cache
 import json
 import os
 from pprint import pprint
@@ -12,12 +13,12 @@ import re
 import socket
 import subprocess
 import sys
-from typing import Any, Callable, Dict, Iterator, List, NamedTuple, Set, \
-    Tuple, Union
+from typing import Any, Callable, Dict, Iterator, List, NamedTuple, Optional, \
+    Set, Tuple, Union
 import yaml
 
 
-__version__ = '0.7.1'
+__version__ = '0.8'
 
 
 def parse_opts(argv):
@@ -195,37 +196,20 @@ def ipaddr_key(iface: str) -> str:
     return 'ipaddress_' + iface
 
 
-def looks_like_ipaddr(s: str) -> bool:
-    return re.fullmatch(r'\d+(\.\d+){3}', s) is not None
-
-
 def enrich_cluster_desc(desc: Dict[str, Any], mock_p: bool) -> None:
-    use_fqdn = False
     for node in desc['nodes']:
         # The fact names used here correspond to version 2.4.1 of `facter`.
         # See https://puppet.com/docs/puppet/6.6/core_facts.html#legacy-facts
-        #
-        # XXX-TODO: Use `salt` instead of `facter`;
-        # e.g., `salt eosnode-[1,2] grains.get host`.
         node['facts'] = get_facts(node['hostname'], mock_p,
-                                  'hostname', 'fqdn',
                                   'processorcount', 'memorysize_mb',
                                   ipaddr_key(node['data_iface']))
         node['facts']['_memsize_MB'] = int(float(
             node['facts']['memorysize_mb']))
 
-        use_fqdn = use_fqdn or \
-            ('.' in node['hostname'] and
-             not looks_like_ipaddr(node['hostname'])) or \
-            '.' in run_command(node['hostname'], 'hostname')
-
         for m0d in node['m0_servers']:
             m0d.setdefault('runs_confd', False)
             m0d['_io_disks'] = get_disks(node['hostname'], mock_p,
                                          m0d['io_disks'])
-    if use_fqdn:
-        for node in desc['nodes']:
-            node['facts']['hostname'] = node['facts']['fqdn']
 
 
 def validate_cluster_desc(desc: Dict[str, Any]) -> None:
@@ -240,11 +224,12 @@ def validate_cluster_desc(desc: Dict[str, Any]) -> None:
     for node in desc['nodes']:
         node_id = node['hostname']
 
-        if looks_like_ipaddr(node_id):
+        if re.fullmatch(r'\d+(\.\d+){3}', node_id) is not None:
+            # node_id seems to be an IP address.
             iface = node['data_iface']
             iface_ip = node['facts'][ipaddr_key(iface)]
             assert node_id == iface_ip, \
-                f'hostname ({node_id}) != IP of {iface} ({iface_ip})'
+                f'"hostname" ({node_id}) != IP of {iface} ({iface_ip})'
 
         assert node['hostname']
         iface = node['data_iface']
@@ -277,9 +262,19 @@ Make sure the value of data_iface in the CDF is correct."""
     assert desc['pools'], 'List of pools must not be empty'
 
 
+@lru_cache(maxsize=1)
+def minion_id() -> Optional[str]:
+    path = '/etc/salt/minion_id'
+    if not os.path.isfile(path):
+        return None
+    with open(path) as f:
+        return f.readline().strip()
+
+
 def is_localhost(hostname: str) -> bool:
-    return hostname in ('localhost', '127.0.0.1', socket.gethostname(),
-                        socket.getfqdn())
+    assert hostname
+    return hostname in ('localhost', '127.0.0.1', minion_id(),
+                        socket.gethostname(), socket.getfqdn())
 
 
 def run_command(hostname: str, *args: str) -> str:
@@ -297,10 +292,7 @@ def get_facts(hostname: str, mock_p: bool, *args: str) -> Dict[str, Any]:
 
 def fabricate_facts(hostname: str, *args: str) -> Dict[str, Any]:
     rng = random.randrange
-    hostname = re.sub('[^@]*@', '', hostname)  # drop 'user@' part
     fabricated = {
-        'hostname': hostname,
-        'fqdn': hostname + '.localdomain',
         'processorcount': rng(1, 21),
         'memorysize_mb': '{:.2f}'.format(random.uniform(512, 16000)),
         'ipaddress_eth1': '.'.join(str(n) for n in [
@@ -352,7 +344,7 @@ def fabricate_disks(hostname: str, paths: List[str]) -> List[Disk]:
 ObjT = Enum('ObjT', 'root fdmi_flt_grp fdmi_filter'
             ' node process service sdev'  # software subtree
             ' site rack enclosure controller drive'  # hardware subtree
-            ' pool pver pver_f objv'  # pool subtree
+            ' pool pver pver_f objv'  # pools subtree
             ' profile')
 ObjT.__doc__ = 'Mero conf object type'
 
@@ -519,12 +511,13 @@ class ConfNode(ToDhall):
 
     @classmethod
     def build(cls, m0conf: Dict[Oid, Any], parent: Oid,
-              host_facts: Dict[str, Any]) -> Oid:
+              node_desc: Dict[str, Any]) -> Oid:
         assert parent.type is ObjT.root
         node_id = new_oid(ObjT.node)
-        m0conf[node_id] = cls(hostname=host_facts['hostname'],
-                              nr_cpu=host_facts['processorcount'],
-                              memsize_MB=host_facts['_memsize_MB'],
+        facts = node_desc['facts']
+        m0conf[node_id] = cls(hostname=node_desc['hostname'],
+                              nr_cpu=facts['processorcount'],
+                              memsize_MB=facts['_memsize_MB'],
                               processes=[])
         m0conf[parent].nodes.append(node_id)
         return node_id
@@ -1296,9 +1289,7 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
     rack_id = ConfRack.build(conf, ConfSite.build(conf, root_id))
 
     for node in cluster_desc['nodes']:
-        facts = node['facts']
-
-        node_id = ConfNode.build(conf, root_id, facts)
+        node_id = ConfNode.build(conf, root_id, node)
         ctrl_id = None
         if any(m0d['_io_disks'] for m0d in node['m0_servers']):
             ctrl_id = ConfController.build(conf,
@@ -1314,10 +1305,11 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
             if m0d['runs_confd']:
                 confd_p = True
 
+        ipaddr = node['facts'][ipaddr_key(node['data_iface'])]
         (cluster.consul_servers if confd_p else cluster.consul_clients).\
-            append(ConsulAgent(hostname=facts['hostname'],
+            append(ConsulAgent(hostname=node['hostname'],
                                # XXX use 'mgmt_iface' for consul?
-                               ipaddr=facts[ipaddr_key(node['data_iface'])]))
+                               ipaddr=ipaddr))
 
         for client_t, proc_t in [('s3', ProcT.m0_client_s3),
                                  ('other', ProcT.m0_client_other)]:

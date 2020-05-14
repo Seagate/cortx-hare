@@ -66,6 +66,14 @@ EOF
     for host in ${hosts[@]}; do
         _time $M0VG up $opt_provision $host
         _time $M0VG reload $opt_provision $host
+
+        # XXX Try to get rid of this hack.
+        $M0VG run --vm $host -f <<EOF
+[[ -s /etc/salt/minion_id ]] || {
+    sudo mkdir -p /etc/salt
+    echo $(ci_vm_name_prefix)-$host | sudo tee /etc/salt/minion_id >/dev/null
+}
+EOF
     done
 
     # 'hostmanager' plugin should be executed last, when all machines are up.

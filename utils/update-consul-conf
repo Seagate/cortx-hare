@@ -20,18 +20,18 @@ case "$*" in
     *) usage >&2; exit 1;;
 esac
 
-node_name=$(hostname --fqdn)
+node=$(cat /etc/salt/minion_id)
 
 get_service_ids() {
     local filter=$1
-    local cmd="consul kv get -recurse m0conf/nodes/$node_name/processes/ |
+    local cmd="consul kv get -recurse m0conf/nodes/$node/processes/ |
                   $filter | sed 's/.*processes.//' | cut -d/ -f1"
     eval $cmd || true
 }
 
 get_service_ep() {
     local id=$1
-    consul kv get m0conf/nodes/$node_name/processes/$id/endpoint
+    consul kv get m0conf/nodes/$node/processes/$id/endpoint
 }
 
 get_service_addr() {
@@ -53,7 +53,7 @@ id2fid() {
 HAX_ID=$(get_service_ids 'grep -iw ha')
 [[ $HAX_ID ]] || {
     cat >&2 <<.
-Cannot get information about Hax from Consul for this host ($node_name).
+Cannot get information about Hax from Consul for this host ($node).
 Please verify that the host name matches the one stored in the Consul KV.
 .
     usage >&2
@@ -210,5 +210,3 @@ sudo sed -r "s;(http://)localhost;\1$(get_service_ip_addr $HAX_EP);" \
          -i $CONF_FILE
 
 consul reload > /dev/null
-
-echo $node_name > /var/lib/hare/node-name
