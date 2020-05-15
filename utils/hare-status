@@ -4,7 +4,6 @@
 
 import argparse
 import sys
-from socket import gethostname
 from subprocess import PIPE, Popen
 from typing import Any, Dict, List, NamedTuple, Optional, Set
 
@@ -19,17 +18,11 @@ class Fid:
         self.container = container
         self.key = key
 
-    @staticmethod
-    def to_process_fid(key: int):
-        return Fid(0x7200000000000001, key)
-
-    @staticmethod
-    def parse(val: str):
-        cont, key = tuple(int(s, 16) for s in val.split(':', 1))
-        return Fid(cont, key)
+    def __str__(self):
+        return f'{self.container:#x}:{self.key:#x}'
 
     def __repr__(self):
-        return f'{self.container:#x}:{self.key:#x}'
+        return f'{self.__class__.__name__}({self.container:#x}, {self.key:#x})'
 
 
 class FidEncoder(j.JSONEncoder):
@@ -119,30 +112,26 @@ def proc_id2name(cns: Consul, node: str, proc_id: int) -> str:
     return 'm0_client'
 
 
-def processes(cns: Consul, host: str) -> List:
-    data = cns.kv.get(f'm0conf/nodes/{host}/processes', recurse=True)[1]
-    fidk_list = list({(x['Key'].split('/'))[4] for x in data})
-    fidk_list.sort(key=int, reverse=False)
-
+def processes(cns: Consul, node_id: str) -> List[Process]:
+    # Get 'm0conf/nodes/<node_id>/processes/<process_fidk>/...' entries
+    # from the KV.  See 'Consul KV Schema' in [4/KV](rfc/4/README.md).
+    data = cns.kv.get(f'm0conf/nodes/{node_id}/processes', recurse=True)[1]
+    fidk_list: List[int] = list({int(x['Key'].split('/')[4]) for x in data})
+    fidk_list.sort()
     return [
-        Process(name=proc_id2name(cns, host, x),
-                fid=Fid.to_process_fid(int(x)),
-                ep=get_kv(cns, f'm0conf/nodes/{host}/processes/{x}/endpoint'),
-                status=process_status(cns, host, Fid.to_process_fid(int(x))))
-        for x in fidk_list
+        Process(name=proc_id2name(cns, node_id, k),
+                fid=Fid(0x7200000000000001, k),
+                ep=get_kv(cns,
+                          f'm0conf/nodes/{node_id}/processes/{k}/endpoint'),
+                status=process_status(cns, node_id, k))
+        for k in fidk_list
     ]
 
 
-def is_localhost(hostname: str) -> bool:
-    name = gethostname()
-    return hostname in ('localhost', '127.0.0.1', name, f'{name}.local')
-
-
-def process_status(cns: Consul, host: str, fidk: int) -> str:
-    svcs_status = cns.health.node(host)
-    for svc in svcs_status[1]:
-        if svc['ServiceID'] != '' and fidk == int(svc['ServiceID']):
-            return 'started' if svc['Status'] == 'passing' else 'offline'
+def process_status(cns: Consul, node_id: str, fidk: int) -> str:
+    for check in cns.health.node(node_id)[1]:
+        if check['ServiceID'] and fidk == int(check['ServiceID']):
+            return 'started' if check['Status'] == 'passing' else 'offline'
     return 'unknown'
 
 
@@ -155,10 +144,8 @@ def cluster_online() -> bool:
 
 
 def get_cluster_status(cns: Consul) -> Dict[str, Any]:
-
     nodes = [(Host(name=h, svcs=processes(cns, h)))._asdict()
              for h in hosts(cns)]
-
     return {
         'profile': profile(cns),
         'pools': [x for x in sns_pools(cns)],
