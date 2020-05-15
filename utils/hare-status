@@ -184,8 +184,7 @@ def main(argv=None):
         print(f'    {h} {leader_tag(cns, h)}')
         for p in processes(cns, h):
             fid: str = f'{p.fid}'
-            print(f'    [{p.status:<10}] {p.name:<20}\
- {fid:<30} {p.ep:<30}')
+            print(f'    [{p.status}]  {p.name:<9}  {fid:<23}  {p.ep}')
 
 
 if __name__ == '__main__':
