@@ -352,15 +352,15 @@ sudo cp /usr/lib/systemd/system/hare-hax.service \
 sudo cp /usr/lib/systemd/system/hare-hax.service \
         /usr/lib/systemd/system/hare-hax-c2.service
 sudo sed -e 's/hare-consul-agent.service/hare-consul-agent-c1.service/' \
-         -e "/ExecStart=/iExecStartPre=/bin/mount $lvolume /var/mero" \
+         -e "/ExecStart=/iExecStartPre=/bin/sh -c 'mountpoint /var/mero || /bin/mount $lvolume /var/mero'" \
          -e '/ExecStart=/aExecStartPost=/usr/sbin/attrd_updater -U 1 -n native-data-stack-present' \
          -e '/ExecStart=/aExecStopPost=/usr/sbin/attrd_updater -U 0 -n native-data-stack-present' \
-         -e "/ExecStart=/aExecStopPost=/bin/sh -c '! mountpoint /var/mero || while ! /bin/umount /var/mero; do sleep 1; done'" \
+         -e "/ExecStart=/aExecStopPost=/bin/sh -c '! mountpoint /var/mero || while ! /bin/umount /var/mero; do lsof +D /var/mero; sleep 1; done'" \
          -i /usr/lib/systemd/system/hare-hax-c1.service
 sudo sed -e 's/hare-consul-agent.service/hare-consul-agent-c2.service/' \
          -e "/ExecStart/iEnvironmentFile=$hare_dir/hax-env-c2" \
-         -e "/ExecStart=/iExecStartPre=/bin/mount $rvolume /var/mero2" \
-         -e "/ExecStart=/aExecStopPost=/bin/sh -c '! mountpoint /var/mero2 || while ! /bin/umount /var/mero2; do sleep 1; done'" \
+         -e "/ExecStart=/iExecStartPre=/bin/sh -c 'mountpoint /var/mero2 || /bin/mount $rvolume /var/mero2'" \
+         -e "/ExecStart=/aExecStopPost=/bin/sh -c '! mountpoint /var/mero2 || while ! /bin/umount /var/mero2; do lsof +D /var/mero2; sleep 1; done'" \
          -i /usr/lib/systemd/system/hare-hax-c2.service
 echo "HARE_HAX_NODE_NAME=$rnode" | sudo tee $hare_dir/hax-env-c2 > /dev/null
 
@@ -369,16 +369,16 @@ sudo cp /usr/lib/systemd/system/hare-hax.service
         /usr/lib/systemd/system/hare-hax-c1.service &&
 sudo sed -e 's/hare-consul-agent.service/hare-consul-agent-c1.service/'
          -e '/ExecStart/iEnvironmentFile=$hare_dir/hax-env-c1'
-         -e '/ExecStart=/iExecStartPre=/bin/mount $lvolume /var/mero1'
-         -e \"/ExecStart=/aExecStopPost=/bin/sh -c '! mountpoint /var/mero1 || while ! /bin/umount /var/mero1; do sleep 1; done'\"
+         -e \"/ExecStart=/iExecStartPre=/bin/sh -c 'mountpoint /var/mero1 || /bin/mount $lvolume /var/mero1'\"
+         -e \"/ExecStart=/aExecStopPost=/bin/sh -c '! mountpoint /var/mero1 || while ! /bin/umount /var/mero1; do lsof +D /var/mero1; sleep 1; done'\"
          -i /usr/lib/systemd/system/hare-hax-c1.service &&
 sudo cp /usr/lib/systemd/system/hare-hax.service
         /usr/lib/systemd/system/hare-hax-c2.service &&
 sudo sed -e 's/hare-consul-agent.service/hare-consul-agent-c2.service/'
-         -e '/ExecStart=/iExecStartPre=/bin/mount $rvolume /var/mero'
+         -e \"/ExecStart=/iExecStartPre=/bin/sh -c 'mountpoint /var/mero || /bin/mount $rvolume /var/mero'\"
          -e '/ExecStart=/aExecStartPost=/usr/sbin/attrd_updater -U 1 -n native-data-stack-present' \
          -e '/ExecStart=/aExecStopPost=/usr/sbin/attrd_updater -U 0 -n native-data-stack-present' \
-         -e \"/ExecStart=/aExecStopPost=/bin/sh -c '! mountpoint /var/mero || while ! /bin/umount /var/mero; do sleep 1; done'\"
+         -e \"/ExecStart=/aExecStopPost=/bin/sh -c '! mountpoint /var/mero || while ! /bin/umount /var/mero; do lsof +D /var/mero; sleep 1; done'\"
          -i /usr/lib/systemd/system/hare-hax-c2.service &&
 echo 'HARE_HAX_NODE_NAME=$lnode' | sudo tee $hare_dir/hax-env-c1 > /dev/null"
 ssh $rnode $cmd
