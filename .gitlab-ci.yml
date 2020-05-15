@@ -7,7 +7,7 @@ variables:
   # Mero git reference to build and use.
   #
   # If `MERO_COMMIT_REF` is empty or undefined, CI will use rpms from
-  # http://ci-storage.mero.colo.seagate.com/releases/eos/BLATEST/
+  # http://ci-storage.mero.colo.seagate.com/releases/master/BLATEST/
   MERO_COMMIT_REF: ''
 
   DOCKER_REGISTRY: registry.gitlab.mero.colo.seagate.com

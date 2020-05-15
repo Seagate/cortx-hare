@@ -10,7 +10,7 @@ set -x
 
 # `BLATEST` is a symlink, which may be reset at any moment.
 # Store the path of its current target into a variable.
-latest_release_dir=$(readlink -f /releases/eos/BLATEST)
+latest_release_dir=$(readlink -f /releases/master/BLATEST)
 
 # Build Hare rpm.  This requires mero{,-devel} packages to be installed.
 _time yum install -y $latest_release_dir/eos-core{,-devel}-[0-9]*.rpm
@@ -24,8 +24,8 @@ cp -v \
    /root/rpmbuild/RPMS/x86_64/eos-hare*.rpm \
    $latest_release_dir/eos-core{,-devel}-[0-9]*.rpm \
    $latest_release_dir/eos-s3server-[0-9]*.rpm \
-   /releases/eos/s3server_uploads/log4cxx_eos{,-devel}-[0-9]*.rpm \
-   /releases/eos/s3server_uploads/s3cmd-[0-9]*.rpm \
+   /releases/master/s3server_uploads/log4cxx_eos{,-devel}-[0-9]*.rpm \
+   /releases/master/s3server_uploads/s3cmd-[0-9]*.rpm \
    $RPMSYNC_DIR/
 cd $RPMSYNC_DIR
 createrepo -v .  # see https://wiki.centos.org/HowTos/CreateLocalRepos
