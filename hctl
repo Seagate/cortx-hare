@@ -92,7 +92,7 @@ case $cmd in
         PYTHONPATH="$HARE_BASE_DIR/lib64/python3.6/site-packages:$PYTHONPATH"
         export PYTHONPATH
 
-        logger --tag $PROG -- $PROG $cmd "$@"
+        systemd-cat --identifier $PROG <<< "$PROG $cmd $@"
         exec $HARE_BASE_DIR/libexec/hare-$cmd "$@"
         ;;
     *) die "Unknown command: '$cmd'" ;;
