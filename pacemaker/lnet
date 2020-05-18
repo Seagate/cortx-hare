@@ -99,6 +99,10 @@ lnet_start() {
     if [ $? =  $OCF_SUCCESS ]; then
 	return $OCF_SUCCESS
     fi
+    # Make sure mero-kernel moule is stopped before we add the new
+    # endpoint address. This is workaround for EOS-8257 issue, a bug
+    # in Pacemaker - https://bugs.clusterlabs.org/show_bug.cgi?id=5428.
+    systemctl stop mero-kernel
     lnetctl net add --net ${OCF_RESKEY_nettype} --if ${OCF_RESKEY_iface}
 }
 
