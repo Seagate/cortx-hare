@@ -243,11 +243,7 @@ sudo umount /var/mero2
 sudo umount /var/mero1
 sudo rm -r /var/mero1
 
-# We don't need `/var/mero` mounted anymore. `hax` systemd
-# unit will mount/umount it automatically on start/stop.
-while ! sudo umount /var/mero; do sleep 1; done
-
-ssh $rnode 'sudo mkdir -p /var/mero1 && while ! sudo umount /var/mero; do sleep 1; done'
+ssh $rnode 'sudo mkdir -p /var/mero1'
 
 echo 'Preparing Consul agents config files...'
 cmd='
