@@ -40,5 +40,5 @@ for r in ${resources[@]}; do
     pcs resource delete $r || true
 done
 
-while ! umount /var/mero2; do sleep 1; done
-while ! umount /var/mero1; do sleep 1; done
+while mountpoint /var/mero2 && ! umount /var/mero2; do sleep 1; done
+while mountpoint /var/mero1 && ! umount /var/mero1; do sleep 1; done
