@@ -417,6 +417,18 @@ static void handle_stob_ioq(const struct hax_msg *hm)
 	    &hm->hm_msg.hm_data.u.hed_stob_ioq;
 	char buf[512] = { 0 };
 
+	/*
+	 * This IEM was disabled temporarily.
+	 *
+	 * There is no justification for this arbitrary decision. This was
+	 * wrong thing to do in the first place, but we were forced to do it
+	 * after ~15h of meetings.
+	 * Now we need to disable this, and it took only several hours of
+	 * discussions in private chats and 1h meeting with several managements
+	 * and architects present.
+	 */
+	return;
+
 	snprintf(buf, sizeof(buf) - 1,
 		 "%x|" FID_F "|" FID_F "|" FID_F "|%" PRIx64 "|%" PRIx64
 		 "|%" PRIx64 "|%" PRIx64 "|%" PRIx64 "|%" PRIx32,
