@@ -117,10 +117,9 @@ wait_active() {
 
 process_started() {
     local fid=$1
-    case $(consul kv get processes/$fid |
-               jq '.state == "M0_CONF_HA_PROCESS_STARTED"' || true) in
-        true) return 0;;
-    esac
+    if [[ $(get-process-state $fid) == M0_CONF_HA_PROCESS_STARTED ]]; then
+        return 0
+    fi
     return 1
 }
 
@@ -179,7 +178,7 @@ for id in $IDs; do
         # (see utils/check-service also).
         while [[ -f /tmp/mero-mkfs-pass-$fid ||
                  -f /tmp/mero-mkfs-fail-$fid ]] ||
-              ! consul kv get processes/$fid | grep -q 'STOPPED'; do
+              [[ $(get-process-state $fid) != M0_CONF_HA_PROCESS_STOPPED ]]; do
             sleep 1
         done
         sleep 1

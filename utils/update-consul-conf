@@ -30,8 +30,8 @@ get_service_ids() {
 }
 
 get_service_ep() {
-    local id=$1
-    consul kv get m0conf/nodes/$node/processes/$id/endpoint
+    local process_fidk=$1
+    consul kv get m0conf/nodes/$node/processes/$process_fidk/endpoint
 }
 
 get_service_addr() {
