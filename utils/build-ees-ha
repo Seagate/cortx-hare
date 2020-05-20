@@ -328,12 +328,11 @@ unset conf_dir
 echo 'Adding Consul to Pacemaker...'
 sudo pcs resource create consul-c1 systemd:hare-consul-agent-c1
 sudo pcs resource create consul-c2 systemd:hare-consul-agent-c2
-sudo pcs resource group add c1 consul-c1
-sudo pcs resource group add c2 consul-c2
+sudo pcs resource group add c1 consul-c1 --after ip-c1
+sudo pcs resource group add c2 consul-c2 --after ip-c2
 
 echo 'Adding Mero kernel module to Pacemaker...'
-sudo pcs resource create mero-kernel systemd:mero-kernel
-sudo pcs resource clone mero-kernel
+sudo pcs resource create mero-kernel systemd:mero-kernel clone
 sudo pcs constraint order lnet-c1 then mero-kernel-clone
 sudo pcs constraint order lnet-c2 then mero-kernel-clone
 
@@ -376,8 +375,8 @@ echo 'HARE_HAX_NODE_NAME=$lnode' | sudo tee $hare_dir/hax-env-c1 > /dev/null"
 ssh $rnode $cmd
 
 sudo pcs cluster cib mcfg
-sudo pcs -f mcfg resource create hax-c1 systemd:hare-hax-c1
-sudo pcs -f mcfg resource create hax-c2 systemd:hare-hax-c2
+sudo pcs -f mcfg resource create hax-c1 systemd:hare-hax-c1 op stop timeout=30
+sudo pcs -f mcfg resource create hax-c2 systemd:hare-hax-c2 op stop timeout=30
 sudo pcs -f mcfg resource group add c1 hax-c1
 sudo pcs -f mcfg resource group add c2 hax-c2
 sudo pcs -f mcfg constraint order mero-kernel-clone then hax-c1
