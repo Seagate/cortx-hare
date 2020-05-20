@@ -176,7 +176,7 @@ def main(argv=None):
         return 0
 
     print('Profile: ' + profile(cns))
-    print('Data Pools:')
+    print('Data pools:')
     for x in sns_pools(cns):
         print(f'    {x}')
     print('Services:')

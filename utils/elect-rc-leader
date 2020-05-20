@@ -36,12 +36,10 @@ cleanup() {
     pkill -f 'sh.*proto-rc' || true
 }
 
-node=$(cat /etc/salt/minion_id)
-
 # If the session is already set - the leader is elected, so
 # there is nothing to do (except cleanup after ourself).
 get_session_id | grep -q ^- || {
-    if [[ $(get_leader_node) != $node ]]; then
+    if [[ $(get_leader_node) != $(node-name) ]]; then
         cleanup
     fi
     exit 0
@@ -51,7 +49,7 @@ cleanup
 
 # Create session with the service:confd Health Checker:
 create_session() {
-    local checks_a=($(consul kv get -recurse m0conf/nodes/$node |
+    local checks_a=($(consul kv get -recurse m0conf/nodes/$(node-name) |
                       egrep -w 'confd|ha' |
                       sed -r 's/.*processes.([0-9]+).*/"service:\1"/'))
     # See the trick comma separated list explained here:
@@ -81,7 +79,7 @@ while true; do
     sleep $((RANDOM % 10))
     SID=$(create_session || true)
     if [[ $SID ]]; then
-        consul kv put -acquire -session=$SID leader $node \
+        consul kv put -acquire -session=$SID leader $(node-name) \
                       2>/dev/null && break
         destroy_session $SID
     fi

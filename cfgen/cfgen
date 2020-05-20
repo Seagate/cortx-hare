@@ -18,7 +18,7 @@ from typing import Any, Callable, Dict, Iterator, List, NamedTuple, Optional, \
 import yaml
 
 
-__version__ = '0.8'
+__version__ = '0.9'
 
 
 def parse_opts(argv):
@@ -65,6 +65,7 @@ def parse_opts(argv):
 
 class ShowSchema(argparse.Action):
     def __call__(self, *args):
+        # XXX-TODO: Rename `nodes.hostname` to `nodes.name`.
         print("""\
 # Cluster Description is a YAML file with the following schema:
 ---  # start of the document (optional)
@@ -213,49 +214,46 @@ def enrich_cluster_desc(desc: Dict[str, Any], mock_p: bool) -> None:
 
 
 def validate_cluster_desc(desc: Dict[str, Any]) -> None:
-    nodes = [(x['hostname'], x['facts'][ipaddr_key(x['data_iface'])])
+    Node = NamedTuple('Node', [('name', str), ('ipaddr', str)])
+    nodes = [Node(name=x['hostname'],
+                  ipaddr=x['facts'][ipaddr_key(x['data_iface'])])
              for x in desc['nodes']]
-    assert all_unique(ip for _name, ip in nodes), \
+    assert all_unique(x.name for x in nodes), \
+        "Node names ('hostname' values in the CDF) are not unique:\n" + \
+        '\n'.join('  ' + x.name for x in nodes)
+    assert all_unique(x.ipaddr for x in nodes), \
         'IP addresses are not unique:\n' + \
-        '\n'.join('    ' + name + ' ' + ip for name, ip in nodes)
+        '\n'.join('  ' + x.ipaddr for x in nodes)
 
     total_nr_confds = total_nr_disks = 0
 
     for node in desc['nodes']:
-        node_id = node['hostname']
-
-        if re.fullmatch(r'\d+(\.\d+){3}', node_id) is not None:
-            # node_id seems to be an IP address.
-            iface = node['data_iface']
-            iface_ip = node['facts'][ipaddr_key(iface)]
-            assert node_id == iface_ip, \
-                f'"hostname" ({node_id}) != IP of {iface} ({iface_ip})'
-
-        assert node['hostname']
+        name = node['hostname']
+        assert name
         iface = node['data_iface']
         assert iface
         assert node['facts'][ipaddr_key(iface)], \
-            f"""{node_id}: {iface!r} interface has no IP address
+            f"""{name}: {iface!r} interface has no IP address
 Make sure the value of data_iface in the CDF is correct."""
 
         nr_confds = sum(1 for m0d in node['m0_servers'] if m0d['runs_confd'])
-        assert nr_confds < 2, f'{node_id}: Too many confd services'
+        assert nr_confds < 2, f'{name}: Too many confd services'
         total_nr_confds += nr_confds
 
         for m0d in node['m0_servers']:
             assert m0d['runs_confd'] or m0d['io_disks'], \
-                f"{node_id}: Either 'runs_confd' or 'io_disks' must be set"
+                f"{name}: Either 'runs_confd' or 'io_disks' must be set"
 
         disks: List[Disk] = []
         for m0d in node['m0_servers']:
             disks.extend(m0d['_io_disks'])
         assert all_unique(disks), \
-            f'{node_id}: Same disk used by several IO services'
+            f'{name}: Same disk used by several IO services'
         total_nr_disks += len(disks)
 
         assert (nr_confds + node['m0_clients']['s3']
                 + node['m0_clients']['other'] > 0), \
-            f'{node_id}: At least one Mero server or client is required'
+            f'{name}: At least one Mero server or client is required'
 
     assert total_nr_confds > 0, 'At least one confd is required'
     assert total_nr_disks > 0, 'No disks found'
@@ -487,9 +485,9 @@ class ConfNode(ToDhall):
     _objt = ObjT.node
     _downlinks = {Downlink('processes', ObjT.process)}
 
-    def __init__(self, hostname: str, nr_cpu: int, memsize_MB: int,
+    def __init__(self, name: str, nr_cpu: int, memsize_MB: int,
                  processes: List[Oid]):
-        self.hostname = hostname
+        self.name = name
         self.nr_cpu = nr_cpu
         self.memsize_MB = memsize_MB
         assert all(x.type is ObjT.process for x in processes)
@@ -515,7 +513,7 @@ class ConfNode(ToDhall):
         assert parent.type is ObjT.root
         node_id = new_oid(ObjT.node)
         facts = node_desc['facts']
-        m0conf[node_id] = cls(hostname=node_desc['hostname'],
+        m0conf[node_id] = cls(name=node_desc['hostname'],
                               nr_cpu=facts['processorcount'],
                               memsize_MB=facts['_memsize_MB'],
                               processes=[])
@@ -1150,7 +1148,7 @@ class ConfProfile(ToDhall):
         return prof_id
 
 
-ConsulAgent = NamedTuple('ConsulAgent', [('hostname', str), ('ipaddr', str)])
+ConsulAgent = NamedTuple('ConsulAgent', [('node_name', str), ('ipaddr', str)])
 
 Cluster = NamedTuple('Cluster', [('m0conf', Dict[Oid, Any]),
                                  ('consul_servers', List[ConsulAgent]),
@@ -1213,14 +1211,14 @@ def generate_consul_kv(cluster: Cluster, dhall_dir: str) -> str:
                 assert proc_id.type is ObjT.process
                 for svc_id in m0conf[proc_id].services:
                     stype = m0conf[svc_id].type.name[len('M0_CST_'):].lower()
-                    yield ConsulService(node_name=node.hostname,
+                    yield ConsulService(node_name=node.name,
                                         proc_id=proc_id,
                                         ep=m0conf[proc_id].endpoint,
                                         svc_id=svc_id, stype=stype)
                 # Add clovis clients to consul kv
                 if proc_id in cluster.m0_clients:
                     proc_ep = m0conf[proc_id].endpoint
-                    yield ConsulService(node_name=node.hostname,
+                    yield ConsulService(node_name=node.name,
                                         proc_id=proc_id,
                                         ep=m0conf[proc_id].endpoint,
                                         svc_id=cluster.m0_clients[proc_id],
@@ -1307,7 +1305,7 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
 
         ipaddr = node['facts'][ipaddr_key(node['data_iface'])]
         (cluster.consul_servers if confd_p else cluster.consul_clients).\
-            append(ConsulAgent(hostname=node['hostname'],
+            append(ConsulAgent(node_name=node['hostname'],
                                # XXX use 'mgmt_iface' for consul?
                                ipaddr=ipaddr))
 
@@ -1372,7 +1370,7 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
 
     validate_m0conf(conf)
     assert cluster.consul_servers
-    names = [x.hostname
+    names = [x.node_name
              for x in cluster.consul_servers + cluster.consul_clients]
     assert all_unique(names)
     assert all(re.search('[",= @]', name) is None for name in names)

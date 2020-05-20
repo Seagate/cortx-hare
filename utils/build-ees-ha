@@ -240,7 +240,7 @@ done
 
 run_on_both 'sudo rm -f /etc/sysconfig/m0d-*'
 
-hctl bootstrap -c $hare_dir/
+hctl bootstrap --conf-dir $hare_dir
 hctl shutdown
 
 # Create /var/mero dirs for the foreign data-stacks:

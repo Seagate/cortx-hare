@@ -55,9 +55,8 @@ done
     exit 1
 }
 
-node=$(cat /etc/salt/minion_id)
-sed -r -e "s/^(NODE=).*/\1$node/" \
-       -e "s/^(NODE_ID=).*/\1$($HARE_DIR/libexec/gen-uuid $node)/" \
+sed -r -e "s/^(NODE=).*/\1$(node-name)/" \
+       -e "s/^(NODE_ID=).*/\1$($HARE_DIR/libexec/gen-uuid $(node-name))/" \
        -e "s/^(MODE=).*/\1$mode/" \
        -e "s/^(BIND=).*/\1$bind_addr/" \
        -e "s/^(CLIENT)=.*/\1=127.0.0.1 $bind_addr/" $ENV_TEMPLATE |

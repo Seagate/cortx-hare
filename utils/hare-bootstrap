@@ -9,15 +9,18 @@ PROG=${0##*/}
 
 usage() {
     cat <<EOF
-Usage: $PROG [OPTIONS...] --conf-dir DIR|cluster-description-file.yaml
+Usage: $PROG [--mkfs] <CDF>
+       $PROG [--mkfs] --conf-dir <dir>
 
-Bootstrap cluster described by the description file or
-using the ready configuration at the specified directory.
+Bootstrap the cluster.
+
+Positional argument:
+  <CDF>  Path to the cluster description file.
 
 Options:
-  --mkfs               Do m0mkfs (WARNING: wipes all Mero data).
-  -c, --conf-dir DIR   Don't generate configuration files, use
-                       existing ones at the specified DIR(ectory).
+  --mkfs               Execute m0mkfs.  *CAUTION* This wipes all Mero data!
+  -c, --conf-dir <dir> Do not generate configuration files, use
+                       existing ones from the specified directory.
   -h, --help           Show this help and exit.
 EOF
 }
@@ -32,16 +35,18 @@ say() {
 }
 
 get_server_nodes() {
-    jq -r '.servers[] | "\(.hostname) \(.ipaddr)"' $cfgen_out/consul-agents.json
+    jq -r '.servers[] | "\(.node_name) \(.ipaddr)"' \
+       $conf_dir/consul-agents.json
 }
 
 get_client_nodes() {
-    jq -r '.clients[] | "\(.hostname) \(.ipaddr)"' $cfgen_out/consul-agents.json
+    jq -r '.clients[] | "\(.node_name) \(.ipaddr)"' \
+       $conf_dir/consul-agents.json
 }
 
 get_all_nodes() {
-    jq -r '(.servers + .clients)[] | "\(.hostname) \(.ipaddr)"' \
-        $cfgen_out/consul-agents.json
+    jq -r '(.servers + .clients)[] | "\(.node_name) \(.ipaddr)"' \
+        $conf_dir/consul-agents.json
 }
 
 get_session() {
@@ -90,7 +95,7 @@ abort_if_RC_leader_election_is_impossible() {
     while IFS=/ read node confd_id; do
         local ok=true
         confd_id="m0d@$(printf 0x7200000000000001:0x%x $confd_id)"
-        if [[ $node == $this_node_name ]]; then
+        if [[ $node == $(node-name) ]]; then
             ssh=
         else
             ssh="ssh $node"
@@ -109,9 +114,9 @@ abort_if_RC_leader_election_is_impossible() {
             # node.
             return 0
         fi
-    done < <(jq -r '.[] | .key' $cfgen_out/consul-kv.json |
+    done < <(jq -r '.[] | .key' $conf_dir/consul-kv.json |
                 grep '/services/confd$' |
-                # m0conf/nodes/<hostname>/processes/<process_id>/services/confd
+                # m0conf/nodes/<name>/processes/<process_id>/services/confd
                 cut -d/ -f3,5
             )
     cat >&2 <<EOF
@@ -132,6 +137,19 @@ done)
 EOF
     exit 1
 }
+
+is_localhost() {
+    (($# == 1)) && [[ -n $1 ]] || die "${FUNCNAME[0]}: Invalid usage"
+    local node=$1
+    case $node in
+        localhost|127.0.0.1|$(hostname)|$(hostname --fqdn)) return 0;;
+    esac
+    local path=/etc/salt/minion_id
+    [[ -e $path && $(cat $path) == $node ]] && return 0 || return 1
+}
+
+# --------------------------------------------------------------------
+# main
 
 TEMP=$(getopt --options hc: \
               --longoptions help,mkfs,conf-dir: \
@@ -154,30 +172,31 @@ while true; do
     esac
 done
 
-[[ $conf_dir ]] || (($# == 1)) || {
-    usage >&2
-    exit 1
-}
+case $# in
+    0) [[ -d $conf_dir ]] || die "'--conf-dir' argument is not a directory";;
+    1) [[ -z $conf_dir ]] || { usage >&2; exit 1; };;
+    *) die 'Too many arguments';;  # unreachable (ruled out by getopt)
+esac
 
-cluster_descr=${1:-}
-cfgen_out=${conf_dir:-'/var/lib/hare'}
-this_node_name=$(cat /etc/salt/minion_id)
+cdf=${1:-}
 
 if sudo systemctl --quiet is-active hare-consul-agent; then
     die 'hare-consul-agent is active ==> cluster is already running'
 fi
 
-if ! [[ $conf_dir ]]; then
-    if ! [[ -d $cfgen_out ]]; then
+if [[ -z $conf_dir ]]; then
+    conf_dir=/var/lib/hare
+
+    if ! [[ -d $conf_dir ]]; then
         cat <<EOF >&2
-$cfgen_out directory does not exist.
-Try reinstalling hare.
+$conf_dir directory does not exist.
+Try reinstalling Hare.
 EOF
         exit 1
     fi
-    if ! [[ -w $cfgen_out ]]; then
+    if ! [[ -w $conf_dir ]]; then
         cat <<EOF >&2
-Cannot write to $cfgen_out directory.
+Cannot write to $conf_dir directory.
 
 Did you forget to add current user ($USER) to 'hare' group?
 If so, run
@@ -186,16 +205,26 @@ then re-login and try to bootstrap again.
 EOF
         exit 1
     fi
+
     say 'Generating cluster configuration...'
-    cfgen -o $cfgen_out $cluster_descr
-    dhall text < $cfgen_out/confd.dhall | m0confgen > $cfgen_out/confd.xc
+    PATH="$(dirname $(readlink -f $0)):$PATH" cfgen -o $conf_dir $cdf
+    dhall text < $conf_dir/confd.dhall | m0confgen > $conf_dir/confd.xc
+
+    while read node _; do
+        if is_localhost $node; then
+            echo $node > $conf_dir/node-name
+        else
+            ssh $node "echo $node > $conf_dir/node-name"
+        fi
+    done < <(get_all_nodes)
+
     echo ' OK'
 fi
 
 abort_if_RC_leader_election_is_impossible
 
 # Get my IP address (the one that the other agents will join to).
-read _ join_ip <<< $(get_server_nodes | grep -w $this_node_name)
+read _ join_ip <<< $(get_server_nodes | grep -w $(node-name))
 
 if [[ -z $join_ip ]]; then
     cat <<'EOF' >&2
@@ -223,22 +252,22 @@ done
 echo ' OK'
 
 say 'Importing configuration into the KV store...'
-jq '[.[] | {key, value: (.value | @base64)}]' < $cfgen_out/consul-kv.json |
+jq '[.[] | {key, value: (.value | @base64)}]' < $conf_dir/consul-kv.json |
     consul kv import - > /dev/null
 echo ' OK'
 
 say 'Starting Consul agents on other cluster nodes...'
 pids=()
 while read node bind_ip; do
-    ssh $node "$(which mk-consul-env) --mode server \
-                                      --bind $bind_ip --join $join_ip &&
+    ssh $node "PATH=$PATH $(which mk-consul-env) \
+                          --mode server --bind $bind_ip --join $join_ip &&
                sudo systemctl start hare-consul-agent" &
     pids+=($!)
-done < <(get_server_nodes | grep -vw $this_node_name || true)
+done < <(get_server_nodes | grep -vw $(node-name) || true)
 
 while read node bind_ip; do
-    ssh $node "$(which mk-consul-env) --mode client \
-                                      --bind $bind_ip --join $join_ip &&
+    ssh $node "PATH=$PATH $(which mk-consul-env) \
+                          --mode client --bind $bind_ip --join $join_ip &&
                sudo systemctl start hare-consul-agent" &
     pids+=($!)
 done < <(get_client_nodes)
@@ -267,14 +296,14 @@ pids=($!)
 while read node _; do
     ssh $node "PATH=$PATH $(which update-consul-conf)" &
     pids+=($!)
-done < <(get_all_nodes | grep -vw $this_node_name || true)
+done < <(get_all_nodes | grep -vw $(node-name) || true)
 wait4 ${pids[@]}
 echo ' OK'
 
 say 'Installing Mero configuration files...'
 while read node _; do
-    scp -q $cfgen_out/confd.xc $node:$cfgen_out
-done < <(get_server_nodes | grep -vw $this_node_name || true)
+    scp -q $conf_dir/confd.xc $node:$conf_dir
+done < <(get_server_nodes | grep -vw $(node-name) || true)
 echo ' OK'
 
 say 'Waiting for the RC Leader to get elected...'
@@ -314,7 +343,7 @@ start_mero() {
     while read node _; do
         ssh $node "PATH=$PATH $(which bootstrap-node) $op --phase $phase" &
         pids+=($!)
-    done < <(get_nodes $phase | grep -vw $this_node_name || true)
+    done < <(get_nodes $phase | grep -vw $(node-name) || true)
     wait4 ${pids[@]}
     echo ' OK'
 }
@@ -345,12 +374,12 @@ if [[ -n $S3_IDs ]]; then
     while read node _; do
         ssh $node "PATH=$PATH $(which bootstrap-node) --phase phase3" &
         pids+=($!)
-    done < <(get_all_nodes | grep -vw $this_node_name || true)
+    done < <(get_all_nodes | grep -vw $(node-name) || true)
     wait4 ${pids[@]}
     echo ' OK'
 fi
 
-say 'Checking health of the services...'
+say 'Checking health of services...'
 check_service() {
     local svc=$1
     curl -s http://127.0.0.1:8500/v1/health/service/$svc |

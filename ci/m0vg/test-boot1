@@ -41,7 +41,5 @@ for i in {0..9}; do
 done
 
 for cdf in singlenode.yaml ci-boot1-2ios.yaml; do
-    sed "s/localhost/$(cat /etc/salt/minion_id)/" cfgen/examples/$cdf \
-        > ci/m0vg/_$cdf
-    test_cluster ci/m0vg/_$cdf
+    test_cluster cfgen/examples/$cdf
 done
