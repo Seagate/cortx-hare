@@ -157,7 +157,7 @@ class AppRunner:
     def __init__(self):
         self._get_client = self._get_client_default
 
-    def _get_client_default(args: Any) -> Client:
+    def _get_client_default(self, args: Any) -> Client:
         creds = None
         if args.username:
             if not args.password:
