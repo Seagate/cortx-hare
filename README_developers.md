@@ -51,9 +51,8 @@ The scripts in this repository constitute a middleware layer between [Consul](ht
      done
      ```
 
-   * If `data_iface` field is specified, make sure that it refers to
-     an existing network interface (it should be present in the output
-     of `ip a` command).
+   * Make sure that `data_iface` value refers to existing network
+     interface (it should be present in the output of `ip a` command).
 
 4. Start the cluster.
    ```sh

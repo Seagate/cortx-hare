@@ -45,10 +45,10 @@ ensure that
           for x in 'integration/centos-7.7.1908/last_successful' 's3server_uploads'
           do
               repo="ci-storage.mero.colo.seagate.com/releases/eos/$x"
-              yum-config-manager --add-repo="http://$repo"
+              sudo yum-config-manager --add-repo="http://$repo"
               sudo tee -a /etc/yum.repos.d/${repo//\//_}.repo <<< 'gpgcheck=0'
-	  done
-	  unset repo x
+          done
+          unset repo x
 
           sudo yum install -y eos-hare eos-s3server
       fi

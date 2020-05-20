@@ -122,9 +122,7 @@ wait_for_s3server_to_start() {
 cd /data/hare/
 
 cdf=ci/m0vg/_test-boot1-s3.yaml
-sed -e 's/s3: 0/s3: 2/' \
-    -e "s/localhost/$(cat /etc/salt/minion_id)/" \
-    cfgen/examples/singlenode.yaml >$cdf
+sed 's/s3: 0/s3: 2/' cfgen/examples/singlenode.yaml >$cdf
 
 s3auth-disable
 _time hctl bootstrap --mkfs $cdf

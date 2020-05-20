@@ -108,13 +108,13 @@ to generate configuration data.
     {
       "servers": [
         {
-          "hostname": "<str>",
+          "node_name": "<str>",
           "ipaddr": "<str>"
         }
       ],
       "clients": [
         {
-          "hostname": "<str>",
+          "node_name": "<str>",
           "ipaddr": "<str>"
         }
       ]
