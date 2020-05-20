@@ -271,6 +271,28 @@ cmd_deregister_node() {
 EOF
 }
 
+# Cleanup Consul data directory before starting the agent to
+# avoid possible inconsistencies related to consensus when Consul
+# agent joins the Consul cluster. Mainly problems related to leader
+# election.
+
+consul_c2_cfg_dir=$hare_dir/consul-$ip2
+consul_c1_cfg_dir=$hare_dir/consul-$ip1
+
+sudo sed \
+ -e "/ExecStart=/iExecStartPre=/bin/rm -rf $consul_c2_cfg_dir" \
+ -i /usr/lib/systemd/system/hare-consul-agent-c2.service
+sudo systemctl daemon-reload
+
+cmd="
+sudo sed
+ -e '/ExecStart=/iExecStartPre=/bin/rm -rf $consul_c1_cfg_dir'
+ -i /usr/lib/systemd/system/hare-consul-agent-c1.service &&
+sudo systemctl daemon-reload"
+ssh $rnode $cmd
+
+unset consul_c1_cfg_dir consul_c2_cfg_dir
+
 sudo cp $hare_dir/consul-env $hare_dir/consul-env-c1
 scp $rnode:$hare_dir/consul-env $hare_dir/consul-env-c2
 sudo sed -r \
