@@ -71,6 +71,12 @@ groupadd --force hare
 chgrp hare /var/lib/hare
 chmod --changes g+w /var/lib/hare
 
+# puppet-agent provides a newer version of facter, but sometimes it might not be
+# available in /usr/bin/, so we need to fix this
+if [[ ! -e /usr/bin/facter && -e /opt/puppetlabs/bin/facter ]] ; then
+    ln -vsf /opt/puppetlabs/bin/facter /usr/bin/facter
+fi
+
 %postun
 systemctl daemon-reload
 
