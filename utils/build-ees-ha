@@ -170,8 +170,6 @@ sudo pcs -f lcfg constraint order lnet-clone then lnet-c1
 sudo pcs -f lcfg constraint order lnet-clone then lnet-c2
 sudo pcs cluster cib-push lcfg --config
 
-sleep 5 # Allow Pacemaker to configure the IPs
-
 # Check the IPs
 check_msg="
 Check the following:
@@ -179,11 +177,26 @@ Check the following:
  2) Run 'pcs status' and make sure LNet is configured.
  3) STONITH is configured or disabled in Pacemaker."
 
-ip a | grep -qF $ip1 ||
-    die "IP address $ip1 doesn't appear to be configured at $lnode. $check_msg"
+# Allow Pacemaker to configure the IPs
+count=10 # On CI VMs it may be quite slow
+while [[ $((count--)) -ne 0 ]]; do
+  sleep 5
+  sudo lctl list_nids | fgrep -q $ip1 || continue
+  ssh $rnode "sudo lctl list_nids | fgrep -q $ip2" || continue
+  break
+done
 
-ssh $rnode "ip a | grep -qF $ip2" ||
-    die "IP address $ip2 doesn't appear to be configured at $rnode. $check_msg"
+ip a | fgrep -q $ip1 ||
+  die "IP address $ip1 doesn't appear to be configured at $lnode. $check_msg"
+
+ssh $rnode "ip a | fgrep -q $ip2" ||
+  die "IP address $ip2 doesn't appear to be configured at $rnode. $check_msg"
+
+sudo lctl list_nids | fgrep -q $ip1 ||
+  die "LNet endpoint $ip1 doesn't appear to be configured at $lnode. $check_msg"
+
+ssh $rnode "sudo lctl list_nids | fgrep -q $ip2" ||
+  die "LNet endpoint $ip2 doesn't appear to be configured at $rnode. $check_msg"
 
 if ! $skip_mkfs; then
     sudo mkfs.ext4 -q $lvolume >/dev/null <<< y
