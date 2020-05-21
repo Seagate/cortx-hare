@@ -238,24 +238,24 @@ for f in $hare_dir/{confd.xc,consul-kv.json}; do
         -i $f
 done
 
+run_on_both 'sudo rm -f /etc/sysconfig/m0d-*'
+
 hctl bootstrap -c $hare_dir/
 hctl shutdown
 
-# Prepare symlinks for the failover so that m0d processes
-# from both nodes could access their files at `/var/mero`:
-sudo mkdir -p /var/mero1
+# Create /var/mero dirs for the foreign data-stacks:
 sudo mkdir -p /var/mero2
-sudo mount $lvolume /var/mero1
-sudo mount $rvolume /var/mero2
-sudo ln -sf $(find /var/mero2/m0d-* -maxdepth 0 -type d) \
-           /var/mero1/ || true
-sudo ln -sf $(find /var/mero1/m0d-* -maxdepth 0 -type d) \
-           /var/mero2/ || true
-sudo umount /var/mero2
-sudo umount /var/mero1
-sudo rm -r /var/mero1
-
 ssh $rnode 'sudo mkdir -p /var/mero1'
+
+# Prepare Mero conf files on each node:
+lm0confs=$(echo /etc/sysconfig/m0d-*)
+rm0confs=$(sudo ssh $rnode 'echo /etc/sysconfig/m0d-*')
+sudo scp -q $lm0confs $rnode:/etc/sysconfig/
+sudo scp -q $rnode:\{${rm0confs/ /,}\} /etc/sysconfig/
+for f in $rm0confs; do sudo sed '1iMERO_M0D_DATA_DIR=/var/mero2' -i $f; done
+ssh $rnode "for f in $lm0confs; do \
+                       sudo sed '1iMERO_M0D_DATA_DIR=/var/mero1' -i \$f; done"
+
 
 echo 'Preparing Consul agents config files...'
 cmd='
@@ -378,11 +378,10 @@ sudo cp /usr/lib/systemd/system/hare-hax.service \
         /usr/lib/systemd/system/hare-hax-c2.service
 sudo sed -e 's/hare-consul-agent.service/hare-consul-agent-c1.service/' \
          -e "/ExecStart=/iExecStartPre=/bin/sh -c 'mountpoint /var/mero || /bin/mount $lvolume /var/mero'" \
-         -e '/ExecStart=/aExecStartPost=/usr/sbin/attrd_updater -U 1 -n native-data-stack-present' \
-         -e '/ExecStart=/aExecStopPost=/usr/sbin/attrd_updater -U 0 -n native-data-stack-present' \
          -e "/ExecStart=/aExecStopPost=/bin/sh -c '! mountpoint /var/mero || while ! /bin/umount /var/mero; do lsof +D /var/mero; sleep 1; done'" \
          -i /usr/lib/systemd/system/hare-hax-c1.service
 sudo sed -e 's/hare-consul-agent.service/hare-consul-agent-c2.service/' \
+         -e 's;ExecStart.*cd /var/mero;&2;' \
          -e "/ExecStart/iEnvironmentFile=$hare_dir/hax-env-c2" \
          -e "/ExecStart=/iExecStartPre=/bin/sh -c 'mountpoint /var/mero2 || /bin/mount $rvolume /var/mero2'" \
          -e "/ExecStart=/aExecStopPost=/bin/sh -c '! mountpoint /var/mero2 || while ! /bin/umount /var/mero2; do lsof +D /var/mero2; sleep 1; done'" \
@@ -393,6 +392,7 @@ cmd="
 sudo cp /usr/lib/systemd/system/hare-hax.service
         /usr/lib/systemd/system/hare-hax-c1.service &&
 sudo sed -e 's/hare-consul-agent.service/hare-consul-agent-c1.service/'
+         -e 's;ExecStart.*cd /var/mero;&1;' \
          -e '/ExecStart/iEnvironmentFile=$hare_dir/hax-env-c1'
          -e \"/ExecStart=/iExecStartPre=/bin/sh -c 'mountpoint /var/mero1 || /bin/mount $lvolume /var/mero1'\"
          -e \"/ExecStart=/aExecStopPost=/bin/sh -c '! mountpoint /var/mero1 || while ! /bin/umount /var/mero1; do lsof +D /var/mero1; sleep 1; done'\"
@@ -401,8 +401,6 @@ sudo cp /usr/lib/systemd/system/hare-hax.service
         /usr/lib/systemd/system/hare-hax-c2.service &&
 sudo sed -e 's/hare-consul-agent.service/hare-consul-agent-c2.service/'
          -e \"/ExecStart=/iExecStartPre=/bin/sh -c 'mountpoint /var/mero || /bin/mount $rvolume /var/mero'\"
-         -e '/ExecStart=/aExecStartPost=/usr/sbin/attrd_updater -U 1 -n native-data-stack-present' \
-         -e '/ExecStart=/aExecStopPost=/usr/sbin/attrd_updater -U 0 -n native-data-stack-present' \
          -e \"/ExecStart=/aExecStopPost=/bin/sh -c '! mountpoint /var/mero || while ! /bin/umount /var/mero; do lsof +D /var/mero; sleep 1; done'\"
          -i /usr/lib/systemd/system/hare-hax-c2.service &&
 echo 'HARE_HAX_NODE_NAME=$lnode' | sudo tee $hare_dir/hax-env-c1 > /dev/null"
@@ -417,12 +415,6 @@ sudo pcs -f mcfg constraint order mero-kernel-clone then hax-c1
 sudo pcs -f mcfg constraint order mero-kernel-clone then hax-c2
 sudo pcs -f mcfg constraint order consul-c2 then hax-c1
 sudo pcs -f mcfg constraint order consul-c1 then hax-c2
-# Don't allow the foreign data-stack to start without
-# native data-stack present on the node:
-sudo pcs -f mcfg constraint location hax-c1 rule score=-INFINITY \
-                     '#uname' eq $rnode and native-data-stack-present ne 1
-sudo pcs -f mcfg constraint location hax-c2 rule score=-INFINITY \
-                     '#uname' eq $lnode and native-data-stack-present ne 1
 sudo pcs cluster cib-push mcfg --config
 
 echo 'Adding Mero to Pacemaker...'
@@ -477,10 +469,6 @@ if ! is_virtual; then
     sudo pcs -f clustercfg constraint order c2 then ClusterIP-clone
     sudo pcs cluster cib-push clustercfg --config
 fi
-
-# Copy only the updated files from each side.
-sudo rsync -u /etc/sysconfig/m0d-* $rnode:/etc/sysconfig/
-sudo rsync -u "$rnode:/etc/sysconfig/m0d-*" /etc/sysconfig/
 
 echo 'Disabling some systemd units...'
 units_to_disable=(
