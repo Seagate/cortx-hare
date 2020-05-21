@@ -104,4 +104,11 @@ bash -x /opt/seagate/eos/hare/libexec/build-ees-ha \
     --right-node ${hosts[1]} \
     --left-volume ${disks[0]} \
     --right-volume ${disks[1]} \
-    ci/m0vg/_test-pcs.yaml
+    ci/m0vg/_test-pcs.yaml || {
+
+    rc=$?
+    (($rc != 0))  # "assert"
+    sudo pcs status
+    exit $rc
+}
+sudo pcs status
