@@ -85,14 +85,31 @@ class Client():
                         predicate=non_standby_nodes)
         waiter.wait()
 
+    def _is_last_online_node(self, node_name: str) -> bool:
+        nodes = self.get_online_nodes()
+        return len(nodes) == 1 and nodes[0].name == node_name
+
     def shutdown_node(self, node_name: str, timeout: int = 120) -> None:
+        last_node = self._is_last_online_node(node_name)
+        logging.debug(
+            'Checking whether it is possible to shutdown the node %s',
+            node_name)
+        self.connector.ensure_shutdown_possible(node_name)
+
         self.connector.standby_node(node_name)
         waiter = Waiter(title=f'resources are stopped at node {node_name}',
                         timeout_seconds=timeout,
                         provider_fn=self.connector.get_nodes,
                         predicate=has_no_resources(node_name))
         waiter.wait()
-        self.connector.shutdown_node(node_name)
+        if not last_node:
+            self.connector.shutdown_node(node_name)
+        else:
+            logging.info(
+                'Node %s is the last alive node in the cluster. '
+                'It will be powered off by means of direct IPMI signal '
+                'without involving Pacemaker', node_name)
+            self.connector.manual_shutdown_node(node_name)
 
     def disable_stonith(self, timeout: int = 120) -> None:
         resources = self.connector.get_stonith_resources()
