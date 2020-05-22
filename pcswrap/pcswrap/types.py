@@ -14,6 +14,11 @@ Resource = NamedTuple('Resource', [('id', str), ('resource_agent', str),
                                    ('failed', bool), ('failure_ignored', bool),
                                    ('nodes_running_on', int)])
 
+StonithResource = NamedTuple('StonithResource',
+                             [('klass', str), ('typename', str),
+                              ('pcmk_host_list', str), ('ipaddr', str),
+                              ('login', str), ('passwd', str)])
+
 
 class PcsConnector(ABC):
     credentials = None
@@ -71,3 +76,16 @@ class PcsConnector(ABC):
 
     def get_credentials(self) -> Optional[Credentials]:
         return self.credentials
+
+    @abstractmethod
+    def manual_shutdown_node(self, node_name: str) -> None:
+        '''
+        Powers off the given node by name using explicit ipmi_tool invocation.
+        The necessary IPMI parameters are extracted from the corresponding
+        stonith resource which is registered in Pacemaker
+        '''
+        pass
+
+    @abstractmethod
+    def ensure_shutdown_possible(self, node_name: str) -> None:
+        pass
