@@ -1,0 +1,172 @@
+#!/usr/bin/env bash
+set -eu -o pipefail
+export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
+# set -x
+
+PROG=${0##*/}
+
+usage() {
+    cat <<EOF
+Usage: $PROG [OPTS] <CDF> [<params.yaml>]
+
+Formats EES Cortx MOTR storage.
+
+Here are some prerequisites/guidelines:
+
+* Password-less ssh access between the nodes is required.
+* Cortx MOTR is installed.
+
+* The script should be run from the "left" node.
+
+Mandatory parameters:
+  --ip1           <addr>         1st roaming IP address
+  --ip2           <addr>         2nd roaming IP address.
+  --left-node     <n1>  Left  node hostname (default: pod-c1)
+  --right-node    <n2>  Right node hostname (default: pod-c2)
+  --left-volume   <lv>  Left  node /var/mero volume (default: /dev/sdb)
+  --right-volume  <rv>  Right node /var/mero volume (default: /dev/sdc)
+                  <CDF>          Hare Cluster Description File
+
+Note: parameters can be specified either directly via cmd-line options
+or via a yaml file, e.g.:
+
+  ip1: <ip>
+  ip2: <ip2>
+  left-node: <lnode>
+  right-node: <rnode>
+  left-volume: <lvolume>
+  right-volume: <rvolume>
+EOF
+}
+
+TEMP=$(getopt --options h,i: \
+              --longoptions help,ip1:,ip2: \
+              --longoptions left-node:,right-node: \
+              --longoptions left-volume:,right-volume: \
+              --name "$PROG" -- "$@" || true)
+
+(($? == 0)) || { usage >&2; exit 1; }
+
+eval set -- "$TEMP"
+
+ip1=
+ip2=
+lnode=pod-c1
+rnode=pod-c2
+lvolume=/dev/sdb
+rvolume=/dev/sdc
+
+while true; do
+    case "$1" in
+        -h|--help)           usage; exit ;;
+        --ip1)               ip1=$2; shift 2 ;;
+        --ip2)               ip2=$2; shift 2 ;;
+        --left-node)         lnode=$2; shift 2 ;;
+        --right-node)        rnode=$2; shift 2 ;;
+        --left-volume)       lvolume=$2; shift 2 ;;
+        --right-volume)      rvolume=$2; shift 2 ;;
+        --)                  shift; break ;;
+        *)                   break ;;
+    esac
+done
+
+cdf=${1:-}
+argsfile=${2:-}
+
+hare_dir=/var/lib/hare
+
+die() {
+    echo "$PROG: ERROR: $*" >&2
+    exit 1
+}
+
+# Read Virtual ip, node and meta data volume information from args file.
+if [[ -f $argsfile ]]; then
+    while IFS=': ' read name value; do
+       case $name in
+           ip1)          ip1=$value     ;;
+           ip2)          ip2=$value     ;;
+           left-node)    lnode=$value   ;;
+           right-node)   rnode=$value   ;;
+           left-volume)  lvolume=$value ;;
+           right-volume) rvolume=$value ;;
+       esac
+    done < $argsfile
+fi
+
+[[ $ip1 ]] && [[ $ip2 ]] && [[ $cdf ]]  || {
+    usage >&2
+    exit 1
+}
+
+[[ -b $lvolume ]] || die "meta-data volume $lvolume is not available"
+[[ -b $rvolume ]] || die "meta-data volume $rvolume is not available"
+
+/opt/seagate/eos/hare/bin/consul kv export > \
+    /var/lib/hare/consul-conf-exported.json
+
+# Temporily move consul resources after lnet on both the nodes so that
+# lnet resources are still running after we stop consul.
+pcs resource group add c1 consul-c1 --after lnet-c1
+pcs resource group add c2 consul-c2 --after lnet-c2
+
+sudo pcs resource disable consul-c1
+sudo pcs resource disable consul-c2
+
+# Wait until consul, hax and m0d are stopped.
+while [ `pgrep consul` ] || [ `pgrep hax` ] || [ `pgrep m0d` ] ||
+      [ `ssh $rnode 'pgrep consul'` ] || [ `ssh $rnode 'pgrep hax'` ] ||
+      [ `ssh $rnode 'pgrep m0d'` ]; do
+    sleep 5
+done
+
+ip a | grep -qF $ip1 ||
+  die "IP address $ip1 doesn't appear to be configured at $lnode."
+
+ssh $rnode "ip a | grep -qF $ip2" ||
+  die "IP address $ip2 doesn't appear to be configured at $rnode."
+
+sudo lctl list_nids | grep -qF $ip1 ||
+  die "LNet endpoint $ip1 doesn't appear to be configured at $lnode."
+
+ssh $rnode "sudo lctl list_nids | grep -qF $ip2" ||
+  die "LNet endpoint $ip2 doesn't appear to be configured at $rnode."
+
+echo "Mounting /var/mero on both the nodes..."
+mkdir -p /var/mero &&
+  ! mountpoint -q /var/mero && sudo mount $lvolume /var/mero || true
+ssh $rnode "mkdir -p /var/mero &&
+  ! mountpoint -q /var/mero && sudo mount $rvolume /var/mero || true"
+
+hctl bootstrap --mkfs -c /var/lib/hare
+hctl shutdown
+
+# Ideally we will not touch the foreign directories (/var/mero{1,2}) for
+# each node during reset but we make sure they exist when cluster is back up.
+sudo mkdir -p /var/mero2
+ssh $rnode 'sudo mkdir -p /var/mero1'
+
+echo 'Unmounting /var/mero from both the nodes...'
+sudo umount /var/mero
+ssh $rnode 'sudo umount /var/mero'
+
+# Move consul resources back to their original positions in their respective
+# resource groups i.e. after virtual ip resources on both the nodes.
+pcs resource group add c1 consul-c1 --after ip-c1
+pcs resource group add c2 consul-c2 --after ip-c2
+
+sudo pcs resource enable consul-c1
+sudo pcs resource enable consul-c2
+
+echo 'Wait for services to start...'
+while true; do
+    if [[ `pgrep consul` && `pgrep hax` && `pgrep m0d` &&
+          `ssh $rnode 'pgrep consul'` && `ssh $rnode 'pgrep hax'` &&
+          `ssh $rnode 'pgrep m0d'` ]]; then
+            break
+    fi
+    sleep 5
+done
+
+/opt/seagate/eos/hare/bin/consul kv import \
+    @/var/lib/hare/consul-conf-exported.json
