@@ -3,13 +3,14 @@ import json
 import logging
 import os
 import sys
-from typing import Any, Callable, List
+from typing import Any, Callable, List, Optional
+
+from systemd import journal
 
 from pcswrap.exception import CliException, MaintenanceFailed, TimeoutException
 from pcswrap.internal.connector import CliConnector
 from pcswrap.internal.waiter import Waiter
 from pcswrap.types import Credentials, Node, PcsConnector, Resource
-from systemd import journal
 
 __all__ = ['Client', 'main']
 
@@ -160,6 +161,43 @@ class Client():
         logging.info(
             'Stonith resources are enabled. Cluster is functional now.')
 
+    def get_status(self, is_full: bool = False) -> str:
+        nodes = [node._asdict() for node in self.get_all_nodes()]
+        if not is_full:
+            return json.dumps(nodes)
+
+        def safe_lower(s: Optional[str]) -> str:
+            if not s:
+                return ''
+            return s.lower()
+
+        started = 0
+        stopped = 0
+        unstarted = 0
+        for res in self.connector.get_resources():
+            role = safe_lower(res.role)
+            target_role = safe_lower(res.target_role)
+            if 'started' == role:
+                started += 1
+            elif 'stopped' == role:
+                stopped += 1
+                if target_role == 'started':
+                    # if target_role = Started while currently the resource
+                    # is not running then this resource is still planned
+                    # for start (i.e. it is not disabled)
+                    unstarted += 1
+        result = {
+            'resources': {
+                'statistics': {
+                    'started': started,
+                    'stopped': stopped,
+                    'awaiting_start': unstarted
+                }
+            },
+            'nodes': nodes
+        }
+        return json.dumps(result)
+
 
 def _setup_logging(verbose: bool) -> None:
     level = logging.DEBUG if verbose else logging.INFO
@@ -206,9 +244,7 @@ class AppRunner:
             else:
                 client().unstandby_node(args.unstandby_node)
         elif hasattr(args, 'show_status'):
-            nodes = [node._asdict() for node in client().get_all_nodes()]
-            json_str = json.dumps(nodes)
-            print(json_str)
+            print(client().get_status(is_full=args.full_status))
         elif hasattr(args, 'shutdown_node'):
             node = args.shutdown_node[0]
             client().shutdown_node(node, timeout=args.timeout_sec)
@@ -283,6 +319,13 @@ class AppRunner:
                                    dest='show_status',
                                    default=True,
                                    help=argparse.SUPPRESS)
+        status_parser.add_argument(
+            '--full',
+            action='store_true',
+            dest='full_status',
+            default=False,
+            help='Show overall cluster status, so not only nodes '
+            'will be included')
         shutdown_parser.add_argument('shutdown_node',
                                      type=str,
                                      nargs=1,

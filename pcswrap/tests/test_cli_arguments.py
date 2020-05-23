@@ -63,10 +63,10 @@ class AppRunnerTest(unittest.TestCase):
 
         # Note that any method except for get_all_nodes will raise an
         # exception immediately.
-        stub_client.get_all_nodes = MagicMock()
+        stub_client.get_status = MagicMock()
 
         runner.run(['status'])
-        self.assertTrue(stub_client.get_all_nodes.called)
+        self.assertTrue(stub_client.get_status.called)
 
     def test_standby_single_node_works(self):
         stub_client, runner = self._create_client_and_runner()
