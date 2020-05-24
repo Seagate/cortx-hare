@@ -36,9 +36,9 @@ usage() {
     cat <<EOF
 Usage: $PROG <command> [options]
 
-  Bootstrap, start/stop Mero cluster. Show cluster status.
+Interact with Mero cluster.
 
-  Commands:
+Commands:
 
 $(commands_usage)
 
@@ -62,7 +62,6 @@ _help() {
     [[ $1 == stdout ]] && usage || usage >&2
     exit 1
 }
-
 
 # parse CLI options
 while true ; do
