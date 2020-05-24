@@ -9,19 +9,20 @@ PROG=${0##*/}
 
 usage() {
     cat <<EOF
-Usage: $PROG [--mkfs] <CDF>
-       $PROG [--mkfs] --conf-dir <dir>
+Usage: $PROG [<option>]... <CDF>
+       $PROG [<option>]... --conf-dir <dir>
 
 Bootstrap the cluster.
 
-Positional argument:
-  <CDF>  Path to the cluster description file.
+Positional arguments:
+  <CDF>                  Path to the cluster description file.
+  -c, --conf-dir <dir>   Don't generate configuration files, use existing
+                         ones from the specified directory.
 
 Options:
-  --mkfs               Execute m0mkfs.  *CAUTION* This wipes all Mero data!
-  -c, --conf-dir <dir> Do not generate configuration files, use
-                       existing ones from the specified directory.
-  -h, --help           Show this help and exit.
+  --debug      Print commands and their arguments as they are executed.
+  --mkfs       Execute m0mkfs.  *CAUTION* This wipes all Mero data!
+  -h, --help   Show this help and exit.
 EOF
 }
 
@@ -152,7 +153,7 @@ is_localhost() {
 # main
 
 TEMP=$(getopt --options hc: \
-              --longoptions help,mkfs,conf-dir: \
+              --longoptions help,mkfs,conf-dir:,debug \
               --name "$PROG" -- "$@" || true)
 
 (($? == 0)) || { usage >&2; exit 1; }
@@ -161,12 +162,14 @@ eval set -- "$TEMP"
 
 conf_dir=
 opt_mkfs=
+debug_p=false
 
 while true; do
     case "$1" in
         -h|--help)           usage; exit ;;
         --mkfs)              opt_mkfs=--mkfs; shift ;;
         -c|--conf-dir)       conf_dir=$2; shift 2 ;;
+        --debug)             debug_p=true; shift ;;
         --)                  shift; break ;;
         *)                   break ;;
     esac
@@ -177,6 +180,8 @@ case $# in
     1) [[ -z $conf_dir ]] || { usage >&2; exit 1; };;
     *) die 'Too many arguments';;  # unreachable (ruled out by getopt)
 esac
+
+$debug_p && set -x
 
 cdf=${1:-}
 
