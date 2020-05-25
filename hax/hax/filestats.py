@@ -5,6 +5,7 @@ import time
 from hax.exception import HAConsistencyException
 from hax.halink import HaLink, log_exception
 from hax.types import FsStatsWithTime, StoppableThread
+from typing import List
 from hax.util import ConsulUtil
 
 
@@ -31,6 +32,10 @@ class FsStatsUpdater(StoppableThread):
             halink.start_rconfc()
             logging.info('rconfc is initialized, FS stats can be polled now')
             while not self.stopped:
+                started = self._ioservices_running()
+                if not all(started):
+                    self.stopped = True
+                    continue
                 stats = halink.get_filesystem_stats()
                 logging.debug('FS stats are as follows: %s', stats)
                 now_time = datetime.datetime.now()
@@ -53,11 +58,15 @@ class FsStatsUpdater(StoppableThread):
             ffi.shun_mero_thread()
             logging.debug('filesystem stats updater thread exited')
 
+    def _ioservices_running(self) -> List[bool]:
+        statuses = self.consul.get_m0d_statuses()
+        logging.debug('The following statuses received: %s', statuses)
+        started = ['M0_CONF_HA_PROCESS_STARTED' == v[1] for v in statuses]
+        return started
+
     def _ensure_mero_all_started(self):
         while True:
-            statuses = self.consul.get_m0d_statuses()
-            logging.debug('The following statuses received: %s', statuses)
-            started = ['M0_CONF_HA_PROCESS_STARTED' == v[1] for v in statuses]
+            started = self._ioservices_running()
             if all(started):
                 logging.debug(
                     'According to Consul all confds have been started')
