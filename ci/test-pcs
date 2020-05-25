@@ -3,11 +3,42 @@ set -eu -o pipefail
 export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
 set -x
 
-. ci/functions.sh  # _time, ci_init_m0vg, ci_success, ci_vm_name_prefix
+. ci/functions.sh  # _time, ci_init_m0vg, ci_success, ci_vm_name_prefix, die
 
 cd $WORKSPACE_DIR
 
-pass_file=hare/ci/m0vg/_test-pcs.pass
+fprefix=hare/ci/m0vg/_test-pcs
+
+subnet() {
+    local address netmask
+    read address netmask < <(
+        virsh net-dumpxml vagrant-libvirt | xpath -q -e '/network/ip/@*' |
+            # address="192.168.121.1"
+            # netmask="255.255.255.0"
+            awk -F'[="]+' '
+                /address/ { a = $2 }
+                /netmask/ { m = $2 }
+                END { print a, m }'
+    )
+    [[ $netmask == 255.255.255.0 ]] || die "${FUNCNAME[0]}: Unsupported netmask"
+    echo ${address%.*}
+}
+
+# IP addresses offered to VMs by virsh's DHCP server (dnsmasq).
+# See also https://wiki.libvirt.org/page/VirtualNetworking#DNS_.26_DHCP
+taken_ips() {
+    virsh net-dhcp-leases vagrant-libvirt | awk '$4 == "ipv4" { print $5 }' |
+        cut -d/ -f1 | sort -t. -k4 -n | tee $fprefix.DEBUG.taken-ips
+}
+
+roaming_ips() {
+    local how_many=${1:-2}
+    join -v1 <(seq 2 254 | sort) <(taken_ips | cut -d. -f4 | sort) |
+        shuf -n $how_many | sed "s/^/$(subnet)./" |
+        sort -t. -k4 -n | tee $fprefix.DEBUG.roaming-ips
+}
+
+pass_file=$fprefix.pass
 {
     tr -dc '_[:alnum:]' </dev/urandom | head -c20 || true
     echo
@@ -23,6 +54,8 @@ done
 $M0VG run --vm pod-c1 /data/hare/ci/m0vg/ssh-keyscan $(ci_vm_name_prefix)-pod-c2
 
 _time $M0VG run --vm pod-c1 \
-      PASS_FILE=/data/$pass_file /data/hare/ci/m0vg/test-pcs
+      PASS_FILE=/data/$pass_file \
+      ROAMING_IPS=$(roaming_ips | paste -d, -s) \
+      /data/hare/ci/m0vg/test-pcs
 
 ci_success

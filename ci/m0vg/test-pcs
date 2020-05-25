@@ -13,6 +13,9 @@ hosts=($(ci_vm_name_prefix)-pod-c{1,2})
 
 [[ -s $PASS_FILE ]] || die "Cannot get password from $PASS_FILE"
 
+IFS=, read -a roaming_ips <<< $ROAMING_IPS
+((${#roaming_ips[@]} == 2)) || die "Bad ROAMING_IPS: $ROAMING_IPS"
+
 # Configure Corosync.
 # https://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/2.0/html/Clusters_from_Scratch/_configure_corosync.html
 sudo pcs cluster auth ${hosts[@]} -u hacluster -p $(cat $PASS_FILE)
@@ -33,25 +36,7 @@ sudo pcs property set stonith-enabled=false
 # https://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/2.0/html/Clusters_from_Scratch/_explore_the_existing_configuration.html
 sudo crm_verify --live-check --verbose
 
-ips=( $(awk '/pod-c/ {print $1}' /etc/hosts) )
-((${#ips[@]} == 2)) ||
-    die "/etc/hosts: 2 'pod-c' lines expected, got ${#ips[@]}"
-[[ ${ips[0]%.*} == ${ips[1]%.*} ]] ||
-    die "IP addresses are not from the same /24 network: ${ips[@]}"
-subnet=${ips[0]%.*}
-
-# Generate roaming IP addresses.
-last_byte=101
-while true; do
-    roaming_ips=(
-        $subnet.$last_byte
-        $subnet.$((last_byte + 1))
-    )
-    (( $(echo ${ips[@]} ${roaming_ips[@]} | tr ' ' \\n | sort -u | wc -l)
-       == 4 )) && break
-    ((last_byte += 2))
-done
-
+subnet=${roaming_ips[0]%.*}
 data_iface=$(ip -4 -oneline address | grep -m1 -F $subnet | awk '{print $2}')
 disks=(/dev/disk/by-id/scsi-*)
 
