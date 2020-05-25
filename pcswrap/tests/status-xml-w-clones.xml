@@ -6,7 +6,7 @@
         <last_update time="Wed Feb 26 14:07:26 2020" />
         <last_change time="Tue Feb 25 20:08:36 2020" user="root" client="cibadmin" origin="smc7-m11" />
         <nodes_configured number="2" expected_votes="unknown" />
-        <resources_configured number="6" disabled="0" blocked="0" />
+        <resources_configured number="6" disabled="2" blocked="0" />
         <cluster_options stonith-enabled="false" symmetric-cluster="true" no-quorum-policy="ignore" maintenance-mode="false" />
     </summary>
     <nodes>

@@ -4,6 +4,7 @@ from subprocess import PIPE, Popen
 from typing import Any, Dict, List, Match, Optional, Tuple
 
 import defusedxml.ElementTree as ET
+
 from pcswrap.exception import CliException, PcsNoStatusException
 from pcswrap.types import Node, PcsConnector, Resource, StonithResource
 
@@ -248,3 +249,12 @@ class CliConnector(PcsConnector):
         if not resource:
             raise RuntimeError(
                 f'No stonith resource is found for node {node_name}.')
+
+    def get_eligible_resource_count(self) -> int:
+        xml_str = self.executor.get_full_status_xml()
+        xml = self._parse_xml(xml_str)
+        tag = xml.find('./summary/resources_configured')
+        total = int(tag.attrib['number'])
+        disabled = int(tag.attrib['disabled'])
+        blocked = int(tag.attrib['blocked'])
+        return total - disabled - blocked
