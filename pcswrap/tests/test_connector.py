@@ -84,6 +84,12 @@ class PcsExecutorTest(unittest.TestCase):
         connector = CliConnector(executor=stub_executor)
         self.assertEqual('mycluster', connector.get_cluster_name())
 
+    def test_get_eligible_resource_count_works(self):
+        stub_executor = CliExecutor()
+        stub_executor.get_full_status_xml = MagicMock(return_value = GOOD_XML)
+        connector = CliConnector(executor=stub_executor)
+        self.assertEqual(4, connector.get_eligible_resource_count())
+
     def test_get_resources_works(self):
         stub_executor = CliExecutor()
         stub_executor.get_full_status_xml = MagicMock(side_effect=[GOOD_XML])

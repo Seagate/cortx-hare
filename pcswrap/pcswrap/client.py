@@ -167,31 +167,25 @@ class Client():
             return json.dumps(nodes)
 
         def safe_lower(s: Optional[str]) -> str:
-            if not s:
-                return ''
-            return s.lower()
+            return (s or '').lower()
+
+        eligible = self.connector.get_eligible_resource_count()
 
         started = 0
         stopped = 0
-        unstarted = 0
         for res in self.connector.get_resources():
             role = safe_lower(res.role)
-            target_role = safe_lower(res.target_role)
-            if 'started' == role:
+            if role == 'started':
                 started += 1
-            elif 'stopped' == role:
+            elif role == 'stopped':
                 stopped += 1
-                if target_role == 'started':
-                    # if target_role = Started while currently the resource
-                    # is not running then this resource is still planned
-                    # for start (i.e. it is not disabled)
-                    unstarted += 1
+
         result = {
             'resources': {
                 'statistics': {
                     'started': started,
                     'stopped': stopped,
-                    'awaiting_start': unstarted
+                    'starting': eligible - started
                 }
             },
             'nodes': nodes

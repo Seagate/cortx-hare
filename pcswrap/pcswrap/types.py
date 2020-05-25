@@ -80,7 +80,7 @@ class PcsConnector(ABC):
     @abstractmethod
     def manual_shutdown_node(self, node_name: str) -> None:
         '''
-        Powers off the given node by name using explicit ipmi_tool invocation.
+        Powers off the given node by name using explicit ipmitool invocation.
         The necessary IPMI parameters are extracted from the corresponding
         stonith resource which is registered in Pacemaker
         '''
@@ -88,4 +88,13 @@ class PcsConnector(ABC):
 
     @abstractmethod
     def ensure_shutdown_possible(self, node_name: str) -> None:
+        pass
+
+    @abstractmethod
+    def get_eligible_resource_count(self) -> int:
+        '''
+        Looks into "summary" information provided by Pacemaker and extracts the
+        number of resources that are expected to run with respect to disabled
+        and blocked resources.
+        '''
         pass
