@@ -102,18 +102,22 @@ fi
 [[ -b $lvolume ]] || die "meta-data volume $lvolume is not available"
 [[ -b $rvolume ]] || die "meta-data volume $rvolume is not available"
 
+echo 'Exporting Consul configuration to /var/lib/hare/consul-conf-exported.json'
 /opt/seagate/eos/hare/bin/consul kv export > \
     /var/lib/hare/consul-conf-exported.json
 
 # Temporily move consul resources after lnet on both the nodes so that
 # lnet resources are still running after we stop consul.
-pcs resource group add c1 consul-c1 --after lnet-c1
-pcs resource group add c2 consul-c2 --after lnet-c2
+echo 'Repositioning Consul resources on both the nodes...'
+sudo pcs resource group add c1 consul-c1 --after lnet-c1
+sudo pcs resource group add c2 consul-c2 --after lnet-c2
 
+echo 'Disabling Consul resources...'
 sudo pcs resource disable consul-c1
 sudo pcs resource disable consul-c2
 
 # Wait until consul, hax and m0d are stopped.
+echo 'Waiting for Consul, hax and m0d services to stop on both the nodes...'
 while [ `pgrep consul` ] || [ `pgrep hax` ] || [ `pgrep m0d` ] ||
       [ `ssh $rnode 'pgrep consul'` ] || [ `ssh $rnode 'pgrep hax'` ] ||
       [ `ssh $rnode 'pgrep m0d'` ]; do
@@ -121,23 +125,32 @@ while [ `pgrep consul` ] || [ `pgrep hax` ] || [ `pgrep m0d` ] ||
 done
 
 ip a | grep -qF $ip1 ||
-  die "IP address $ip1 doesn't appear to be configured at $lnode."
+  die "IP address $ip1 doesn't appear to be configured at $lnode"
 
 ssh $rnode "ip a | grep -qF $ip2" ||
-  die "IP address $ip2 doesn't appear to be configured at $rnode."
+  die "IP address $ip2 doesn't appear to be configured at $rnode"
 
 sudo lctl list_nids | grep -qF $ip1 ||
-  die "LNet endpoint $ip1 doesn't appear to be configured at $lnode."
+  die "LNet endpoint $ip1 doesn't appear to be configured at $lnode"
 
 ssh $rnode "sudo lctl list_nids | grep -qF $ip2" ||
-  die "LNet endpoint $ip2 doesn't appear to be configured at $rnode."
+  die "LNet endpoint $ip2 doesn't appear to be configured at $rnode"
+
+echo "Conforming if /var/mero on both the nodes is unmounted..."
+while mountpoint /var/mero && ! umount /var/mero; do sleep 1; done
+while ssh $rnode 'mountpoint /var/mero && ! umount /var/mero'; do sleep 1; done
+
+echo "Formatting volumes $lvolume and $rvolume ..."
+mkfs.ext4 $lvolume
+mkfs.ext4 $rvolume
 
 echo "Mounting /var/mero on both the nodes..."
 mkdir -p /var/mero &&
-  ! mountpoint -q /var/mero && sudo mount $lvolume /var/mero || true
+  ! mountpoint -q /var/mero && sudo mount $lvolume /var/mero
 ssh $rnode "mkdir -p /var/mero &&
-  ! mountpoint -q /var/mero && sudo mount $rvolume /var/mero || true"
+  ! mountpoint -q /var/mero && sudo mount $rvolume /var/mero"
 
+echo 'Running hctl bootstrap..'
 hctl bootstrap --mkfs -c /var/lib/hare
 hctl shutdown
 
@@ -152,13 +165,18 @@ ssh $rnode 'sudo umount /var/mero'
 
 # Move consul resources back to their original positions in their respective
 # resource groups i.e. after virtual ip resources on both the nodes.
-pcs resource group add c1 consul-c1 --after ip-c1
-pcs resource group add c2 consul-c2 --after ip-c2
+echo 'Repositioning Consul resources to original location on both the nodes...'
+sudo pcs resource group add c1 consul-c1 --after ip-c1
+sudo pcs resource group add c2 consul-c2 --after ip-c2
 
+echo 'Enabling Consul resources on both the nodes...'
 sudo pcs resource enable consul-c1
 sudo pcs resource enable consul-c2
 
-echo 'Wait for services to start...'
+# Reset failcount once after reset
+sudo pcs resource cleanup
+
+echo 'Wait until Consul, hax and m0d services start on both the nodes...'
 while true; do
     if [[ `pgrep consul` && `pgrep hax` && `pgrep m0d` &&
           `ssh $rnode 'pgrep consul'` && `ssh $rnode 'pgrep hax'` &&
@@ -168,5 +186,6 @@ while true; do
     sleep 5
 done
 
+echo 'Import /var/lib/hare/consul-conf-exported.json...'
 /opt/seagate/eos/hare/bin/consul kv import \
     @/var/lib/hare/consul-conf-exported.json
