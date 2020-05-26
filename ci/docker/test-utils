@@ -16,3 +16,5 @@ fi
 make check
 make test
 make install
+
+hctl --help  # this verifies that utils/hare-* have `# :help: ` lines
