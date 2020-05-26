@@ -2,15 +2,15 @@
 
 import logging
 from queue import Queue
+from typing import NamedTuple
 
 from hax.ffi import HaxFFI
+from hax.filestats import FsStatsUpdater
 from hax.halink import HaLink
 from hax.handler import ConsumerThread
 from hax.server import run_server
-from hax.filestats import FsStatsUpdater
 from hax.types import Fid
 from hax.util import ConsulUtil, repeat_if_fails
-from typing import NamedTuple
 
 __all__ = ['main']
 
@@ -31,7 +31,7 @@ def _run_qconsumer_thread(queue: Queue, ffi: HaxFFI) -> ConsumerThread:
 
 
 def _run_stats_updater_thread(halink: HaLink) -> FsStatsUpdater:
-    thread = FsStatsUpdater(halink)
+    thread = FsStatsUpdater(halink, interval_sec=30)
     thread.start()
     return thread
 
