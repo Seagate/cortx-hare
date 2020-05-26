@@ -413,34 +413,7 @@ static void handle_process_event(const struct hax_msg *hm)
 
 static void handle_stob_ioq(const struct hax_msg *hm)
 {
-	const struct m0_stob_ioq_error *ioq_err =
-	    &hm->hm_msg.hm_data.u.hed_stob_ioq;
-	char buf[512] = { 0 };
-
-	/*
-	 * This IEM was disabled temporarily.
-	 *
-	 * There is no justification for this arbitrary decision. This was
-	 * wrong thing to do in the first place, but we were forced to do it
-	 * after ~15h of meetings.
-	 * Now we need to disable this, and it took only several hours of
-	 * discussions in private chats and 1h meeting with several managements
-	 * and architects present.
-	 */
-	return;
-
-	snprintf(buf, sizeof(buf) - 1,
-		 "%x|" FID_F "|" FID_F "|" FID_F "|%" PRIx64 "|%" PRIx64
-		 "|%" PRIx64 "|%" PRIx64 "|%" PRIx64 "|%" PRIx32,
-		 m0_ha_msg_type_get(&hm->hm_msg),
-		 FID_P(&ioq_err->sie_conf_sdev),
-		 FID_P(&ioq_err->sie_stob_id.si_domain_fid),
-		 FID_P(&ioq_err->sie_stob_id.si_fid), ioq_err->sie_fd,
-		 ioq_err->sie_opcode, ioq_err->sie_rc, ioq_err->sie_offset,
-		 ioq_err->sie_size, ioq_err->sie_bshift);
-
-	M0_MERO_IEM_DESC(M0_MERO_IEM_SEVERITY_E_ERROR, M0_MERO_IEM_MODULE_IO,
-			 M0_MERO_IEM_EVENT_IOQ, "stob_ioq_error [%s]", buf);
+	/* just ignore it for now */
 }
 
 static void _dummy_handle(const struct hax_msg *msg)
