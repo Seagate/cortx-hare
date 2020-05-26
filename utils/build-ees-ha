@@ -299,6 +299,23 @@ sudo sed
 sudo systemctl daemon-reload"
 ssh $rnode $cmd
 
+# Add and update node attribute for consul resource on both the nodes.
+# This will be used to define constraints for the resources depending
+# on consul.
+sudo sed \
+ -e '/ExecStart=/aExecStartPost=/usr/sbin/attrd_updater -U 1 -n consul-c1-running' \
+ -e '/ExecStartPost=/aExecStopPost=/usr/sbin/attrd_updater -U 0 -n consul-c1-running' \
+ -i /usr/lib/systemd/system/hare-consul-agent-c1.service
+sudo systemctl daemon-reload
+
+cmd="
+sudo sed
+ -e '/ExecStart=/aExecStartPost=/usr/sbin/attrd_updater -U 1 -n consul-c2-running' \
+ -e '/ExecStartPost=/aExecStopPost=/usr/sbin/attrd_updater -U 0 -n consul-c2-running' \
+ -i /usr/lib/systemd/system/hare-consul-agent-c2.service &&
+sudo systemctl daemon-reload"
+ssh $rnode $cmd
+
 unset consul_c1_cfg_dir consul_c2_cfg_dir
 
 sudo cp $hare_dir/consul-env $hare_dir/consul-env-c1
