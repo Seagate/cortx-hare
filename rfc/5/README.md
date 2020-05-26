@@ -31,7 +31,7 @@ The code of `hax` consists of C and Python parts.
 
 [m0_ha_msg_type][] | Reaction of `hax`
 --- | ---
-M0_HA_MSG_STOB_IOQ | Call `m0_mero_iem()` to generate an IEM (Interesting Event Message).
+M0_HA_MSG_STOB_IOQ | Ignore.
 M0_HA_MSG_NVEC | Build the reply based on Consul data; see the [details below](#4-handling-of-nvec-get-request).
 M0_HA_MSG_FAILURE_VEC_REQ | Reply with stub data &mdash; empty vector for fid `M0_FID_TINIT('o', 2, 9)`.
 M0_HA_MSG_FAILURE_VEC_REP | Reply with stub data &mdash; empty vector for fid `M0_FID_TINIT('o', 2, 9)`.
