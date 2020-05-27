@@ -118,9 +118,9 @@ sudo pcs resource disable consul-c2
 
 # Wait until consul, hax and m0d are stopped.
 echo 'Waiting for Consul, hax and m0d services to stop on both the nodes...'
-while [ `pgrep consul` ] || [ `pgrep hax` ] || [ `pgrep m0d` ] ||
-      [ `ssh $rnode 'pgrep consul'` ] || [ `ssh $rnode 'pgrep hax'` ] ||
-      [ `ssh $rnode 'pgrep m0d'` ]; do
+while [[ `pgrep consul` ]] || [[ `pgrep hax` ]] || [[ `pgrep m0d` ]] ||
+      [[ `ssh $rnode 'pgrep consul'` ]] || [[ `ssh $rnode 'pgrep hax'` ]] ||
+      [[ `ssh $rnode 'pgrep m0d'` ]]; do
     sleep 5
 done
 
