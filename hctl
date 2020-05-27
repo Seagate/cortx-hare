@@ -33,6 +33,10 @@ else
 fi
 
 usage() {
+    # NB: `local var=$(func)` expression ignores exit status of `func`
+    # and always succeeds.
+    local commands  # do not assign the value here
+    commands=$(commands_usage)
     cat <<EOF
 Usage: $PROG <command> [options]
 
@@ -40,21 +44,37 @@ Interact with Mero cluster.
 
 Commands:
 
-$(commands_usage)
+$commands
 
-    help         Show this help screen and exit.
+    help        Show this help and exit.
 EOF
 }
 
-commands_usage() {
+command_help() (
+    local exec=$1
     local tag='# :help: '
-    for cmd in $HARE_BASE_DIR/libexec/hare-*; do
-        local name=${cmd##*/hare-}
-        if [[ $(grep -c "^$tag" $cmd) != 1 ]]; then
-            die "$cmd: '$tag' line is missing"
-        fi
-        local info=$(grep -Po "(?<=^$tag).*" $cmd)
-        echo -e "    $name\t$info"
+
+    # Note, that these `die` statements don't terminate the script.
+    case $(grep -c "^$tag" $exec) in
+        0) die "$exec: '$tag' line is missing" ;;
+        1) grep -Po "(?<=^$tag).*" $exec ;;
+        *) die "$exec: there can be only one '$tag' line" ;;
+    esac
+)
+
+commands_usage() {
+    local -a lines
+    local name help line
+    local ok=true
+    for exec in $HARE_BASE_DIR/libexec/hare-*; do
+        name=${exec##*/hare-}
+        help=$(command_help $exec) || ok=false
+        lines+=("$(echo -e "    $name\t$help")")
+    done
+    $ok || return 1
+
+    for line in "${lines[@]}"; do
+        echo "$line"  # quotes are needed
     done
 }
 
