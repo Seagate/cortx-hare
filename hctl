@@ -58,27 +58,20 @@ commands_usage() {
     done
 }
 
-_help() {
-    [[ $1 == stdout ]] && usage || usage >&2
-    exit 1
-}
-
 # parse CLI options
 while true ; do
     case $1 in
-        -h|--help|help)  _help stdout ;;
-
-        -*) die "Unknown option '$1', see \`$PROG help\`." ;;
+        -h|--help|help) usage; exit ;;
+        -*) die "Unknown option '$1'; see \`$PROG help\`" ;;
         *)  cmd=${1:-help} ; shift || true ; break ;;
     esac
-
     shift
 done
 
 # process commands
 case $cmd in
-    help)  _help stdout ;;
-    bootstrap|shutdown|status|reportbug|node)
+    help) usage; exit ;;
+    bootstrap|node|reportbug|shutdown|status)
         if [[ -d $M0_SRC_DIR/utils ]]; then
             PATH="$M0_SRC_DIR/utils:$PATH"
         fi
