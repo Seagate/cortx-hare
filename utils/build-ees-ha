@@ -603,6 +603,11 @@ sudo pcs cluster cib-push s3cfg --config
 
 echo 'Adding mero-free-space-monitor to pacemaker...'
 sudo pcs resource create mero-free-space-mon systemd:mero-free-space-monitor \
-     op monitor interval=30s
+     op monitor interval=30s meta failure-timeout=300s
 sudo pcs constraint order mero-ios-c1 then mero-free-space-mon
 sudo pcs constraint order mero-ios-c2 then mero-free-space-mon
+sudo pcs constraint colocation add mero-free-space-mon with mero-ios-c1 \
+     score=1000
+sudo pcs constraint colocation add mero-free-space-mon with mero-ios-c2 \
+     score=1000
+
