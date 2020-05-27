@@ -526,7 +526,7 @@ get_s3_svc() {
 
 echo 'Adding rabbit-mq resources and constraints...'
 sudo pcs resource create rabbitmq systemd:rabbitmq-server clone op \
-    monitor interval=30s
+    monitor interval=30s meta failure-timeout=20s
 
 echo 'Adding s3background services...'
 sudo pcs cluster cib s3bcfg
