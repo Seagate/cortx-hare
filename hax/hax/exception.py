@@ -6,3 +6,7 @@ class HaxAPIException(RuntimeError):
 
 class HAConsistencyException(HaxAPIException):
     pass
+
+
+class ConfdQuorumException(HaxAPIException):
+    pass

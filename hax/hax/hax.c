@@ -177,10 +177,17 @@ PyObject *m0_ha_filesystem_stats_fetch(unsigned long long ctx)
 	struct m0_spiel *spiel = m0_halon_interface_spiel(hi);
 
 	struct m0_fs_stats stats;
-	Py_BEGIN_ALLOW_THREADS int rc =
+	int rc;
+	Py_BEGIN_ALLOW_THREADS rc =
 	    m0_spiel_filesystem_stats_fetch(spiel, &stats);
-	M0_ASSERT(rc == 0);
-	Py_END_ALLOW_THREADS PyObject *hax_mod = getModule("hax.types");
+	Py_END_ALLOW_THREADS if (rc != 0)
+	{
+		PyGILState_Release(gstate);
+		// This returns None python object (which is a singleton)
+		// properly with respect to reference counters.
+		Py_RETURN_NONE;
+	}
+	PyObject *hax_mod = getModule("hax.types");
 	PyObject *fs_stats = PyObject_CallMethod(
 	    hax_mod, "FsStats", "(KKKKKII)", stats.fs_free_seg,
 	    stats.fs_total_seg, stats.fs_free_disk, stats.fs_avail_disk,
