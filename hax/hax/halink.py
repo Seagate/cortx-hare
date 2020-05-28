@@ -3,6 +3,7 @@ import logging
 from errno import EAGAIN
 from typing import Any, List
 
+from hax.exception import ConfdQuorumException
 from hax.ffi import HaxFFI, make_array, make_c_str
 from hax.message import EntrypointRequest, HaNvecGetEvent, ProcessEvent
 from hax.types import (ConfHaProcess, Fid, FidStruct, FsStats, HaNote,
@@ -201,4 +202,7 @@ class HaLink:
 
     def get_filesystem_stats(self) -> FsStats:
         stats: FsStats = self._ffi.filesystem_stats_fetch(self._ha_ctx)
+        if stats is None:
+            raise ConfdQuorumException(
+                'Confd quorum lost, filesystem statistics is unavailable')
         return stats
