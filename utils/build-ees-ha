@@ -528,6 +528,23 @@ echo 'Adding rabbit-mq resources and constraints...'
 sudo pcs resource create rabbitmq systemd:rabbitmq-server clone op \
     monitor interval=30s meta failure-timeout=20s
 
+# Add and update node attribute for s3backgroundconsumer resource on both the
+# nodes. This will be used to define constraints for the resources depending
+# on s3backgroundconsumer resource on a node.
+sudo sed \
+ -e '/ExecStart=/aExecStartPost=/usr/sbin/attrd_updater -U 1 -n s3backcons-running' \
+ -e '/ExecStop=/aExecStopPost=/usr/sbin/attrd_updater -U 0 -n s3backcons-running' \
+ -i /usr/lib/systemd/system/s3backgroundconsumer.service
+sudo systemctl daemon-reload
+
+cmd="
+sudo sed
+ -e '/ExecStart=/aExecStartPost=/usr/sbin/attrd_updater -U 1 -n s3backcons-running' \
+ -e '/ExecStop=/aExecStopPost=/usr/sbin/attrd_updater -U 0 -n s3backcons-running' \
+ -i /usr/lib/systemd/system/s3backgroundconsumer.service &&
+sudo systemctl daemon-reload"
+ssh $rnode $cmd
+
 echo 'Adding s3background services...'
 sudo pcs cluster cib s3bcfg
 sudo pcs -f s3bcfg resource create s3backcons-c1 systemd:s3backgroundconsumer
@@ -541,6 +558,10 @@ sudo pcs -f s3bcfg constraint order rabbitmq-clone then s3backcons-c2
 sudo pcs -f s3bcfg resource create s3backprod systemd:s3backgroundproducer op \
     monitor interval=30s
 sudo pcs -f s3bcfg constraint order rabbitmq-clone then s3backprod
+sudo pcs -f s3bcfg constraint location s3backprod rule score=-INFINITY '#uname' \
+    eq $lnode and s3backcons-running eq 0
+sudo pcs -f s3bcfg constraint location s3backprod rule score=-INFINITY '#uname' \
+    eq $rnode and s3backcons-running eq 0
 sudo pcs -f s3bcfg constraint colocation add s3backprod with s3backcons-c1 \
     score=50000
 sudo pcs -f s3bcfg constraint colocation add s3backprod with s3backcons-c2 \
