@@ -50,6 +50,13 @@ else
     service=$svc
 fi
 
+# See https://www.consul.io/docs/agent/checks#check-scripts
+declare -A status=(
+    [passing]=0
+    [warning]=1
+    [failing]=2
+)
+
 if [[ $service =~ m0d ]]; then
     pass=/tmp/mero-mkfs-pass-$fid
     fail=/tmp/mero-mkfs-fail-$fid
@@ -57,16 +64,18 @@ if [[ $service =~ m0d ]]; then
     if [[ -f $pass ]]; then
         rm $pass
         touch $fail
-        exit 0
+        exit ${status[passing]}
     elif [[ -f $fail ]]; then
         rm $fail
-        exit 1
+        exit ${status[warning]}
     fi
 fi
 
 case $(systemctl is-active $service) in
-    'active') exit 0;;
-    'deactivating') exit 0;;
-    'failed') exit 2;;
-    *) exit 1;;
+    active|deactivating)
+        exit ${status[passing]};;
+    failed)
+        exit ${status[failing]};;
+    *)
+        exit ${status[warning]};;
 esac
