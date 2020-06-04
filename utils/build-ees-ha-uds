@@ -7,7 +7,7 @@ PROG=${0##*/}
 
 usage() {
     cat <<EOF
-Usage: $PROG [-h | --help]
+Usage: $PROG [OPTS]
 
 Configures UDS HA by adding resources to Pacemaker.
 
@@ -15,28 +15,78 @@ Caveats:
 
 * The script expects that 'csm-web' resource is added to Pacemaker.
   Check with 'pcs status'.
+
+Optional parameters:
+  --cib-file            Pacemaker configuration file.
+  --update              Preserve Consul and Mero state, reconfigure Pacemaker only.
+
 EOF
 }
 
-TEMP=$(getopt --options h \
-              --longoptions help \
+TEMP=$(getopt --options h,i: \
+              --longoptions help,cib-file:,update \
               --name "$PROG" -- "$@" || true)
+
+(($? == 0)) || { usage >&2; exit 1; }
 
 eval set -- "$TEMP"
 
+update=false
+cib_file=/var/lib/hare/cib_cortx_cluster.xml
+
 while true; do
-    case "$1" in
-        -h|--help) usage; exit ;;
-        --)        shift; break ;;
-        *)         break ;;
+    case "${1:-default}" in
+        -h|--help)     usage; exit ;;
+        --cib-file)    cib_file=$2; shift 2 ;;
+        --update)      update=true; shift 2 ;;
+        --)            shift; break ;;
+        *)             break ;;
     esac
 done
 
-# Abort (set -e) if `csm-web` resource does not exist.
-sudo pcs resource show csm-web >/dev/null
+precheck() {
+    # Abort (set -e) if `csm-web` resource does not exist.
+    sudo pcs resource show csm-web >/dev/null
+}
 
-echo 'Adding UDS resource and constraints...'
-sudo pcs cluster cib udscfg
-sudo pcs -f udscfg resource create uds systemd:uds op monitor interval=30s
-sudo pcs -f udscfg constraint colocation add uds with csm-web score=INFINITY
-sudo pcs cluster cib-push udscfg --config
+uds_rsc_add() {
+    echo 'Adding UDS resource and constraints...'
+    sudo pcs -f $cib_file resource create uds systemd:uds op monitor interval=30s
+    sudo pcs -f $cib_file constraint colocation add uds with csm-web score=INFINITY
+}
+
+cib_init() {
+   sudo pcs cluster cib $cib_file
+}
+
+cib_commit() {
+    sudo pcs cluster cib-push $cib_file --config
+}
+
+# HA operations table.
+ha_ops=(
+    precheck
+    uds_rsc_add
+)
+
+# Maps ha operation from the ha_ops table to its respective type.
+# HA operations are classified and described as follows,
+# bootstrap:   executes during clean installation of the software only
+# update:      executes during clean install and software update
+declare -A ha_ops_type=(
+    [precheck]='bootstrap'
+    [uds_rsc_add]='update'
+)
+
+for op in ${ha_ops[@]}; do
+    if ! $update; then
+        cib_init
+        $op
+        cib_commit
+    elif [[ ${ha_ops_type[$op]} == 'update' ]]; then
+        # We are using existing CIB as a base and re-applying the pcs
+        # instructions, thus some instructions would already exist in the
+        # CIB, we ignore them.
+        $op || true
+    fi
+done

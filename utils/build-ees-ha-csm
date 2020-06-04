@@ -35,6 +35,10 @@ Mandatory parameters:
   --left-node     <n1>  Left node hostname (default: pod-c1)
   --right-node    <n2>  Right node hostname (default: pod-c2)
 
+Optional parameters:
+  --cib-file            Pacemaker configuration file.
+  --update              Preserve Consul and Mero state, reconfigure Pacemaker only.
+
 Note: parameters can be specified either directly via command line options
 or via YAML file, e.g.:
 
@@ -47,6 +51,7 @@ EOF
 
 TEMP=$(getopt --options h,i: \
               --longoptions help,vip:,interface:,left-node:,right-node: \
+              --longoptions cib-file:,update \
               --name "$PROG" -- "$@" || true)
 
 (($? == 0)) || { usage >&2; exit 1; }
@@ -57,6 +62,8 @@ vip=
 iface=eth1
 lnode=pod-c1
 rnode=pod-c2
+update=false
+cib_file=/var/lib/hare/cib_cortx_cluster.xml
 
 while true; do
     case "$1" in
@@ -65,6 +72,8 @@ while true; do
         -i|--interface)      iface=$2; shift 2 ;;
         --left-node)         lnode=$2; shift 2 ;;
         --right-node)        rnode=$2; shift 2 ;;
+        --cib-file)          cib_file=$2; shift 2 ;;
+        --update)            update=true; shift 2 ;;
         --)                  shift; break ;;
         *)                   break ;;
     esac
@@ -101,64 +110,110 @@ run_on_both() {
     ssh $rnode $cmd
 }
 
-systemctl is-active --quiet hare-consul-agent-c1 ||
-    die 'No active Consul instance found'
-ssh $rnode "systemctl is-active --quiet hare-consul-agent-c2" ||
-    die 'No active Consul instance found'
+precheck() {
+    systemctl is-active --quiet hare-consul-agent-c1 ||
+        die 'No active Consul instance found'
+    ssh $rnode "systemctl is-active --quiet hare-consul-agent-c2" ||
+        die 'No active Consul instance found'
 
-systemctl is-active --quiet elasticsearch ||
-    die 'No active elasticsearch instance found'
-ssh $rnode "systemctl is-active --quiet elasticsearch" ||
-    die 'No active elasticsearch instance found'
+    systemctl is-active --quiet elasticsearch ||
+        die 'No active elasticsearch instance found'
+    ssh $rnode "systemctl is-active --quiet elasticsearch" ||
+        die 'No active elasticsearch instance found'
 
-systemctl is-active --quiet rabbitmq-server ||
-    die 'No active rabbitmq instance found'
-ssh $rnode "systemctl is-active --quiet rabbitmq-server" ||
-    die 'No active rabbitmq instance found'
+    systemctl is-active --quiet rabbitmq-server ||
+        die 'No active rabbitmq instance found'
+    ssh $rnode "systemctl is-active --quiet rabbitmq-server" ||
+        die 'No active rabbitmq instance found'
+}
 
-echo 'Disabling csm and kibana systemd units...'
-units_to_disable=(
-    kibana
-    csm_web
-    csm_agent
+systemd_disable() {
+    echo 'Disabling csm and kibana systemd units...'
+    units_to_disable=(
+        kibana
+        csm_web
+        csm_agent
+    )
+
+    for u in ${units_to_disable[@]}; do
+        run_on_both "sudo systemctl stop $u && sudo systemctl disable $u"
+    done
+}
+
+kibana_rsc_add() {
+    echo 'Adding kibana resources...'
+    sudo pcs -f $cib_file resource create kibana-vip ocf:heartbeat:IPaddr2 \
+        ip=$vip cidr_netmask=24 nic=$iface iflabel=v1 \
+        op start   interval=0s timeout=60s \
+        op monitor interval=5s timeout=20s \
+        op stop    interval=0s timeout=60s
+    sudo pcs -f $cib_file resource create kibana systemd:kibana op monitor interval=30s
+}
+
+csm_rsc_add() {
+    echo 'Adding csm resources and constraints...'
+
+    sudo pcs -f $cib_file resource create csm-agent systemd:csm_agent op \
+        monitor interval=30s
+    sudo pcs -f $cib_file resource create csm-web systemd:csm_web op \
+        monitor interval=30s
+
+    sudo pcs -f $cib_file resource group add \
+        csm-kibana kibana-vip kibana csm-web csm-agent
+
+    sudo pcs -f $cib_file constraint order consul-c1 then csm-web
+    sudo pcs -f $cib_file constraint order consul-c2 then csm-web
+    sudo pcs -f $cib_file constraint order els-search-clone then csm-kibana
+
+    sudo pcs -f $cib_file constraint location csm-kibana prefers $lnode
+
+    sudo pcs -f $cib_file constraint location csm-kibana rule score=-INFINITY \
+        '#uname' eq $lnode and consul-c1-running eq 0
+    sudo pcs -f $cib_file constraint location csm-kibana rule score=-INFINITY \
+        '#uname' eq $rnode and consul-c2-running eq 0
+
+    sudo pcs -f $cib_file constraint colocation add csm-kibana with els-search-clone \
+        score=INFINITY
+    sudo pcs -f $cib_file constraint colocation add csm-kibana with rabbitmq-clone \
+        score=INFINITY
+}
+
+cib_init() {
+   sudo pcs cluster cib $cib_file
+}
+
+cib_commit() {
+    sudo pcs cluster cib-push $cib_file --config
+}
+
+# HA operations table.
+ha_ops=(
+    precheck
+    systemd_disable
+    kibana_rsc_add
+    csm_rsc_add
 )
 
-for u in ${units_to_disable[@]}; do
-    run_on_both "sudo systemctl stop $u && sudo systemctl disable $u"
+# Maps ha operation from the ha_ops table to its respective type.
+# HA operations are classified and described as follows,
+# bootstrap:   executes during clean installation of the software only
+# update:      executes during clean install and software update
+declare -A ha_ops_type=(
+    [precheck]='bootstrap'
+    [systemd_disable]='bootstrap'
+    [kibana_rsc_add]='update'
+    [csm_rsc_add]='update'
+)
+
+for op in ${ha_ops[@]}; do
+    if ! $update; then
+        cib_init
+        $op
+        cib_commit
+    elif [[ ${ha_ops_type[$op]} == 'update' ]]; then
+        # We are using existing CIB as a base and re-applying the pcs
+        # instructions, thus some instructions would already exist in the
+        # CIB, we ignore them.
+        $op || true
+    fi
 done
-
-echo 'Adding kibana resources...'
-sudo pcs resource create kibana-vip ocf:heartbeat:IPaddr2 \
-    ip=$vip cidr_netmask=24 nic=$iface iflabel=v1 \
-    op start   interval=0s timeout=60s \
-    op monitor interval=5s timeout=20s \
-    op stop    interval=0s timeout=60s
-sudo pcs resource create kibana systemd:kibana op monitor interval=30s
-
-echo 'Adding csm resources and constraints...'
-
-sudo pcs cluster cib csmcfg
-sudo pcs -f csmcfg resource create csm-agent systemd:csm_agent op \
-    monitor interval=30s
-sudo pcs -f csmcfg resource create csm-web systemd:csm_web op \
-     monitor interval=30s
-
-sudo pcs -f csmcfg resource group add \
-     csm-kibana kibana-vip kibana csm-web csm-agent
-
-sudo pcs -f csmcfg constraint order consul-c1 then csm-web
-sudo pcs -f csmcfg constraint order consul-c2 then csm-web
-sudo pcs -f csmcfg constraint order els-search-clone then csm-kibana
-
-sudo pcs -f csmcfg constraint location csm-kibana prefers $lnode
-
-sudo pcs -f csmcfg constraint location csm-kibana rule score=-INFINITY \
-    '#uname' eq $lnode and consul-c1-running eq 0
-sudo pcs -f csmcfg constraint location csm-kibana rule score=-INFINITY \
-    '#uname' eq $rnode and consul-c2-running eq 0
-
-sudo pcs -f csmcfg constraint colocation add csm-kibana with els-search-clone \
-    score=INFINITY
-sudo pcs -f csmcfg constraint colocation add csm-kibana with rabbitmq-clone \
-    score=INFINITY
-sudo pcs cluster cib-push csmcfg --config

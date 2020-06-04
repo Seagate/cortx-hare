@@ -37,6 +37,8 @@ Optional parameters:
   --right-volume  <rv>  Right node /var/mero volume (default: /dev/sdc)
   --skip-mkfs           Don't mkfs /var/mero
   --net-type <tcp|o2ib> LNet network type (default: tcp)
+  --cib-file      <cf>  Pacemaker configuration file
+  --update              Preserve Consul and Mero state, reconfigure Pacemaker only.
 
 Note: parameters can be specified either directly via cmd-line options
 or via a yaml file, e.g.:
@@ -56,6 +58,7 @@ EOF
 TEMP=$(getopt --options h,i: \
               --longoptions help,ip1:,ip2:,interface:,left-node:,right-node: \
               --longoptions left-volume:,right-volume:,skip-mkfs,net-type: \
+              --longoptions cib-file:,update \
               --name "$PROG" -- "$@" || true)
 
 (($? == 0)) || { usage >&2; exit 1; }
@@ -71,6 +74,8 @@ lvolume=/dev/sdb
 rvolume=/dev/sdc
 skip_mkfs=false
 net_type=tcp
+update=false
+cib_file=/var/lib/hare/cib_cortx_cluster.xml
 
 while true; do
     case "$1" in
@@ -84,6 +89,8 @@ while true; do
         --right-volume)      rvolume=$2; shift 2 ;;
         --skip-mkfs)         skip_mkfs=true; shift 1 ;;
         --net-type)          net_type=$2; shift 2 ;;
+        --cib-file)          cib_file=$2; shift 2 ;;
+        --update)            update=true; shift 2 ;;
         --)                  shift; break ;;
         *)                   break ;;
     esac
@@ -137,143 +144,142 @@ fi
 netmask=$(ip -oneline -4 address show dev $iface |
               awk '{print $4}' | cut -d/ -f2 | head -1)
 
-echo 'Adding the roaming IP addresses into Pacemaker...'
-sudo pcs cluster cib icfg
-sudo pcs -f icfg resource create ip-c1 ocf:heartbeat:IPaddr2 \
-         ip=$ip1 cidr_netmask=$netmask iflabel=c1 op monitor interval=0
-sudo pcs -f icfg resource create ip-c2 ocf:heartbeat:IPaddr2 \
-         ip=$ip2 cidr_netmask=$netmask iflabel=c2 op monitor interval=0
-sudo pcs -f icfg constraint location ip-c1 prefers $lnode
-sudo pcs -f icfg constraint location ip-c2 prefers $rnode
-sudo pcs cluster cib-push icfg --config
-
-echo 'Adding LNet...'
-sudo pcs cluster cib lcfg
-sudo pcs -f lcfg resource create lnet systemd:lnet
-sudo pcs -f lcfg resource clone lnet
-sudo pcs cluster cib-push lcfg --config
-
 run_on_both() {
     local cmd=$*
     eval $cmd
     ssh $rnode $cmd
 }
 
-sudo pcs cluster cib lcfg
-sudo pcs -f lcfg resource create lnet-c1 ocf:eos:lnet \
-         iface=$iface:c1 nettype=$net_type op monitor interval=30s
-sudo pcs -f lcfg resource create lnet-c2 ocf:eos:lnet \
-         iface=$iface:c2 nettype=$net_type op monitor interval=30s
-sudo pcs -f lcfg resource group add c1 ip-c1 lnet-c1
-sudo pcs -f lcfg resource group add c2 ip-c2 lnet-c2
-sudo pcs -f lcfg constraint order lnet-clone then lnet-c1
-sudo pcs -f lcfg constraint order lnet-clone then lnet-c2
-sudo pcs cluster cib-push lcfg --config
+ip_addr_rsc_add() {
+    echo 'Adding the roaming IP addresses into Pacemaker...'
+    sudo pcs -f $cib_file resource create ip-c1 ocf:heartbeat:IPaddr2 \
+             ip=$ip1 cidr_netmask=$netmask iflabel=c1 op monitor interval=0
+    sudo pcs -f $cib_file resource create ip-c2 ocf:heartbeat:IPaddr2 \
+             ip=$ip2 cidr_netmask=$netmask iflabel=c2 op monitor interval=0
+    sudo pcs -f $cib_file constraint location ip-c1 prefers $lnode
+    sudo pcs -f $cib_file constraint location ip-c2 prefers $rnode
+}
 
-# Give Pacemaker time to configure the IPs
-for i in {1..10}; do
-    sleep 5
-    sudo lctl list_nids | grep -qF $ip1 || continue
-    ssh $rnode "sudo lctl list_nids | grep -qF $ip2" || continue
-    break
-done
+lnet_rsc_add() {
+    echo 'Adding LNet...'
+    sudo pcs -f $cib_file resource create lnet systemd:lnet
+    sudo pcs -f $cib_file resource clone lnet
+    sudo pcs -f $cib_file resource create lnet-c1 ocf:eos:lnet \
+             iface=$iface:c1 nettype=$net_type op monitor interval=30s
+    sudo pcs -f $cib_file resource create lnet-c2 ocf:eos:lnet \
+             iface=$iface:c2 nettype=$net_type op monitor interval=30s
+    sudo pcs -f $cib_file resource group add c1 ip-c1 lnet-c1
+    sudo pcs -f $cib_file resource group add c2 ip-c2 lnet-c2
+    sudo pcs -f $cib_file constraint order lnet-clone then lnet-c1
+    sudo pcs -f $cib_file constraint order lnet-clone then lnet-c2
+}
 
-# Check the IPs
-check_msg="
-Check the following:
- 1) Make sure the netmask of the main IP on $iface interface is <= 24 bits.
- 2) Run 'pcs status' and make sure LNet is configured.
- 3) STONITH is configured or disabled in Pacemaker."
+net_config_check() {
+    # Give Pacemaker time to configure the IPs
+    for i in {1..10}; do
+        sleep 5
+        sudo lctl list_nids | grep -qF $ip1 || continue
+        ssh $rnode "sudo lctl list_nids | grep -qF $ip2" || continue
+        break
+    done
 
-ip a | grep -qF $ip1 ||
-  die "IP address $ip1 doesn't appear to be configured at $lnode. $check_msg"
+    # Check the IPs
+    check_msg="
+    Check the following:
+     1) Make sure the netmask of the main IP on $iface interface is <= 24 bits.
+     2) Run 'pcs status' and make sure LNet is configured.
+     3) STONITH is configured or disabled in Pacemaker."
 
-ssh $rnode "ip a | grep -qF $ip2" ||
-  die "IP address $ip2 doesn't appear to be configured at $rnode. $check_msg"
+    ip a | grep -qF $ip1 ||
+      die "IP address $ip1 doesn't appear to be configured at $lnode. $check_msg"
 
-sudo lctl list_nids | grep -qF $ip1 ||
-  die "LNet endpoint $ip1 doesn't appear to be configured at $lnode. $check_msg"
+    ssh $rnode "ip a | grep -qF $ip2" ||
+      die "IP address $ip2 doesn't appear to be configured at $rnode. $check_msg"
 
-ssh $rnode "sudo lctl list_nids | grep -qF $ip2" ||
-  die "LNet endpoint $ip2 doesn't appear to be configured at $rnode. $check_msg"
+    sudo lctl list_nids | grep -qF $ip1 ||
+      die "LNet endpoint $ip1 doesn't appear to be configured at $lnode. $check_msg"
 
-if ! $skip_mkfs; then
-    sudo mkfs.ext4 -q $lvolume >/dev/null <<< y
-    sudo mkfs.ext4 -q $rvolume >/dev/null <<< y
-fi
+    ssh $rnode "sudo lctl list_nids | grep -qF $ip2" ||
+      die "LNet endpoint $ip2 doesn't appear to be configured at $rnode. $check_msg"
+}
 
-# Mount /var/mero (if not mounted).
-mkdir -p /var/mero &&
-  ! mountpoint -q /var/mero && sudo mount $lvolume /var/mero || true
-ssh $rnode "mkdir -p /var/mero &&
-  ! mountpoint -q /var/mero && sudo mount $rvolume /var/mero || true"
+bootstrap() {
+    if ! $skip_mkfs; then
+        sudo mkfs.ext4 -q $lvolume >/dev/null <<< y
+        sudo mkfs.ext4 -q $rvolume >/dev/null <<< y
+    fi
 
-echo 'Preparing Hare configuration files...'
+    # Mount /var/mero (if not mounted).
+    mkdir -p /var/mero &&
+      ! mountpoint -q /var/mero && sudo mount $lvolume /var/mero || true
+    ssh $rnode "mkdir -p /var/mero &&
+      ! mountpoint -q /var/mero && sudo mount $rvolume /var/mero || true"
+
+    echo 'Preparing Hare configuration files...'
 
 # Update data_iface values in CDF: 1st data_iface will be `${iface}_c1`,
 #                                  2nd data_iface will be `${iface}_c2`.
-sudo sed -r -e "/[#].*data_iface/b ; # skip commented out data_iface lines
-                /data_iface: *[a-z0-9]+[_:]c[12]/b ; # skip already updated
-                0,/(data_iface: *)[a-z0-9]+\b/s//\1${iface}_c1/ ;
-                0,/(data_iface: *)[a-z0-9]+\b/s//\1${iface}_c2/" \
-            -i $cdf
-
-if facter --version | grep -q ^3; then
-    # New facter-3 requires colons (:) for interface aliases.
     sudo sed -r -e "/[#].*data_iface/b ; # skip commented out data_iface lines
-                    s/(data_iface: *${iface})_(c[12])/\1:\2/" \
-            -i $cdf
-fi
+                    /data_iface: *[a-z0-9]+[_:]c[12]/b ; # skip already updated
+                    0,/(data_iface: *)[a-z0-9]+\b/s//\1${iface}_c1/ ;
+                    0,/(data_iface: *)[a-z0-9]+\b/s//\1${iface}_c2/" \
+                -i $cdf
+
+    if facter --version | grep -q ^3; then
+        # New facter-3 requires colons (:) for interface aliases.
+        sudo sed -r -e "/[#].*data_iface/b ; # skip commented out data_iface lines
+                        s/(data_iface: *${iface})_(c[12])/\1:\2/" \
+                    -i $cdf
+    fi
 
 # Make sure mero-kernel is not loaded.
-run_on_both 'sudo systemctl stop mero-kernel'
+    run_on_both 'sudo systemctl stop mero-kernel'
 
-hctl bootstrap --mkfs $cdf
-hctl shutdown
+    hctl bootstrap --mkfs $cdf
+    hctl shutdown
 
 # LNet endpoints suffixes should be unique so that in case
 # of a failover all the Mero services (which would work on
 # the same node) could talk to each other.
 # (It is a workaround for Mero EOS-2799 issue.)
-for f in $hare_dir/{confd.xc,consul-kv.json}; do
-    sed -r -e "s/($ip2.*:12345:1):1/\1:2/" \
-           -e "s/($ip2.*:12345:2):1/\1:3/" \
-           -e "s/($ip2.*:12345:2):2/\1:4/" \
-        -i $f
-done
+    for f in $hare_dir/{confd.xc,consul-kv.json}; do
+        sed -r -e "s/($ip2.*:12345:1):1/\1:2/" \
+               -e "s/($ip2.*:12345:2):1/\1:3/" \
+               -e "s/($ip2.*:12345:2):2/\1:4/" \
+            -i $f
+    done
 
-run_on_both 'sudo rm -f /etc/sysconfig/m0d-*'
+    run_on_both 'sudo rm -f /etc/sysconfig/m0d-*'
 
-hctl bootstrap --conf-dir $hare_dir
-hctl shutdown
+    hctl bootstrap --conf-dir $hare_dir
+    hctl shutdown
 
 # Create /var/mero dirs for the foreign data-stacks:
-sudo mkdir -p /var/mero2
-ssh $rnode 'sudo mkdir -p /var/mero1'
+    sudo mkdir -p /var/mero2
+    ssh $rnode 'sudo mkdir -p /var/mero1'
+}
 
-# Prepare Mero conf files on each node:
-lm0confs=$(echo /etc/sysconfig/m0d-*)
-rm0confs=$(sudo ssh $rnode 'echo /etc/sysconfig/m0d-*')
-sudo scp -q $lm0confs $rnode:/etc/sysconfig/
-sudo scp -q $rnode:\{${rm0confs/ /,}\} /etc/sysconfig/
-for f in $rm0confs; do sudo sed '1iMERO_M0D_DATA_DIR=/var/mero2' -i $f; done
-ssh $rnode "for f in $lm0confs; do \
-                       sudo sed '1iMERO_M0D_DATA_DIR=/var/mero1' -i \$f; done"
+# Runs hctl bootstrap to update hare configuration changes.
+# Note: This modifies consul kv which needs to be explicitly restored.
+bootstrap_update_only() {
+    mkdir -p /var/mero &&
+      ! mountpoint -q /var/mero && sudo mount $lvolume /var/mero || true
+    ssh $rnode "mkdir -p /var/mero &&
+      ! mountpoint -q /var/mero && sudo mount $rvolume /var/mero || true"
+    hctl bootstrap --conf-dir $hare_dir
+    hctl shutdown
+}
 
-
-echo 'Preparing Consul agents config files...'
-cmd='
-sudo cp /usr/lib/systemd/system/hare-consul-agent.service
-        /usr/lib/systemd/system/hare-consul-agent-c1.service &&
-sudo cp /usr/lib/systemd/system/hare-consul-agent.service
-        /usr/lib/systemd/system/hare-consul-agent-c2.service &&
-for i in c{1,2}; do
-    sudo sed "s/consul-env/&-$i/"
-             -i /usr/lib/systemd/system/hare-consul-agent-$i.service &&
-    sudo sed "/ExecStart=/aExecStartPost=/bin/sleep 5"
-             -i /usr/lib/systemd/system/hare-consul-agent-$i.service;
-done'
-run_on_both $cmd
+mero_config() {
+    # Prepare Mero conf files on each node:
+    lm0confs=$(echo /etc/sysconfig/m0d-*)
+    rm0confs=$(sudo ssh $rnode 'echo /etc/sysconfig/m0d-*')
+    sudo scp -q $lm0confs $rnode:/etc/sysconfig/
+    sudo scp -q $rnode:\{${rm0confs/ /,}\} /etc/sysconfig/
+    for f in $rm0confs; do sudo sed '1iMERO_M0D_DATA_DIR=/var/mero2' -i $f; done
+    ssh $rnode "for f in $lm0confs; do \
+                           sudo sed '1iMERO_M0D_DATA_DIR=/var/mero1' -i \$f; done"
+}
 
 cmd_deregister_node() {
     local node=$1
@@ -283,168 +289,200 @@ cmd_deregister_node() {
 EOF
 }
 
+consul_systemd_prepare() {
+    cmd='
+    sudo cp /usr/lib/systemd/system/hare-consul-agent.service
+            /usr/lib/systemd/system/hare-consul-agent-c1.service &&
+    sudo cp /usr/lib/systemd/system/hare-consul-agent.service
+            /usr/lib/systemd/system/hare-consul-agent-c2.service &&
+    for i in c{1,2}; do
+        sudo sed "s/consul-env/&-$i/"
+                 -i /usr/lib/systemd/system/hare-consul-agent-$i.service &&
+        sudo sed "/ExecStart=/aExecStartPost=/bin/sleep 5"
+                 -i /usr/lib/systemd/system/hare-consul-agent-$i.service;
+    done'
+    run_on_both $cmd
+}
+
+consul_systemd_update() {
 # Cleanup Consul data directory before starting the agent to
 # avoid possible inconsistencies related to consensus when Consul
 # agent joins the Consul cluster. Mainly problems related to leader
 # election.
 
-consul_c2_cfg_dir=$hare_dir/consul-$ip2
-consul_c1_cfg_dir=$hare_dir/consul-$ip1
+    consul_c2_cfg_dir=$hare_dir/consul-$ip2
+    consul_c1_cfg_dir=$hare_dir/consul-$ip1
 
-sudo sed \
- -e "/ExecStart=/iExecStartPre=/bin/rm -rf $consul_c2_cfg_dir" \
- -i /usr/lib/systemd/system/hare-consul-agent-c2.service
-sudo systemctl daemon-reload
+    sudo sed \
+     -e "/ExecStart=/iExecStartPre=/bin/rm -rf $consul_c2_cfg_dir" \
+     -i /usr/lib/systemd/system/hare-consul-agent-c2.service
+    sudo systemctl daemon-reload
 
-cmd="
-sudo sed
- -e '/ExecStart=/iExecStartPre=/bin/rm -rf $consul_c1_cfg_dir'
- -i /usr/lib/systemd/system/hare-consul-agent-c1.service &&
-sudo systemctl daemon-reload"
-ssh $rnode $cmd
+    cmd="
+    sudo sed
+     -e '/ExecStart=/iExecStartPre=/bin/rm -rf $consul_c1_cfg_dir'
+     -i /usr/lib/systemd/system/hare-consul-agent-c1.service &&
+    sudo systemctl daemon-reload"
+    ssh $rnode $cmd
 
 # Add and update node attribute for consul resource on both the nodes.
 # This will be used to define constraints for the resources depending
 # on consul.
-sudo sed \
- -e '/ExecStart=/aExecStartPost=/usr/sbin/attrd_updater -U 1 -n consul-c1-running' \
- -e '/ExecStartPost=/aExecStopPost=/usr/sbin/attrd_updater -U 0 -n consul-c1-running' \
- -i /usr/lib/systemd/system/hare-consul-agent-c1.service
-sudo systemctl daemon-reload
+   sudo sed \
+    -e '/ExecStart=/aExecStartPost=/usr/sbin/attrd_updater -U 1 -n consul-c1-running' \
+    -e '/ExecStartPost=/aExecStopPost=/usr/sbin/attrd_updater -U 0 -n consul-c1-running' \
+    -i /usr/lib/systemd/system/hare-consul-agent-c1.service
+   sudo systemctl daemon-reload
 
-cmd="
-sudo sed
- -e '/ExecStart=/aExecStartPost=/usr/sbin/attrd_updater -U 1 -n consul-c2-running' \
- -e '/ExecStartPost=/aExecStopPost=/usr/sbin/attrd_updater -U 0 -n consul-c2-running' \
- -i /usr/lib/systemd/system/hare-consul-agent-c2.service &&
-sudo systemctl daemon-reload"
-ssh $rnode $cmd
+   cmd="
+   sudo sed
+    -e '/ExecStart=/aExecStartPost=/usr/sbin/attrd_updater -U 1 -n consul-c2-running' \
+    -e '/ExecStartPost=/aExecStopPost=/usr/sbin/attrd_updater -U 0 -n consul-c2-running' \
+    -i /usr/lib/systemd/system/hare-consul-agent-c2.service &&
+   sudo systemctl daemon-reload"
+   ssh $rnode $cmd
 
-unset consul_c1_cfg_dir consul_c2_cfg_dir
+   unset consul_c1_cfg_dir consul_c2_cfg_dir
+}
 
-sudo cp $hare_dir/consul-env $hare_dir/consul-env-c1
-scp $rnode:$hare_dir/consul-env $hare_dir/consul-env-c2
-sudo sed -r \
-  -e 's/server$/server-c1/' \
-  -e "s/JOIN=/&-retry-join $ip2 /" \
-  -i $hare_dir/consul-env-c1
-sudo sed -r \
-  -e 's/server$/server-c2/' \
-  -e 's/127.0.0.1 //' \
-  -i $hare_dir/consul-env-c2
+consul_env_prepare() {
+    echo 'Preparing Consul agents config files...'
+    sudo cp $hare_dir/consul-env $hare_dir/consul-env-c1
+    scp $rnode:$hare_dir/consul-env $hare_dir/consul-env-c2
+    sudo sed -r \
+     -e 's/server$/server-c1/' \
+     -e "s/JOIN=/&-retry-join $ip2 /" \
+     -i $hare_dir/consul-env-c1
+    sudo sed -r \
+     -e 's/server$/server-c2/' \
+     -e 's/127.0.0.1 //' \
+     -i $hare_dir/consul-env-c2
 
-scp $hare_dir/consul-env $rnode:$hare_dir/consul-env-c1
-cmd="
-sudo cp $hare_dir/consul-env $hare_dir/consul-env-c2 &&
-sudo sed -r \
-  -e 's/server$/server-c1/' \
-  -e 's/127.0.0.1 //' \
-  -e 's/JOIN=/&-retry-join $ip2 /' \
-  -e 's/ -bootstrap-expect 1//' \
-  -i $hare_dir/consul-env-c1 &&
-sudo sed -r \
-  -e 's/server$/server-c2/' \
-  -i $hare_dir/consul-env-c2"
-ssh $rnode $cmd
+    scp $hare_dir/consul-env $rnode:$hare_dir/consul-env-c1
+    cmd="
+    sudo cp $hare_dir/consul-env $hare_dir/consul-env-c2 &&
+    sudo sed -r \
+     -e 's/server$/server-c1/' \
+     -e 's/127.0.0.1 //' \
+     -e 's/JOIN=/&-retry-join $ip2 /' \
+     -e 's/ -bootstrap-expect 1//' \
+     -i $hare_dir/consul-env-c1 &&
+    sudo sed -r \
+     -e 's/server$/server-c2/' \
+     -i $hare_dir/consul-env-c2"
+    ssh $rnode $cmd
+}
 
-run_on_both "mkdir -p $hare_dir/consul-server-c{1,2}-conf"
+consul_conf_prepare() {
+    run_on_both "mkdir -p $hare_dir/consul-server-c{1,2}-conf"
 
-conf_dir=consul-server-c1-conf
+    conf_dir=consul-server-c1-conf
 
-sudo cp $hare_dir/consul-server-conf/consul-server-conf.json \
-        $hare_dir/$conf_dir/$conf_dir.json
-sudo sed -e 's/"--hax"/"--svc", "hare-hax-c1"/' \
-         -i $hare_dir/$conf_dir/$conf_dir.json
+    sudo cp $hare_dir/consul-server-conf/consul-server-conf.json \
+            $hare_dir/$conf_dir/$conf_dir.json
+    sudo sed -e 's/"--hax"/"--svc", "hare-hax-c1"/' \
+             -i $hare_dir/$conf_dir/$conf_dir.json
 
-cp $hare_dir/$conf_dir/$conf_dir.json /tmp/$conf_dir.json
-sudo sed -e '/\"server\"/a\ \ "leave_on_terminate": true,' \
-         -i /tmp/$conf_dir.json
-scp /tmp/$conf_dir.json $rnode:$hare_dir/$conf_dir/
-rm /tmp/$conf_dir.json
+    cp $hare_dir/$conf_dir/$conf_dir.json /tmp/$conf_dir.json
+    sudo sed -e '/\"server\"/a\ \ "leave_on_terminate": true,' \
+             -i /tmp/$conf_dir.json
+    scp /tmp/$conf_dir.json $rnode:$hare_dir/$conf_dir/
+    rm /tmp/$conf_dir.json
 
-conf_dir=consul-server-c2-conf
+    conf_dir=consul-server-c2-conf
 
-cmd="
-sudo cp $hare_dir/consul-server-conf/consul-server-conf.json \
-        $hare_dir/$conf_dir/$conf_dir.json &&
-sudo sed -e 's/\"--hax\"/\"--svc\", \"hare-hax-c2\"/' \
-         -i $hare_dir/$conf_dir/$conf_dir.json &&
+    cmd="
+    sudo cp $hare_dir/consul-server-conf/consul-server-conf.json \
+            $hare_dir/$conf_dir/$conf_dir.json &&
+    sudo sed -e 's/\"--hax\"/\"--svc\", \"hare-hax-c2\"/' \
+             -i $hare_dir/$conf_dir/$conf_dir.json &&
 
-cp $hare_dir/$conf_dir/$conf_dir.json /tmp/$conf_dir.json &&
-sudo sed -e '/\"server\"/a\ \ \"leave_on_terminate\": true,' \
-         -i /tmp/$conf_dir.json"
+    cp $hare_dir/$conf_dir/$conf_dir.json /tmp/$conf_dir.json &&
+    sudo sed -e '/\"server\"/a\ \ \"leave_on_terminate\": true,' \
+             -i /tmp/$conf_dir.json"
 
-ssh $rnode $cmd
-scp $rnode:/tmp/$conf_dir.json $hare_dir/$conf_dir/
-ssh $rnode "rm /tmp/$conf_dir.json"
+    ssh $rnode $cmd
+    scp $rnode:/tmp/$conf_dir.json $hare_dir/$conf_dir/
+    ssh $rnode "rm /tmp/$conf_dir.json"
 
-unset conf_dir
+    unset conf_dir
+}
 
-echo 'Adding Consul to Pacemaker...'
-sudo pcs resource create consul-c1 systemd:hare-consul-agent-c1
-sudo pcs resource create consul-c2 systemd:hare-consul-agent-c2
-sudo pcs resource group add c1 consul-c1 --after ip-c1
-sudo pcs resource group add c2 consul-c2 --after ip-c2
+consul_rsc_add() {
+    echo 'Adding Consul to Pacemaker...'
+    sudo pcs -f $cib_file resource create consul-c1 systemd:hare-consul-agent-c1
+    sudo pcs -f $cib_file resource create consul-c2 systemd:hare-consul-agent-c2
+    sudo pcs -f $cib_file resource group add c1 consul-c1 --after ip-c1
+    sudo pcs -f $cib_file resource group add c2 consul-c2 --after ip-c2
+}
 
-echo 'Adding Mero kernel module to Pacemaker...'
-sudo pcs resource create mero-kernel systemd:mero-kernel clone
-sudo pcs constraint order lnet-c1 then mero-kernel-clone
-sudo pcs constraint order lnet-c2 then mero-kernel-clone
+mero_kernel_rsc_add() {
+    echo 'Adding Mero kernel module to Pacemaker...'
+    sudo pcs -f $cib_file resource create mero-kernel systemd:mero-kernel clone
+    sudo pcs -f $cib_file constraint order lnet-c1 then mero-kernel-clone
+    sudo pcs -f $cib_file constraint order lnet-c2 then mero-kernel-clone
+}
 
-echo 'Adding Hax to Pacemaker...'
+hax_systemd_prepare() {
+    echo 'Adding Hax to Pacemaker...'
+    sudo cp -f /usr/lib/systemd/system/hare-hax.service \
+            /usr/lib/systemd/system/hare-hax-c1.service
+    sudo cp -f /usr/lib/systemd/system/hare-hax.service \
+            /usr/lib/systemd/system/hare-hax-c2.service
+}
 
-sudo cp /usr/lib/systemd/system/hare-hax.service \
-        /usr/lib/systemd/system/hare-hax-c1.service
-sudo cp /usr/lib/systemd/system/hare-hax.service \
-        /usr/lib/systemd/system/hare-hax-c2.service
-sudo sed -e 's/hare-consul-agent.service/hare-consul-agent-c1.service/' \
-         -e "/ExecStart=/iExecStartPre=/bin/sh -c 'mountpoint /var/mero || /bin/mount $lvolume /var/mero'" \
-         -e "/ExecStart=/aExecStopPost=/bin/sh -c '! mountpoint /var/mero || while ! /bin/umount /var/mero; do lsof +D /var/mero; sleep 1; done'" \
-         -i /usr/lib/systemd/system/hare-hax-c1.service
-sudo sed -e 's/hare-consul-agent.service/hare-consul-agent-c2.service/' \
-         -e 's;ExecStart.*cd /var/mero;&2;' \
-         -e "/ExecStart/iEnvironmentFile=$hare_dir/hax-env-c2" \
-         -e "/ExecStart=/iExecStartPre=/bin/sh -c 'mountpoint /var/mero2 || /bin/mount $rvolume /var/mero2'" \
-         -e "/ExecStart=/aExecStopPost=/bin/sh -c '! mountpoint /var/mero2 || while ! /bin/umount /var/mero2; do lsof +D /var/mero2; sleep 1; done'" \
-         -i /usr/lib/systemd/system/hare-hax-c2.service
-echo "HARE_HAX_NODE_NAME=$rnode" | sudo tee $hare_dir/hax-env-c2 > /dev/null
+hax_systemd_update() {
+    sudo sed -e 's/hare-consul-agent.service/hare-consul-agent-c1.service/' \
+             -e "/ExecStart=/iExecStartPre=/bin/sh -c 'mountpoint /var/mero || /bin/mount $lvolume /var/mero'" \
+             -e "/ExecStart=/aExecStopPost=/bin/sh -c '! mountpoint /var/mero || while ! /bin/umount /var/mero; do lsof +D /var/mero; sleep 1; done'" \
+             -i /usr/lib/systemd/system/hare-hax-c1.service
+    sudo sed -e 's/hare-consul-agent.service/hare-consul-agent-c2.service/' \
+             -e 's;ExecStart.*cd /var/mero;&2;' \
+             -e "/ExecStart/iEnvironmentFile=$hare_dir/hax-env-c2" \
+             -e "/ExecStart=/iExecStartPre=/bin/sh -c 'mountpoint /var/mero2 || /bin/mount $rvolume /var/mero2'" \
+             -e "/ExecStart=/aExecStopPost=/bin/sh -c '! mountpoint /var/mero2 || while ! /bin/umount /var/mero2; do lsof +D /var/mero2; sleep 1; done'" \
+             -i /usr/lib/systemd/system/hare-hax-c2.service
+    echo "HARE_HAX_NODE_NAME=$rnode" | sudo tee $hare_dir/hax-env-c2 > /dev/null
 
-cmd="
-sudo cp /usr/lib/systemd/system/hare-hax.service
-        /usr/lib/systemd/system/hare-hax-c1.service &&
-sudo sed -e 's/hare-consul-agent.service/hare-consul-agent-c1.service/'
-         -e 's;ExecStart.*cd /var/mero;&1;' \
-         -e '/ExecStart/iEnvironmentFile=$hare_dir/hax-env-c1'
-         -e \"/ExecStart=/iExecStartPre=/bin/sh -c 'mountpoint /var/mero1 || /bin/mount $lvolume /var/mero1'\"
-         -e \"/ExecStart=/aExecStopPost=/bin/sh -c '! mountpoint /var/mero1 || while ! /bin/umount /var/mero1; do lsof +D /var/mero1; sleep 1; done'\"
-         -i /usr/lib/systemd/system/hare-hax-c1.service &&
-sudo cp /usr/lib/systemd/system/hare-hax.service
-        /usr/lib/systemd/system/hare-hax-c2.service &&
-sudo sed -e 's/hare-consul-agent.service/hare-consul-agent-c2.service/'
-         -e \"/ExecStart=/iExecStartPre=/bin/sh -c 'mountpoint /var/mero || /bin/mount $rvolume /var/mero'\"
-         -e \"/ExecStart=/aExecStopPost=/bin/sh -c '! mountpoint /var/mero || while ! /bin/umount /var/mero; do lsof +D /var/mero; sleep 1; done'\"
-         -i /usr/lib/systemd/system/hare-hax-c2.service &&
-echo 'HARE_HAX_NODE_NAME=$lnode' | sudo tee $hare_dir/hax-env-c1 > /dev/null"
-ssh $rnode $cmd
+    cmd="
+    sudo cp -f /usr/lib/systemd/system/hare-hax.service
+            /usr/lib/systemd/system/hare-hax-c1.service &&
+    sudo sed -e 's/hare-consul-agent.service/hare-consul-agent-c1.service/'
+             -e 's;ExecStart.*cd /var/mero;&1;' \
+             -e '/ExecStart/iEnvironmentFile=$hare_dir/hax-env-c1'
+             -e \"/ExecStart=/iExecStartPre=/bin/sh -c 'mountpoint /var/mero1 || /bin/mount $lvolume /var/mero1'\"
+             -e \"/ExecStart=/aExecStopPost=/bin/sh -c '! mountpoint /var/mero1 || while ! /bin/umount /var/mero1; do lsof +D /var/mero1; sleep 1; done'\"
+             -i /usr/lib/systemd/system/hare-hax-c1.service &&
+    sudo cp -f /usr/lib/systemd/system/hare-hax.service
+            /usr/lib/systemd/system/hare-hax-c2.service &&
+    sudo sed -e 's/hare-consul-agent.service/hare-consul-agent-c2.service/'
+             -e \"/ExecStart=/iExecStartPre=/bin/sh -c 'mountpoint /var/mero || /bin/mount $rvolume /var/mero'\"
+             -e \"/ExecStart=/aExecStopPost=/bin/sh -c '! mountpoint /var/mero || while ! /bin/umount /var/mero; do lsof +D /var/mero; sleep 1; done'\"
+             -i /usr/lib/systemd/system/hare-hax-c2.service &&
+    echo 'HARE_HAX_NODE_NAME=$lnode' | sudo tee $hare_dir/hax-env-c1 > /dev/null"
+    ssh $rnode $cmd
+}
 
-sudo pcs cluster cib mcfg
-sudo pcs -f mcfg resource create hax-c1 systemd:hare-hax-c1 op stop timeout=30
-sudo pcs -f mcfg resource create hax-c2 systemd:hare-hax-c2 op stop timeout=30
-sudo pcs -f mcfg resource group add c1 hax-c1
-sudo pcs -f mcfg resource group add c2 hax-c2
-sudo pcs -f mcfg constraint order mero-kernel-clone then hax-c1
-sudo pcs -f mcfg constraint order mero-kernel-clone then hax-c2
-sudo pcs -f mcfg constraint order consul-c2 then hax-c1
-sudo pcs -f mcfg constraint order consul-c1 then hax-c2
-sudo pcs cluster cib-push mcfg --config
+hax_rsc_add() {
+    sudo pcs -f $cib_file resource create hax-c1 systemd:hare-hax-c1 op stop timeout=30
+    sudo pcs -f $cib_file resource create hax-c2 systemd:hare-hax-c2 op stop timeout=30
+    sudo pcs -f $cib_file resource group add c1 hax-c1
+    sudo pcs -f $cib_file resource group add c2 hax-c2
+    sudo pcs -f $cib_file constraint order mero-kernel-clone then hax-c1
+    sudo pcs -f $cib_file constraint order mero-kernel-clone then hax-c2
+    sudo pcs -f $cib_file constraint order consul-c2 then hax-c1
+    sudo pcs -f $cib_file constraint order consul-c1 then hax-c2
+}
 
-echo 'Adding Mero to Pacemaker...'
+mero_systemd_update() {
+    echo 'Adding Mero to Pacemaker...'
 
-cmd='
-sudo sed "s/TimeoutStopSec=.*/TimeoutStopSec=5sec/"
-    -i /usr/lib/systemd/system/m0d@.service &&
-sudo systemctl daemon-reload'
-run_on_both $cmd
+    cmd='
+    sudo sed "s/TimeoutStopSec=.*/TimeoutStopSec=5sec/"
+        -i /usr/lib/systemd/system/m0d@.service &&
+    sudo systemctl daemon-reload'
+    run_on_both $cmd
+}
 
 get_fid() {
     local node=$1
@@ -456,84 +494,103 @@ get_fid() {
        $hare_dir/$conf_dir/$conf_dir.json | awk "/$svc.0x/ {print \$2}"
 }
 
-c1_confd=$(get_fid c1 confd)
-c2_confd=$(get_fid c2 confd)
-c1_ios=$(get_fid c1 ios)
-c2_ios=$(get_fid c2 ios)
+mero_rsc_add() {
+    c1_confd=$(get_fid c1 confd)
+    c2_confd=$(get_fid c2 confd)
+    c1_ios=$(get_fid c1 ios)
+    c2_ios=$(get_fid c2 ios)
 
-sudo pcs cluster cib mcfg
-sudo pcs -f mcfg resource create mero-confd-c1 systemd:m0d@$c1_confd op stop \
-     timeout=600
-sudo pcs -f mcfg resource create mero-ios-c1 systemd:m0d@$c1_ios op stop \
-     timeout=600
-sudo pcs -f mcfg resource group add c1 mero-confd-c1
-sudo pcs -f mcfg resource group add c1 mero-ios-c1
-sudo pcs -f mcfg resource create mero-confd-c2 systemd:m0d@$c2_confd op stop \
-     timeout=600
-sudo pcs -f mcfg resource create mero-ios-c2 systemd:m0d@$c2_ios op stop \
-     timeout=600
-sudo pcs -f mcfg resource group add c2 mero-confd-c2
-sudo pcs -f mcfg resource group add c2 mero-ios-c2
-sudo pcs -f mcfg constraint order mero-confd-c1 then mero-ios-c2
-sudo pcs -f mcfg constraint order mero-confd-c2 then mero-ios-c1
-sudo pcs cluster cib-push mcfg --config
+    sudo pcs -f $cib_file resource create mero-confd-c1 systemd:m0d@$c1_confd op stop \
+         timeout=600
+    sudo pcs -f $cib_file resource create mero-ios-c1 systemd:m0d@$c1_ios op stop \
+         timeout=600
+    sudo pcs -f $cib_file resource group add c1 mero-confd-c1
+    sudo pcs -f $cib_file resource group add c1 mero-ios-c1
+    sudo pcs -f $cib_file resource create mero-confd-c2 systemd:m0d@$c2_confd op stop \
+         timeout=600
+    sudo pcs -f $cib_file resource create mero-ios-c2 systemd:m0d@$c2_ios op stop \
+         timeout=600
+    sudo pcs -f $cib_file resource group add c2 mero-confd-c2
+    sudo pcs -f $cib_file resource group add c2 mero-ios-c2
+    sudo pcs -f $cib_file constraint order mero-confd-c1 then mero-ios-c2
+    sudo pcs -f $cib_file constraint order mero-confd-c2 then mero-ios-c1
+
+    echo 'Adding mero-free-space-monitor to pacemaker...'
+    sudo pcs -f $cib_file resource create mero-free-space-mon systemd:mero-free-space-monitor \
+         op monitor interval=30s meta failure-timeout=300s
+    sudo pcs -f $cib_file constraint order mero-ios-c1 then mero-free-space-mon
+    sudo pcs -f $cib_file constraint order mero-ios-c2 then mero-free-space-mon
+    sudo pcs -f $cib_file constraint colocation add mero-free-space-mon with mero-ios-c1 \
+         score=1000
+    sudo pcs -f $cib_file constraint colocation add mero-free-space-mon with mero-ios-c2 \
+         score=1000
+}
 
 is_virtual() {
     which facter &>/dev/null || return 1  # assume physical if facter is missing
     [[ $(facter is_virtual) == true ]] && return 0 || return 1
 }
 
-if ! is_virtual; then
-    echo 'Configuring ClusterIP constrains in Pacemaker...'
-    sudo pcs cluster cib clustercfg
-    sudo pcs -f clustercfg constraint order c1 then ClusterIP-clone
-    sudo pcs -f clustercfg constraint order c2 then ClusterIP-clone
-    sudo pcs cluster cib-push clustercfg --config
-fi
+clusterip_rsc_add() {
+    if ! is_virtual; then
+        echo 'Configuring ClusterIP constrains in Pacemaker...'
+        sudo pcs -f $cib_file constraint order c1 then ClusterIP-clone
+        sudo pcs -f $cib_file constraint order c2 then ClusterIP-clone
+    fi
+}
 
-echo 'Disabling some systemd units...'
-units_to_disable=(
-    elasticsearch
-    haproxy
-    rabbitmq-server
-    statsd
-    slapd
-    s3authserver
-)
+systemd_units_disable() {
+    echo 'Disabling some systemd units...'
+    units_to_disable=(
+        elasticsearch
+        haproxy
+        rabbitmq-server
+        statsd
+        slapd
+        s3authserver
+    )
 
-for u in ${units_to_disable[@]}; do
-    run_on_both "sudo systemctl stop $u && sudo systemctl disable $u" || true
-done
+    for u in ${units_to_disable[@]}; do
+        run_on_both "sudo systemctl stop $u && sudo systemctl disable $u" || true
+    done
+}
 
-echo 'Adding ldap to Pacemaker...'
-sudo pcs resource create ldap systemd:slapd clone op monitor interval=30s
+ldap_rsc_add() {
+    echo 'Adding ldap to Pacemaker...'
+    sudo pcs -f $cib_file resource create ldap systemd:slapd clone op monitor interval=30s
+}
 
-echo 'Adding s3authserver to Pacemaker...'
-sudo pcs cluster cib s3authcfg
-sudo pcs -f s3authcfg resource create s3auth systemd:s3authserver clone op \
-    monitor interval=30
-sudo pcs -f s3authcfg constraint order ldap-clone then s3auth-clone
-sudo pcs -f s3authcfg constraint order mero-ios-c1 then s3auth-clone
-sudo pcs -f s3authcfg constraint order mero-ios-c2 then s3auth-clone
-sudo pcs cluster cib-push s3authcfg --config
+s3auth_rsc_add() {
+    echo 'Adding s3authserver to Pacemaker...'
+    sudo pcs -f $cib_file resource create s3auth systemd:s3authserver clone op \
+        monitor interval=30
+    sudo pcs -f $cib_file constraint order ldap-clone then s3auth-clone
+    sudo pcs -f $cib_file constraint order mero-ios-c1 then s3auth-clone
+    sudo pcs -f $cib_file constraint order mero-ios-c2 then s3auth-clone
+}
 
-echo 'Adding elastic search to Pacemaker..'
-sudo pcs resource create els-search systemd:elasticsearch clone op \
-    monitor interval=30s
+elastic_search_rsc_add() {
+    echo 'Adding elastic search to Pacemaker..'
+    sudo pcs -f $cib_file resource create els-search systemd:elasticsearch clone op \
+        monitor interval=30s
+}
 
-echo 'Adding statsd to Pacemaker...'
-sudo pcs resource create statsd systemd:statsd clone op monitor interval=30s
-sudo pcs constraint order els-search-clone then statsd-clone
+statsd_rsc_add() {
+    echo 'Adding statsd to Pacemaker...'
+    sudo pcs -f $cib_file resource create statsd systemd:statsd clone op monitor interval=30s
+    sudo pcs -f $cib_file constraint order els-search-clone then statsd-clone
+}
 
-echo 'Adding haproxy to pacemaker...'
-sudo pcs resource create haproxy-c1 systemd:haproxy op monitor interval=30s
-sudo pcs resource create haproxy-c2 systemd:haproxy op monitor interval=30s
-sudo pcs constraint location haproxy-c1 prefers $lnode=INFINITY
-sudo pcs constraint location haproxy-c1 avoids $rnode=INFINITY
-sudo pcs constraint location haproxy-c2 prefers $rnode=INFINITY
-sudo pcs constraint location haproxy-c2 avoids $lnode=INFINITY
+haproxy_rsc_add() {
+    echo 'Adding haproxy to pacemaker...'
+    sudo pcs -f $cib_file resource create haproxy-c1 systemd:haproxy op monitor interval=30s
+    sudo pcs -f $cib_file resource create haproxy-c2 systemd:haproxy op monitor interval=30s
+    sudo pcs -f $cib_file constraint location haproxy-c1 prefers $lnode=INFINITY
+    sudo pcs -f $cib_file constraint location haproxy-c1 avoids $rnode=INFINITY
+    sudo pcs -f $cib_file constraint location haproxy-c2 prefers $rnode=INFINITY
+    sudo pcs -f $cib_file constraint location haproxy-c2 avoids $lnode=INFINITY
+}
 
-echo 'Adding S3server to Pacemaker...'
 get_s3_svc() {
     local cfg=$1
     local svc=$2
@@ -541,53 +598,62 @@ get_s3_svc() {
         awk "/$svc.s3server@/ {print \$2}"
 }
 
-echo 'Adding rabbit-mq resources and constraints...'
-sudo pcs resource create rabbitmq systemd:rabbitmq-server clone op \
-    monitor interval=30s meta failure-timeout=20s
+rabbitmq_rsc_add() {
+    echo 'Adding rabbit-mq resources and constraints...'
+    sudo pcs -f $cib_file resource create rabbitmq systemd:rabbitmq-server clone op \
+        monitor interval=30s meta failure-timeout=20s
+}
 
+s3_systemd_update() {
 # Add and update node attribute for s3backgroundconsumer resource on both the
 # nodes. This will be used to define constraints for the resources depending
 # on s3backgroundconsumer resource on a node.
-sudo sed \
- -e '/ExecStart=/aExecStartPost=/usr/sbin/attrd_updater -U 1 -n s3backcons-running' \
- -e '/ExecStop=/aExecStopPost=/usr/sbin/attrd_updater -U 0 -n s3backcons-running' \
- -i /usr/lib/systemd/system/s3backgroundconsumer.service
-sudo systemctl daemon-reload
+    sudo sed \
+     -e '/ExecStart=/aExecStartPost=/usr/sbin/attrd_updater -U 1 -n s3backcons-running' \
+     -e '/ExecStop=/aExecStopPost=/usr/sbin/attrd_updater -U 0 -n s3backcons-running' \
+     -i /usr/lib/systemd/system/s3backgroundconsumer.service
+    sudo systemctl daemon-reload
 
-cmd="
-sudo sed
- -e '/ExecStart=/aExecStartPost=/usr/sbin/attrd_updater -U 1 -n s3backcons-running' \
- -e '/ExecStop=/aExecStopPost=/usr/sbin/attrd_updater -U 0 -n s3backcons-running' \
- -i /usr/lib/systemd/system/s3backgroundconsumer.service &&
-sudo systemctl daemon-reload"
-ssh $rnode $cmd
+    cmd="
+    sudo sed
+     -e '/ExecStart=/aExecStartPost=/usr/sbin/attrd_updater -U 1 -n s3backcons-running' \
+     -e '/ExecStop=/aExecStopPost=/usr/sbin/attrd_updater -U 0 -n s3backcons-running' \
+     -i /usr/lib/systemd/system/s3backgroundconsumer.service &&
+    sudo systemctl daemon-reload"
+    ssh $rnode $cmd
+    cmd='
+    sudo sed "s/TimeoutStopSec=.*/TimeoutStopSec=7sec/"
+             -i /usr/lib/systemd/system/s3server@.service &&
+    sudo systemctl daemon-reload'
+    run_on_both $cmd
+}
 
-echo 'Adding s3background services...'
-sudo pcs cluster cib s3bcfg
-sudo pcs -f s3bcfg resource create s3backcons-c1 systemd:s3backgroundconsumer
-sudo pcs -f s3bcfg resource create s3backcons-c2 systemd:s3backgroundconsumer
-sudo pcs -f s3bcfg constraint location s3backcons-c1 prefers $lnode=INFINITY
-sudo pcs -f s3bcfg constraint location s3backcons-c1 avoids $rnode=INFINITY
-sudo pcs -f s3bcfg constraint location s3backcons-c2 prefers $rnode=INFINITY
-sudo pcs -f s3bcfg constraint location s3backcons-c2 avoids $lnode=INFINITY
-sudo pcs -f s3bcfg constraint order rabbitmq-clone then s3backcons-c1
-sudo pcs -f s3bcfg constraint order rabbitmq-clone then s3backcons-c2
-sudo pcs -f s3bcfg resource create s3backprod systemd:s3backgroundproducer op \
-    monitor interval=30s
-sudo pcs -f s3bcfg constraint order rabbitmq-clone then s3backprod
-sudo pcs -f s3bcfg constraint location s3backprod rule score=-INFINITY '#uname' \
-    eq $lnode and s3backcons-running eq 0
-sudo pcs -f s3bcfg constraint location s3backprod rule score=-INFINITY '#uname' \
-    eq $rnode and s3backcons-running eq 0
-sudo pcs -f s3bcfg constraint colocation add s3backprod with s3backcons-c1 \
-    score=50000
-sudo pcs -f s3bcfg constraint colocation add s3backprod with s3backcons-c2 \
-    score=50000
-sudo pcs cluster cib-push s3bcfg --config
+s3back_rsc_add() {
+    echo 'Adding s3background services...'
+    sudo pcs -f $cib_file resource create s3backcons-c1 systemd:s3backgroundconsumer
+    sudo pcs -f $cib_file resource create s3backcons-c2 systemd:s3backgroundconsumer
+    sudo pcs -f $cib_file constraint location s3backcons-c1 prefers $lnode=INFINITY
+    sudo pcs -f $cib_file constraint location s3backcons-c1 avoids $rnode=INFINITY
+    sudo pcs -f $cib_file constraint location s3backcons-c2 prefers $rnode=INFINITY
+    sudo pcs -f $cib_file constraint location s3backcons-c2 avoids $lnode=INFINITY
+    sudo pcs -f $cib_file constraint order rabbitmq-clone then s3backcons-c1
+    sudo pcs -f $cib_file constraint order rabbitmq-clone then s3backcons-c2
+    sudo pcs -f $cib_file resource create s3backprod systemd:s3backgroundproducer op \
+        monitor interval=30s
+    sudo pcs -f $cib_file constraint order rabbitmq-clone then s3backprod
+    sudo pcs -f $cib_file constraint location s3backprod rule score=-INFINITY '#uname' \
+        eq $lnode and s3backcons-running eq 0
+    sudo pcs -f $cib_file constraint location s3backprod rule score=-INFINITY '#uname' \
+        eq $rnode and s3backcons-running eq 0
+    sudo pcs -f $cib_file constraint colocation add s3backprod with s3backcons-c1 \
+        score=50000
+    sudo pcs -f $cib_file constraint colocation add s3backprod with s3backcons-c2 \
+        score=50000
+}
 
 s3servers_all=
 
-add_s3server_resources() {
+_s3server_rsc_add() {
    local suffix=$1
    local node_local=$2
    local node_remote=$3
@@ -599,57 +665,127 @@ add_s3server_resources() {
    )
    ((${#s3server_fids[@]} == 0)) && return
 
-   sudo pcs cluster cib s3cfg
    local count=1
    for i in ${s3server_fids[@]}; do
-      sudo pcs -f s3cfg resource create s3server-$suffix-$count systemd:$i op \
+      sudo pcs -f $cib_file resource create s3server-$suffix-$count systemd:$i op \
           stop timeout=600
-      sudo pcs -f s3cfg constraint location s3server-$suffix-$count \
+      sudo pcs -f $cib_file constraint location s3server-$suffix-$count \
           prefers $node_local=INFINITY
-      sudo pcs -f s3cfg constraint location s3server-$suffix-$count \
+      sudo pcs -f $cib_file constraint location s3server-$suffix-$count \
           avoids $node_remote=INFINITY
       # Order constraint adds the startup dependency of s3server on s3authserver
-      sudo pcs -f s3cfg constraint \
+      sudo pcs -f $cib_file constraint \
            order s3auth-clone then s3server-$suffix-$count
       # Colocation constraint will add a s3server's liveness dependency
       # on the local s3authserver
-      sudo pcs -f s3cfg constraint colocation add s3server-$suffix-$count \
+      sudo pcs -f $cib_file constraint colocation add s3server-$suffix-$count \
           with s3auth-clone score=INFINITY
       s3servers+=" s3server-$suffix-$count"
       s3servers_all+=" s3server-$suffix-$count"
       (( count++ ))
    done
-   sudo pcs cluster cib-push s3cfg --config
 
-   sudo pcs cluster cib s3cfg
-   sudo pcs -f s3cfg constraint order set $s3servers require-all=false \
+   sudo pcs -f $cib_file constraint order set $s3servers require-all=false \
        sequential=false set s3backcons-$suffix
-   sudo pcs -f s3cfg constraint order set $s3servers require-all=false \
+   sudo pcs -f $cib_file constraint order set $s3servers require-all=false \
        sequential=false set haproxy-$suffix
-   sudo pcs cluster cib-push s3cfg --config
 }
 
-cmd='
-sudo sed "s/TimeoutStopSec=.*/TimeoutStopSec=7sec/"
-         -i /usr/lib/systemd/system/s3server@.service &&
-sudo systemctl daemon-reload'
-run_on_both $cmd
+s3server_rsc_add() {
+    echo 'Adding S3server to Pacemaker...'
+    _s3server_rsc_add c1 $lnode $rnode
+    _s3server_rsc_add c2 $rnode $lnode
 
-add_s3server_resources c1 $lnode $rnode
-add_s3server_resources c2 $rnode $lnode
+    sudo pcs -f $cib_file constraint order set $s3servers_all require-all=false \
+        sequential=false set s3backprod
+}
 
-sudo pcs cluster cib s3cfg
-sudo pcs -f s3cfg constraint order set $s3servers_all require-all=false \
-    sequential=false set s3backprod
-sudo pcs cluster cib-push s3cfg --config
+cib_init() {
+   sudo pcs cluster cib $cib_file
+}
 
-echo 'Adding mero-free-space-monitor to pacemaker...'
-sudo pcs resource create mero-free-space-mon systemd:mero-free-space-monitor \
-     op monitor interval=30s meta failure-timeout=300s
-sudo pcs constraint order mero-ios-c1 then mero-free-space-mon
-sudo pcs constraint order mero-ios-c2 then mero-free-space-mon
-sudo pcs constraint colocation add mero-free-space-mon with mero-ios-c1 \
-     score=1000
-sudo pcs constraint colocation add mero-free-space-mon with mero-ios-c2 \
-     score=1000
+cib_commit() {
+    sudo pcs cluster cib-push $cib_file --config
+}
 
+# HA operations table.
+ha_ops=(
+    ip_addr_rsc_add
+    lnet_rsc_add
+    net_config_check
+    bootstrap
+    bootstrap_update_only
+    mero_config
+    consul_systemd_prepare
+    consul_systemd_update
+    consul_env_prepare
+    consul_conf_prepare
+    consul_rsc_add
+    mero_kernel_rsc_add
+    hax_systemd_prepare
+    hax_systemd_update
+    hax_rsc_add
+    mero_systemd_update
+    mero_rsc_add
+    clusterip_rsc_add
+    systemd_units_disable
+    ldap_rsc_add
+    s3auth_rsc_add
+    elastic_search_rsc_add
+    statsd_rsc_add
+    haproxy_rsc_add
+    rabbitmq_rsc_add
+    s3_systemd_update
+    s3back_rsc_add
+    s3server_rsc_add
+)
+
+# Maps ha operation from the ha_ops table to its respective type.
+# HA operations are classified and described as follows,
+# bootstrap:   executes during clean installation of the software only
+# update:      executes during clean install and software update
+# update-only: executes during software update only
+declare -A ha_ops_type=(
+    [ip_addr_rsc_add]='update'
+    [lnet_rsc_add]='update'
+    [net_config_check]='bootstrap'
+    [bootstrap]='bootstrap'
+    [bootstrap_update_only]='update-only'
+    [mero_config]='bootstrap'
+    [consul_systemd_prepare]='update'
+    [consul_systemd_update]='update'
+    [consul_env_prepare]='bootstrap'
+    [consul_conf_prepare]='bootstrap'
+    [consul_rsc_add]='update'
+    [mero_kernel_rsc_add]='update'
+    [hax_systemd_prepare]='update'
+    [hax_systemd_update]='update'
+    [hax_rsc_add]='update'
+    [mero_systemd_update]='update'
+    [mero_rsc_add]='update'
+    [clusterip_rsc_add]='update'
+    [systemd_units_disable]='update'
+    [ldap_rsc_add]='update'
+    [s3auth_rsc_add]='update'
+    [elastic_search_rsc_add]='update'
+    [statsd_rsc_add]='update'
+    [haproxy_rsc_add]='update'
+    [rabbitmq_rsc_add]='update'
+    [s3_systemd_update]='update'
+    [s3back_rsc_add]='update'
+    [s3server_rsc_add]='update'
+)
+
+for op in ${ha_ops[@]}; do
+    if ! $update && [[ ${ha_ops_type[$op]} != 'update-only' ]]; then
+        cib_init
+        $op
+        cib_commit
+    elif $update && [[ ${ha_ops_type[$op]} != 'bootstrap' ]]; then
+        # We are using existing CIB as a base and re-applying the pcs
+        # instructions, thus some instructions would already exist in the
+        # CIB, we ignore them.
+        $op || true
+        cib_commit
+    fi
+done

@@ -1,0 +1,104 @@
+#!/bin/bash
+set -eu -o pipefail
+export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
+# set -x
+
+PROG=${0##*/}
+
+usage() {
+    cat <<EOF
+Usage: $PROG [OPTS] <CDF> <params.yaml>
+
+Update HA instructions for IO path, SSPL, CSM and UDS
+Caveats:
+
+* The script expects existing Pacemaker cluster to be running.
+
+* Passwordless SSH access between the nodes is required.
+
+* The script should be executed from the "left" node.
+
+Mandatory parameters:
+    <CDF>         Hare cluster description file
+    <IO_HA_ARGS>  IO path argument file
+    <CSM_HA_ARGS> CSM HA argument file
+
+Note: parameters can be specified either directly via command line options
+or via YAML file, e.g.:
+EOF
+}
+
+TEMP=$(getopt --options h: \
+              --longoptions help \
+              --name "$PROG" -- "$@" || true)
+
+(($? == 0)) || { usage >&2; exit 1; }
+
+eval set -- "$TEMP"
+
+while true; do
+    case "$1" in
+        -h|--help)           usage; exit ;;
+        --)                  shift; break ;;
+        *)                   break ;;
+    esac
+done
+
+cdf=${1:-}
+ioargsfile=${2:-}
+csmargsfile=${3:-}
+
+[[ $cdf ]] && [[ $ioargsfile ]] && [[ $csmargsfile ]] || {
+    usage >&2
+    exit 1
+}
+
+hare_dir=/var/lib/hare
+cib_file=/var/lib/hare/cib_cortx_cluster.xml
+hare_exec=/opt/seagate/eos/hare/libexec
+consul_bin=/opt/seagate/eos/hare/bin
+
+reset_all() {
+	$hare_exec/prov-ha-reset
+        $hare_exec/prov-ha-sspl-reset
+        $hare_exec/prov-ha-csm-reset
+	$hare_exec/prov-ha-uds-reset
+}
+
+cib_init() {
+   sudo pcs cluster cib $cib_file
+}
+
+cib_commit() {
+    sudo pcs cluster cib-push $cib_file --config
+}
+
+echo 'Exporting Consul kv...'
+$consul_bin/consul kv export > $hare_dir/consul-conf-exported.json
+
+# reset resources
+reset_all
+
+# Initialize CIB
+cib_init
+
+echo 'Updating ha resources for IO path, SSPL, CSM and UDS...'
+# Update various HA components.
+$hare_exec/build-ees-ha $cdf $ioargsfile --cib-file $cib_file \
+    --update
+$hare_exec/build-ees-ha-csm $csmargsfile --cib-file $cib_file \
+    --update
+$hare_exec/build-ees-ha-sspl $ioargsfile --cib-file $cib_file \
+    --update
+$hare_exec/build-ees-ha-uds --cib-file $cib_file --update
+
+#XXX Presently replacing the cib xml file does not work if in new versions
+# the resources are deleted.
+# Revisit this to avoid deleting of resources from pacemaker.
+#cibadmin --replace --xml-file $cib_file
+echo 'Updating Pacemaker CIB...'
+cib_commit
+sudo pcs resource cleanup
+
+echo 'Importing Consul kv...'
+$consul_bin/consul kv import @$hare_dir/consul-conf-exported.json
