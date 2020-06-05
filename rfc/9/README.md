@@ -104,9 +104,9 @@ specific goals:
 5. A patch MUST compile cleanly and pass project self-tests on at least
    the principal target platform.
 
-6. A patch commit message MUST consist of a single short (less than 50
-   characters) line stating the problem ("Problem: ...") being solved,
-   followed by a blank line and then the proposed solution
+6. A patch commit message SHOULD consist of a single short (less than
+   50 characters) line stating the problem ("Problem: ...") being
+   solved, followed by a blank line and then the proposed solution
    ("Solution: ...").
 
 <!--
