@@ -16,3 +16,9 @@ hare:
   reset:
     script: /opt/seagate/eos/hare/libexec/prov-ha-reset
     args: null
+  post_update:
+    script: /opt/seagate/eos/hare/libexec/build-ees-ha-update
+    args:
+      - /var/lib/hare/cluster.yaml
+      - /var/lib/hare/build-ees-ha-args.yaml
+      - /var/lib/hare/build-ees-ha-csm-args.yaml
