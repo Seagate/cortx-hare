@@ -31,7 +31,7 @@ Mandatory parameters:
 
 Optional parameters:
   --cib-file            Pacemaker configuration file.
-  --update              Preserve Consul and Mero state, reconfigure Pacemaker only.
+  --update              Preserve Consul and Motr state, reconfigure Pacemaker only.
 
 Note: parameters can be specified either directly via command line options
 or via YAML file, e.g.:
@@ -115,7 +115,7 @@ systemd_disable() {
 sspl_rsc_add() {
     echo 'Adding sspl resource and constraints...'
 
-    sudo pcs -f $cib_file resource create sspl ocf:eos:sspl \
+    sudo pcs -f $cib_file resource create sspl ocf:cortx:sspl \
         master meta migration-threshold=10 failure-timeout=10s is-managed=true
     sudo pcs -f $cib_file constraint order consul-c1 then sspl-master kind=Optional
     sudo pcs -f $cib_file constraint order consul-c2 then sspl-master kind=Optional
@@ -133,15 +133,15 @@ sspl_rsc_add() {
 consul_config() {
     echo 'Copying Consul configuration files...'
 
-    sudo cp /opt/seagate/eos/sspl/bin/consul_config.json \
+    sudo cp /opt/seagate/cortx/sspl/bin/consul_config.json \
            $hare_dir/consul-server-c1-conf/
     cmd="
-    cp /opt/seagate/eos/sspl/bin/consul_config.json \
+    cp /opt/seagate/cortx/sspl/bin/consul_config.json \
        $hare_dir/consul-server-c2-conf/"
     ssh $rnode $cmd
 
     echo 'Reloading Consul...'
-    /opt/seagate/eos/hare/bin/consul reload
+    /opt/seagate/cortx/hare/bin/consul reload
 }
 
 cib_init() {

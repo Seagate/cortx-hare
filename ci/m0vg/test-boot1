@@ -6,10 +6,10 @@ set -x
 . /data/hare/ci/_env  # MERO_COMMIT_REF
 . /data/hare/ci/functions.sh  # _time
 
-# XXX `m0crate-io-conf` executes `consul`, which is /opt/seagate/eos/hare/bin.
+# XXX `m0crate-io-conf` executes `consul`, which is /opt/seagate/cortx/hare/bin.
 # There should be a better way to add that directory to PATH; see
 # http://gitlab.mero.colo.seagate.com/mero/hare/merge_requests/248#note_16669
-export PATH="/opt/seagate/eos/hare/bin:$PATH"
+export PATH="/opt/seagate/cortx/hare/bin:$PATH"
 
 do_io() {
     utils/m0crate-io-conf >_m0crate-io.yaml
@@ -34,10 +34,10 @@ test_cluster() {
 
 cd /data/hare/
 
-sudo mkdir -p /var/mero
+sudo mkdir -p /var/motr
 for i in {0..9}; do
-    sudo dd if=/dev/zero of=/var/mero/disk$i.img bs=1M seek=9999 count=1
-    sudo losetup /dev/loop$i /var/mero/disk$i.img
+    sudo dd if=/dev/zero of=/var/motr/disk$i.img bs=1M seek=9999 count=1
+    sudo losetup /dev/loop$i /var/motr/disk$i.img
 done
 
 for cdf in singlenode.yaml ci-boot1-2ios.yaml; do

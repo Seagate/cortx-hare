@@ -87,7 +87,7 @@ append_hax_svc() {
       \"port\": $port,
       \"checks\": [
           {
-            \"args\": [ \"/opt/seagate/eos/hare/libexec/check-service\", \"--hax\" ],
+            \"args\": [ \"/opt/seagate/cortx/hare/libexec/check-service\", \"--hax\" ],
             \"interval\": \"1s\",
             \"status\": \"warning\"
           }
@@ -108,7 +108,7 @@ append_confd_svc() {
       \"port\": $port,
       \"checks\": [
           {
-            \"args\": [ \"/opt/seagate/eos/hare/libexec/check-service\",
+            \"args\": [ \"/opt/seagate/cortx/hare/libexec/check-service\",
                         \"--fid\", \"$fid\" ],
             \"interval\": \"1s\",
             \"status\": \"warning\"
@@ -119,7 +119,7 @@ append_confd_svc() {
 MERO_M0D_EP='$ep'
 MERO_HA_EP='$HAX_EP'
 MERO_PROCESS_FID='$fid'
-MERO_CONF_XC='/etc/mero/confd.xc'
+MERO_CONF_XC='/etc/motr/confd.xc'
 EOF
 }
 
@@ -136,7 +136,7 @@ append_ios_svc() {
       \"port\": $port,
       \"checks\": [
           {
-            \"args\": [ \"/opt/seagate/eos/hare/libexec/check-service\",
+            \"args\": [ \"/opt/seagate/cortx/hare/libexec/check-service\",
                         \"--fid\", \"$fid\" ],
             \"interval\": \"1s\",
             \"status\": \"warning\"
@@ -165,7 +165,7 @@ append_s3_svc() {
       \"port\": $port,
       \"checks\": [
           {
-            \"args\": [ \"/opt/seagate/eos/hare/libexec/check-service\",
+            \"args\": [ \"/opt/seagate/cortx/hare/libexec/check-service\",
                         \"--svc\", \"$s3svc\" ],
             \"interval\": \"1s\",
             \"status\": \"warning\"

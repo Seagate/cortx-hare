@@ -24,6 +24,6 @@ processes.
   * [5/HAX](5/README.md) — HAlink eXchange
 * Stable
   * [3/CFGEN](3/README.md) — Configuration Generation
-  * [6/BOOT](6/README.md) — Mero Cluster Bootstrap
+  * [6/BOOT](6/README.md) — Motr Cluster Bootstrap
   * [8/STYLE](8/README.md) — Coding Style Guidelines
   * [9/PC3](9/README.md) — Pedantic Code Construction Contract

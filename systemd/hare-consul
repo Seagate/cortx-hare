@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 set -eu -o pipefail
 
-# TODO: '/opt/seagate/eos/hare' prefix can be different, e.g. '/usr'
-HARE_BASE_DIR=/opt/seagate/eos/hare
+# TODO: '/opt/seagate/cortx/hare' prefix can be different, e.g. '/usr'
+HARE_BASE_DIR=/opt/seagate/cortx/hare
 
 PATH="$HARE_BASE_DIR/libexec:$PATH"
 PATH="$HARE_BASE_DIR/bin:$PATH"
 export PATH
 
-# TODO: should it be `consul` and PATH=/opt/seagate/eos/hare/bin:$PATH ?
+# TODO: should it be `consul` and PATH=/opt/seagate/cortx/hare/bin:$PATH ?
 exec consul agent -node $NODE -node-id $NODE_ID -bind $BIND -client "$CLIENT" $JOIN \
      -config-dir=/var/lib/hare/consul-$MODE-conf \
      -data-dir=/var/lib/hare/consul-$BIND $EXTRA_OPTS

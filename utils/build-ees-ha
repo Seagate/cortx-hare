@@ -33,12 +33,12 @@ Optional parameters:
   -i, --interface <if>  Data network interface (default: eth1)
   --left-node     <n1>  Left  node hostname (default: pod-c1)
   --right-node    <n2>  Right node hostname (default: pod-c2)
-  --left-volume   <lv>  Left  node /var/mero volume (default: /dev/sdb)
-  --right-volume  <rv>  Right node /var/mero volume (default: /dev/sdc)
-  --skip-mkfs           Don't mkfs /var/mero
+  --left-volume   <lv>  Left  node /var/motr volume (default: /dev/sdb)
+  --right-volume  <rv>  Right node /var/motr volume (default: /dev/sdc)
+  --skip-mkfs           Don't mkfs /var/motr
   --net-type <tcp|o2ib> LNet network type (default: tcp)
   --cib-file      <cf>  Pacemaker configuration file
-  --update              Preserve Consul and Mero state, reconfigure Pacemaker only.
+  --update              Preserve Consul and Motr state, reconfigure Pacemaker only.
 
 Note: parameters can be specified either directly via cmd-line options
 or via a yaml file, e.g.:
@@ -164,9 +164,9 @@ lnet_rsc_add() {
     echo 'Adding LNet...'
     sudo pcs -f $cib_file resource create lnet systemd:lnet
     sudo pcs -f $cib_file resource clone lnet
-    sudo pcs -f $cib_file resource create lnet-c1 ocf:eos:lnet \
+    sudo pcs -f $cib_file resource create lnet-c1 ocf:cortx:lnet \
              iface=$iface:c1 nettype=$net_type op monitor interval=30s
-    sudo pcs -f $cib_file resource create lnet-c2 ocf:eos:lnet \
+    sudo pcs -f $cib_file resource create lnet-c2 ocf:cortx:lnet \
              iface=$iface:c2 nettype=$net_type op monitor interval=30s
     sudo pcs -f $cib_file resource group add c1 ip-c1 lnet-c1
     sudo pcs -f $cib_file resource group add c2 ip-c2 lnet-c2
@@ -209,11 +209,11 @@ bootstrap() {
         sudo mkfs.ext4 -q $rvolume >/dev/null <<< y
     fi
 
-    # Mount /var/mero (if not mounted).
-    mkdir -p /var/mero &&
-      ! mountpoint -q /var/mero && sudo mount $lvolume /var/mero || true
-    ssh $rnode "mkdir -p /var/mero &&
-      ! mountpoint -q /var/mero && sudo mount $rvolume /var/mero || true"
+    # Mount /var/motr (if not mounted).
+    mkdir -p /var/motr &&
+      ! mountpoint -q /var/motr && sudo mount $lvolume /var/motr || true
+    ssh $rnode "mkdir -p /var/motr &&
+      ! mountpoint -q /var/motr && sudo mount $rvolume /var/motr || true"
 
     echo 'Preparing Hare configuration files...'
 
@@ -232,16 +232,16 @@ bootstrap() {
                     -i $cdf
     fi
 
-# Make sure mero-kernel is not loaded.
-    run_on_both 'sudo systemctl stop mero-kernel'
+# Make sure motr-kernel is not loaded.
+    run_on_both 'sudo systemctl stop motr-kernel'
 
     hctl bootstrap --mkfs $cdf
     hctl shutdown
 
 # LNet endpoints suffixes should be unique so that in case
-# of a failover all the Mero services (which would work on
+# of a failover all the Motr services (which would work on
 # the same node) could talk to each other.
-# (It is a workaround for Mero EOS-2799 issue.)
+# (It is a workaround for Motr EOS-2799 issue.)
     for f in $hare_dir/{confd.xc,consul-kv.json}; do
         sed -r -e "s/($ip2.*:12345:1):1/\1:2/" \
                -e "s/($ip2.*:12345:2):1/\1:3/" \
@@ -254,31 +254,31 @@ bootstrap() {
     hctl bootstrap --conf-dir $hare_dir
     hctl shutdown
 
-# Create /var/mero dirs for the foreign data-stacks:
-    sudo mkdir -p /var/mero2
-    ssh $rnode 'sudo mkdir -p /var/mero1'
+# Create /var/motr dirs for the foreign data-stacks:
+    sudo mkdir -p /var/motr2
+    ssh $rnode 'sudo mkdir -p /var/motr1'
 }
 
 # Runs hctl bootstrap to update hare configuration changes.
 # Note: This modifies consul kv which needs to be explicitly restored.
 bootstrap_update_only() {
-    mkdir -p /var/mero &&
-      ! mountpoint -q /var/mero && sudo mount $lvolume /var/mero || true
-    ssh $rnode "mkdir -p /var/mero &&
-      ! mountpoint -q /var/mero && sudo mount $rvolume /var/mero || true"
+    mkdir -p /var/motr &&
+      ! mountpoint -q /var/motr && sudo mount $lvolume /var/motr || true
+    ssh $rnode "mkdir -p /var/motr &&
+      ! mountpoint -q /var/motr && sudo mount $rvolume /var/motr || true"
     hctl bootstrap --conf-dir $hare_dir
     hctl shutdown
 }
 
-mero_config() {
-    # Prepare Mero conf files on each node:
+motr_config() {
+    # Prepare Motr conf files on each node:
     lm0confs=$(echo /etc/sysconfig/m0d-*)
     rm0confs=$(sudo ssh $rnode 'echo /etc/sysconfig/m0d-*')
     sudo scp -q $lm0confs $rnode:/etc/sysconfig/
     sudo scp -q $rnode:\{${rm0confs/ /,}\} /etc/sysconfig/
-    for f in $rm0confs; do sudo sed '1iMERO_M0D_DATA_DIR=/var/mero2' -i $f; done
+    for f in $rm0confs; do sudo sed '1iMERO_M0D_DATA_DIR=/var/motr2' -i $f; done
     ssh $rnode "for f in $lm0confs; do \
-                           sudo sed '1iMERO_M0D_DATA_DIR=/var/mero1' -i \$f; done"
+                           sudo sed '1iMERO_M0D_DATA_DIR=/var/motr1' -i \$f; done"
 }
 
 cmd_deregister_node() {
@@ -416,20 +416,20 @@ consul_rsc_add() {
     sudo pcs -f $cib_file resource group add c2 consul-c2 --after ip-c2
 }
 
-mero_kernel_rsc_add() {
-    echo 'Adding Mero kernel module to Pacemaker...'
-    sudo pcs -f $cib_file resource create mero-kernel systemd:mero-kernel clone
-    sudo pcs -f $cib_file constraint order lnet-c1 then mero-kernel-clone
-    sudo pcs -f $cib_file constraint order lnet-c2 then mero-kernel-clone
+motr_kernel_rsc_add() {
+    echo 'Adding Motr kernel module to Pacemaker...'
+    sudo pcs -f $cib_file resource create motr-kernel systemd:motr-kernel clone
+    sudo pcs -f $cib_file constraint order lnet-c1 then motr-kernel-clone
+    sudo pcs -f $cib_file constraint order lnet-c2 then motr-kernel-clone
 
-    # Make sure mero-kernel is always stopped before lnet-c1/2
+    # Make sure motr-kernel is always stopped before lnet-c1/2
     # is started. Otherwise, some transition abort in between may
-    # prevent mero-kernel restart. This is a workaround suggested
+    # prevent motr-kernel restart. This is a workaround suggested
     # at https://bugs.clusterlabs.org/show_bug.cgi?id=5428#c5.
-    sudo pcs -f $cib_file constraint order stop mero-kernel-clone then \
+    sudo pcs -f $cib_file constraint order stop motr-kernel-clone then \
                                            start lnet-c1 \
                                            kind=Optional symmetrical=false
-    sudo pcs -f $cib_file constraint order stop mero-kernel-clone then \
+    sudo pcs -f $cib_file constraint order stop motr-kernel-clone then \
                                            start lnet-c2 \
                                            kind=Optional symmetrical=false
 }
@@ -444,14 +444,14 @@ hax_systemd_prepare() {
 
 hax_systemd_update() {
     sudo sed -e 's/hare-consul-agent.service/hare-consul-agent-c1.service/' \
-             -e "/ExecStart=/iExecStartPre=/bin/sh -c 'mountpoint /var/mero || /bin/mount $lvolume /var/mero'" \
-             -e "/ExecStart=/aExecStopPost=/bin/sh -c '! mountpoint /var/mero || while ! /bin/umount /var/mero; do lsof +D /var/mero; sleep 1; done'" \
+             -e "/ExecStart=/iExecStartPre=/bin/sh -c 'mountpoint /var/motr || /bin/mount $lvolume /var/motr'" \
+             -e "/ExecStart=/aExecStopPost=/bin/sh -c '! mountpoint /var/motr || while ! /bin/umount /var/motr; do lsof +D /var/motr; sleep 1; done'" \
              -i /usr/lib/systemd/system/hare-hax-c1.service
     sudo sed -e 's/hare-consul-agent.service/hare-consul-agent-c2.service/' \
-             -e 's;ExecStart.*cd /var/mero;&2;' \
+             -e 's;ExecStart.*cd /var/motr;&2;' \
              -e "/ExecStart/iEnvironmentFile=$hare_dir/hax-env-c2" \
-             -e "/ExecStart=/iExecStartPre=/bin/sh -c 'mountpoint /var/mero2 || /bin/mount $rvolume /var/mero2'" \
-             -e "/ExecStart=/aExecStopPost=/bin/sh -c '! mountpoint /var/mero2 || while ! /bin/umount /var/mero2; do lsof +D /var/mero2; sleep 1; done'" \
+             -e "/ExecStart=/iExecStartPre=/bin/sh -c 'mountpoint /var/motr2 || /bin/mount $rvolume /var/motr2'" \
+             -e "/ExecStart=/aExecStopPost=/bin/sh -c '! mountpoint /var/motr2 || while ! /bin/umount /var/motr2; do lsof +D /var/motr2; sleep 1; done'" \
              -i /usr/lib/systemd/system/hare-hax-c2.service
     echo "HARE_HAX_NODE_NAME=$rnode" | sudo tee $hare_dir/hax-env-c2 > /dev/null
 
@@ -459,16 +459,16 @@ hax_systemd_update() {
     sudo cp -f /usr/lib/systemd/system/hare-hax.service
             /usr/lib/systemd/system/hare-hax-c1.service &&
     sudo sed -e 's/hare-consul-agent.service/hare-consul-agent-c1.service/'
-             -e 's;ExecStart.*cd /var/mero;&1;' \
+             -e 's;ExecStart.*cd /var/motr;&1;' \
              -e '/ExecStart/iEnvironmentFile=$hare_dir/hax-env-c1'
-             -e \"/ExecStart=/iExecStartPre=/bin/sh -c 'mountpoint /var/mero1 || /bin/mount $lvolume /var/mero1'\"
-             -e \"/ExecStart=/aExecStopPost=/bin/sh -c '! mountpoint /var/mero1 || while ! /bin/umount /var/mero1; do lsof +D /var/mero1; sleep 1; done'\"
+             -e \"/ExecStart=/iExecStartPre=/bin/sh -c 'mountpoint /var/motr1 || /bin/mount $lvolume /var/motr1'\"
+             -e \"/ExecStart=/aExecStopPost=/bin/sh -c '! mountpoint /var/motr1 || while ! /bin/umount /var/motr1; do lsof +D /var/motr1; sleep 1; done'\"
              -i /usr/lib/systemd/system/hare-hax-c1.service &&
     sudo cp -f /usr/lib/systemd/system/hare-hax.service
             /usr/lib/systemd/system/hare-hax-c2.service &&
     sudo sed -e 's/hare-consul-agent.service/hare-consul-agent-c2.service/'
-             -e \"/ExecStart=/iExecStartPre=/bin/sh -c 'mountpoint /var/mero || /bin/mount $rvolume /var/mero'\"
-             -e \"/ExecStart=/aExecStopPost=/bin/sh -c '! mountpoint /var/mero || while ! /bin/umount /var/mero; do lsof +D /var/mero; sleep 1; done'\"
+             -e \"/ExecStart=/iExecStartPre=/bin/sh -c 'mountpoint /var/motr || /bin/mount $rvolume /var/motr'\"
+             -e \"/ExecStart=/aExecStopPost=/bin/sh -c '! mountpoint /var/motr || while ! /bin/umount /var/motr; do lsof +D /var/motr; sleep 1; done'\"
              -i /usr/lib/systemd/system/hare-hax-c2.service &&
     echo 'HARE_HAX_NODE_NAME=$lnode' | sudo tee $hare_dir/hax-env-c1 > /dev/null"
     ssh $rnode $cmd
@@ -479,14 +479,14 @@ hax_rsc_add() {
     sudo pcs -f $cib_file resource create hax-c2 systemd:hare-hax-c2 op stop timeout=30
     sudo pcs -f $cib_file resource group add c1 hax-c1
     sudo pcs -f $cib_file resource group add c2 hax-c2
-    sudo pcs -f $cib_file constraint order mero-kernel-clone then hax-c1
-    sudo pcs -f $cib_file constraint order mero-kernel-clone then hax-c2
+    sudo pcs -f $cib_file constraint order motr-kernel-clone then hax-c1
+    sudo pcs -f $cib_file constraint order motr-kernel-clone then hax-c2
     sudo pcs -f $cib_file constraint order consul-c2 then hax-c1
     sudo pcs -f $cib_file constraint order consul-c1 then hax-c2
 }
 
-mero_systemd_update() {
-    echo 'Adding Mero to Pacemaker...'
+motr_systemd_update() {
+    echo 'Adding Motr to Pacemaker...'
 
     cmd='
     sudo sed "s/TimeoutStopSec=.*/TimeoutStopSec=5sec/"
@@ -505,35 +505,35 @@ get_fid() {
        $hare_dir/$conf_dir/$conf_dir.json | awk "/$svc.0x/ {print \$2}"
 }
 
-mero_rsc_add() {
+motr_rsc_add() {
     c1_confd=$(get_fid c1 confd)
     c2_confd=$(get_fid c2 confd)
     c1_ios=$(get_fid c1 ios)
     c2_ios=$(get_fid c2 ios)
 
-    sudo pcs -f $cib_file resource create mero-confd-c1 systemd:m0d@$c1_confd op stop \
+    sudo pcs -f $cib_file resource create motr-confd-c1 systemd:m0d@$c1_confd op stop \
          timeout=600
-    sudo pcs -f $cib_file resource create mero-ios-c1 systemd:m0d@$c1_ios op stop \
+    sudo pcs -f $cib_file resource create motr-ios-c1 systemd:m0d@$c1_ios op stop \
          timeout=600
-    sudo pcs -f $cib_file resource group add c1 mero-confd-c1
-    sudo pcs -f $cib_file resource group add c1 mero-ios-c1
-    sudo pcs -f $cib_file resource create mero-confd-c2 systemd:m0d@$c2_confd op stop \
+    sudo pcs -f $cib_file resource group add c1 motr-confd-c1
+    sudo pcs -f $cib_file resource group add c1 motr-ios-c1
+    sudo pcs -f $cib_file resource create motr-confd-c2 systemd:m0d@$c2_confd op stop \
          timeout=600
-    sudo pcs -f $cib_file resource create mero-ios-c2 systemd:m0d@$c2_ios op stop \
+    sudo pcs -f $cib_file resource create motr-ios-c2 systemd:m0d@$c2_ios op stop \
          timeout=600
-    sudo pcs -f $cib_file resource group add c2 mero-confd-c2
-    sudo pcs -f $cib_file resource group add c2 mero-ios-c2
-    sudo pcs -f $cib_file constraint order mero-confd-c1 then mero-ios-c2
-    sudo pcs -f $cib_file constraint order mero-confd-c2 then mero-ios-c1
+    sudo pcs -f $cib_file resource group add c2 motr-confd-c2
+    sudo pcs -f $cib_file resource group add c2 motr-ios-c2
+    sudo pcs -f $cib_file constraint order motr-confd-c1 then motr-ios-c2
+    sudo pcs -f $cib_file constraint order motr-confd-c2 then motr-ios-c1
 
-    echo 'Adding mero-free-space-monitor to pacemaker...'
-    sudo pcs -f $cib_file resource create mero-free-space-mon systemd:mero-free-space-monitor \
+    echo 'Adding motr-free-space-monitor to pacemaker...'
+    sudo pcs -f $cib_file resource create motr-free-space-mon systemd:motr-free-space-monitor \
          op monitor interval=30s meta failure-timeout=300s
-    sudo pcs -f $cib_file constraint order mero-ios-c1 then mero-free-space-mon
-    sudo pcs -f $cib_file constraint order mero-ios-c2 then mero-free-space-mon
-    sudo pcs -f $cib_file constraint colocation add mero-free-space-mon with mero-ios-c1 \
+    sudo pcs -f $cib_file constraint order motr-ios-c1 then motr-free-space-mon
+    sudo pcs -f $cib_file constraint order motr-ios-c2 then motr-free-space-mon
+    sudo pcs -f $cib_file constraint colocation add motr-free-space-mon with motr-ios-c1 \
          score=1000
-    sudo pcs -f $cib_file constraint colocation add mero-free-space-mon with mero-ios-c2 \
+    sudo pcs -f $cib_file constraint colocation add motr-free-space-mon with motr-ios-c2 \
          score=1000
 }
 
@@ -576,8 +576,8 @@ s3auth_rsc_add() {
     sudo pcs -f $cib_file resource create s3auth systemd:s3authserver clone op \
         monitor interval=30
     sudo pcs -f $cib_file constraint order ldap-clone then s3auth-clone
-    sudo pcs -f $cib_file constraint order mero-ios-c1 then s3auth-clone
-    sudo pcs -f $cib_file constraint order mero-ios-c2 then s3auth-clone
+    sudo pcs -f $cib_file constraint order motr-ios-c1 then s3auth-clone
+    sudo pcs -f $cib_file constraint order motr-ios-c2 then s3auth-clone
 }
 
 elastic_search_rsc_add() {
@@ -720,18 +720,18 @@ ha_ops=(
     net_config_check
     bootstrap
     bootstrap_update_only
-    mero_config
+    motr_config
     consul_systemd_prepare
     consul_systemd_update
     consul_env_prepare
     consul_conf_prepare
     consul_rsc_add
-    mero_kernel_rsc_add
+    motr_kernel_rsc_add
     hax_systemd_prepare
     hax_systemd_update
     hax_rsc_add
-    mero_systemd_update
-    mero_rsc_add
+    motr_systemd_update
+    motr_rsc_add
     clusterip_rsc_add
     systemd_units_disable
     ldap_rsc_add
@@ -756,18 +756,18 @@ declare -A ha_ops_type=(
     [net_config_check]='bootstrap'
     [bootstrap]='bootstrap'
     [bootstrap_update_only]='update-only'
-    [mero_config]='bootstrap'
+    [motr_config]='bootstrap'
     [consul_systemd_prepare]='update'
     [consul_systemd_update]='update'
     [consul_env_prepare]='bootstrap'
     [consul_conf_prepare]='bootstrap'
     [consul_rsc_add]='update'
-    [mero_kernel_rsc_add]='update'
+    [motr_kernel_rsc_add]='update'
     [hax_systemd_prepare]='update'
     [hax_systemd_update]='update'
     [hax_rsc_add]='update'
-    [mero_systemd_update]='update'
-    [mero_rsc_add]='update'
+    [motr_systemd_update]='update'
+    [motr_rsc_add]='update'
     [clusterip_rsc_add]='update'
     [systemd_units_disable]='update'
     [ldap_rsc_add]='update'

@@ -136,7 +136,7 @@ def process_status(cns: Consul, node_id: str, fidk: int) -> str:
 
 
 def cluster_online() -> bool:
-    cmd = ['pgrep', '--full', '/opt/seagate/eos/hare/bin/hax']
+    cmd = ['pgrep', '--full', '/opt/seagate/cortx/hare/bin/hax']
     process = Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE, encoding='utf8')
     out, err = process.communicate()
     exit_code = process.returncode

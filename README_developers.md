@@ -2,8 +2,8 @@
 
 The scripts in this repository constitute a middleware layer between [Consul](https://www.consul.io/) and [Mero](http://gitlab.mero.colo.seagate.com/mero/mero) services.  Their responsibilities:
 
-- generate initial configuration of Mero cluster;
-- mediate communications between Mero services and Consul agents.
+- generate initial configuration of Motr cluster;
+- mediate communications between Motr services and Consul agents.
 
 ## 0. Prerequisites
 
@@ -14,7 +14,7 @@ The scripts in this repository constitute a middleware layer between [Consul](ht
   sudo yum install python3 python3-devel
   ```
 
-* Ensure that Mero is built and its systemd services are installed.
+* Ensure that Motr is built and its systemd services are installed.
   ```sh
   M0_SRC_DIR=/data/mero  # YMMV
 
@@ -43,10 +43,10 @@ The scripts in this repository constitute a middleware layer between [Consul](ht
    * Ensure that the disks enumerated in the `io_disks` list exist.
      Create loop devices, if necessary:
      ```bash
-     sudo mkdir -p /var/mero
+     sudo mkdir -p /var/motr
      for i in {0..9}; do
-         sudo dd if=/dev/zero of=/var/mero/disk$i.img bs=1M seek=9999 count=1
-         sudo losetup /dev/loop$i /var/mero/disk$i.img
+         sudo dd if=/dev/zero of=/var/motr/disk$i.img bs=1M seek=9999 count=1
+         sudo losetup /dev/loop$i /var/motr/disk$i.img
      done
      ```
 

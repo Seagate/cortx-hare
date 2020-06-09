@@ -58,7 +58,7 @@ Location to store the resource state in
 Location to store the sspl mode. [ Active, Degraded ]
 </longdesc>
 <shortdesc lang="en">SSPL state file</shortdesc>
-<content type="string" default="/var/eos/sspl/data/state.txt" />
+<content type="string" default="/var/cortx/sspl/data/state.txt" />
 </parameter>
 </parameters>
 <actions>
@@ -129,10 +129,10 @@ stateful_demote() {
     stateful_update "slave"
 
     if [ -z $OCF_RESKEY_sspl_mode ]; then
-        OCF_RESKEY_sspl_mode="/var/eos/sspl/data/state.txt"
+        OCF_RESKEY_sspl_mode="/var/cortx/sspl/data/state.txt"
     fi
 
-    echo "state=degrade" > /var/eos/sspl/data/state.txt
+    echo "state=degrade" > /var/cortx/sspl/data/state.txt
     return 0
 }
 
@@ -149,9 +149,9 @@ stateful_promote() {
     stateful_update "master"
 
     if [ -z $OCF_RESKEY_sspl_mode ]; then
-        OCF_RESKEY_sspl_mode="/var/eos/sspl/data/state.txt"
+        OCF_RESKEY_sspl_mode="/var/cortx/sspl/data/state.txt"
     fi
-    echo "state=active" > /var/eos/sspl/data/state.txt
+    echo "state=active" > /var/cortx/sspl/data/state.txt
     # This is required in promote in order to switch SSPL to active mode.
     # Here active mode means, some of the SSPL modules will be resumed after
     # this signal is received by SSPL. Without this sspl won't read updated

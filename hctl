@@ -26,8 +26,8 @@ die() {
 if [[ $SRC_DIR =~ bin/?$ ]]; then
     HARE_BASE_DIR=$SRC_DIR/..
 else
-    # TODO: '/opt/seagate/eos/hare' prefix can be different, e.g. '/usr'
-    HARE_BASE_DIR=/opt/seagate/eos/hare
+    # TODO: '/opt/seagate/cortx/hare' prefix can be different, e.g. '/usr'
+    HARE_BASE_DIR=/opt/seagate/cortx/hare
     [[ -d $HARE_BASE_DIR && -e $HARE_BASE_DIR/bin/hctl ]] ||
         die 'Hare is not installed, please run `make devinstall`.'
 fi
@@ -40,7 +40,7 @@ usage() {
     cat <<EOF
 Usage: $PROG <command> [options]
 
-Interact with Mero cluster.
+Interact with Motr cluster.
 
 Commands:
 

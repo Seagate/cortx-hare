@@ -48,7 +48,7 @@ class HaLink:
                 'Cannot start ha_link. m0_halon_interface::start' +
                 ' returned non-zero code (%s)', result)
             raise RuntimeError('Cannot start m0_halon_interface.' +
-                               'Please check Mero logs for more details.')
+                               'Please check Motr logs for more details.')
 
     def start_rconfc(self) -> int:
         logging.debug('Starting rconfc')
@@ -56,7 +56,7 @@ class HaLink:
                                              self._process_fid.to_c())
         if result:
             raise RuntimeError('Cannot start rconfc.' +
-                               'Please check Mero logs for more details.')
+                               'Please check Motr logs for more details.')
         logging.debug('rconfc started')
         return result
 
@@ -153,7 +153,7 @@ class HaLink:
 
     @log_exception
     def ha_nvec_get(self, hax_msg: int, nvec: List[HaNote]) -> None:
-        logging.debug('Got ha nvec of length %s from Mero land', len(nvec))
+        logging.debug('Got ha nvec of length %s from Motr land', len(nvec))
         self.queue.put(HaNvecGetEvent(hax_msg, nvec, self))
 
     @log_exception
@@ -193,12 +193,12 @@ class HaLink:
         self._ha_ctx = 0
         logging.debug('ha_link destroyed. Bye!')
 
-    def adopt_mero_thread(self):
-        logging.debug('Adopting Mero thread')
-        self._ffi.adopt_mero_thread()
+    def adopt_motr_thread(self):
+        logging.debug('Adopting Motr thread')
+        self._ffi.adopt_motr_thread()
 
-    def shun_mero_thread(self):
-        self._ffi.shun_mero_thread()
+    def shun_motr_thread(self):
+        self._ffi.shun_motr_thread()
 
     def get_filesystem_stats(self) -> FsStats:
         stats: FsStats = self._ffi.filesystem_stats_fetch(self._ha_ctx)

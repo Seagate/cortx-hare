@@ -7,7 +7,7 @@ set -x
 
 if [[ -n ${MERO_COMMIT_REF:-} ]]; then
     # `systemctl start hare-hax` command, called by `bootstrap-node`,
-    # will fail unless `mero-kernel` systemd service is installed.
+    # will fail unless `motr-kernel` systemd service is installed.
     sudo /data/mero/scripts/install-mero-service
 
     # `TERM=dumb` silences `tput: unknown terminal "unknown"` warnings.
@@ -20,7 +20,7 @@ else
         # error message.  This happens when the CI job is retried manually.
         sudo tee -a /etc/yum.repos.d/${repo//\//_}.repo <<< 'gpgcheck=0'
     fi
-    sudo yum install -y eos-hare eos-s3server s3cmd
+    sudo yum install -y cortx-hare cortx-s3server s3cmd
     /data/hare/ci/m0vg/modify-s3server-config
 fi
 

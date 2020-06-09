@@ -18,16 +18,16 @@ document are to be interpreted as described in
 ## Configuration Generation
 
 Configuration generation script &mdash; `cfgen` &mdash; generates
-various configuration files required to start Mero cluster.
+various configuration files required to start Motr cluster.
 
 ![cfgen](cfgen.png)
 
 ### Cluster Description File (CDF)
 
 Cluster administrator SHALL provide a _cluster description file_ (CDF),
-specifying which hosts the cluster is made of, how many Mero services
+specifying which hosts the cluster is made of, how many Motr services
 and clients to run, where to run confd services, which drives to use
-for Mero I/O.
+for Motr I/O.
 
 CDF is a YAML file with the following schema:
 ```yaml
@@ -42,7 +42,7 @@ nodes:
                             # Empty list means no IO service.
     m0_clients:
         s3: <int>     # number of S3 servers to start
-        other: <int>  # max quantity of other Mero clients this host may have
+        other: <int>  # max quantity of other Motr clients this host may have
 pools:
   - name: <str>
     allowed_failures:  # optional section; no failures will be allowed
@@ -71,7 +71,7 @@ pools:
 ```
 usage: cfgen [OPTION]... CDF
 
-Generate configuration files required to start Mero cluster.
+Generate configuration files required to start Motr cluster.
 
 positional arguments:
   CDF                  cluster description file; use '--help-schema' option
@@ -81,7 +81,7 @@ optional arguments:
   -h, --help           show this help message and exit
   --help-schema        show the schema of cluster description file (CDF)
   -D dir, --dhall dir  directory with auxiliary Dhall expressions (defaults to
-                       '/opt/seagate/eos/hare/share/cfgen/dhall')
+                       '/opt/seagate/cortx/hare/share/cfgen/dhall')
   -o output-dir        output directory (defaults to '.')
   --mock               Generate pseudo-random "facts". The hosts specified in
                        the cluster description file will not be visited and
@@ -96,7 +96,7 @@ to generate configuration data.
 
 ### Output files
 
-  * `confd.dhall` &mdash; Mero configuration in
+  * `confd.dhall` &mdash; Motr configuration in
     [Dhall](https://dhall-lang.org/) format.
 
   * `consul-agents.json` &mdash; tells [`bootstrap`](rfc/6/README.md) script

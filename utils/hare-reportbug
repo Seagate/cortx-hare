@@ -61,12 +61,12 @@ exec 2> >(tee _reportbug.stderr >&2)
 sudo journalctl --no-pager --full --utc --boot --output short-precise \
      > syslog.txt || true
 
-sudo systemctl --all --full --no-pager status {hare,m0,mero,s3}\* \
+sudo systemctl --all --full --no-pager status {hare,m0,motr,s3}\* \
      > systemctl-status.txt || true
 
 extra_files=(
-    /etc/sysconfig/mero
-    /opt/seagate/eos-prvsnr/pillar/components/cluster.sls
+    /etc/sysconfig/motr
+    /opt/seagate/cortx-prvsnr/pillar/components/cluster.sls
     /opt/seagate/s3/conf/s3config.yaml
     $(if [[ -r /etc/corosync/corosync.conf ]]; then
           awk '$1 == "logfile:" { print $2 }' /etc/corosync/corosync.conf

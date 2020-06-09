@@ -23,7 +23,7 @@ __version__ = '0.9'
 
 def parse_opts(argv):
     p = argparse.ArgumentParser(description='Generate configuration files'
-                                ' required to start Mero cluster.',
+                                ' required to start Motr cluster.',
                                 usage='%(prog)s [OPTION]... CDF')
     p.add_argument('CDF', type=argparse.FileType(),
                    help='cluster description file;'
@@ -31,7 +31,7 @@ def parse_opts(argv):
     p.add_argument('--help-schema', nargs=0,
                    help='show the schema of cluster description file (CDF)',
                    action=ShowSchema)
-    default_dhall_dir = '/opt/seagate/eos/hare/share/cfgen/dhall'
+    default_dhall_dir = '/opt/seagate/cortx/hare/share/cfgen/dhall'
     p.add_argument('-D', '--dhall', metavar='dir',
                    help='directory with auxiliary Dhall expressions'
                    f' (defaults to {default_dhall_dir!r})',
@@ -80,7 +80,7 @@ nodes:
                             # Empty list means no IO service.
     m0_clients:
         s3: <int>     # number of S3 servers to start
-        other: <int>  # max quantity of other Mero clients this host may have
+        other: <int>  # max quantity of other Motr clients this host may have
 pools:
   - name: <str>
     allowed_failures:  # optional section; no failures will be allowed
@@ -253,7 +253,7 @@ Make sure the value of data_iface in the CDF is correct."""
 
         assert (nr_confds + node['m0_clients']['s3']
                 + node['m0_clients']['other'] > 0), \
-            f'{name}: At least one Mero server or client is required'
+            f'{name}: At least one Motr server or client is required'
 
     assert total_nr_confds > 0, 'At least one confd is required'
     assert total_nr_disks > 0, 'No disks found'
@@ -304,7 +304,7 @@ Disk.size.__doc__ = 'Total size, in bytes'
 Disk.blksize.__doc__ = 'Block size for file system I/O'
 
 
-# XXX see build_disk_info() in mero's `utils/m0genfacts`
+# XXX see build_disk_info() in motr's `utils/m0genfacts`
 def get_disks(hostname: str, mock_p: bool, paths: List[str]) -> List[Disk]:
     if not paths:
         return []
@@ -344,7 +344,7 @@ ObjT = Enum('ObjT', 'root fdmi_flt_grp fdmi_filter'
             ' site rack enclosure controller drive'  # hardware subtree
             ' pool pver pver_f objv'  # pools subtree
             ' profile')
-ObjT.__doc__ = 'Mero conf object type'
+ObjT.__doc__ = 'Motr conf object type'
 
 
 def objT_to_dhall(t: ObjT) -> str:
@@ -352,7 +352,7 @@ def objT_to_dhall(t: ObjT) -> str:
 
 
 Oid = NamedTuple('Oid', [('type', ObjT), ('fidk', int)])
-Oid.__doc__ = 'Mero conf object identifier'
+Oid.__doc__ = 'Motr conf object identifier'
 Oid.fidk.__doc__ = '.f_key part of the corresponding m0_fid'
 
 
@@ -590,7 +590,7 @@ class ConfProcess(ToDhall):
 
 # m0_conf_service_type
 class SvcT(Enum):
-    """Mero service type
+    """Motr service type
     """
     M0_CST_MDS = 1
     M0_CST_IOS = auto()
@@ -948,7 +948,7 @@ pver_levels = Failures._fields
 PDClustAttrs0 = NamedTuple('PDClustAttrs0',
                            # XXX What about `unit_size` and `seed`?
                            [('data_units', int), ('parity_units', int)])
-PDClustAttrs0.__doc__ = 'Mero parity de-clustering layout attributes'
+PDClustAttrs0.__doc__ = 'Motr parity de-clustering layout attributes'
 
 
 def tolerated_failures(m0conf: Dict[Oid, Any], pd_attrs: PDClustAttrs0,

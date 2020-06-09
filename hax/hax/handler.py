@@ -21,7 +21,7 @@ class ConsumerThread(StoppableThread):
 
     def _do_work(self, q: Queue, ffi: HaxFFI):
         logging.info('Handler thread has started')
-        ffi.adopt_mero_thread()
+        ffi.adopt_motr_thread()
 
         def pull_msg():
             try:
@@ -45,7 +45,7 @@ class ConsumerThread(StoppableThread):
                     if isinstance(item, EntrypointRequest):
                         ha_link = item.ha_link_instance
                         # While replying any Exception is catched. In such a
-                        # case, the mero process will receive EAGAIN and
+                        # case, the motr process will receive EAGAIN and
                         # hence will need to make new attempt by itself
                         ha_link.send_entrypoint_request_reply(item)
                     elif isinstance(item, ProcessEvent):
@@ -75,6 +75,6 @@ class ConsumerThread(StoppableThread):
                     # no op, swallow the exception
                     logging.exception('**ERROR**')
         except StopIteration:
-            ffi.shun_mero_thread()
+            ffi.shun_motr_thread()
         finally:
             logging.info('Handler thread has exited')

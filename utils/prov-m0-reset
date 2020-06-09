@@ -23,8 +23,8 @@ Mandatory parameters:
   --ip2           <addr>         2nd roaming IP address.
   --left-node     <n1>  Left  node hostname (default: pod-c1)
   --right-node    <n2>  Right node hostname (default: pod-c2)
-  --left-volume   <lv>  Left  node /var/mero volume (default: /dev/sdb)
-  --right-volume  <rv>  Right node /var/mero volume (default: /dev/sdc)
+  --left-volume   <lv>  Left  node /var/motr volume (default: /dev/sdb)
+  --right-volume  <rv>  Right node /var/motr volume (default: /dev/sdc)
                   <CDF>          Hare Cluster Description File
 
 Note: parameters can be specified either directly via cmd-line options
@@ -103,7 +103,7 @@ fi
 [[ -b $rvolume ]] || die "meta-data volume $rvolume is not available"
 
 echo 'Exporting Consul configuration to /var/lib/hare/consul-conf-exported.json'
-/opt/seagate/eos/hare/bin/consul kv export > \
+/opt/seagate/cortx/hare/bin/consul kv export > \
     /var/lib/hare/consul-conf-exported.json
 
 # Temporily move consul resources after lnet on both the nodes so that
@@ -140,19 +140,19 @@ sudo lctl list_nids | grep -qF $ip1 ||
 ssh $rnode "sudo lctl list_nids | grep -qF $ip2" ||
   die "LNet endpoint $ip2 doesn't appear to be configured at $rnode"
 
-echo 'Conforming if /var/mero on both the nodes is unmounted...'
-while mountpoint /var/mero && ! umount /var/mero; do sleep 1; done
-while ssh $rnode 'mountpoint /var/mero && ! umount /var/mero'; do sleep 1; done
+echo 'Conforming if /var/motr on both the nodes is unmounted...'
+while mountpoint /var/motr && ! umount /var/motr; do sleep 1; done
+while ssh $rnode 'mountpoint /var/motr && ! umount /var/motr'; do sleep 1; done
 
 echo "Formatting volumes $lvolume and $rvolume ..."
 mkfs.ext4 $lvolume
 mkfs.ext4 $rvolume
 
-echo 'Mounting /var/mero on both the nodes...'
-mkdir -p /var/mero &&
-  ! mountpoint -q /var/mero && sudo mount $lvolume /var/mero
-ssh $rnode "mkdir -p /var/mero &&
-  ! mountpoint -q /var/mero && sudo mount $rvolume /var/mero"
+echo 'Mounting /var/motr on both the nodes...'
+mkdir -p /var/motr &&
+  ! mountpoint -q /var/motr && sudo mount $lvolume /var/motr
+ssh $rnode "mkdir -p /var/motr &&
+  ! mountpoint -q /var/motr && sudo mount $rvolume /var/motr"
 
 echo 'Resetting failed systemd units on both the nodes...'
 sudo systemctl reset-failed hare\* m0d\*
@@ -162,14 +162,14 @@ echo 'Running hctl bootstrap..'
 hctl bootstrap --mkfs -c /var/lib/hare
 hctl shutdown
 
-# Ideally we will not touch the foreign directories (/var/mero{1,2}) for
+# Ideally we will not touch the foreign directories (/var/motr{1,2}) for
 # each node during reset but we make sure they exist when cluster is back up.
-sudo mkdir -p /var/mero2
-ssh $rnode 'sudo mkdir -p /var/mero1'
+sudo mkdir -p /var/motr2
+ssh $rnode 'sudo mkdir -p /var/motr1'
 
-echo 'Unmounting /var/mero from both the nodes...'
-sudo umount /var/mero
-ssh $rnode 'sudo umount /var/mero'
+echo 'Unmounting /var/motr from both the nodes...'
+sudo umount /var/motr
+ssh $rnode 'sudo umount /var/motr'
 
 # Move consul resources back to their original positions in their respective
 # resource groups i.e. after virtual ip resources on both the nodes.
@@ -197,6 +197,6 @@ done
 
 echo 'Importing /var/lib/hare/consul-conf-exported.json...'
 for i in {1..10}; do
-    /opt/seagate/eos/hare/bin/consul kv import \
+    /opt/seagate/cortx/hare/bin/consul kv import \
         @/var/lib/hare/consul-conf-exported.json && break || sleep 5
 done

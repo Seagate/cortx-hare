@@ -10,7 +10,7 @@ RUN mkdir $HARE_VENV_DIR \
 # PyYAML - for cfgen
 # flake8 - for hax
 # mypy   - for hax
-# ply    - for Mero
+# ply    - for Motr
 # wheel  - for hax
 RUN source $HARE_VENV_DIR/bin/activate \
     && pip3 install PyYAML flake8 mypy ply wheel

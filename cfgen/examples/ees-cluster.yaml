@@ -16,7 +16,7 @@ nodes:
           - /dev/sdg
     m0_clients:
         s3: 0           # number of S3 servers to start
-        other: 2        # max quantity of other Mero clients this node may have
+        other: 2        # max quantity of other Motr clients this node may have
   - hostname: pod-c2
     data_iface: eth1_c2
     data_iface_type: o2ib

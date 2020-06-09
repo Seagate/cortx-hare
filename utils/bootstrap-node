@@ -13,14 +13,14 @@ Bootstraps single node after local consul agent is started.
 
 The required parameter is one of the following:
 
-  --phase 1 - start Mero confd servers
-  --phase 2 - start Mero IO servers
+  --phase 1 - start Motr confd servers
+  --phase 2 - start Motr IO servers
   --phase 3 - start S3 servers
 
 Options:
-  --mkfs-only   Do m0mkfs only (CAUTION: wipes Mero data).
-  --mkfs        Do m0mkfs (CAUTION: wipes Mero data) and start Mero servers.
-  --m0d         Skip m0mkfs, start Mero servers.
+  --mkfs-only   Do m0mkfs only (CAUTION: wipes Motr data).
+  --mkfs        Do m0mkfs (CAUTION: wipes Motr data) and start Motr servers.
+  --m0d         Skip m0mkfs, start Motr servers.
   -h, --help    Show this help and exit.
 EOF
 }
@@ -58,21 +58,21 @@ if [[ $do_mkfs ]] && [[ $phase == 'phase3' ]]; then
     die '--mkfs conflicts with --phase3'
 fi
 
-# If mero-kernel.service is not installed, the script will fail
+# If motr-kernel.service is not installed, the script will fail
 # anyway, with or without this check.  The purpose of the check is to
 # provide proper error message.
 #
 # Without this check `sudo systemctl start hare-hax` fails with "Failed to
 # start hax.service: Unit not found" error message.  That error
 # message is misleading, because hax.service _is_ installed, it is
-# one of its dependencies - mero-kernel.service - which isn't.
-out_systemctl=$(systemctl list-unit-files mero-kernel.service)
-if ! grep -qE '^mero-kernel\.service\>' <<< "$out_systemctl"; then
+# one of its dependencies - motr-kernel.service - which isn't.
+out_systemctl=$(systemctl list-unit-files motr-kernel.service)
+if ! grep -qE '^motr-kernel\.service\>' <<< "$out_systemctl"; then
     cat >&2 <<EOF
 **********************************************************************
 SNAP!  You've stumbled on an insufficiently tested branch of code.
 
-bootstrap-node script believes that 'mero-kernel' is not installed.
+bootstrap-node script believes that 'motr-kernel' is not installed.
 Oftentimes this belief is contradicted by reality.
 
 EES developers need your help.
@@ -84,23 +84,23 @@ with the following output:
 ----------BEGIN OUTPUT----------
 HOSTNAME=$HOSTNAME
 
-\`systemctl list-unit-files mero-kernel.service\`:
+\`systemctl list-unit-files motr-kernel.service\`:
 $out_systemctl
 ----------END OUTPUT----------
 
 Thanks!  You're such a wonderful person. [But you got problems.]
 **********************************************************************
 EOF
-    die "'mero-kernel' systemd service is not installed"
+    die "'motr-kernel' systemd service is not installed"
 fi
 
 . update-consul-conf --dry-run  # import CONFD_IDs, IOS_IDs, id2fid()
 
-if [[ $do_mkfs ]] && [[ ! -e /etc/sysconfig/mero-kernel ]]; then
-    # Auto-start of `mero-kernel` systemd unit will cause kernel panic
+if [[ $do_mkfs ]] && [[ ! -e /etc/sysconfig/motr-kernel ]]; then
+    # Auto-start of `motr-kernel` systemd unit will cause kernel panic
     # unless `MERO_NODE_UUID` configuration option is provided.
     echo "MERO_NODE_UUID='$(uuidgen --time)'" |
-        sudo tee /etc/sysconfig/mero-kernel >/dev/null
+        sudo tee /etc/sysconfig/motr-kernel >/dev/null
 fi
 
 wait_active() {
@@ -139,7 +139,7 @@ wait_m0d_started() {
 }
 
 if [[ -n $CONFD_IDs || -n $IOS_IDs ]]; then
-    sudo mkdir -p /var/mero/hax
+    sudo mkdir -p /var/motr/hax
     sudo systemctl start hare-hax
     wait_active hare-hax 5
 fi
@@ -147,8 +147,8 @@ fi
 if [[ -n $CONFD_IDs && $phase == phase1 ]]; then
     [[ -f /var/lib/hare/confd.xc ]] ||
         die 'Cannot bootstrap server node without /var/lib/hare/confd.xc file'
-    sudo mkdir -p /etc/mero
-    sudo cp /var/lib/hare/confd.xc /etc/mero/
+    sudo mkdir -p /etc/motr
+    sudo cp /var/lib/hare/confd.xc /etc/motr/
 fi
 
 case $phase in
@@ -172,12 +172,12 @@ esac
 for id in $IDs; do
     fid=$(id2fid $id)
     if [[ $do_mkfs ]]; then
-        sudo systemctl start mero-mkfs@$fid
-        touch /tmp/mero-mkfs-pass-$fid
+        sudo systemctl start motr-mkfs@$fid
+        touch /tmp/motr-mkfs-pass-$fid
         # Give time for service check to reset m0mkfs' HA state
         # (see utils/check-service also).
-        while [[ -f /tmp/mero-mkfs-pass-$fid ||
-                 -f /tmp/mero-mkfs-fail-$fid ]] ||
+        while [[ -f /tmp/motr-mkfs-pass-$fid ||
+                 -f /tmp/motr-mkfs-fail-$fid ]] ||
               [[ $(get-process-state $fid) != M0_CONF_HA_PROCESS_STOPPED ]]; do
             sleep 1
         done

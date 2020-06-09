@@ -13,8 +13,8 @@ set +eu
 . $OCF_ROOT/lib/heartbeat/ocf-shellfuncs
 set -eu
 
-HA_CHECKS_DIR=/opt/seagate/eos/hare/libexec/ha-checks
-RUN_DIR=/run/eos
+HA_CHECKS_DIR=/opt/seagate/cortx/hare/libexec/ha-checks
+RUN_DIR=/run/cortx
 
 # XXX Extract this function into some library once it is copied 3 times.
 # See https://wiki.c2.com/?ThreeStrikesAndYouRefactor .

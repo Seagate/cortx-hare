@@ -4,7 +4,7 @@
 variables:
   CENTOS_RELEASE: 7
 
-  # Mero git reference to build and use.
+  # Motr git reference to build and use.
   #
   # If `MERO_COMMIT_REF` is empty or undefined, CI will use rpms from
   # http://ci-storage.mero.colo.seagate.com/releases/master/BLATEST/

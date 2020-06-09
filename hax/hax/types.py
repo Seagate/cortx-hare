@@ -19,7 +19,7 @@ ObjT = Enum(
         ('PROCESS', 0x7200000000000001),
         ('SERVICE', 0x7300000000000001)
     ])
-ObjT.__doc__ = 'Mero conf object types and their m0_fid.f_container values'
+ObjT.__doc__ = 'Motr conf object types and their m0_fid.f_container values'
 
 
 class HaNoteStruct(c.Structure):
@@ -35,7 +35,7 @@ class HaNoteStruct(c.Structure):
     # */
     M0_NC_FAILED = 2
     # /**
-    # * Object is experiencing a temporary failure. Halon will notify Mero
+    # * Object is experiencing a temporary failure. Halon will notify Motr
     # * when the object is available for use again.
     # */
     M0_NC_TRANSIENT = 3

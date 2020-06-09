@@ -692,16 +692,16 @@ static struct m0_ha_msg *_ha_nvec_msg_alloc(const struct m0_ha_nvec *nvec,
 	return msg;
 }
 
-void adopt_mero_thread(void)
+void adopt_motr_thread(void)
 {
 	int rc;
 
 	rc = m0_halon_interface_thread_adopt(hc0->hc_hi, &m0thread);
 	if (rc != 0)
-		M0_LOG(M0_ERROR, "Mero thread adoption failed: %d\n", rc);
+		M0_LOG(M0_ERROR, "Motr thread adoption failed: %d\n", rc);
 }
 
-void shun_mero_thread(void)
+void shun_motr_thread(void)
 {
 	m0_halon_interface_thread_shun();
 }

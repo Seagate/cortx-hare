@@ -15,7 +15,7 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 
 ## HAlink eXchange (hax)
 
-Mero process and Consul agent cannot communicate directly.  They communicate over `hax` server — a bridge, one side of which accepts connections from Mero processes, the other side communicates with Consul agent over HTTP.
+Motr process and Consul agent cannot communicate directly.  They communicate over `hax` server — a bridge, one side of which accepts connections from Motr processes, the other side communicates with Consul agent over HTTP.
 
 ![hax](hax.png)
 
@@ -25,9 +25,9 @@ The code of `hax` consists of C and Python parts.
 * The callback functions passed to `m0_halon_interface_start()` are defined in the Python code.  Callback handlers (e.g., `entrypoint_request_cb`, `msg_received_cb`) send HTTP requests to Consul.
 * Python part also runs HTTP server.  This server receives HTTP POST request from a Consul's watch handler with payload of HA state updates.
 
-## Interaction with Mero
+## Interaction with Motr
 
-### Messages from Mero
+### Messages from Motr
 
 [m0_ha_msg_type][] | Reaction of `hax`
 --- | ---
@@ -51,15 +51,15 @@ M0_HA_MSG_SNS_ERR | `m0_panic()`
 
 ```plantuml
 @startuml
-participant "m0mkfs/m0d" as Mero
+participant "m0mkfs/m0d" as Motr
 participant Hax
 participant "Consul KV" as KV
 participant "Consul Service Catalog" as Services
-activate Mero
+activate Motr
 activate KV
 activate Services
 
-Mero -> Hax: Send entrypoint request
+Motr -> Hax: Send entrypoint request
 activate Hax
 Hax -> Hax: Process asynchronously
 activate Hax
@@ -68,7 +68,7 @@ note right of KV: Leader session is required to get the Principal RM node
 KV --> Hax
 Hax -> Services: Get all confd processes
 Services --> Hax
-Hax -> Mero: Send entrypoint reply
+Hax -> Motr: Send entrypoint reply
 deactivate Hax
 @enduml
 ```
@@ -76,11 +76,11 @@ deactivate Hax
 **Notes**:
 1. Entrypoint request replies are sent from a different thread to the one which received the request.
 2. The order of replies is the same to the order of received requests.
-3. If hax is not able to build the reply (e.g. if Consul is not operational), hax will send `EAGAIN` back to the Mero process. Mero process MUST repeat the request.
+3. If hax is not able to build the reply (e.g. if Consul is not operational), hax will send `EAGAIN` back to the Motr process. Motr process MUST repeat the request.
 
-#### 2. Consul watch sends new Mero process statuses
+#### 2. Consul watch sends new Motr process statuses
 
-When Consul watch sends new Mero process statuses, `hax` forwards the statuses via ha_link.
+When Consul watch sends new Motr process statuses, `hax` forwards the statuses via ha_link.
 
 ```plantuml
 @startuml
@@ -91,7 +91,7 @@ activate HAlink
 activate Hax
 activate Consul
 
-Consul -> Hax: Send new status of all Mero processes
+Consul -> Hax: Send new status of all Motr processes
 Hax -> Hax: Convert JSON to ha_notes
 Hax -> HAlink: Send M0_HA_NVEC_SET message
 @enduml
@@ -102,17 +102,17 @@ Hax -> HAlink: Send M0_HA_NVEC_SET message
 
 #### 3. Handling of M0_HA_MSG_EVENT_PROCESS message
 
-Having received M0_HA_MSG_EVENT_PROCESS from Mero, `hax` updates process status in the Consul KV.
+Having received M0_HA_MSG_EVENT_PROCESS from Motr, `hax` updates process status in the Consul KV.
 
 ```plantuml
 @startuml
-participant "m0mkfs/m0d" as Mero
+participant "m0mkfs/m0d" as Motr
 participant Hax
 participant "Consul KV" as KV
-activate Mero
+activate Motr
 activate KV
 
-Mero -> Hax: Send M0_HA_MSG_EVENT_PROCESS message
+Motr -> Hax: Send M0_HA_MSG_EVENT_PROCESS message
 activate Hax
 Hax -> Hax: Process asynchronously
 activate Hax
@@ -133,13 +133,13 @@ deactivate Hax
 
 ```plantuml
 @startuml
-participant "m0mkfs/m0d" as Mero
+participant "m0mkfs/m0d" as Motr
 participant Hax
 participant "Consul KV" as KV
-activate Mero
+activate Motr
 activate KV
 
-Mero -> Hax: Send M0_HA_MSG_NVEC message
+Motr -> Hax: Send M0_HA_MSG_NVEC message
 activate Hax
 Hax -> Hax: Process asynchronously
 activate Hax
@@ -154,7 +154,7 @@ loop if ConsulException raises
     KV --> Hax
     Hax -> Hax: Build ha_nvec reply
     note right of Hax: Resulting no_state is one of (M0_NC_FAILED, M0_NC_ONLINE).
-    Hax -> Mero: Send reply of M0_HA_NVEC_SET type
+    Hax -> Motr: Send reply of M0_HA_NVEC_SET type
   end
 end
 deactivate Hax
@@ -176,21 +176,21 @@ Hax processes the following callbacks from `ha_link` (via `m0_ha_halon_interface
 **Notes:**
 
 1. Hax MUST NOT make any assumption whether the service is registered in Consul. Service registering and watching the KV with the service status is out of  hax' responsibilty.
-2. In the future we might want to support Mero service update events (namely, `M0_HA_MSG_EVENT_SERVICE` message with event type `M0_CONF_HA_SERVICE_FAILED`, `M0_CONF_HA_SERVICE_STOPPED` or `M0_CONF_HA_SERVICE_FAILED` - see `m0_conf_ha_service_event` enum in `mero/conf/ha.h`). For the current version this functionality more like an overkill.
+2. In the future we might want to support Motr service update events (namely, `M0_HA_MSG_EVENT_SERVICE` message with event type `M0_CONF_HA_SERVICE_FAILED`, `M0_CONF_HA_SERVICE_STOPPED` or `M0_CONF_HA_SERVICE_FAILED` - see `m0_conf_ha_service_event` enum in `mero/conf/ha.h`). For the current version this functionality more like an overkill.
 3. In the future versions process update events must be forwarded through Consul-based Event Queue.
 
 ### Storing process status in Consul KV
 
-The general idea of storing the mero process status in Consul KV can be seen below.
+The general idea of storing the motr process status in Consul KV can be seen below.
 
 ```plantuml
 @startuml
-participant "m0mkfs/m0d" as Mero
+participant "m0mkfs/m0d" as Motr
 participant Hax
 participant KV
 participant "P health-check.sh" as Checker
 
-Mero -> Hax: Process P is now online
+Motr -> Hax: Process P is now online
 Hax -> KV: put processes/<fid> = online
 KV --> Hax: Ok
 loop every n sec
@@ -209,7 +209,7 @@ end
 
 1. `fid` in the proposed Consul KV key `processes/<fid>` corresponds to the process fid (this guarantees that the key is unique within `processes/` prefix).
    - This means that the check script (health-check.sh) must know the fid of the processes it monitors.
-   - This is OK that the keys in the KV are not reader-friendly and don't expose the logical name of the mero process. The end user will need to look into [Consul services](https://www.consul.io/api/agent/service.html) to learn the state of the particular mero process.
+   - This is OK that the keys in the KV are not reader-friendly and don't expose the logical name of the motr process. The end user will need to look into [Consul services](https://www.consul.io/api/agent/service.html) to learn the state of the particular motr process.
 2. Checker script must check both value in Consul KV and `pgrep` the process. This is required to make sure that the value in KV is not obsolete.
 3. "online" status shown at the diagram is chosen for the sake of simplicity. The exhaustive list of the values to store can be seen in [4/KV](../4/README.md).
 
@@ -314,5 +314,5 @@ Internally `hax` uses [python-consul](https://pypi.org/project/python-consul/) P
 
 </details>
 
-The incoming HTTP requests bring the changes in the service states that Consul is aware of. Hax takes this information and forwards it via `ha_link` to Mero (see `m0_ha_notify` function in `hax/hax.c`).
+The incoming HTTP requests bring the changes in the service states that Consul is aware of. Hax takes this information and forwards it via `ha_link` to Motr (see `m0_ha_notify` function in `hax/hax.c`).
 

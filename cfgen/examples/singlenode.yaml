@@ -22,7 +22,7 @@ nodes:
           - /dev/loop9
     m0_clients:
       s3: 0         # number of S3 servers to start
-      other: 2      # max quantity of other Mero clients this host may have
+      other: 2      # max quantity of other Motr clients this host may have
 pools:
   - name: the pool
     disks: all

@@ -12,8 +12,8 @@ set -x
 # Store the path of its current target into a variable.
 latest_release_dir=$(readlink -f /releases/master/BLATEST)
 
-# Build Hare rpm.  This requires mero{,-devel} packages to be installed.
-_time yum install -y $latest_release_dir/eos-core{,-devel}-[0-9]*.rpm
+# Build Hare rpm.  This requires motr{,-devel} packages to be installed.
+_time yum install -y $latest_release_dir/cortx-motr{,-devel}-[0-9]*.rpm
 time make rpm
 
 # Create local yum repository with a snapshot of compatible rpms used
@@ -21,10 +21,10 @@ time make rpm
 # CI jobs.
 mkdir -vp $RPMSYNC_DIR
 cp -v \
-   /root/rpmbuild/RPMS/x86_64/eos-hare*.rpm \
-   $latest_release_dir/eos-core{,-devel}-[0-9]*.rpm \
-   $latest_release_dir/eos-s3server-[0-9]*.rpm \
-   /releases/master/s3server_uploads/log4cxx_eos{,-devel}-[0-9]*.rpm \
+   /root/rpmbuild/RPMS/x86_64/cortx-hare*.rpm \
+   $latest_release_dir/cortx-motr{,-devel}-[0-9]*.rpm \
+   $latest_release_dir/cortx-s3server-[0-9]*.rpm \
+   /releases/master/s3server_uploads/log4cxx_cortx{,-devel}-[0-9]*.rpm \
    /releases/master/s3server_uploads/s3cmd-[0-9]*.rpm \
    $RPMSYNC_DIR/
 cd $RPMSYNC_DIR

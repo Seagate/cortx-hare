@@ -81,7 +81,7 @@ EOF
 
 cdf 'hosts[@]' $data_iface 'disks[@]' > ci/m0vg/_test-pcs.yaml
 
-bash -x /opt/seagate/eos/hare/libexec/build-ees-ha \
+bash -x /opt/seagate/cortx/hare/libexec/build-ees-ha \
     --ip1 ${roaming_ips[0]} \
     --ip2 ${roaming_ips[1]} \
     --interface $data_iface \

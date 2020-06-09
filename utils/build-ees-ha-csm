@@ -37,7 +37,7 @@ Mandatory parameters:
 
 Optional parameters:
   --cib-file            Pacemaker configuration file.
-  --update              Preserve Consul and Mero state, reconfigure Pacemaker only.
+  --update              Preserve Consul and Motr state, reconfigure Pacemaker only.
 
 Note: parameters can be specified either directly via command line options
 or via YAML file, e.g.:

@@ -73,10 +73,10 @@ class HaxFFI:
         ]
         self.ha_nvec_reply = lib.m0_ha_nvec_reply_send
 
-        lib.adopt_mero_thread.argtypes = []
-        lib.adopt_mero_thread.restype = c.c_int
-        self.adopt_mero_thread = lib.adopt_mero_thread
-        self.shun_mero_thread = lib.shun_mero_thread
+        lib.adopt_motr_thread.argtypes = []
+        lib.adopt_motr_thread.restype = c.c_int
+        self.adopt_motr_thread = lib.adopt_motr_thread
+        self.shun_motr_thread = lib.shun_motr_thread
 
         lib.m0_ha_filesystem_stats_fetch.argtypes = [c.c_void_p]
         lib.m0_ha_filesystem_stats_fetch.restype = c.py_object

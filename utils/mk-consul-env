@@ -5,8 +5,8 @@ export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
 
 PROG=${BASH_SOURCE[0]##*/}
 
-# XXX '/opt/seagate/eos/hare' prefix can be different
-HARE_DIR=/opt/seagate/eos/hare
+# XXX '/opt/seagate/cortx/hare' prefix can be different
+HARE_DIR=/opt/seagate/cortx/hare
 
 ENV_TEMPLATE=$HARE_DIR/share/consul/consul-env.in
 ENV_FILE=/var/lib/hare/consul-env

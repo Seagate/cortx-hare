@@ -55,8 +55,8 @@ csmargsfile=${3:-}
 
 hare_dir=/var/lib/hare
 cib_file=/var/lib/hare/cib_cortx_cluster.xml
-hare_exec=/opt/seagate/eos/hare/libexec
-consul_bin=/opt/seagate/eos/hare/bin
+hare_exec=/opt/seagate/cortx/hare/libexec
+consul_bin=/opt/seagate/cortx/hare/bin
 
 reset_all() {
     $hare_exec/prov-ha-uds-reset

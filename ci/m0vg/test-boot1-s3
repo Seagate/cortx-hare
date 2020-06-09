@@ -6,7 +6,7 @@ set -x
 . /data/hare/ci/_env  # HARE_CI_S3_ACCESS_KEY, HARE_CI_S3_SECRET_KEY
 . /data/hare/ci/functions.sh  # _time
 
-export PATH="/opt/seagate/eos/hare/bin:/opt/seagate/eos/hare/libexec:$PATH"
+export PATH="/opt/seagate/cortx/hare/bin:/opt/seagate/cortx/hare/libexec:$PATH"
 
 generate_s3cfg() {
     . update-consul-conf --dry-run  # import CONFD_IDs, IOS_IDs, id2fid()

@@ -5,7 +5,7 @@ usage() {
     cat <<EOF
 Usage: ${0##*/} <type>
 
-Generate new fid for the specified Mero conf object type.
+Generate new fid for the specified Motr conf object type.
 
 See the output of \`\$M0_SRC_DIR/utils/m0confgen --types' (2nd column)
 for the supported <type> values.

@@ -18,8 +18,8 @@ Key | Value | Description
 `eq/<epoch>` | event | `eq/*` items are collectively referred to as the EQ (Event Queue).  Events are consumed and dequeued by the RC script.
 `last_fidk` | last generated fid key | Atomically incremented counter that is used to generate fids.
 `leader` | node name | This key is used for RC leader election.  Created with [`consul lock`](https://www.consul.io/docs/commands/lock.html) command.
-`m0conf/nodes/<name>/processes/<process_fidk>/endpoint` | endpoint address | Endpoint address of the Mero process (Consul service) with fid key `<process_fidk>`.  Example: `192.168.180.162@tcp:12345:44:101`.
-`m0conf/nodes/<name>/processes/<process_fidk>/services/<svc_type>` | Fid key | Fid key of the Mero service, specified by its type, parent process, and node.
+`m0conf/nodes/<name>/processes/<process_fidk>/endpoint` | endpoint address | Endpoint address of the Motr process (Consul service) with fid key `<process_fidk>`.  Example: `192.168.180.162@tcp:12345:44:101`.
+`m0conf/nodes/<name>/processes/<process_fidk>/services/<svc_type>` | Fid key | Fid key of the Motr service, specified by its type, parent process, and node.
 `m0conf/profiles/<profile_fidk>` | `[ <pool_fidk> ]` | Array of fid keys of the SNS pools associated with this profile.
 `processes/<fid>` | `{ "state": "<HA state>" }` | The items are created and updated by `hax` processes.  Supported values of \<HA state\>: `M0_CONF_HA_PROCESS_STARTING`, `M0_CONF_HA_PROCESS_STARTED`, `M0_CONF_HA_PROCESS_STOPPING`, `M0_CONF_HA_PROCESS_STOPPED`.
 `profile` | fid | Profile fid in string format.  Example: `"0x7000000000000001:0x4"`.
@@ -35,7 +35,7 @@ Key | Value | Description
 
   Word "process" is ambiguous, we should be more specific.
   We are dealing with a subset of m0_conf_process objects.
-  The items correspond to m0d processes --- Mero servers.
+  The items correspond to m0d processes --- Motr servers.
 
   'm0-processes' is also slightly more greppable.
 -->
@@ -93,6 +93,6 @@ Field | Description
 `fs_svc_total`   | total number of IOS, MDS, and CAS services
 `fs_svc_replied` | how many of them have replied
 
-Corresponding Mero structure: [`struct m0_fs_stats`][spiel/m0_fs_stats]
+Corresponding Motr structure: [`struct m0_fs_stats`][spiel/m0_fs_stats]
 
 [spiel/m0_fs_stats]: http://gitlab.mero.colo.seagate.com/mero/mero/blob/3c6e1148ff5fb18b81236700396bd7881ad61c18/spiel/spiel.h#L1251

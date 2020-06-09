@@ -3,7 +3,7 @@ hare:
     script: null
     args: null
   init:
-    script: /opt/seagate/eos/hare/libexec/build-ees-ha
+    script: /opt/seagate/cortx/hare/libexec/build-ees-ha
     args:
       - /var/lib/hare/cluster.yaml
       - /var/lib/hare/build-ees-ha-args.yaml
@@ -14,10 +14,10 @@ hare:
     script: null
     args: null
   reset:
-    script: /opt/seagate/eos/hare/libexec/prov-ha-reset
+    script: /opt/seagate/cortx/hare/libexec/prov-ha-reset
     args: null
   post_update:
-    script: /opt/seagate/eos/hare/libexec/build-ees-ha-update
+    script: /opt/seagate/cortx/hare/libexec/build-ees-ha-update
     args:
       - /var/lib/hare/cluster.yaml
       - /var/lib/hare/build-ees-ha-args.yaml

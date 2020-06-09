@@ -16,4 +16,4 @@ hare:
     args: null
 
 support_bundle:
-    - /opt/seagate/eos/hare/bin/hctl reportbug
+    - /opt/seagate/cortx/hare/bin/hctl reportbug

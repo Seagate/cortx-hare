@@ -128,7 +128,7 @@ clean-pcswrap:
 # Install --------------------------------------------- {{{1
 #
 
-PREFIX            := opt/seagate/eos/hare
+PREFIX            := opt/seagate/cortx/hare
 CFGEN_EXE          = $(DESTDIR)/$(PREFIX)/bin/cfgen
 CFGEN_SHARE        = $(DESTDIR)/$(PREFIX)/share/cfgen
 CONSUL_LIBEXEC     = $(DESTDIR)/$(PREFIX)/libexec/consul
@@ -138,7 +138,7 @@ HARE_LIBEXEC       = $(DESTDIR)/$(PREFIX)/libexec
 HA_CHECKS          = $(HARE_LIBEXEC)/ha-checks
 HAX_EXE            = $(DESTDIR)/$(PREFIX)/bin/hax
 HAX_EGG_LINK       = $(DESTDIR)/$(PREFIX)/lib/python3.$(PY3_VERSION_MINOR)/site-packages/hax.egg-link
-OCF_RESOURCES      = $(DESTDIR)/usr/lib/ocf/resource.d/eos
+OCF_RESOURCES      = $(DESTDIR)/usr/lib/ocf/resource.d/cortx
 PCSWRAP_EXE        = $(DESTDIR)/$(PREFIX)/bin/PCSWRAP
 PCSWRAP_EGG_LINK   = $(DESTDIR)/$(PREFIX)/lib/python3.$(PY3_VERSION_MINOR)/site-packages/pcswrap.egg-link
 SYSTEMD_CONFIG_DIR = $(DESTDIR)/usr/lib/systemd/system
@@ -178,9 +178,9 @@ install-dirs:
 		  $(HARE_LIBEXEC) \
 		  $(HA_CHECKS) \
 		  $(OCF_RESOURCES) \
-		  $(DESTDIR)/run/eos \
+		  $(DESTDIR)/run/cortx \
 		  $(DESTDIR)/var/log/hare \
-		  $(DESTDIR)/var/mero/hax; \
+		  $(DESTDIR)/var/motr/hax; \
 	 do \
 	     install --verbose --directory $$d; \
 	 done
@@ -353,7 +353,7 @@ uninstall:
 	          $(DESTDIR)/usr/bin/hctl \
 	          $(DESTDIR)/var/lib/hare \
 	          $(DESTDIR)/var/log/hare \
-	          $(DESTDIR)/var/mero/hax; \
+	          $(DESTDIR)/var/motr/hax; \
 	 do \
 	     if [[ -e $$d ]]; then \
 	         $(call _log,removing $$d); \
@@ -416,7 +416,7 @@ test-cfgen: $(PY_VENV_DIR)
 
 VERSION   := $(shell cat VERSION)
 GITREV     = git$(shell git rev-parse --short HEAD)
-DIST_FILE := eos-hare-$(VERSION).tar.gz
+DIST_FILE := cortx-hare-$(VERSION).tar.gz
 
 RPMBUILD_DIR    := $(HOME)/rpmbuild
 RPMBUILD_TOPDIR := $(abspath $(RPMBUILD_DIR))
@@ -427,9 +427,9 @@ RPMSPECS_DIR    := $(RPMBUILD_DIR)/SPECS
 dist:
 	@$(call _info,Generating dist archive)
 	@rm -f $(DIST_FILE)
-	@git archive -v --prefix=eos-hare/ HEAD -o $(DIST_FILE:.gz=)
+	@git archive -v --prefix=cortx-hare/ HEAD -o $(DIST_FILE:.gz=)
 	git submodule foreach --recursive \
-	     "git archive --prefix=eos-hare/\$$path/ --output=\$$sha1.tar HEAD \
+	     "git archive --prefix=cortx-hare/\$$path/ --output=\$$sha1.tar HEAD \
 	      && tar --concatenate --file=$$(pwd)/$(DIST_FILE:.gz=) \$$sha1.tar \
 	      && rm \$$sha1.tar"
 	@gzip $(DIST_FILE:.gz=)

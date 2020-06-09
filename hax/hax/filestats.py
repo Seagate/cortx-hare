@@ -27,8 +27,8 @@ class FsStatsUpdater(StoppableThread):
         try:
             ffi = halink._ffi
             logging.info('filesystem stats updater thread has started')
-            ffi.adopt_mero_thread()
-            self._ensure_mero_all_started()
+            ffi.adopt_motr_thread()
+            self._ensure_motr_all_started()
             halink.start_rconfc()
             logging.info('rconfc is initialized, FS stats can be polled now')
             while not self.stopped:
@@ -54,8 +54,8 @@ class FsStatsUpdater(StoppableThread):
         except Exception:
             logging.exception('Aborting due to an error')
         finally:
-            logging.debug('Releasing mero-related resources for this thread')
-            ffi.shun_mero_thread()
+            logging.debug('Releasing motr-related resources for this thread')
+            ffi.shun_motr_thread()
             logging.debug('filesystem stats updater thread exited')
 
     def _ioservices_running(self) -> List[bool]:
@@ -64,7 +64,7 @@ class FsStatsUpdater(StoppableThread):
         started = ['M0_CONF_HA_PROCESS_STARTED' == v[1] for v in statuses]
         return started
 
-    def _ensure_mero_all_started(self):
+    def _ensure_motr_all_started(self):
         while True:
             started = self._ioservices_running()
             if all(started):

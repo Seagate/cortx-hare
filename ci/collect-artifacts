@@ -19,7 +19,7 @@ for vm in $($M0VG status | awk '$2 == "running" {print $1}'); do
 
     say 'systemctl status'
     $M0VG run --vm $vm sudo systemctl --all --full --no-pager status \
-          {hare,m0,mero,s3}\\* >$outdir/systemctl-status.txt || true
+          {hare,m0,motr,s3}\\* >$outdir/systemctl-status.txt || true
 
     if [[ -e hare/ci/_$CI_JOB_NAME.errno ]]; then
         say 'Consul logs'

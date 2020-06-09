@@ -1,12 +1,12 @@
 [Unit]
 Description=HAX daemon for Hare
-Requires=hare-consul-agent.service mero-kernel.service
-After=hare-consul-agent.service mero-kernel.service
+Requires=hare-consul-agent.service motr-kernel.service
+After=hare-consul-agent.service motr-kernel.service
 
 [Service]
-# TODO: '/opt/seagate/eos/hare' prefix can be different, e.g. '/usr'
+# TODO: '/opt/seagate/cortx/hare' prefix can be different, e.g. '/usr'
 SyslogIdentifier=hare-hax
-Environment=PYTHONPATH=/opt/seagate/eos/hare/lib64/python3.6/site-packages:/opt/seagate/eos/hare/lib/python3.6/site-packages
-ExecStart=/bin/sh -c 'cd /var/mero/hax && exec /opt/seagate/eos/hare/bin/hax'
+Environment=PYTHONPATH=/opt/seagate/cortx/hare/lib64/python3.6/site-packages:/opt/seagate/cortx/hare/lib/python3.6/site-packages
+ExecStart=/bin/sh -c 'cd /var/motr/hax && exec /opt/seagate/cortx/hare/bin/hax'
 KillMode=process
 Restart=on-failure

@@ -31,14 +31,14 @@ resources=(
     s3auth
     ldap
     rabbitmq
-    mero-free-space-mon
+    motr-free-space-mon
     c{2,1}
-    mero-kernel
+    motr-kernel
     lnet
 )
 for r in ${resources[@]}; do
     pcs resource delete $r || true
 done
 
-while mountpoint /var/mero2 && ! umount /var/mero2; do sleep 1; done
-while mountpoint /var/mero1 && ! umount /var/mero1; do sleep 1; done
+while mountpoint /var/motr2 && ! umount /var/motr2; do sleep 1; done
+while mountpoint /var/motr1 && ! umount /var/motr1; do sleep 1; done

@@ -6,7 +6,7 @@ export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
 PROG=${0##*/}
 DEFAULT_TIMEOUT=5
 
-export PATH="/opt/seagate/eos/hare/bin:$PATH"
+export PATH="/opt/seagate/cortx/hare/bin:$PATH"
 
 # XXX Extract this function into some library once it is copied 3 times.
 # See https://wiki.c2.com/?ThreeStrikesAndYouRefactor .

@@ -7,11 +7,11 @@ usage() {
     cat <<EOF
 Usage: $prog OPTION...
 
-Checks health of the specified service (hax or Mero).
+Checks health of the specified service (hax or Motr).
 
 Options:
   -x, --hax       Check hax service.
-  -f, --fid fid   Check Mero service of the specified fid.
+  -f, --fid fid   Check Motr service of the specified fid.
   -s, --svc svc   Check another service specified as svc.
   -h, --help      Show this help.
 EOF
@@ -58,8 +58,8 @@ declare -A status=(
 )
 
 if [[ $service =~ m0d ]]; then
-    pass=/tmp/mero-mkfs-pass-$fid
-    fail=/tmp/mero-mkfs-fail-$fid
+    pass=/tmp/motr-mkfs-pass-$fid
+    fail=/tmp/motr-mkfs-fail-$fid
 
     if [[ -f $pass ]]; then
         rm $pass

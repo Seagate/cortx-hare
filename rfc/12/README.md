@@ -49,8 +49,8 @@ this is functionality of entire data stack.
 
 | implementation | integration | check-id | what it checks | how it checks | action if the check fails | components involved |
 | -------------- | ----------- | -------- | -------------- | --------------| ------------------------- | ----------------------------------- |
-| [EOS-4870](https://jts.seagate.com/browse/EOS-4870) | [EOS-4882](https://jts.seagate.com/browse/EOS-4882) | data1 | data stack on a single server | S3 request to HAProxy  | failover to the server where the test passes | Mero, S3 server |
-| [EOS-4871](https://jts.seagate.com/browse/EOS-4871) | [EOS-4883](https://jts.seagate.com/browse/EOS-4883) | data2 | data stack on a both servers | S3 request to HAProxy  | run data1 on each server | Mero, S3 server |
+| [EOS-4870](https://jts.seagate.com/browse/EOS-4870) | [EOS-4882](https://jts.seagate.com/browse/EOS-4882) | data1 | data stack on a single server | S3 request to HAProxy  | failover to the server where the test passes | Motr, S3 server |
+| [EOS-4871](https://jts.seagate.com/browse/EOS-4871) | [EOS-4883](https://jts.seagate.com/browse/EOS-4883) | data2 | data stack on a both servers | S3 request to HAProxy  | run data1 on each server | Motr, S3 server |
 | [EOS-4872](https://jts.seagate.com/browse/EOS-4872) | [EOS-4884](https://jts.seagate.com/browse/EOS-4884) | mgmt | management stack on a single server | ? | failover to another server | CSM |
 | [EOS-4874](https://jts.seagate.com/browse/EOS-4874) | [EOS-4886](https://jts.seagate.com/browse/EOS-4886) | external-data | connection to the outside world over data network | ping default gw for data network | ? | - |
 | [EOS-4875](https://jts.seagate.com/browse/EOS-4875) | [EOS-4887](https://jts.seagate.com/browse/EOS-4887) | external-mgmt | connection to the outside world over management network | ping default gw for management network | failover to another server if this ins the server where CSM is running | - |

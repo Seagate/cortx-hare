@@ -43,7 +43,7 @@ def create_process_fid(key: int) -> Fid:
     return mk_fid(ObjT.PROCESS, key)
 
 
-# See enum m0_conf_ha_process_event in Mero source code.
+# See enum m0_conf_ha_process_event in Motr source code.
 ha_process_events = ('M0_CONF_HA_PROCESS_STARTING',
                      'M0_CONF_HA_PROCESS_STARTED',
                      'M0_CONF_HA_PROCESS_STOPPING',
@@ -205,7 +205,7 @@ class ConsulUtil:
 
     def get_m0d_statuses(self) -> List[Tuple[ServiceData, str]]:
         """
-        Return the list of all Mero service statuses according to Consul
+        Return the list of all Motr service statuses according to Consul
         watchers. The following services are considered: ios, confd.
         """
         def get_status(srv: ServiceData) -> str:
@@ -242,7 +242,7 @@ class ConsulUtil:
         fidk = str(process_fid.key)
 
         # This is the RegExp to match the keys in Consul KV that describe
-        # the Mero services that are enclosed into the Mero process that has
+        # the Motr services that are enclosed into the Motr process that has
         # the given fidk.
         #
         # Note: we assume that fidk uniquely identifies the given process

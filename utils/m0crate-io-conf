@@ -3,7 +3,7 @@ set -eu -o pipefail
 # set -x
 export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
 
-PATH=$PATH:/opt/seagate/eos/hare/bin
+PATH=$PATH:/opt/seagate/cortx/hare/bin
 
 ## Return profile fid.
 ##
@@ -35,7 +35,7 @@ clovis_clients() {
 }
 
 ## Parameterized version of `clovis/m0crate/tests/test1_io.yaml` from
-## Mero sources.
+## Motr sources.
 m0crate_io_conf() {
     local local_ep=$1
     local hax_ep=$2

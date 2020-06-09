@@ -44,7 +44,7 @@ ci_init_m0vg() (
         # Get `m0vg` script.
         #
         # Notes:
-        # 1. We download the latest Mero, disregarding `MERO_COMMIT_REF`.
+        # 1. We download the latest Motr, disregarding `MERO_COMMIT_REF`.
         # 2. We use no `--recursive`, because we don't need submodules.
         git clone --depth 1 http://gitlab.mero.colo.seagate.com/mero/mero.git \
             ${M0VG%%/*}
@@ -82,7 +82,7 @@ ci_success() {
 XXX_with_s3server() {
     if [[ -n ${MERO_COMMIT_REF:-} ]]; then
         cat >&2 <<'EOF'
-*WARNING* CI cannot test s3server with custom Mero.
+*WARNING* CI cannot test s3server with custom Motr.
 See http://gitlab.mero.colo.seagate.com/mero/hare/issues/216
 EOF
         return 1

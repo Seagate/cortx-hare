@@ -48,11 +48,11 @@ def get_hax_version():
         return read('../VERSION')
 
 
-def get_mero_dir():
+def get_motr_dir():
     try:
-        # Mero devel rpm takes precedence over M0_SRC_DIR
-        if pkgconfig.exists('mero'):
-            return pkgconfig.variables('mero')['includedir']
+        # Motr devel rpm takes precedence over M0_SRC_DIR
+        if pkgconfig.exists('motr'):
+            return pkgconfig.variables('motr')['includedir']
     except EnvironmentError:
         # fall back to M0_SRC_DIR handling if `pkg-config` is not available in
         # the system
@@ -64,32 +64,32 @@ def get_mero_dir():
     return P.normpath(P.dirname(P.abspath(__file__)) + '/../../mero')
 
 
-def get_mero_libs_dir():
+def get_motr_libs_dir():
     try:
-        # Mero devel rpm takes precedence over M0_SRC_DIR
-        if pkgconfig.exists('mero'):
-            return pkgconfig.variables('mero')['libdir']
+        # Motr devel rpm takes precedence over M0_SRC_DIR
+        if pkgconfig.exists('motr'):
+            return pkgconfig.variables('motr')['libdir']
     except EnvironmentError:
         # fall back to M0_SRC_DIR handling if `pkg-config` is not available in
         # the system
         pass
 
-    libs_dir = get_mero_dir() + '/mero/.libs'
-    libmero = libs_dir + '/libmero.so'
-    assert P.isfile(libmero), f'{libmero}: No such file'
+    libs_dir = get_motr_dir() + '/mero/.libs'
+    libmotr = libs_dir + '/libmotr.so'
+    assert P.isfile(libmotr), f'{libmotr}: No such file'
     return libs_dir
 
 
 def get_galois_include_dir():
-    mero_dir = get_mero_dir()
-    return f'{mero_dir}/extra-libs/galois/include/'
+    motr_dir = get_motr_dir()
+    return f'{motr_dir}/extra-libs/galois/include/'
 
 
-def get_mero_cflags():
+def get_motr_cflags():
     try:
-        # Mero devel rpm takes precedence over M0_SRC_DIR
-        if pkgconfig.exists('mero'):
-            return pkgconfig.cflags('mero').split()
+        # Motr devel rpm takes precedence over M0_SRC_DIR
+        if pkgconfig.exists('motr'):
+            return pkgconfig.cflags('motr').split()
     except EnvironmentError:
         # fall back to M0_SRC_DIR handling if `pkg-config` is not available in
         # the system
@@ -113,12 +113,12 @@ setup(
         Extension(
             name='libhax',
             sources=['hax/hax.c'],
-            include_dirs=[get_mero_dir(),
+            include_dirs=[get_motr_dir(),
                           get_galois_include_dir()],
             define_macros=[('M0_INTERNAL', ''), ('M0_EXTERN', 'extern')],
-            library_dirs=[get_mero_libs_dir()],
-            runtime_library_dirs=[get_mero_libs_dir()],
-            libraries=['mero'],
-            extra_compile_args=[x for x in get_mero_cflags() + ['-fPIC']])
+            library_dirs=[get_motr_libs_dir()],
+            runtime_library_dirs=[get_motr_libs_dir()],
+            libraries=['motr'],
+            extra_compile_args=[x for x in get_motr_cflags() + ['-fPIC']])
     ],
 )
