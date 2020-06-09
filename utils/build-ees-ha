@@ -246,7 +246,7 @@ bootstrap() {
     done
 
     run_on_both 'sudo rm -f /etc/sysconfig/m0d-*'
-
+    run_on_both 'sudo systemctl reset-failed hare\* m0d\*'
     hctl bootstrap --conf-dir $hare_dir
     hctl shutdown
 
@@ -417,6 +417,17 @@ mero_kernel_rsc_add() {
     sudo pcs -f $cib_file resource create mero-kernel systemd:mero-kernel clone
     sudo pcs -f $cib_file constraint order lnet-c1 then mero-kernel-clone
     sudo pcs -f $cib_file constraint order lnet-c2 then mero-kernel-clone
+
+    # Make sure mero-kernel is always stopped before lnet-c1/2
+    # is started. Otherwise, some transition abort in between may
+    # prevent mero-kernel restart. This is a workaround suggested
+    # at https://bugs.clusterlabs.org/show_bug.cgi?id=5428#c5.
+    sudo pcs -f $cib_file constraint order stop mero-kernel-clone then \
+                                           start lnet-c1 \
+                                           kind=Optional symmetrical=false
+    sudo pcs -f $cib_file constraint order stop mero-kernel-clone then \
+                                           start lnet-c2 \
+                                           kind=Optional symmetrical=false
 }
 
 hax_systemd_prepare() {
