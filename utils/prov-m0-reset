@@ -116,13 +116,17 @@ echo 'Disabling Consul resources...'
 sudo pcs resource disable consul-c1
 sudo pcs resource disable consul-c2
 
-# Wait until consul, hax and m0d are stopped.
-echo 'Waiting for Consul, hax and m0d services to stop on both the nodes...'
-while [[ `pgrep consul` ]] || [[ `pgrep hax` ]] || [[ `pgrep m0d` ]] ||
-      [[ `ssh $rnode 'pgrep consul'` ]] || [[ `ssh $rnode 'pgrep hax'` ]] ||
-      [[ `ssh $rnode 'pgrep m0d'` ]]; do
+echo 'Waiting for Consul agents, hax and m0d services to stop on both the nodes...'
+while [[ `pgrep -a consul | grep 'consul agent'` ]] || [[ `pgrep hax` ]] ||
+      [[ `pgrep m0d` ]] ||
+      [[ `ssh $rnode 'pgrep -a consul | grep "consul agent"'` ]] ||
+      [[ `ssh $rnode 'pgrep hax'` ]] || [[ `ssh $rnode 'pgrep m0d'` ]]; do
     sleep 5
 done
+
+# Killing any remaining consul watcher processes.
+sudo pkill consul || true
+ssh $rnode 'sudo pkill consul' || true
 
 ip a | grep -qF $ip1 ||
   die "IP address $ip1 doesn't appear to be configured at $lnode"
@@ -136,7 +140,7 @@ sudo lctl list_nids | grep -qF $ip1 ||
 ssh $rnode "sudo lctl list_nids | grep -qF $ip2" ||
   die "LNet endpoint $ip2 doesn't appear to be configured at $rnode"
 
-echo "Conforming if /var/mero on both the nodes is unmounted..."
+echo 'Conforming if /var/mero on both the nodes is unmounted...'
 while mountpoint /var/mero && ! umount /var/mero; do sleep 1; done
 while ssh $rnode 'mountpoint /var/mero && ! umount /var/mero'; do sleep 1; done
 
@@ -144,11 +148,15 @@ echo "Formatting volumes $lvolume and $rvolume ..."
 mkfs.ext4 $lvolume
 mkfs.ext4 $rvolume
 
-echo "Mounting /var/mero on both the nodes..."
+echo 'Mounting /var/mero on both the nodes...'
 mkdir -p /var/mero &&
   ! mountpoint -q /var/mero && sudo mount $lvolume /var/mero
 ssh $rnode "mkdir -p /var/mero &&
   ! mountpoint -q /var/mero && sudo mount $rvolume /var/mero"
+
+echo 'Resetting failed systemd units on both the nodes...'
+sudo systemctl reset-failed hare\* m0d\*
+ssh $rnode 'sudo systemctl reset-failed hare\* m0d\*'
 
 echo 'Running hctl bootstrap..'
 hctl bootstrap --mkfs -c /var/lib/hare
@@ -176,16 +184,19 @@ sudo pcs resource enable consul-c2
 # Reset failcount once after reset
 sudo pcs resource cleanup
 
-echo 'Wait until Consul, hax and m0d services start on both the nodes...'
+echo 'Waiting for Consul agents, hax and m0ds to start on both the nodes...'
 while true; do
-    if [[ `pgrep consul` && `pgrep hax` && `pgrep m0d` &&
-          `ssh $rnode 'pgrep consul'` && `ssh $rnode 'pgrep hax'` &&
-          `ssh $rnode 'pgrep m0d'` ]]; then
+    if [[ `pgrep -a consul | grep 'consul agent'` &&
+          `pgrep hax` && `pgrep m0d` &&
+          `ssh $rnode 'pgrep -a consul | grep "consul agent"'` &&
+          `ssh $rnode 'pgrep hax'` && `ssh $rnode 'pgrep m0d'` ]]; then
             break
     fi
     sleep 5
 done
 
-echo 'Import /var/lib/hare/consul-conf-exported.json...'
-/opt/seagate/eos/hare/bin/consul kv import \
-    @/var/lib/hare/consul-conf-exported.json
+echo 'Importing /var/lib/hare/consul-conf-exported.json...'
+for i in {1..10}; do
+    /opt/seagate/eos/hare/bin/consul kv import \
+        @/var/lib/hare/consul-conf-exported.json && break || sleep 5
+done
