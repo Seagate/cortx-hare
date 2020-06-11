@@ -59,10 +59,10 @@ hare_exec=/opt/seagate/eos/hare/libexec
 consul_bin=/opt/seagate/eos/hare/bin
 
 reset_all() {
-	$hare_exec/prov-ha-reset
-        $hare_exec/prov-ha-sspl-reset
-        $hare_exec/prov-ha-csm-reset
 	$hare_exec/prov-ha-uds-reset
+        $hare_exec/prov-ha-csm-reset
+        $hare_exec/prov-ha-sspl-reset
+	$hare_exec/prov-ha-reset
 }
 
 cib_init() {
