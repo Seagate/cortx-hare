@@ -59,37 +59,22 @@ hare_exec=/opt/seagate/eos/hare/libexec
 consul_bin=/opt/seagate/eos/hare/bin
 
 reset_all() {
-	$hare_exec/prov-ha-uds-reset
-        $hare_exec/prov-ha-csm-reset
-        $hare_exec/prov-ha-sspl-reset
-	$hare_exec/prov-ha-reset
+    $hare_exec/prov-ha-uds-reset
+    $hare_exec/prov-ha-csm-reset
+    $hare_exec/prov-ha-sspl-reset
+    $hare_exec/prov-ha-reset
 }
 
-cib_init() {
-   sudo pcs cluster cib $cib_file
-}
-
-cib_commit() {
-    sudo pcs cluster cib-push $cib_file --config
-}
-
-echo 'Exporting Consul kv...'
+echo 'Exporting Consul KV...'
 $consul_bin/consul kv export > $hare_dir/consul-conf-exported.json
 
-# reset resources
 reset_all
-
-# Initialize CIB
-cib_init
+sudo pcs cluster cib $cib_file
 
 echo 'Updating ha resources for IO path, SSPL, CSM and UDS...'
-# Update various HA components.
-$hare_exec/build-ees-ha $cdf $ioargsfile --cib-file $cib_file \
-    --update
-$hare_exec/build-ees-ha-csm $csmargsfile --cib-file $cib_file \
-    --update
-$hare_exec/build-ees-ha-sspl $ioargsfile --cib-file $cib_file \
-    --update
+$hare_exec/build-ees-ha $cdf $ioargsfile --cib-file $cib_file --update
+$hare_exec/build-ees-ha-csm $csmargsfile --cib-file $cib_file --update
+$hare_exec/build-ees-ha-sspl $ioargsfile --cib-file $cib_file --update
 $hare_exec/build-ees-ha-uds --cib-file $cib_file --update
 
 #XXX Presently replacing the cib xml file does not work if in new versions
@@ -97,8 +82,8 @@ $hare_exec/build-ees-ha-uds --cib-file $cib_file --update
 # Revisit this to avoid deleting of resources from pacemaker.
 #cibadmin --replace --xml-file $cib_file
 echo 'Updating Pacemaker CIB...'
-cib_commit
+sudo pcs cluster cib-push $cib_file --config
 sudo pcs resource cleanup
 
-echo 'Importing Consul kv...'
+echo 'Importing Consul KV...'
 $consul_bin/consul kv import @$hare_dir/consul-conf-exported.json
