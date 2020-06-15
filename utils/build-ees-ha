@@ -641,11 +641,11 @@ s3_systemd_update() {
 
 s3back_rsc_add() {
     echo 'Adding s3background services...'
-    sudo pcs -f $cib_file resource create s3backcons-c1 systemd:s3backgroundconsumer
-    sudo pcs -f $cib_file resource create s3backcons-c2 systemd:s3backgroundconsumer
-    sudo pcs -f $cib_file constraint location s3backcons-c1 prefers $lnode=INFINITY
+    sudo pcs -f $cib_file resource create s3backcons-c1 \
+                          systemd:s3backgroundconsumer meta failure-timeout=300s
+    sudo pcs -f $cib_file resource create s3backcons-c2 \
+                          systemd:s3backgroundconsumer meta failure-timeout=300s
     sudo pcs -f $cib_file constraint location s3backcons-c1 avoids $rnode=INFINITY
-    sudo pcs -f $cib_file constraint location s3backcons-c2 prefers $rnode=INFINITY
     sudo pcs -f $cib_file constraint location s3backcons-c2 avoids $lnode=INFINITY
     sudo pcs -f $cib_file constraint order rabbitmq-clone then s3backcons-c1
     sudo pcs -f $cib_file constraint order rabbitmq-clone then s3backcons-c2
