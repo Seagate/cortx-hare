@@ -5,6 +5,8 @@ set -x
 
 . ci/functions.sh  # _time, ci_init_m0vg, ci_success
 
+echo 'XXX Hello from Jenkins!'; exit 99
+
 cd $WORKSPACE_DIR
 
 ci_init_m0vg
