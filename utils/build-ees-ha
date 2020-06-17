@@ -619,19 +619,13 @@ s3_systemd_update() {
 # Add and update node attribute for s3backgroundconsumer resource on both the
 # nodes. This will be used to define constraints for the resources depending
 # on s3backgroundconsumer resource on a node.
-    sudo sed \
-     -e '/ExecStart=/aExecStartPost=/usr/sbin/attrd_updater -U 1 -n s3backcons-running' \
-     -e '/ExecStop=/aExecStopPost=/usr/sbin/attrd_updater -U 0 -n s3backcons-running' \
-     -i /usr/lib/systemd/system/s3backgroundconsumer.service
-    sudo systemctl daemon-reload
-
     cmd="
     sudo sed
      -e '/ExecStart=/aExecStartPost=/usr/sbin/attrd_updater -U 1 -n s3backcons-running' \
      -e '/ExecStop=/aExecStopPost=/usr/sbin/attrd_updater -U 0 -n s3backcons-running' \
      -i /usr/lib/systemd/system/s3backgroundconsumer.service &&
     sudo systemctl daemon-reload"
-    ssh $rnode $cmd
+    run_on_both $cmd
     cmd='
     sudo sed "s/TimeoutStopSec=.*/TimeoutStopSec=7sec/"
              -i /usr/lib/systemd/system/s3server@.service &&
