@@ -69,6 +69,223 @@ configured to run confd).
 Use `cfgen/examples/ees-cluster.yaml`, which describes a dual-node cluster,
 as an example.
 
+## 3 Node setup
+
+0. Create three nodes fron service catalogs (RHEL 7.7 EXT4 (4x50GB Disks) on https://ssc-cloud.colo.seagate.com/
+
+1. Add S3 server dependancies repo   (On all nodes)
+
+   ```sh
+   sudo yum-config-manager --add-repo=http://ci-storage.mero.colo.seagate.com/releases/eos/s3server_uploads
+   ```
+
+2. Add repo for luster               (On all nodes)
+
+   ```sh
+   sudo yum-config-manager --add-repo=http://ci-storage.mero.colo.seagate.com/releases/eos/lustre/custom/tcp
+   ```
+
+3. Add repor for CORTEX              (On all nodes)
+
+   ```sh
+   sudo yum-config-manager --add-repo=http://ci-storage.mero.colo.seagate.com/releases/eos/integration/centos-7.7.1908/last_successful
+   ```
+
+4. Add repo for pacemaker (It will be removed after pacemaker related things moved to cortex-ha)       (On all nodes)
+   - add /etc/yum.repos.d/base.repo with following contents
+
+ ```
+[base]
+gpgcheck=0
+enabled=1
+baseurl=http://ssc-satellite1.colo.seagate.com/pulp/repos/EOS/Library/custom/CentOS-7/CentOS-7-OS/
+name=base
+```
+
+5. Install MOTR, S3 Server, Hare      (On all nodes)
+
+   ```sh
+   yum install -y --nogpgcheck eos-core eos-core-devel eos-s3server eos-hare
+   ```
+
+6. Set hostname as node-name          (On all nodes)
+
+   ```sh
+   hostname > /var/lib/hare/node-name
+   ```
+
+7. Create virtual devices             (On all nodes)
+
+   ```sh
+   m0setup
+   ```
+
+8. Configure Lnet                     (On all nodes)
+   - edit /etc/modprobe.d/lnet.conf file with netowork interface used by MOTR endpoints'
+
+   ```
+   options lnet networks=tcp(eth0) config_on_load=1
+   ```
+   - Check lnet nids
+ 
+   ```sh
+   systemctl start lnet
+   lctl list_nids #check nids
+   ```
+
+9. Add key to nodes   (On node-1)
+   ```sh
+   ssh-keygen
+   ssh-copy-id  <node-2>
+   ssh-copy-id  <node-2>
+   ```
+
+10. Edit cluster defination with layout 2 + 1   (On 1st node)
+   Add $HOME/threenodes.yaml
+   ```
+nodes:
+  - hostname: node-1  (hostname)
+    data_iface: eth0
+    m0_servers:
+      - runs_confd: true
+        io_disks: []
+      - io_disks:
+          - /dev/loop1
+          - /dev/loop2
+          - /dev/loop3
+          - /dev/loop4
+    m0_clients:
+        s3: 1
+        other: 2
+  - hostname: node-2  (hostname)
+    data_iface: eth0
+    m0_servers:
+      - runs_confd: true
+        io_disks: []
+      - io_disks:
+          - /dev/loop1
+          - /dev/loop2
+          - /dev/loop3
+          - /dev/loop4
+    m0_clients:
+        s3: 1
+        other: 2
+  - hostname: node-2  (hostname)
+    data_iface: eth0
+    m0_servers:
+      - runs_confd: true
+        io_disks: []
+      - io_disks:
+          - /dev/loop1
+          - /dev/loop2
+          - /dev/loop3
+          - /dev/loop4
+    m0_clients:
+        s3: 1
+        other: 2
+pools:
+  - name: the pool
+    disks: all
+    data_units: 2
+    parity_units: 1
+    # allowed_failures: { site: 0, rack: 0, encl: 0, ctrl: 0, disk: 0 }
+```
+11. Bootstrap cluster
+
+   ```sh
+   hctl bootstrap --mkfs $HOME/threenodes.yaml
+   ```
+```
+[root@ssc-vm-0442 520422]# hctl bootstrap --mkfs threenode.yaml
+2020-06-12 07:19:30: Generating cluster configuration... OK
+2020-06-12 07:19:33: Starting Consul server agent on this node.............. OK
+2020-06-12 07:19:44: Importing configuration into the KV store... OK
+2020-06-12 07:19:45: Starting Consul agents on other cluster nodes.... OK
+2020-06-12 07:19:46: Updating Consul agents configs from the KV store... OK
+2020-06-12 07:19:47: Installing Mero configuration files... OK
+2020-06-12 07:19:48: Waiting for the RC Leader to get elected... OK
+2020-06-12 07:19:48: Starting Mero (phase1, mkfs)... OK
+2020-06-12 07:19:53: Starting Mero (phase1, m0d)... OK
+2020-06-12 07:19:56: Starting Mero (phase2, mkfs)... OK
+2020-06-12 07:20:01: Starting Mero (phase2, m0d)... OK
+2020-06-12 07:20:04: Starting S3 servers (phase3)... OK
+2020-06-12 07:20:06: Checking health of services... OK
+[root@ssc-vm-0442 520422]# hctl status
+Profile: 0x7000000000000001:0x7b
+Data pools:
+    0x6f00000000000001:0x7c
+Services:
+    ssc-vm-0444.colo.seagate.com  (RC)
+    [started]  hax        0x7200000000000001:0x56  10.230.245.167@tcp:12345:1:1
+    [started]  confd      0x7200000000000001:0x59  10.230.245.167@tcp:12345:2:1
+    [started]  ioservice  0x7200000000000001:0x5c  10.230.245.167@tcp:12345:2:2
+    [started]  s3server   0x7200000000000001:0x6c  10.230.245.167@tcp:12345:3:1
+    [started]  s3server   0x7200000000000001:0x6f  10.230.245.167@tcp:12345:3:2
+    [started]  s3server   0x7200000000000001:0x72  10.230.245.167@tcp:12345:3:3
+    [unknown]  m0_client  0x7200000000000001:0x75  10.230.245.167@tcp:12345:4:1
+    [unknown]  m0_client  0x7200000000000001:0x78  10.230.245.167@tcp:12345:4:2
+    ssc-vm-0442.colo.seagate.com
+    [started]  hax        0x7200000000000001:0x6   10.230.250.241@tcp:12345:1:1
+    [started]  confd      0x7200000000000001:0x9   10.230.250.241@tcp:12345:2:1
+    [started]  ioservice  0x7200000000000001:0xc   10.230.250.241@tcp:12345:2:2
+    [started]  s3server   0x7200000000000001:0x1c  10.230.250.241@tcp:12345:3:1
+    [started]  s3server   0x7200000000000001:0x1f  10.230.250.241@tcp:12345:3:2
+    [started]  s3server   0x7200000000000001:0x22  10.230.250.241@tcp:12345:3:3
+    [unknown]  m0_client  0x7200000000000001:0x25  10.230.250.241@tcp:12345:4:1
+    [unknown]  m0_client  0x7200000000000001:0x28  10.230.250.241@tcp:12345:4:2
+    ssc-vm-0443.colo.seagate.com
+    [started]  hax        0x7200000000000001:0x2e  10.230.250.160@tcp:12345:1:1
+    [started]  confd      0x7200000000000001:0x31  10.230.250.160@tcp:12345:2:1
+    [started]  ioservice  0x7200000000000001:0x34  10.230.250.160@tcp:12345:2:2
+    [started]  s3server   0x7200000000000001:0x44  10.230.250.160@tcp:12345:3:1
+    [started]  s3server   0x7200000000000001:0x47  10.230.250.160@tcp:12345:3:2
+    [started]  s3server   0x7200000000000001:0x4a  10.230.250.160@tcp:12345:3:3
+    [unknown]  m0_client  0x7200000000000001:0x4d  10.230.250.160@tcp:12345:4:1
+    [unknown]  m0_client  0x7200000000000001:0x50  10.230.250.160@tcp:12345:4:2
+[root@ssc-vm-0442 520422]#
+```
+
+12. S3 IO - S3 auth server not provisioned yet  (On node-1)
+```sh
+   hctl shutdown
+   /opt/seagate/eos/hare/libexec/s3auth-disable
+   hctl bootstrap --mkfs $HOME/threenodes.yaml
+   ```
+
+
+12. Do S3 IO (on client node)
+
+   - Edit /etc/hosts to point s3.seagate.com to node-1   (No Cluster IP on mannual setup)
+
+```
+127.0.0.1   localhost localhost.localdomain localhost4 localhost4.localdomain4
+::1         localhost localhost.localdomain localhost6 localhost6.localdomain6
+
+10.230.250.241 s3.seagate.com iam.seagate.com
+```
+   - Test S3 IO
+   ```sh
+   s3cmd mb s3://testbkt
+   s3cmd put /root/lustre-2.12.3-1.src.rpm  s3://testbkt/lustre-2.12.3-1.src.rpm
+   s3cmd get s3://testbkt/lustre-2.12.3-1.src.rpm /tmp/lustre-2.12.3-1.src.rpm
+   diff /root/lustre-2.12.3-1.src.rpm /tmp/lustre-2.12.3-1.src.rpm
+   ```
+   ```
+[root@ssc-vm-0023 520422]# s3cmd mb s3://testbkt
+Bucket 's3://testbkt/' created
+[root@ssc-vm-0023 520422]# s3cmd ls
+2020-06-17 10:24  s3://testbkt
+[root@ssc-vm-0023 520422]#
+[root@ssc-vm-0023 520422]# s3cmd put /root/lustre-2.12.3-1.src.rpm  s3://testbkt/lustre-2.12.3-1.src.rpm
+upload: '/root/lustre-2.12.3-1.src.rpm' -> 's3://testbkt/lustre-2.12.3-1.src.rpm'  [1 of 1]
+ 14848544 of 14848544   100% in    0s    48.45 MB/s  done
+[root@ssc-vm-0023 520422]# s3cmd get s3://testbkt/lustre-2.12.3-1.src.rpm /tmp/lustre-2.12.3-1.src.rpm
+download: 's3://testbkt/lustre-2.12.3-1.src.rpm' -> '/tmp/lustre-2.12.3-1.src.rpm'  [1 of 1]
+ 14848544 of 14848544   100% in    1s    13.99 MB/s  done
+[root@ssc-vm-0023 520422]# diff /root/lustre-2.12.3-1.src.rpm /tmp/lustre-2.12.3-1.src.rpm
+[root@ssc-vm-0023 520422]#
+```
+
 ## Test I/O
 
 ```sh
