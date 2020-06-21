@@ -31,8 +31,6 @@ BuildRequires: python36-setuptools
 Requires: facter
 Requires: jq
 Requires: cortx-motr = %{h_motr_version}
-Requires: pacemaker
-Requires: pcs
 Requires: python36
 
 Conflicts: halon
