@@ -162,7 +162,6 @@ class ClientTest(unittest.TestCase):
             side_effect=[[
                 Node(name='test',
                      online=True,
-                     shutdown=False,
                      standby=False,
                      unclean=False,
                      resources_running=2)
@@ -170,7 +169,6 @@ class ClientTest(unittest.TestCase):
                          [
                              Node(name='test',
                                   online=True,
-                                  shutdown=False,
                                   standby=False,
                                   unclean=False,
                                   resources_running=2)
@@ -178,7 +176,6 @@ class ClientTest(unittest.TestCase):
                          [
                              Node(name='test',
                                   online=True,
-                                  shutdown=False,
                                   standby=False,
                                   unclean=False,
                                   resources_running=0)
@@ -205,7 +202,6 @@ class ClientTest(unittest.TestCase):
         connector.get_nodes = MagicMock(return_value=[
             Node(name='test',
                  online=True,
-                 shutdown=False,
                  standby=False,
                  unclean=False,
                  resources_running=2)

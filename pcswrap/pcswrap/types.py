@@ -3,9 +3,8 @@ from typing import List, NamedTuple, Optional
 
 Credentials = NamedTuple('Credentials', [('username', str), ('password', str)])
 
-Node = NamedTuple('Node', [('name', str), ('online', bool), ('shutdown', bool),
-                           ('standby', bool), ('unclean', bool),
-                           ('resources_running', int)])
+Node = NamedTuple('Node', [('name', str), ('online', bool), ('standby', bool),
+                           ('unclean', bool), ('resources_running', int)])
 
 Resource = NamedTuple('Resource', [('id', str), ('resource_agent', str),
                                    ('role', str), ('target_role', str),

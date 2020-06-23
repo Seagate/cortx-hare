@@ -127,7 +127,6 @@ class CliConnector(PcsConnector):
         def to_node(tag) -> Node:
             return Node(name=tag.attrib['name'],
                         online=b(tag.attrib['online']),
-                        shutdown=b(tag.attrib['shutdown']),
                         unclean=b(tag.attrib['unclean']),
                         standby=b(tag.attrib['standby']),
                         resources_running=int(tag.attrib['resources_running']))
