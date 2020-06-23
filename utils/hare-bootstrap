@@ -219,7 +219,9 @@ EOF
         if is_localhost $node; then
             echo $node > $conf_dir/node-name
         else
-            ssh $node "echo $node > $conf_dir/node-name"
+            # Redirect stdin to /dev/null (`-n`) to prevent
+            # accidental stealing of `get_all_nodes` output.
+	    ssh -n $node "echo $node > $conf_dir/node-name"
         fi
     done < <(get_all_nodes)
 
