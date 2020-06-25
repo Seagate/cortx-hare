@@ -307,14 +307,6 @@ has been elected.
   The timeout resets automatically (for demo purposes), so you will
   see it in the log file every other minute.
 
-## Roadmap
-
-1. EES release (due at the end of 2019) — Halon is replaced in Mero software stack with Consul & ‘hare’ scripts.  Failover is performed by [Pacemaker](https://clusterlabs.org/pacemaker/).
-
-2. EOS release — Consul takes over Pacemaker's responsibilities.
-
-See also [plan.org](./plan.org).
-
 ## Links
 
 - [Halon replacement: a simpler, better HA subsystem for EOS](https://docs.google.com/presentation/d/17Pn61WBbTHpeR4NxGtaDfmmHxgoLW9BnQHRW7WJO0gM/view) (slides)
