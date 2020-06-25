@@ -5,7 +5,7 @@ The scripts in this repository constitute a middleware layer between [Consul](ht
 - generate initial configuration of Mero cluster;
 - mediate communications between Mero services and Consul agents.
 
-## Prerequisites
+## 0. Prerequisites
 
 * Python &geq; 3.6 and the corresponding header files.
 
@@ -21,9 +21,8 @@ The scripts in this repository constitute a middleware layer between [Consul](ht
   $M0_SRC_DIR/scripts/m0 make
   sudo $M0_SRC_DIR/scripts/install-mero-service --link
   ```
-  <!-- XXX TODO: Hare should be able to work with Mero installed from rpm. -->
 
-## Single-node setup
+## 1. Single-node setup
 
 1. Build and install Hare:
    ```sh
@@ -59,7 +58,7 @@ The scripts in this repository constitute a middleware layer between [Consul](ht
    hctl bootstrap --mkfs cfgen/examples/singlenode.yaml
    ```
 
-## Test I/O
+## 2. Test I/O
 
 ```sh
 utils/m0crate-io-conf >/tmp/m0crate-io.yaml
@@ -67,162 +66,191 @@ dd if=/dev/urandom of=/tmp/128M bs=1M count=128
 sudo $M0_SRC_DIR/clovis/m0crate/m0crate -S /tmp/m0crate-io.yaml
 ```
 
-## 3-node VM setup
+## 3. 3-node VM setup
 
-0. Create three nodes from service catalogs (RHEL 7.7 EXT4 (4x50GB Disks) on https://ssc-cloud.colo.seagate.com .
+### 3.1. Create VMs
 
-1. Add yum repositories for Cortx and dependant software components on all nodes.
+* Login to [Red Hat CloudForms](https://ssc-cloud.colo.seagate.com)
+  using your Seagate GID and password.
 
-   ```sh
-   sudo yum-config-manager \
-   --add-repo=http://ci-storage.mero.colo.seagate.com/releases/eos/s3server_uploads \
-   --add-repo=http://ci-storage.mero.colo.seagate.com/releases/eos/lustre/custom/tcp \
-   --add-repo=http://ci-storage.mero.colo.seagate.com/releases/eos/integration/centos-7.7.1908/last_successful \
-   --add-repo=http://ssc-satellite1.colo.seagate.com/pulp/repos/EOS/Library/custom/CentOS-7/CentOS-7-OS
+* Open
+  [Service Catalogs](https://ssc-cloud.colo.seagate.com/catalog/explorer#/).
+
+* Order three "RHEL 7.7 EXT4 (4X50GB Disks)" virtual machines.
+  It will take some time <!-- XXX How long? --> for the order to be processed.
+
+* Find host names of your VMs at the bottom of
+  [Active Services](https://ssc-cloud.colo.seagate.com/service/explorer#/)
+  page.
+
+### 3.2. Install Cortx RPM packages
+
+  Run the following code snippet on each of the nodes (VMs):
+
+  <!-- XXX Is it OK to use "centos-7.7.1908" RPMs on a RHEL system? -->
+  ```bash
+  (set -eu
+
+  ci='ci-storage.mero.colo.seagate.com'
+  ssc='ssc-satellite1.colo.seagate.com'
+  repos=(
+      $ci/releases/eos/integration/centos-7.7.1908/last_successful
+      $ci/releases/eos/lustre/custom/tcp
+      $ci/releases/eos/s3server_uploads
+      $ssc/pulp/repos/EOS/Library/custom/CentOS-7/CentOS-7-OS
+  )
+
+  for repo in ${repos[@]}; do
+      repo_file="/etc/yum.repos.d/${repo//\//_}.repo"
+      if ! [[ -e $repo_file ]]; then
+          sudo yum-config-manager --add-repo="http://$repo"
+          sudo tee -a $repo_file <<< 'gpgcheck=0'
+      fi
+  done
+
+  sudo yum install -y eos-core eos-core-devel eos-s3server s3cmd eos-hare
+  )
+  ```
+
+### 3.3. Create loop devices
+
+Execute `m0setup` on all nodes.
+
+### 3.4. Configure LNet
+
+* Execute these commands on each node (assuming Motr uses `eth0`
+  network interface):
+  ```bash
+  sudo tee /etc/modprobe.d/lnet.conf <<< \
+      'options lnet networks=tcp(eth0) config_on_load=1'
+  sudo systemctl start lnet
+  ```
+
+* Check that LNet works:
+  ```sh
+  sudo lctl list_nids
+  ```
+  The output should not be empty.
+
+### 3.5. Prepare SSH keys
+
+Execute these commands on the primary node (node-1):
+```sh
+ssh-keygen
+ssh-copy-id <hostname of node-2>
+ssh-copy-id <hostname of node-3>
+```
+
+### 3.6. Prepare the CDF
+
+The code snippet below will create the cluster description file (CDF).
+You may want to update `OUT`, `NODES`, and `IFACE` values prior to
+running the code.  The value of `IFACE` should correspond to the value
+used in [step 3.4](#34-configure-lnet).
+
+```bash
+(set -eu
+
+# Path to the CDF.
+OUT=/tmp/trinodes.yaml
+
+# Host names of the VMs.
+NODES=(node-1 node-2 node-3)
+
+# Name of the network interface used for Motr I/O.
+IFACE=eth0
+
+node_desc() {
+    local name=$1 iface=$2
+    cat <<EOF
+  - hostname: $name
+    data_iface: $iface
+    m0_servers:
+      - runs_confd: true
+        io_disks: []
+      - io_disks:
+          - /dev/loop1
+          - /dev/loop2
+          - /dev/loop3
+          - /dev/loop4
+    m0_clients:
+        s3: 1
+        other: 2
+EOF
+}
+
+cat <<EOF >$OUT
+nodes:
+$(node_desc ${NODES[0]} $IFACE)
+$(node_desc ${NODES[1]} $IFACE)
+$(node_desc ${NODES[2]} $IFACE)
+pools:
+  - name: the pool
+    disks: all
+    data_units: 2
+    parity_units: 1
+EOF
+   )
    ```
 
-2. Install MOTR, S3 Server, Hare on all nodes.
+### 3.7. Disable S3 authentication
 
-   ```sh
-   yum install -y --nogpgcheck eos-core eos-core-devel eos-s3server eos-hare
-   ```
+```sh
+/opt/seagate/eos/hare/libexec/s3auth-disable
+```
 
-3. Create virtual devices on all nodes.
+### 3.8. Bootstrap the cluster
 
-   ```sh
-   m0setup
-   ```
+```sh
+hctl bootstrap --mkfs /tmp/trinodes.yaml
+hctl status
+```
 
-4. Configure Lnet on all nodes.
-   - edit /etc/modprobe.d/lnet.conf file with network interface used by MOTR endpoints.
+### 3.8. Configure S3 client
 
-   ```sh
-   echo "options lnet networks=tcp(eth0) config_on_load=1" > /etc/modprobe.d/lnet.conf
-   systemctl start lnet
-   lctl list_nids
-   ```
+* We deploy manually, so there is no Cluster IP.  The workaround:
+  ```sh
+  sudo tee -a /etc/hosts <<< '<IP address of node-1> s3.seagate.com'
+  ```
 
-5. Copy ssh keys to other nodes from node-1.
-   ```sh
-   ssh-keygen
-   ssh-copy-id  <hostname of node-2>
-   ssh-copy-id  <hostname of node-3>
-   ```
+* Configure S3 client: <!-- XXX Which file should this data be put in? -->
+  ```
+  Access Key: anything
+  Secret Key: anything
+  Default Region: US
+  S3 Endpoint: s3.seagate.com
+  DNS-style bucket+hostname:port template for accessing a bucket: %(bucket)s.s3.seagate.com
+  Encryption password:
+  Path to GPG program: /bin/gpg
+  Use HTTPS protocol: False
+  HTTP Proxy server name: <IP address of node-1>
+  HTTP Proxy server port: 28081
+  ```
+  `HTTP Proxy server name` field should be set to the IP address of
+  the primary node.
 
-6. Edit cluster defination file with layout 2 + 1 on node-1.
-   Add $HOME/threenodes.yaml
+  Now execute
+  ```sh
+  s3cmd --configure
+  ```
 
-   ```
-   nodes:
-     - hostname: <hostname of node-1>
-       data_iface: eth0
-       m0_servers:
-         - runs_confd: true
-           io_disks: []
-         - io_disks:
-             - /dev/loop1
-             - /dev/loop2
-             - /dev/loop3
-             - /dev/loop4
-       m0_clients:
-           s3: 1
-           other: 2
-     - hostname: <hostname of node-2>
-       data_iface: eth0
-       m0_servers:
-         - runs_confd: true
-           io_disks: []
-         - io_disks:
-             - /dev/loop1
-             - /dev/loop2
-             - /dev/loop3
-             - /dev/loop4
-       m0_clients:
-           s3: 1
-           other: 2
-     - hostname: <hostname of node-3>
-       data_iface: eth0
-       m0_servers:
-         - runs_confd: true
-           io_disks: []
-         - io_disks:
-             - /dev/loop1
-             - /dev/loop2
-             - /dev/loop3
-             - /dev/loop4
-       m0_clients:
-           s3: 1
-           other: 2
-   pools:
-     - name: the pool
-       disks: all
-       data_units: 2
-       parity_units: 1
-       # allowed_failures: { site: 0, rack: 0, encl: 0, ctrl: 0, disk: 0 }
-   ```
-   - Make sure value of `data_iface` is same as used for lnet @ step (4).
-7. Bootstrap the cluster.
+### 3.8. Test S3 I/O
 
-   ```sh
-   hctl bootstrap --mkfs $HOME/threenodes.yaml
-   hctl status
-   ```
+```sh
+(set -eu
 
-8. Disable S3 authentication on node-1 since S3 Auth server not provisioned
-   yet with manual setup.
-   ```sh
-   hctl shutdown
-   /opt/seagate/eos/hare/libexec/s3auth-disable
-   hctl bootstrap --mkfs $HOME/threenodes.yaml
-   ```
+fn=lustre-2.12.3-1.src.rpm
+s3cmd mb s3://testbkt
+s3cmd put /root/$fn s3://testbkt/$fn
+s3cmd get s3://testbkt/$fn /tmp/$fn
+cmp /root/$fn /tmp/$fn || echo '**ERROR** S3 I/O test failed' >&2
+)
+```
 
-9. Do S3 IO on client node.
+## 4. Multi-node setup
 
-   - Install S3 client node (can get one from ssc cloud).
-
-   ```sh
-   sudo yum-config-manager --add-repo=http://ci-storage.mero.colo.seagate.com/releases/eos/s3server_uploads
-   yum install -y --nogpgcheck s3cmd
-   ```
-
-   - Append /etc/hosts to point s3.seagate.com to node-1
-     (No Cluster IP on mannual setup).
-
-   ```sh
-   echo "<node-1 IP address> s3.seagate.com" > /etc/hosts
-   ```
-   - Configure S3 client, use following configuration values.
-
-     ```
-     Access Key: <any string>
-     Secret Key: <any string>
-     Default Region: US
-     S3 Endpoint: s3.seagate.com
-     DNS-style bucket+hostname:port template for accessing a bucket: %(bucket)s.s3.seagate.com
-     Encryption password:
-     Path to GPG program: /bin/gpg
-     Use HTTPS protocol: False
-     HTTP Proxy server name: <IP address of node-1>
-     HTTP Proxy server port: 28081
-     ```
-   - Make sure use IP address and port of S3 server instance on node-1 since
-     in manual setup no HA Proxy installed.
-
-   ```sh
-   s3cmd --configure
-   ```
-
-   - Test S3 IO.
-   ```sh
-   s3cmd mb s3://testbkt
-   s3cmd put /root/lustre-2.12.3-1.src.rpm  s3://testbkt/lustre-2.12.3-1.src.rpm
-   s3cmd get s3://testbkt/lustre-2.12.3-1.src.rpm /tmp/lustre-2.12.3-1.src.rpm
-   diff /root/lustre-2.12.3-1.src.rpm /tmp/lustre-2.12.3-1.src.rpm
-   ```
-
-## Multi-node setup
-
-For multi-node cluster the steps are similar to those of single-node.
+For multi-node cluster the steps are similar to
+[those of single-node](#1-single-node-setup).
 Steps 1–2 should be performed on each of the nodes.  The bootstrap
 command may be executed on any server node (i.e., on any of the nodes
 configured to run confd).
@@ -230,14 +258,14 @@ configured to run confd).
 Use `cfgen/examples/ees-cluster.yaml`, which describes a dual-node cluster,
 as an example.
 
-## Observe
+## 5. Observe
 
-### Consul web UI
+### 5.1. Consul web UI
 
 To view the [Consul UI](https://learn.hashicorp.com/consul/getting-started/ui#set-up-access-to-the-ui),
 open `http://<vm-ip-address>:8500/ui` URL in your browser.
 
-### The RC leader
+### 5.2. The RC leader
 
 ```
 $ consul kv get -detailed leader
@@ -253,7 +281,7 @@ Value            sage75
 ***Note:*** The presence of the `Session` line indicates that the leader
 has been elected.
 
-### Logs
+### 5.3. Logs
 
 * RC leader election log:
   ```sh
@@ -270,7 +298,7 @@ has been elected.
   journalctl --since <HH:MM> # bootstrap time
   ```
 
-## Miscellanea
+## 6. Miscellanea
 
 * Get an entrypoint:
 
@@ -307,7 +335,7 @@ has been elected.
   The timeout resets automatically (for demo purposes), so you will
   see it in the log file every other minute.
 
-## Links
+## 7. Links
 
 - [Halon replacement: a simpler, better HA subsystem for EOS](https://docs.google.com/presentation/d/17Pn61WBbTHpeR4NxGtaDfmmHxgoLW9BnQHRW7WJO0gM/view) (slides)
 - [Halon replacement: Consul, design highlights](https://docs.google.com/document/d/1cR-BbxtMjGuZPj8NOc95RyFjqmeFsYf4JJ5Hw_tL1zA/view)
