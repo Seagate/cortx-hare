@@ -14,7 +14,6 @@ processes.
 ## Summary
 
 * Raw
-  * [5/HAX](5/README.md) — HAlink eXchange
   * [7/FAIL](7/README.md) — Failure Handling
   * [10/GLOSS](10/README.md) — Hare User's Glossary
   * [11/HCTL](11/README.md) - Hare Controller CLI
@@ -22,8 +21,10 @@ processes.
   * [13/HALC](13/README.md) — EES HA, Loosely Coupled
   * [14/HW](14/README.md) — EES Hardware
 * Draft
-  * [3/CFGEN](3/README.md) — Configuration Generation
   * [4/KV](4/README.md) — Consul KV Schema
+  * [5/HAX](5/README.md) — HAlink eXchange
+* Stable
+  * [3/CFGEN](3/README.md) — Configuration Generation
   * [6/BOOT](6/README.md) — Mero Cluster Bootstrap
   * [8/STYLE](8/README.md) — Coding Style Guidelines
   * [9/PC3](9/README.md) — Pedantic Code Construction Contract
