@@ -14,7 +14,6 @@ processes.
 ## Summary
 
 * Raw
-  * [7/FAIL](7/README.md) — Failure Handling
   * [10/GLOSS](10/README.md) — Hare User's Glossary
   * [11/HCTL](11/README.md) - Hare Controller CLI
   * [12/CHECK](12/README.md) - EES HA Health Checks
