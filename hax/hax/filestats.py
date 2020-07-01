@@ -34,7 +34,6 @@ class FsStatsUpdater(StoppableThread):
             while not self.stopped:
                 started = self._ioservices_running()
                 if not all(started):
-                    self.stopped = True
                     continue
                 stats = halink.get_filesystem_stats()
                 logging.debug('FS stats are as follows: %s', stats)
