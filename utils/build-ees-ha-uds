@@ -6,20 +6,19 @@ export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
 PROG=${0##*/}
 
 usage() {
-cat <<EOF
+    cat <<EOF
 Usage: $PROG [OPTS]
 
 Configures UDS HA by adding resources to Pacemaker.
 
 Caveats:
 
-* The script expects that 'csm-web' resource is added to Pacemaker.
-Check with 'pcs status'.
+* The script expects that 'csm-agent' resource is added to Pacemaker.
+  Check with 'pcs status'.
 
 Optional parameters:
---cib-file            Pacemaker configuration file.
---update              Preserve Consul and Mero state, reconfigure Pacemaker only.
-
+  --cib-file            Pacemaker configuration file.
+  --update              Preserve Consul and Mero state, reconfigure Pacemaker only.
 EOF
 }
 
@@ -45,14 +44,17 @@ while true; do
 done
 
 precheck() {
-    # Abort (set -e) if `csm-web` resource does not exist.
-    sudo pcs resource show csm-web >/dev/null
+    # Abort (set -e) if `csm-agent` resource does not exist.
+    sudo pcs resource show csm-agent >/dev/null
 }
 
 uds_rsc_add() {
     echo 'Adding UDS resource and constraints...'
     sudo pcs -f $cib_file resource create uds systemd:uds op monitor interval=30s
-    sudo pcs -f $cib_file constraint colocation add uds with csm-web score=INFINITY
+    sudo pcs -f $cib_file constraint colocation add uds with csm-agent score=INFINITY
+
+    # According to EOS-9258, there is a bug which requires UDS to be started after csm_agent
+    sudo pcs -f $cib_file constraint order csm-agent then uds
 }
 
 cib_init() {
