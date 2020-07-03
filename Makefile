@@ -115,10 +115,8 @@ CONSUL_LIBEXEC     = $(DESTDIR)/$(PREFIX)/libexec/consul
 CONSUL_SHARE       = $(DESTDIR)/$(PREFIX)/share/consul
 HARE_CONF          = $(DESTDIR)/$(PREFIX)/conf
 HARE_LIBEXEC       = $(DESTDIR)/$(PREFIX)/libexec
-HA_CHECKS          = $(HARE_LIBEXEC)/ha-checks
 HAX_EXE            = $(DESTDIR)/$(PREFIX)/bin/hax
 HAX_EGG_LINK       = $(DESTDIR)/$(PREFIX)/lib/python3.$(PY3_VERSION_MINOR)/site-packages/hax.egg-link
-OCF_RESOURCES      = $(DESTDIR)/usr/lib/ocf/resource.d/cortx
 SYSTEMD_CONFIG_DIR = $(DESTDIR)/usr/lib/systemd/system
 
 # install {{{2
@@ -128,16 +126,6 @@ install: install-dirs install-cfgen install-hax install-systemd install-vendor
 	@for f in utils/*; do \
 	     $(call _log,copying $$f -> $(HARE_LIBEXEC)); \
 	     install $$f $(HARE_LIBEXEC); \
-	 done
-	@$(call _info,Installing OCF resource agents)
-	@for f in pacemaker/*; do \
-	     $(call _log,copying $$f -> $(OCF_RESOURCES)); \
-	     install $$f $(OCF_RESOURCES); \
-	 done
-	@$(call _info,Installing HA checks)
-	@for f in ha-checks/*; do \
-	     $(call _log,copying $$f -> $(HA_CHECKS)); \
-	     install $$f $(HA_CHECKS); \
 	 done
 	@$(call _info,Installing hare provisioning)
 	@for f in provisioning/*; do \
@@ -154,8 +142,6 @@ install: install-dirs install-cfgen install-hax install-systemd install-vendor
 install-dirs:
 	@for d in $(HARE_CONF) \
 		  $(HARE_LIBEXEC) \
-		  $(HA_CHECKS) \
-		  $(OCF_RESOURCES) \
 		  $(DESTDIR)/run/cortx \
 		  $(DESTDIR)/var/log/hare \
 		  $(DESTDIR)/var/motr/hax; \
@@ -227,16 +213,6 @@ devinstall: install-dirs devinstall-cfgen devinstall-hax devinstall-systemd devi
 	     $(call _log,linking $$f -> $(HARE_LIBEXEC)); \
 	     ln -sf $(TOP_SRC_DIR)$$f $(HARE_LIBEXEC); \
 	 done
-	@$(call _info,linking OCF resource agents)
-	@for f in pacemaker/*; do \
-	     $(call _log,linking $$f -> $(OCF_RESOURCES)); \
-	     ln -sf $(TOP_SRC_DIR)$$f $(OCF_RESOURCES); \
-	 done
-	@$(call _info,Linking HA checks)
-	@for f in ha-checks/*; do \
-	     $(call _log,copying $$f -> $(HA_CHECKS)); \
-	     ln -sf $(TOP_SRC_DIR)$$f $(HA_CHECKS); \
-	 done
 	@$(call _log,linking hctl -> $(DESTDIR)/$(PREFIX)/bin)
 	@ln -sf $(TOP_SRC_DIR)hctl $(DESTDIR)/$(PREFIX)/bin
 	@$(call _log,linking hctl -> $(DESTDIR)/usr/bin)
@@ -247,7 +223,6 @@ devinstall: install-dirs devinstall-cfgen devinstall-hax devinstall-systemd devi
 	@$(call _log,changing permission of $(DESTDIR)/var/lib/hare)
 	@chgrp hare $(DESTDIR)/var/lib/hare
 	@chmod --changes g+w $(DESTDIR)/var/lib/hare
-
 
 .PHONY: devinstall-cfgen
 devinstall-cfgen: CFGEN_INSTALL_CMD = ln -sf

@@ -59,7 +59,6 @@ rm -rf %{buildroot}
 %{_sharedstatedir}/hare/
 %{_localstatedir}/motr/hax/
 /opt/seagate/cortx/hare/*
-/usr/lib/ocf/resource.d/cortx/*
 
 %post
 systemctl daemon-reload
