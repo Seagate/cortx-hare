@@ -15,7 +15,6 @@ processes.
 
 * Raw
   * [10/GLOSS](10/README.md) — Hare User's Glossary
-  * [11/HCTL](11/README.md) - Hare Controller CLI
   * [12/CHECK](12/README.md) - EES HA Health Checks
   * [13/HALC](13/README.md) — EES HA, Loosely Coupled
   * [14/HW](14/README.md) — EES Hardware
@@ -27,3 +26,4 @@ processes.
   * [6/BOOT](6/README.md) — Motr Cluster Bootstrap
   * [8/STYLE](8/README.md) — Coding Style Guidelines
   * [9/PC3](9/README.md) — Pedantic Code Construction Contract
+  * [11/HCTL](11/README.md) - Hare Controller CLI

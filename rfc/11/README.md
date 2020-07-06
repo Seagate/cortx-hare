@@ -2,7 +2,7 @@
 domain: gitlab.mero.colo.seagate.com
 shortname: 11/HCTL
 name: Hare Controller CLI
-status: raw
+status: stable
 editor: Konstantin Nekrasov <konstantin.nekrasov@seagate.com>
 ---
 
