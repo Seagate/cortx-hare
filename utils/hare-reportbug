@@ -67,7 +67,7 @@ sudo systemctl --all --full --no-pager status {hare,m0,motr,s3}\* \
 extra_files=(
     /etc/sysconfig/motr
     /opt/seagate/cortx-prvsnr/pillar/components/cluster.sls
-    /opt/seagate/s3/conf/s3config.yaml
+    /opt/seagate/cortx/s3/conf/s3config.yaml
     $(if [[ -r /etc/corosync/corosync.conf ]]; then
           awk '$1 == "logfile:" { print $2 }' /etc/corosync/corosync.conf
       fi)

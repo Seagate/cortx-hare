@@ -15,4 +15,4 @@ sudo sed -E -i.orig \
      -e 's/\<(S3_LIBEVENT_POOL_INITIAL_SIZE):.*/\1: 209715200/' \
      -e 's/\<(S3_LIBEVENT_POOL_MAX_THRESHOLD):.*/\1: 524288000/' \
      -e 's/\<(S3_LIBEVENT_POOL_RESERVE_SIZE):.*/\1: 1048576/' \
-     /opt/seagate/s3/conf/s3config.yaml
+     /opt/seagate/cortx/s3/conf/s3config.yaml
