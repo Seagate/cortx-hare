@@ -1,0 +1,52 @@
+nodes:
+  - hostname: ssu1
+    data_iface: eth1
+    m0_servers:
+      - runs_confd: true
+        io_disks: []
+      - io_disks:
+          - /dev/vdb
+          - /dev/vdc
+          - /dev/vdd
+          - /dev/vde
+          - /dev/vdf
+          - /dev/vdg
+    m0_clients:
+        s3: 0
+        other: 2
+  - hostname: ssu2
+    data_iface: eth1
+    m0_servers:
+      - runs_confd: true
+        io_disks: []
+      - io_disks:
+          - /dev/vdb
+          - /dev/vdc
+          - /dev/vdd
+          - /dev/vde
+          - /dev/vdf
+          - /dev/vdg
+    m0_clients:
+        s3: 0
+        other: 2
+  - hostname: ssu3
+    data_iface: eth1
+    m0_servers:
+      - runs_confd: true
+        io_disks: []
+      - io_disks:
+          - /dev/vdb
+          - /dev/vdc
+          - /dev/vdd
+          - /dev/vde
+          - /dev/vdf
+          - /dev/vdg
+    m0_clients:
+        s3: 0
+        other: 2
+pools:
+  - name: the pool
+    disks: all
+    data_units: 1
+    parity_units: 0
+    # allowed_failures: { site: 0, rack: 0, encl: 0, ctrl: 0, disk: 0 }

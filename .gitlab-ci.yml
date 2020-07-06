@@ -105,6 +105,9 @@ test-boot1:
 test-boot2:
   <<: *test_boot_definition
 
+test-boot3:
+  <<: *test_boot_definition
+
 test-pcs:
   <<: *test_boot_definition
 

@@ -31,6 +31,9 @@ ci_init_m0vg() (
         test-boot2)
             hosts=(ssu1 ssu2)
             ;;
+        test-boot3)
+            hosts=(ssu1 ssu2 ssu3)
+            ;;
         test-pcs)
             hosts=(cmu pod-c1 pod-c2)
             opt_provision=
@@ -56,6 +59,7 @@ M0_VM_BOX_URL='http://ci-storage.mero.colo.seagate.com/vagrant/centos77/dev'
 M0_VM_CMU_MEM_MB=4096
 M0_VM_NAME_PREFIX=$(ci_vm_name_prefix)
 M0_VM_HOSTNAME_PREFIX=$(ci_vm_name_prefix)
+M0_VM_SSU_NR=3
 EOF
     if [[ $CI_JOB_NAME == 'test-pcs' ]]; then
         $M0VG env add M0_VM_POD_SIMULATION=yes M0_VM_POD_DISKS=10

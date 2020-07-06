@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+set -eu -o pipefail
+export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
+set -x
+
+. ci/functions.sh  # _time, ci_init_m0vg, ci_success, ci_vm_name_prefix
+
+cd $WORKSPACE_DIR
+
+ci_init_m0vg
+for vm in ssu{1..3}; do
+    _time $M0VG run --vm $vm /data/hare/ci/m0vg/init-node
+    XXX_with_s3server &&
+        _time $M0VG run --vm $vm /data/hare/utils/s3auth-disable
+    if [[ $vm != ssu1 ]]; then
+	_time $M0VG run --vm ssu1 /data/hare/ci/m0vg/ssh-keyscan \
+              $(ci_vm_name_prefix)-$vm
+    fi
+done
+
+f=hare/cfgen/examples/ci-boot3.yaml
+sed -r "s/(hostname:\s*)(ssu[123])/\\1$(ci_vm_name_prefix)-\\2/" $f \
+    > hare/ci/m0vg/_test${f##*/ci}
+
+_time $M0VG run --vm ssu1 /data/hare/ci/m0vg/test-boot3
+
+ci_success

@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -eu -o pipefail
+export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
+set -x
+
+test_cluster() {
+    local cdf=$1
+
+    time hctl bootstrap --mkfs $cdf
+    hctl status
+    time hctl shutdown
+}
+
+cd /data/hare/
+
+# Server-server Consul agents configuration.
+test_cluster ci/m0vg/_test-boot3.yaml
+
+# XXX-TODO: Remove this block after
+# http://gitlab.mero.colo.seagate.com/mero/hare/issues/216 is resolved.
+. ci/_env
+. ci/functions.sh
+XXX_with_s3server || exit 0
+
+# 2x2 S3 servers.
+cdf=ci/m0vg/_test-boot3-s3.yaml
+sed 's/s3: 0/s3: 2/' ci/m0vg/_test-boot3.yaml >$cdf
+test_cluster $cdf
