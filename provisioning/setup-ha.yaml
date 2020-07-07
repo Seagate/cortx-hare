@@ -1,7 +1,10 @@
 hare:
   post_install:
-    script: null
-    args: null
+    script: /opt/seagate/cortx/hare/libexec/build-ees-ha
+    args:
+      - --init
+      - /var/lib/hare/cluster.yaml
+      - /var/lib/hare/build-ees-ha-args.yaml
   init:
     script: /opt/seagate/cortx/hare/libexec/build-ees-ha
     args:
@@ -16,6 +19,15 @@ hare:
   reset:
     script: /opt/seagate/cortx/hare/libexec/prov-ha-reset
     args: null
+  backup:
+    files:
+      - /var/lib/hare/build-ees-ha*-args.yaml
+      - /var/lib/hare/cluster.yaml
+      - /var/lib/hare/confd.*
+      - /var/lib/hare/consul-*
+      - /var/lib/hare/node-name
+      - /var/lib/hare/hax-env-*
+      - /etc/corosync/corosync.conf
   post_update:
     script: /opt/seagate/cortx/hare/libexec/build-ees-ha-update
     args:

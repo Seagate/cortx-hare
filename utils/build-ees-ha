@@ -58,7 +58,7 @@ EOF
 TEMP=$(getopt --options h,i: \
               --longoptions help,ip1:,ip2:,interface:,left-node:,right-node: \
               --longoptions left-volume:,right-volume:,skip-mkfs,net-type: \
-              --longoptions cib-file:,update \
+              --longoptions cib-file:,init,update \
               --name "$PROG" -- "$@" || true)
 
 (($? == 0)) || { usage >&2; exit 1; }
@@ -75,6 +75,7 @@ rvolume=/dev/sdc
 skip_mkfs=false
 net_type=tcp
 update=false
+init=false
 cib_file=/var/lib/hare/cib_cortx_cluster.xml
 
 while true; do
@@ -91,6 +92,7 @@ while true; do
         --net-type)          net_type=$2; shift 2 ;;
         --cib-file)          cib_file=$2; shift 2 ;;
         --update)            update=true; shift 2 ;;
+        --init)              init=true; shift 2 ;;
         --)                  shift; break ;;
         *)                   break ;;
     esac
@@ -100,6 +102,7 @@ cdf=${1:-}
 argsfile=${2:-}
 
 hare_dir=/var/lib/hare
+log_file=${LOG_FILE:-/var/log/build-ees-ha.log}
 
 die() {
     echo "$PROG: ERROR: $*" >&2
@@ -150,8 +153,13 @@ run_on_both() {
     ssh $rnode $cmd
 }
 
+log() {
+    local msg=$1
+    echo $msg >> $log_file
+}
+
 ip_addr_rsc_add() {
-    echo 'Adding the roaming IP addresses into Pacemaker...'
+    log "${FUNCNAME[0]}: Adding the roaming IP addresses into Pacemaker..."
     sudo pcs -f $cib_file resource create ip-c1 ocf:heartbeat:IPaddr2 \
              ip=$ip1 cidr_netmask=$netmask iflabel=c1 op monitor interval=0
     sudo pcs -f $cib_file resource create ip-c2 ocf:heartbeat:IPaddr2 \
@@ -161,7 +169,7 @@ ip_addr_rsc_add() {
 }
 
 lnet_rsc_add() {
-    echo 'Adding LNet...'
+    log "${FUNCNAME[0]}: Adding LNet to pacemaker..."
     sudo pcs -f $cib_file resource create lnet systemd:lnet
     sudo pcs -f $cib_file resource clone lnet
     sudo pcs -f $cib_file resource create lnet-c1 ocf:cortx:lnet \
@@ -215,7 +223,7 @@ bootstrap() {
     ssh $rnode "mkdir -p /var/motr &&
       ! mountpoint -q /var/motr && sudo mount $rvolume /var/motr || true"
 
-    echo 'Preparing Hare configuration files...'
+    log "${FUNCNAME[0]}: Preparing Hare configuration files..."
 
 # Update data_iface values in CDF: 1st data_iface will be `${iface}_c1`,
 #                                  2nd data_iface will be `${iface}_c2`.
@@ -290,6 +298,7 @@ EOF
 }
 
 consul_systemd_prepare() {
+    log "${FUNCNAME[0]}: Installing Consul systemd units..."
     cmd='
     sudo cp /usr/lib/systemd/system/hare-consul-agent.service
             /usr/lib/systemd/system/hare-consul-agent-c1.service &&
@@ -305,6 +314,7 @@ consul_systemd_prepare() {
 }
 
 consul_systemd_update() {
+    log "${FUNCNAME[0]}: Updating Consul systemd units..."
 # Cleanup Consul data directory before starting the agent to
 # avoid possible inconsistencies related to consensus when Consul
 # agent joins the Consul cluster. Mainly problems related to leader
@@ -346,7 +356,7 @@ consul_systemd_update() {
 }
 
 consul_env_prepare() {
-    echo 'Preparing Consul agents config files...'
+    log "${FUNCNAME[0]}: Creating Consul environment..."
     sudo cp $hare_dir/consul-env $hare_dir/consul-env-c1
     scp $rnode:$hare_dir/consul-env $hare_dir/consul-env-c2
     sudo sed -r \
@@ -374,6 +384,7 @@ consul_env_prepare() {
 }
 
 consul_conf_prepare() {
+    log "${FUNCNAME[0]}: Preparing Consul agent configuration files..."
     run_on_both "mkdir -p $hare_dir/consul-server-c{1,2}-conf"
 
     conf_dir=consul-server-c1-conf
@@ -409,7 +420,7 @@ consul_conf_prepare() {
 }
 
 consul_rsc_add() {
-    echo 'Adding Consul to Pacemaker...'
+    log "${FUNCNAME[0]}: Adding Consul to Pacemaker..."
     sudo pcs -f $cib_file resource create consul-c1 systemd:hare-consul-agent-c1
     sudo pcs -f $cib_file resource create consul-c2 systemd:hare-consul-agent-c2
     sudo pcs -f $cib_file resource group add c1 consul-c1 --after ip-c1
@@ -417,7 +428,7 @@ consul_rsc_add() {
 }
 
 motr_kernel_rsc_add() {
-    echo 'Adding Motr kernel module to Pacemaker...'
+    log "${FUNCNAME[0]}: Adding Motr kernel module to Pacemaker..."
     sudo pcs -f $cib_file resource create motr-kernel systemd:motr-kernel clone
     sudo pcs -f $cib_file constraint order lnet-c1 then motr-kernel-clone
     sudo pcs -f $cib_file constraint order lnet-c2 then motr-kernel-clone
@@ -435,7 +446,7 @@ motr_kernel_rsc_add() {
 }
 
 hax_systemd_prepare() {
-    echo 'Adding Hax to Pacemaker...'
+    log "${FUNCNAME[0]}: Installing hax systemd units..."
     sudo cp -f /usr/lib/systemd/system/hare-hax.service \
             /usr/lib/systemd/system/hare-hax-c1.service
     sudo cp -f /usr/lib/systemd/system/hare-hax.service \
@@ -443,6 +454,7 @@ hax_systemd_prepare() {
 }
 
 hax_systemd_update() {
+    log "${FUNCNAME[0]}: Updating hax systemd units..."
     sudo sed -e 's/hare-consul-agent.service/hare-consul-agent-c1.service/' \
              -e "/ExecStart=/iExecStartPre=/bin/sh -c 'mountpoint /var/motr || /bin/mount $lvolume /var/motr'" \
              -e "/ExecStart=/aExecStopPost=/bin/sh -c '! mountpoint /var/motr || while ! /bin/umount /var/motr; do lsof +D /var/motr; sleep 1; done'" \
@@ -475,6 +487,7 @@ hax_systemd_update() {
 }
 
 hax_rsc_add() {
+    log "${FUNCNAME[0]}: Adding hax to Pacemaker..."
     sudo pcs -f $cib_file resource create hax-c1 systemd:hare-hax-c1 op stop timeout=30
     sudo pcs -f $cib_file resource create hax-c2 systemd:hare-hax-c2 op stop timeout=30
     sudo pcs -f $cib_file resource group add c1 hax-c1
@@ -486,7 +499,7 @@ hax_rsc_add() {
 }
 
 motr_systemd_update() {
-    echo 'Adding Motr to Pacemaker...'
+    log "${FUNCNAME[0]}: Adding Motr to Pacemaker..."
 
     cmd='
     sudo sed "s/TimeoutStopSec=.*/TimeoutStopSec=5sec/"
@@ -511,6 +524,7 @@ motr_rsc_add() {
     c1_ios=$(get_fid c1 ios)
     c2_ios=$(get_fid c2 ios)
 
+    log "${FUNCNAME[0]}: Adding Motr to Pacemaker..."
     sudo pcs -f $cib_file resource create motr-confd-c1 systemd:m0d@$c1_confd op stop \
          timeout=600
     sudo pcs -f $cib_file resource create motr-ios-c1 systemd:m0d@$c1_ios op stop \
@@ -526,7 +540,6 @@ motr_rsc_add() {
     sudo pcs -f $cib_file constraint order motr-confd-c1 then motr-ios-c2
     sudo pcs -f $cib_file constraint order motr-confd-c2 then motr-ios-c1
 
-    echo 'Adding motr-free-space-monitor to pacemaker...'
     sudo pcs -f $cib_file resource create motr-free-space-mon systemd:motr-free-space-monitor \
          op monitor interval=30s meta failure-timeout=300s
     sudo pcs -f $cib_file constraint order motr-ios-c1 then motr-free-space-mon
@@ -544,14 +557,14 @@ is_virtual() {
 
 clusterip_rsc_add() {
     if ! is_virtual; then
-        echo 'Configuring ClusterIP constrains in Pacemaker...'
+        log "${FUNCNAME[0]}: Adding ClusterIP constraints in Pacemaker..."
         sudo pcs -f $cib_file constraint order c1 then ClusterIP-clone
         sudo pcs -f $cib_file constraint order c2 then ClusterIP-clone
     fi
 }
 
 systemd_units_disable() {
-    echo 'Disabling some systemd units...'
+    log "${FUNCNAME[0]}: Disabling systemd units..."
     units_to_disable=(
         elasticsearch
         haproxy
@@ -567,12 +580,12 @@ systemd_units_disable() {
 }
 
 ldap_rsc_add() {
-    echo 'Adding ldap to Pacemaker...'
+    log "${FUNCNAME[0]}: Adding ldap to Pacemaker..."
     sudo pcs -f $cib_file resource create ldap systemd:slapd clone op monitor interval=30s
 }
 
 s3auth_rsc_add() {
-    echo 'Adding s3authserver to Pacemaker...'
+    log "${FUNCNAME[0]}: Adding s3authserver to Pacemaker..."
     sudo pcs -f $cib_file resource create s3auth systemd:s3authserver clone op \
         monitor interval=30
     sudo pcs -f $cib_file constraint order ldap-clone then s3auth-clone
@@ -581,19 +594,19 @@ s3auth_rsc_add() {
 }
 
 elastic_search_rsc_add() {
-    echo 'Adding elastic search to Pacemaker..'
+    log "${FUNCNAME[0]}: Adding elastic search to Pacemaker.."
     sudo pcs -f $cib_file resource create els-search systemd:elasticsearch clone op \
         monitor interval=30s
 }
 
 statsd_rsc_add() {
-    echo 'Adding statsd to Pacemaker...'
+    log "${FUNCNAME[0]}: Adding statsd to Pacemaker..."
     sudo pcs -f $cib_file resource create statsd systemd:statsd clone op monitor interval=30s
     sudo pcs -f $cib_file constraint order els-search-clone then statsd-clone
 }
 
 haproxy_rsc_add() {
-    echo 'Adding haproxy to pacemaker...'
+    log "${FUNCNAME[0]}: Adding haproxy to pacemaker..."
     sudo pcs -f $cib_file resource create haproxy-c1 systemd:haproxy op monitor interval=30s
     sudo pcs -f $cib_file resource create haproxy-c2 systemd:haproxy op monitor interval=30s
     sudo pcs -f $cib_file constraint location haproxy-c1 prefers $lnode=INFINITY
@@ -610,7 +623,7 @@ get_s3_svc() {
 }
 
 rabbitmq_rsc_add() {
-    echo 'Adding rabbit-mq resources and constraints...'
+    log "${FUNCNAME[0]}: Adding rabbit-mq resources and constraints..."
     sudo pcs -f $cib_file resource create rabbitmq systemd:rabbitmq-server clone op \
         monitor interval=30s meta failure-timeout=20s
 }
@@ -619,6 +632,7 @@ s3_systemd_update() {
 # Add and update node attribute for s3backgroundconsumer resource on both the
 # nodes. This will be used to define constraints for the resources depending
 # on s3backgroundconsumer resource on a node.
+    log "${FUNCNAME[0]}: Updating s3 systemd units..."
     cmd="
     sudo sed
      -e '/ExecStart=/aExecStartPost=/usr/sbin/attrd_updater -U 1 -n s3backcons-running' \
@@ -634,7 +648,7 @@ s3_systemd_update() {
 }
 
 s3back_rsc_add() {
-    echo 'Adding s3background services...'
+    log "${FUNCNAME[0]}: Adding s3background services..."
     sudo pcs -f $cib_file resource create s3backcons-c1 \
                           systemd:s3backgroundconsumer meta failure-timeout=300s
     sudo pcs -f $cib_file resource create s3backcons-c2 \
@@ -697,7 +711,7 @@ _s3server_rsc_add() {
 }
 
 s3server_rsc_add() {
-    echo 'Adding S3server to Pacemaker...'
+    log "${FUNCNAME[0]}: Adding S3server to Pacemaker..."
     _s3server_rsc_add c1 $lnode $rnode
     _s3server_rsc_add c2 $rnode $lnode
 
@@ -751,42 +765,44 @@ ha_ops=(
 # update:      executes during clean install and software update
 # update-only: executes during software update only
 declare -A ha_ops_type=(
-    [ip_addr_rsc_add]='update'
-    [lnet_rsc_add]='update'
+    [ip_addr_rsc_add]='bootstrap_update'
+    [lnet_rsc_add]='bootstrap_update'
     [net_config_check]='bootstrap'
     [bootstrap]='bootstrap'
     [bootstrap_update_only]='update-only'
     [motr_config]='bootstrap'
-    [consul_systemd_prepare]='update'
-    [consul_systemd_update]='update'
+    [consul_systemd_prepare]='bootstrap_update_init'
+    [consul_systemd_update]='bootstrap_update_init'
     [consul_env_prepare]='bootstrap'
     [consul_conf_prepare]='bootstrap'
-    [consul_rsc_add]='update'
-    [motr_kernel_rsc_add]='update'
-    [hax_systemd_prepare]='update'
-    [hax_systemd_update]='update'
-    [hax_rsc_add]='update'
-    [motr_systemd_update]='update'
-    [motr_rsc_add]='update'
-    [clusterip_rsc_add]='update'
-    [systemd_units_disable]='update'
-    [ldap_rsc_add]='update'
-    [s3auth_rsc_add]='update'
-    [elastic_search_rsc_add]='update'
-    [statsd_rsc_add]='update'
-    [haproxy_rsc_add]='update'
-    [rabbitmq_rsc_add]='update'
-    [s3_systemd_update]='update'
-    [s3back_rsc_add]='update'
-    [s3server_rsc_add]='update'
+    [consul_rsc_add]='bootstrap_update'
+    [motr_kernel_rsc_add]='bootstrap_update'
+    [hax_systemd_prepare]='bootstrap_update_init'
+    [hax_systemd_update]='bootstrap_update_init'
+    [hax_rsc_add]='bootstrap_update'
+    [motr_systemd_update]='bootstrap_update'
+    [motr_rsc_add]='bootstrap_update'
+    [clusterip_rsc_add]='bootstrap_update'
+    [systemd_units_disable]='bootstrap_update'
+    [ldap_rsc_add]='bootstrap_update'
+    [s3auth_rsc_add]='bootstrap_update'
+    [elastic_search_rsc_add]='bootstrap_update'
+    [statsd_rsc_add]='bootstrap_update'
+    [haproxy_rsc_add]='bootstrap_update'
+    [rabbitmq_rsc_add]='bootstrap_update'
+    [s3_systemd_update]='bootstrap_update'
+    [s3back_rsc_add]='bootstrap_update'
+    [s3server_rsc_add]='bootstrap_update'
 )
 
 for op in ${ha_ops[@]}; do
-    if ! $update && [[ ${ha_ops_type[$op]} != 'update-only' ]]; then
+    if $init && [[ ${ha_ops_type[$op]} =~ .*'init'.* ]]; then
+        $op
+    elif ! $update && ! $init [[ ${ha_ops_type[$op]} =~ .*'bootstrap'.* ]]; then
         cib_init
         $op
         cib_commit
-    elif $update && [[ ${ha_ops_type[$op]} != 'bootstrap' ]]; then
+    elif $update && [[ ${ha_ops_type[$op]} =~ .*'update'.* ]]; then
         # We are using existing CIB as a base and re-applying the pcs
         # instructions, thus some instructions would already exist in the
         # CIB, we ignore them.
