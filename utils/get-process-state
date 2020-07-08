@@ -32,4 +32,4 @@ case $1 in
 esac
 
 fid=$1
-consul kv export processes/$fid | jq -r '.[].value | @base64d' | jq -r '.state'
+consul kv get processes/$fid 2> /dev/null | jq -r '.state'
