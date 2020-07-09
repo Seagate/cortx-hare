@@ -28,7 +28,7 @@ class Fid:
 class FidEncoder(j.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, Fid):
-            return obj.__repr__()
+            return str(obj)
         return super().default(obj)
 
 
