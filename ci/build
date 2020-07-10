@@ -50,8 +50,8 @@ ci_docker() {
     sudo chown -R $(id -u):$(id -g) .
 }
 
-git clone --recursive http://gitlab.mero.colo.seagate.com/mero/mero.git
-cd mero
+git clone --recursive http://gitlab.mero.colo.seagate.com/mero/mero.git cortx-motr
+cd cortx-motr
 git checkout $MERO_COMMIT_REF
 cd -
 

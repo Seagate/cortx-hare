@@ -61,7 +61,7 @@ def get_motr_dir():
     d = os.environ.get('M0_SRC_DIR')
     if d:
         return d
-    return P.normpath(P.dirname(P.abspath(__file__)) + '/../../mero')
+    return P.normpath(P.dirname(P.abspath(__file__)) + '/../../cortx-motr')
 
 
 def get_motr_libs_dir():
