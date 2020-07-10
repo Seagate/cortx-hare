@@ -4,7 +4,6 @@ from subprocess import PIPE, Popen
 from typing import Any, Dict, List, Match, Optional, Tuple
 
 import defusedxml.ElementTree as ET
-
 from pcswrap.exception import CliException, PcsNoStatusException
 from pcswrap.types import Node, PcsConnector, Resource, StonithResource
 
@@ -72,13 +71,10 @@ class CliExecutor:
 
 class StonithParser:
     def _parse_kv(self, text: str) -> Dict[str, str]:
-        def to_pair(s: str) -> Tuple[str, str]:
-            match = re.match(r'^\s*([^=]*)=([^ ]*)$', s)
-            assert match
-            return (match.group(1), match.group(2))
+        def _pair(lst: List[str]) -> Tuple[str, str]:
+            return (lst[0], lst[1])
 
-        pairs = [to_pair(t) for t in text.split(' ')]
-        return {key: val for (key, val) in pairs}
+        return dict(_pair(kv.split('=')) for kv in text.split(' '))
 
     def parse(self, raw_text: str) -> StonithResource:
         lines = raw_text.splitlines()
