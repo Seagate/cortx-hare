@@ -22,8 +22,6 @@ ci_init_m0vg() (
         die "${FUNCNAME[0]}: Invalid M0VG"
 
     local hosts=
-    local opt_provision='--no-provision'
-
     case $CI_JOB_NAME in
         test-boot1)
             hosts=(cmu)
@@ -33,10 +31,6 @@ ci_init_m0vg() (
             ;;
         test-boot3)
             hosts=(ssu1 ssu2 ssu3)
-            ;;
-        test-pcs)
-            hosts=(cmu pod-c1 pod-c2)
-            opt_provision=
             ;;
         *) "${FUNCNAME[0]}: Invalid CI_JOB_NAME";;
     esac
@@ -61,15 +55,11 @@ M0_VM_NAME_PREFIX=$(ci_vm_name_prefix)
 M0_VM_HOSTNAME_PREFIX=$(ci_vm_name_prefix)
 M0_VM_SSU_NR=3
 EOF
-    if [[ $CI_JOB_NAME == 'test-pcs' ]]; then
-        $M0VG env add M0_VM_POD_SIMULATION=yes M0_VM_POD_DISKS=10
-        $M0VG env add M0_VM_DISABLE_PACKAGES_UPGRADE=yes
-    fi
 
     local host=
     for host in ${hosts[@]}; do
-        _time $M0VG up $opt_provision $host
-        _time $M0VG reload $opt_provision $host
+        _time $M0VG up --no-provision $host
+        _time $M0VG reload --no-provision $host
     done
 
     # 'hostmanager' plugin should be executed last, when all machines are up.
