@@ -35,6 +35,7 @@ resources=(
     c{2,1}
     motr-kernel
     lnet
+    ip-c{2,1}
 )
 for r in ${resources[@]}; do
     pcs resource delete $r || true
