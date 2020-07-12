@@ -140,6 +140,7 @@ cleanup:
     - cd $WORKSPACE_DIR
     - m0vg-test-boot1/scripts/m0vg destroy -f || true
     - m0vg-test-boot2/scripts/m0vg destroy -f || true
+    - m0vg-test-boot3/scripts/m0vg destroy -f || true
     - m0vg-test-pcs/scripts/m0vg destroy -f || true
 
 # Docker images ----------------------------------------------------------- {{{1
