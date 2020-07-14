@@ -43,6 +43,7 @@
 , Drive       = ./types/Drive.dhall
 -- pools subtree
 , Pool        = ./types/Pool.dhall
+, PoolType    = ./types/PoolType.dhall
 , Pver        = ./types/Pver.dhall
 , PverF       = ./types/PverF.dhall
 , Objv        = ./types/Objv.dhall

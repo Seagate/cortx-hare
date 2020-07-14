@@ -45,6 +45,8 @@ nodes:
         other: <int>  # max quantity of other Motr clients this host may have
 pools:
   - name: <str>
+    type: sns|dix|md   # type of pool; optional, default is "sns"
+                       # "sns" for data, "dix" for "kv" and md for meta-data
     allowed_failures:  # optional section; no failures will be allowed
                        # if this section is missing or all of its elements
                        # are zeroes
@@ -56,14 +58,14 @@ pools:
     data_units: <int>
     parity_units: <int>
     #
-    # There are two ways of assigning disks to pool.
+    # There are several ways of assigning disks to pool.
     #
-    # 1) Choose which disks of which host to use for this pool.
-    disks:
-      select:
-        - { host: <str>, path_regex: <str> }
-    # 2) Use all available disks of all nodes for this pool.
+    # 1) Use all available disks of all nodes for this pool.
     #disks: all
+    # 2) Use one disk per CAS service
+    #disks: per_cas
+    # 3) Use first disk on controller
+    #disks: first_disk
 ```
 
 ### `cfgen` script
