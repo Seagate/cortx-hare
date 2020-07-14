@@ -14,6 +14,7 @@ let Node =
 
 let Pool =
   { name : Text
+  , type : Optional ./PoolType.dhall
   , disks : ./PoolDisks.dhall
   , data_units : Natural    -- N
   , parity_units : Natural  -- K

@@ -24,6 +24,7 @@ in
     ]
 , pools =
     [ { name = "the pool"
+      , type = None types.PoolType
       , disks = types.PoolDisks.all
       , data_units = 1
       , parity_units = 0

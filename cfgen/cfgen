@@ -83,6 +83,8 @@ nodes:
         other: <int>  # max quantity of other Motr clients this host may have
 pools:
   - name: <str>
+    type: sns|dix|md   # optional, default to "sns"
+                       # "sns" for data, "dix" for KV and md for meta-data
     allowed_failures:  # optional section; no failures will be allowed
                        # if this section is missing or all of its elements
                        # are zeroes
@@ -94,14 +96,14 @@ pools:
     data_units: <int>
     parity_units: <int>
     #
-    # There are two ways of assigning disks to pool.
+    # There are several ways of assigning disks to pool.
     #
-    # 1) Choose which disks of which host to use for this pool.
-    disks:
-      select:
-        - { host: <str>, path_regex: <str> }
-    # 2) Use all available disks of all nodes for this pool.
+    # 1) Use all available disks of all nodes for this pool.
     #disks: all
+    # 2) Use one disk per CAS service
+    #disks: per_cas
+    # 3) Use first drive on controller
+    #disks: first_disk
 ...  # end of the document (optional)""")
         sys.exit()
 
@@ -888,7 +890,25 @@ class ConfDrive(ToDhall):
 
 def pool_drives(m0conf: Dict[Oid, Any],
                 pattern: Union[str, List[Dict[str, str]]]) -> List[Oid]:
-    # XXX-TODO: support 'select' pattern; see cfgen/dhall/types/PoolDisks.dhall
+
+    if pattern == 'per_cas':
+        cas = [(svc_id, ctrl_id)
+               for ctrl_id in m0conf if ctrl_id.type is ObjT.controller
+               for proc_id in m0conf[m0conf[ctrl_id].node].processes
+               for svc_id in m0conf[proc_id].services
+               if m0conf[svc_id].type is SvcT.M0_CST_CAS]
+
+        return [ConfDrive.build(m0conf, ctrl_id,
+                                ConfSdev.build(m0conf, svc_id,
+                                               Disk(path='/dev/null',
+                                                    size=1024,
+                                                    blksize=1)))
+                for (svc_id, ctrl_id) in cas]
+
+    if pattern == 'first_disk':
+        return [m0conf[ctrl_id].drives[0]
+                for ctrl_id in m0conf if ctrl_id.type is ObjT.controller]
+
     assert pattern == 'all'
     return [oid for oid in m0conf if oid.type is ObjT.drive]
 
@@ -1318,55 +1338,41 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
     # XXX-TODO: support multiple profiles
     prof_id = ConfProfile.build(conf, root_id)
 
+    md_pool_defined = False
+    dix_pool_defined = False
     for pool in cluster_desc['pools']:
-        pool_id = ConfPool.build(conf, root_id)
-        ConfPver.build(conf, pool_id,
-                       PDClustAttrs0(data_units=pool['data_units'],
-                                     parity_units=pool['parity_units']),
-                       pool_drives(conf, pool['disks']))
-        conf[prof_id].pools.append(pool_id)
+        ptype = pool.get('type', 'sns')
+        if ptype != 'sns':
+            assert pool['data_units'] == 1
 
-    # Metadata pool.
-    if True:
         pool_id = ConfPool.build(conf, root_id)
-        pool0 = cluster_desc['pools'][0]  # XXX Why the first pool?
-        ctrls = set(conf[d]._parent for d in pool_drives(conf, pool0['disks']))
-        first_drives = [conf[c].drives[0] for c in ctrls if conf[c].drives]
-        ConfPver.build(conf, pool_id,
-                       PDClustAttrs0(data_units=len(first_drives),
-                                     parity_units=0),
-                       drives=first_drives,
-                       tolerance=Failures(0, 0, 0, 1, 0))
+        pver = ConfPver.build(conf, pool_id,
+                              PDClustAttrs0(pool['data_units'],
+                                            pool['parity_units']),
+                              pool_drives(conf, pool['disks']))
+        conf[prof_id].pools.append(pool_id)
+        if ptype == 'dix':
+            dix_pool_defined = True
+            conf[root_id].imeta_pver = pver
+        if ptype == 'md':
+            md_pool_defined = True
+            conf[root_id].mdpool = pool_id
+
+    if not dix_pool_defined:
+        pool_id = ConfPool.build(conf, root_id)
+        #  if dix pool not described lets create pool with 1 + 0
+        pver = ConfPver.build(conf, pool_id, PDClustAttrs0(1, 0),
+                              pool_drives(conf, 'per_cas'))
+        conf[prof_id].pools.append(pool_id)
+        conf[root_id].imeta_pver = pver
+
+    if not md_pool_defined:
+        pool_id = ConfPool.build(conf, root_id)
+        #  if md pool not described lets create pool with 1 + 0
+        pver = ConfPver.build(conf, pool_id, PDClustAttrs0(1, 0),
+                              pool_drives(conf, 'first_disk'))
+        conf[prof_id].pools.append(pool_id)
         conf[root_id].mdpool = pool_id
-        conf[prof_id].pools.append(pool_id)
-
-    # DIX pool.
-    cas = [(svc_id, ctrl_id)
-           for ctrl_id in conf if ctrl_id.type is ObjT.controller
-           for proc_id in conf[conf[ctrl_id].node].processes
-           for svc_id in conf[proc_id].services
-           if conf[svc_id].type is SvcT.M0_CST_CAS]
-    if cas:
-        drives = [ConfDrive.build(conf, ctrl_id,
-                                  ConfSdev.build(conf, svc_id,
-                                                 Disk(path='/dev/null',
-                                                      size=1024,
-                                                      blksize=1)))
-                  for (svc_id, ctrl_id) in cas]
-        pool_id = ConfPool.build(conf, root_id)
-        imeta_pver = ConfPver.build(
-            conf,
-            pool_id,
-            PDClustAttrs0(
-                # For CAS service N must always be equal to 1
-                # as CAS records are indivisible pieces of data:
-                # the whole CAS record is always stored on one node.
-                data_units=1,
-                parity_units=0),
-            drives=drives,
-            tolerance=Failures(0, 0, 0, 1, 0))
-        conf[root_id].imeta_pver = imeta_pver
-        conf[prof_id].pools.append(pool_id)
 
     validate_m0conf(conf)
     assert cluster.consul_servers
