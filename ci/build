@@ -15,6 +15,10 @@ cp -a $CI_PROJECT_DIR $WORKSPACE_DIR/
 
 cd $WORKSPACE_DIR
 
+if [[ $CI_PROJECT_NAME != hare && ! -d hare ]]; then
+    ln -s $CI_PROJECT_NAME hare
+fi
+
 cat >hare/ci/_env <<EOF
 MERO_COMMIT_REF=${MERO_COMMIT_REF:-}
 RPMSYNC_DIR=$RPMSYNC_DIR
