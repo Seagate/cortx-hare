@@ -1,9 +1,9 @@
 [submodule "vendor/consul-bin"]
 	path = vendor/consul-bin
-	url = ../../mero/hare-deps/consul-bin
+	url = ../consul-bin
 [submodule "vendor/dhall-bin"]
 	path = vendor/dhall-bin
-	url = ../../mero/hare-deps/dhall-bin
+	url = ../dhall-bin
 [submodule "vendor/dhall-prelude"]
 	path = vendor/dhall-prelude
-	url = ../../mero/hare-deps/dhall-prelude
+	url = ../dhall-prelude
