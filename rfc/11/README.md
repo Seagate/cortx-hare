@@ -28,31 +28,158 @@ TBD
 
 General command structure is as follows:
 
+```sh
+hctl node [OPTIONS] COMMAND [ARGS]...
+
+Options:
+  --verbose
+  --username TEXT
+  --password TEXT
+  --help           Show this message and exit.
+
+Commands:
+  maintenance    Switch the cluster to maintenance mode.
+  shutdown       Shutdown (power off) the node by name.
+  standby        Put the given node into standby mode.
+  status         Show status of all cluster nodes.
+  unmaintenance  Move the cluster from maintenance back to normal mode.
+  unstandby      Remove the given node from standby mode.
 ```
-hctl node <command>
-```
-Detailed list of commands can be seen below.
 
-|#|Use case|Command line|Sample output|
-|-|--------|------------|-------------|
-|1|Stop the node ('standby')|`hctl node standby <node-id>`| |
-|2|Start the node ('unstandby')|`hctl node unstandby <node-id>`| |
-|3|Stop all nodes in cluster ('standby all')|`hctl node standby --all`| |
-|4|Start all nodes in cluster ('unstandby all')|`hctl node unstandby --all`| |
-|5|Shutdown a node|`hctl node shutdown <node-id>`| |
-|6|Get the status of all nodes in the cluster|`hctl node status`| `[{"name": "srvnode-1", "online": false, "standby": true, "unclean": false, "resources_running": 0}]` |
-|7|Enable "smart maintenance" mode |`hctl node --verbose maintenance --all --timeout-sec=120`| |
-|8|Disable "smart maintenance" mode |`hctl node --verbose unmaintenance --all --timeout-sec=120`| |
+#### General conventions
 
-**Notes**
-1. Smart maintenance - combination of two steps:
-   - Disabling STONITH resources
-   - Switching both cluster nodes to standby mode
-2. `hctl node maintenance --all` command guarantees that once it finishes, the whole operation either succeeded or failed. The caller must analyze exit code.
-3. In case of failure while switching to "smart maintenance", the Pacemaker cluster will be left in unstable state. The caller must perform all the actions to log the problem, reporting it via UI etc but then it MUST run `hctl node unmaintenance --all` to switch the cluster back to normal mode. Note that this operation will most probably trigger STONITH'ing.
-4. `hctl node unmaintenance --all` must be also called in successful case when the maintenance works are over.
-
-**General conventions**:
 1. In case of an error exitcode, the caller should consider `stderr` for explanatory text.
 2. `hctl node status` produces the output to `stdout` in case of success exit code. The output is a valid JSON object.
-3. All log messages are produced to `stderr`.
+3. All log messages are produced to `stderr` and duplicated to journald logs.
+
+#### General options
+
+* `--verbose` Show debug logging while executing any command.
+* `--username` and `--password` Current linux user credentials to authenticate in `pcsd` Pacemaker daemon. These parameters can be helpful when the command is executed from a non-root user. This pair of options is optional; when omitted, no local authentication will be issued while communicating to Pacemaker.
+
+#### Commands
+
+##### maintenance
+
+```sh
+Usage: hctl node maintenance [OPTIONS]
+
+  Switch the cluster to maintenance mode.
+
+Options:
+  --all                  [required]
+  --timeout-sec INTEGER  Maximum time that this command will wait for any
+                         operation to complete before raising an error
+
+  --help                 Show this message and exit.
+```
+
+Put the whole cluster into so called 'smart maintenance' mode. This mode includes the following sequence:
+
+1. Disable STONITH resources. Wait until these resources are stopped (no longer than `timeout-sec` seconds).
+2. Put all the nodes to 'standby' mode. Wait until all resources are stopped (no longer than `timeout-sec` seconds).
+
+**Note:** If any of the steps fail, the cluster will remain in an unstable state: if STONITH resources are disabled, split-brain becomes a real risk. The user will need to issue `hctl node unmaintenance --all` manually to return the cluster back to normal state (note that this command can lead to fencing).
+
+##### shutdown
+
+```sh
+Usage: hctl node shutdown [OPTIONS] NODE
+
+  Shutdown (power off) the node by name.
+
+Options:
+  --timeout-sec INTEGER  Maximum time that this command will wait for any
+                         operation to complete before raising an error
+
+  --help                 Show this message and exit.
+```
+
+Shuts the given node down via IPMI interface (the corresponding IPMI address and credentials are taken from Pacemaker's STONITH resources). Shutdown procedure contains two steps:
+
+1. Switch the node to standby (so that all the resources get stopped for sure)
+2. Once all resources are stopped, trigger shutdown.
+
+**Notes:**
+
+1. Item \[1] waits until all the resources are stopped for sure. It waits no more than `timeout-sec` seconds. Once timeout is exceeded, the tool exits with an exception and non-zero exit code.
+2. As a result, if the resources take too much time to shutdown (by any reason), shutdown will not happen but the node will remain in 'standby' mode. The user will need to 'unstandby' the node manually in this case.
+3. If shutdown fails (e.g. due to IPMI failure), the node will also remain in 'standby' mode.
+
+##### standby
+
+```sh
+Usage: hctl node standby [OPTIONS] [NODE]
+
+  Put the given node into standby mode.
+
+Options:
+  --all   Put all the nodes in the cluster to standby mode (no node name is
+          required).
+
+  --help  Show this message and exit.
+```
+
+Put the given node into standby mode. Note that the tool DOES NOT wait until all the resources are stopped at the given node and exits early.
+
+##### status
+
+```sh
+Usage: hctl node status [OPTIONS]
+
+  Show status of all cluster nodes.
+
+Options:
+  --full  Show overall cluster status, so not only nodes will be included.
+  --help  Show this message and exit.
+```
+
+Outputs the status of the nodes in JSON format. Sample outputs are as follows:
+
+```sh
+hctl node status --full
+{"resources": {"statistics": {"started": 6, "stopped": 0, "starting": 0}}, "nodes": [{"name": "smc7-m11", "online": true, "standby": false, "unclean": false, "resources_running": 3}, {"name": "smc8-m11", "online": false, "standby": false, "unclean": false, "resources_running": 3}]}
+```
+
+```sh
+hctl node status
+[{"name": "smc7-m11", "online": true, "standby": false, "unclean": false, "resources_running": 3}, {"name": "smc8-m11", "online": false, "standby": false, "unclean": false, "resources_running": 3}]
+```
+
+##### unmaintenance
+
+```sh
+Usage: hctl node unmaintenance [OPTIONS]
+
+  Move the cluster from maintenance back to normal mode.
+
+Options:
+  --all                  [required]
+  --timeout-sec INTEGER  Maximum time that this command will wait for any
+                         operation to complete before raising an error
+
+  --help                 Show this message and exit.
+```
+
+Recover from 'smart maintenance' mode. Includes the following steps:
+
+1. Revoke all the nodes from 'standby' mode. Wait until all resources are stopped (no longer than `timeout-sec` seconds).
+2. Enable STONITH resources. Wait until these resources are running (no longer than `timeout-sec` seconds).
+
+**Note:** This command can be used as a general way to return the cluster back to normal mode (so it can 'cure' the cluster after 'standby --all' or after an unsuccessful shutdown).
+
+##### unstandby
+
+```sh
+Usage: hctl node unstandby [OPTIONS] [NODE]
+
+  Remove the given node from standby mode.
+
+Options:
+  --all   Remove all the nodes in the cluster from standby mode (no node name
+          is required).
+
+  --help  Show this message and exit.
+```
+
+**Note:** Similarly to `hctl node standby`, this command exits early, i.e. it doesn't wait until the resources are started at the nodes that used to be in standby state.
