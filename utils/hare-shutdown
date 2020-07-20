@@ -6,11 +6,15 @@ import logging
 import os
 import re
 import threading
-
+from queue import Queue
 from socket import gethostname
 from typing import Dict, List, NamedTuple
-from queue import Queue
-from consul import Consul
+
+from consul import Consul, ConsulException
+from requests.exceptions import RequestException
+from urllib3.exceptions import HTTPError
+from hax.exception import HAConsistencyException
+from hax.util import repeat_if_fails
 
 Process = NamedTuple('Process', [('node', str), ('consul_name', str),
                                  ('systemd_name', str), ('fidk', int),
@@ -27,8 +31,12 @@ def processfid2str(fidk: int) -> str:
 
 
 def get_kv(cns: Consul, key: str) -> str:
-    kv: Dict[str, bytes] = cns.kv.get(key)[1]
-    return kv['Value'].decode() if kv and kv['Value'] is not None else ''
+    try:
+        kv: Dict[str, bytes] = cns.kv.get(key)[1]
+        return kv['Value'].decode() if kv and kv['Value'] is not None else ''
+    except (ConsulException, HTTPError, RequestException) as e:
+        raise HAConsistencyException('Could not access Consul KV')\
+            from e
 
 
 def get_systemd_name(fidk: int, svc_name: str) -> str:
@@ -43,27 +51,31 @@ def get_systemd_name(fidk: int, svc_name: str) -> str:
 def processes_by_consul_svc_name(cns: Consul) -> Dict[str, List[Process]]:
     """Processes grouped by Consul service name.
     """
-    processes: Dict[str, List[Process]] = {}
-    for node in cns.catalog.nodes()[1]:
-        for svc in cns.health.node(node['Node'])[1]:
-            svc_name = svc['ServiceName']
-            if svc_name:
-                fidk = int(svc['ServiceID'])
-                processes.setdefault(svc_name, []).append(
-                    Process(node=node['Node'],
-                            consul_name=svc_name,
-                            systemd_name=get_systemd_name(fidk, svc_name),
-                            fidk=fidk,
-                            status=svc['Status']))
-        consul_status = 'passing' if consul_is_active_at(node['Node']) \
-            else 'offline'
-        processes.setdefault('consul', []).append(
-            Process(node=node['Node'],
-                    consul_name='consul',
-                    systemd_name='hare-consul-agent',
-                    fidk=0,
-                    status=consul_status))
-    return processes
+    try:
+        processes: Dict[str, List[Process]] = {}
+        for node in cns.catalog.nodes()[1]:
+            for svc in cns.health.node(node['Node'])[1]:
+                svc_name = svc['ServiceName']
+                if svc_name:
+                    fidk = int(svc['ServiceID'])
+                    processes.setdefault(svc_name, []).append(
+                        Process(node=node['Node'],
+                                consul_name=svc_name,
+                                systemd_name=get_systemd_name(fidk, svc_name),
+                                fidk=fidk,
+                                status=svc['Status']))
+            consul_status = 'passing' if consul_is_active_at(node['Node']) \
+                else 'offline'
+            processes.setdefault('consul', []).append(
+                Process(node=node['Node'],
+                        consul_name='consul',
+                        systemd_name='hare-consul-agent',
+                        fidk=0,
+                        status=consul_status))
+        return processes
+    except (ConsulException, HTTPError, RequestException) as e:
+        raise HAConsistencyException('Could not access Consul services')\
+            from e
 
 
 def is_localhost(hostname: str) -> bool:
@@ -127,8 +139,7 @@ class QuitMessage:
 
 class Worker(threading.Thread):
     def __init__(self, queue: Queue):
-        super().__init__(target=self._do_work,
-                         args=(queue, ))
+        super().__init__(target=self._do_work, args=(queue, ))
 
     def _do_work(self, queue):
         logging.debug('Started thread')
@@ -172,9 +183,14 @@ def main() -> None:
             exit('Cluster is not running')
 
     cns = Consul()
-    processes = processes_by_consul_svc_name(cns)
-    leader_node = get_kv(cns, 'leader')
 
+    @repeat_if_fails()
+    def _get_processes_and_node():
+        processes = processes_by_consul_svc_name(cns)
+        leader_node = get_kv(cns, 'leader')
+        return (processes, leader_node)
+
+    (processes, leader_node) = _get_processes_and_node()
     for svc in shutdown_sequence:
         # Some processes may be not started as per configuration
         if svc in processes:
