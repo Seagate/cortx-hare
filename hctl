@@ -91,7 +91,7 @@ done
 # process commands
 case $cmd in
     help) usage; exit ;;
-    bootstrap|node|reportbug|shutdown|status)
+    bootstrap|reportbug|shutdown|status)
         if [[ -d $M0_SRC_DIR/utils ]]; then
             PATH="$M0_SRC_DIR/utils:$PATH"
         fi
