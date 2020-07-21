@@ -3,12 +3,16 @@
 # :help: show cluster status
 
 import argparse
+import io
+import logging
 import sys
 from subprocess import PIPE, Popen
 from typing import Any, Dict, List, NamedTuple, Optional, Set
 
 import simplejson as j
 from consul import Consul, ConsulException
+from hax.exception import HAConsistencyException
+from hax.util import repeat_if_fails
 from requests.exceptions import RequestException
 from urllib3.exceptions import HTTPError
 
@@ -38,59 +42,53 @@ Process = NamedTuple('Process', [('name', str), ('fid', Fid), ('ep', str),
 Host = NamedTuple('Host', [('name', str), ('svcs', List[Process])])
 
 
-class NoConsulError(RuntimeError):
-    pass
-
-
 def processfid2str(fidk: int) -> str:
     return '{:#x}:{:#x}'.format(ord('r') << 56 | 1, fidk)
 
 
-def get_kv_throwing(cns: Consul, key: str) -> Any:
+def get_kv(cns: Consul, key: str, recurse: bool = False) -> Any:
     """
-    Returns the given value from Consul KV. May throw NoConsulError in
+    Returns the given value from Consul KV. May throw HAConsistencyException in
     case of an intermittent connection error or while Consul is re-electing
-    internal Raft leader. KeyError will be thrown if no key can be found.
+    internal Raft leader.
     """
     try:
-        kv: Dict[str, Any] = cns.kv.get(key)[1]
+        kv: Dict[str, Any] = cns.kv.get(key, recurse=recurse)[1]
         if kv is None:
-            raise KeyError(kv)
-        return kv['Value']
+            return None
+        if isinstance(kv, list):
+            return kv
+        val = kv['Value']
+        return val.decode() if val else None
     except (ConsulException, HTTPError, RequestException) as e:
-        raise NoConsulError('Could not access Consul KV')\
-            from e
+        raise HAConsistencyException('Could not access Consul KV') from e
 
 
-def get_kv(cns: Consul, key: str) -> str:
-    kv: Dict[str, bytes] = cns.kv.get(key)[1]
-    return kv['Value'].decode() if kv and kv['Value'] is not None else ''
+def get_kv_safe(cns: Consul, key: str, **kwargs) -> str:
+    return get_kv(cns, key, **kwargs) or ''
 
 
 def leader_tag(cns: Consul, host: str) -> str:
-    return ' (RC)' if get_kv(cns, 'leader') == host else ''
+    return ' (RC)' if get_kv_safe(cns, 'leader') == host else ''
 
 
 def profile(cns: Consul) -> str:
-    return get_kv(cns, 'm0conf/profiles')
+    return get_kv_safe(cns, 'm0conf/profiles')
 
 
 def sns_pools(cns: Consul) -> List[str]:
-    return get_kv(cns, 'm0conf/profiles/pools').split(' ')
+    return get_kv_safe(cns, 'm0conf/profiles/pools').split(' ')
 
 
 def hosts(cns: Consul) -> Set[str]:
-    data = cns.kv.get('m0conf/nodes', recurse=True)[1]
+    data = get_kv(cns, 'm0conf/nodes', recurse=True)
     host_names = {(x['Key'].split('/'))[2] for x in data}
     return host_names
 
 
 def get_fs_stats(cns: Consul) -> Optional[Any]:
-    try:
-        data = get_kv_throwing(cns, 'stats/filesystem')
-        return j.loads(data)
-    except KeyError:
-        return None
+    data = get_kv(cns, 'stats/filesystem')
+    return j.loads(data)
 
 
 def proc_id2name(cns: Consul, node: str, proc_id: int) -> str:
@@ -100,8 +98,9 @@ def proc_id2name(cns: Consul, node: str, proc_id: int) -> str:
         'ios': 'ioservice',
         'm0_client_s3': 's3server'
     }
-    services = cns.kv.get(f'm0conf/nodes/{node}/processes/{proc_id}/services',
-                          recurse=True)[1]
+    services = get_kv(cns,
+                      f'm0conf/nodes/{node}/processes/{proc_id}/services',
+                      recurse=True)
     assert services
     for svc in services:
         # key looks like
@@ -115,16 +114,15 @@ def proc_id2name(cns: Consul, node: str, proc_id: int) -> str:
 def processes(cns: Consul, node_id: str) -> List[Process]:
     # Get 'm0conf/nodes/<node_id>/processes/<process_fidk>/...' entries
     # from the KV.  See 'Consul KV Schema' in [4/KV](rfc/4/README.md).
-    data = cns.kv.get(f'm0conf/nodes/{node_id}/processes', recurse=True)[1]
+    data = get_kv(cns, f'm0conf/nodes/{node_id}/processes', recurse=True)
     fidk_list: List[int] = list({int(x['Key'].split('/')[4]) for x in data})
     fidk_list.sort()
     return [
         Process(name=proc_id2name(cns, node_id, k),
                 fid=Fid(0x7200000000000001, k),
-                ep=get_kv(cns,
-                          f'm0conf/nodes/{node_id}/processes/{k}/endpoint'),
-                status=process_status(cns, node_id, k))
-        for k in fidk_list
+                ep=get_kv_safe(
+                    cns, f'm0conf/nodes/{node_id}/processes/{k}/endpoint'),
+                status=process_status(cns, node_id, k)) for k in fidk_list
     ]
 
 
@@ -143,6 +141,7 @@ def cluster_online() -> bool:
     return exit_code == 0
 
 
+@repeat_if_fails(max_retries=24)
 def get_cluster_status(cns: Consul) -> Dict[str, Any]:
     nodes = [(Host(name=h, svcs=processes(cns, h)))._asdict()
              for h in hosts(cns)]
@@ -163,7 +162,41 @@ def parse_opts(argv):
     return p.parse_args(argv)
 
 
+def setup_logging():
+    logging.basicConfig(level=logging.ERROR)
+
+
+@repeat_if_fails(max_retries=24)
+def show_text_status(cns: Consul):
+    # In-memory buffer required because an intermittent Consul exception can
+    # happen right in the middle of printing something. It is good to postpone
+    # the printing to stdout until the moment when those exceptions can't
+    # appear anymore.
+    with io.StringIO() as stream:
+        # Raised exception will cross  the 'with' border so that the stream
+        # will be closed and its memory will be released.
+        #
+        def echo(text):
+            print(text, file=stream)
+
+        def flush():
+            print(stream.getvalue())
+
+        echo('Profile: ' + profile(cns))
+        echo('Data pools:')
+        for x in sns_pools(cns):
+            echo(f'    {x}')
+        echo('Services:')
+        for h in hosts(cns):
+            echo(f'    {h} {leader_tag(cns, h)}')
+            for p in processes(cns, h):
+                fid: str = f'{p.fid}'
+                echo(f'    [{p.status}]  {p.name:<9}  {fid:<23}  {p.ep}')
+        flush()
+
+
 def main(argv=None):
+    setup_logging()
     opts = parse_opts(argv)
     cns = Consul()
     if not cluster_online():
@@ -174,21 +207,11 @@ def main(argv=None):
         status = get_cluster_status(cns)
         print(j.dumps(status, indent=2, cls=FidEncoder))
         return 0
-
-    print('Profile: ' + profile(cns))
-    print('Data pools:')
-    for x in sns_pools(cns):
-        print(f'    {x}')
-    print('Services:')
-    for h in hosts(cns):
-        print(f'    {h} {leader_tag(cns, h)}')
-        for p in processes(cns, h):
-            fid: str = f'{p.fid}'
-            print(f'    [{p.status}]  {p.name:<9}  {fid:<23}  {p.ep}')
+    show_text_status(cns)
 
 
 if __name__ == '__main__':
     try:
         sys.exit(main())
-    except (ConsulException, NoConsulError) as err:
+    except HAConsistencyException as err:
         sys.exit(f'Consul Error: {err}')
