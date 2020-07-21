@@ -323,7 +323,7 @@ override MYPY_OPTS := --config-file hax/mypy.ini $(MYPY_OPTS)
 mypy: $(PYTHON_SCRIPTS)
 	@$(call _info,Checking files with mypy)
 	@$(PY_VENV); \
-	  set -eu -o pipefail; for f in $^; do MYPYPATH=stubs:hax/ mypy $(MYPY_OPTS) $$f; done
+	  set -eu -o pipefail; for f in $^; do MYPYPATH=stubs:hax mypy $(MYPY_OPTS) $$f; done
 
 # Tests ----------------------------------------------- {{{1
 #

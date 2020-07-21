@@ -50,10 +50,23 @@ ha_process_events = ('M0_CONF_HA_PROCESS_STARTING',
                      'M0_CONF_HA_PROCESS_STOPPED')
 
 
-def repeat_if_fails(wait_seconds=5):
+def repeat_if_fails(wait_seconds=5, max_retries=-1):
+    """
+    Ensures that the wrapped function gets re-invoked if
+    HAConsistencyException gets raised. In other words, this wrapper
+    makes the wrapped function repeatable.
+
+    Parameters:
+
+    wait_seconds - delay (in seconds) between the attempts. The delay
+         applies after HAConsistencyException is raised.
+    max_retries - how many attempts the wrapper will perform until finally
+         re-raising the exception. -1 means 'repeat forever'.
+    """
     def callable(f):
         @wraps(f)
         def wrapper(*args, **kwds):
+            attempt_count = 0
             while (True):
                 try:
                     logging.debug(
@@ -64,8 +77,15 @@ def repeat_if_fails(wait_seconds=5):
                                   f.__name__)
                     return result
                 except HAConsistencyException as e:
+                    attempt_count += 1
+                    if max_retries >= 0 and attempt_count > max_retries:
+                        logging.warn(
+                            'Too many errors happened in a row '
+                            '(max_retries = %d)', max_retries)
+                        raise e
                     logging.warn(
-                        f'Got HAConsistencyException: {e.message}. The'
+                        f'Got HAConsistencyException: {e.message} '
+                        f'(attempt {attempt_count}). The'
                         f' attempt will be repeated in {wait_seconds} seconds')
                     sleep(wait_seconds)
 
