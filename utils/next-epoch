@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+set -eu -o pipefail
+export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
+# set -x
+
+KEY=epoch
+
+usage() {
+    cat <<EOF
+Usage: ${0##*/}
+
+Increment the '$KEY' integer (monotonically incremented counter)
+in the Consul KV store using a Check-And-Set operation.
+EOF
+}
+
+case "${1:-}" in
+    -h|--help) usage; exit;;
+esac
+
+if (($# != 0)); then
+    usage >&2
+    exit 1
+fi
+
+current_index() {
+    consul kv get -detailed $KEY | awk '/ModifyIndex/ {print $2}'
+}
+
+next_epoch() {
+    echo $(( $(consul kv get $KEY) + 1 ))
+}
+
+commit() {
+    local val=$1
+    # '-cas' performs a Check-And-Set operation.
+    consul kv put -cas -modify-index=$(current_index) $KEY $val > /dev/null
+}
+
+n=$(next_epoch)
+while ! commit $n; do
+    n=$(next_epoch)
+done
+
+echo $n
