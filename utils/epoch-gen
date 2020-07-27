@@ -1,4 +1,0 @@
-#!/usr/bin/env bash
-set -eu -o pipefail
-
-printf "%09d\n" $(next-gen epoch)

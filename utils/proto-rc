@@ -106,7 +106,7 @@ consul kv get -recurse timeout | {
         fi
         IFS=','
         for ev in $EVENT; do
-            consul kv put eq/$(epoch-gen) $ev
+            consul kv put $(printf "eq/%09d\n" $(next-epoch)) $ev
         done
         IFS=':'
         consul kv delete $TMO
