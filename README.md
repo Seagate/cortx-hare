@@ -8,36 +8,50 @@ disguised as a software project.
 
 ## What Hare does?
 
-1. Configures components of Motr object store system.
-2. Provides CLI for starting/stopping Motr system.
-3. Makes arrangements to ensure that Motr system remains available even
-   when some of its components fail.
+The scripts in this repository constitute a middleware layer between [Consul](https://www.consul.io/) and [Motr](https://github.com/Seagate/cortx-motr) services.
+
+Their responsibilities:
+1. Configures components of the distributed Motr object store.
+2. Makes arrangements to ensure that Motr system remains available even
+   if some of its components fail.
+3. Provides CLI for starting/stopping Motr system.
 
 Hare implementation uses [Consul](https://www.consul.io) key-value store
 and health-checking mechanisms.
 
 <!------------------------------------------------------------------->
 
-## Prerequisites
+## Getting Hare
 
-### :ballot_box_with_check: Checklist
+cortx-hare depends on cortx-motr libraries. Therefore, a correct version of
+cotrx-motr must be installed for proper operation. cotrx-motr can be either
+installed from packages of build from sources.
 
-Before starting the cluster as \<user\> at \<origin\> machine,
-ensure that
+Available options:
+* Install RPMs from CI build.  
+  _The easiest way to get Hare + Motr instances up and running._
+* Build and install from source code.  
+  _Works for contribution process._
 
-\# | Check | Where
---- | --- | ---
-1 | passwordless `sudo` works for \<user\> | all machines
-2 | \<user\> can `ssh` from \<origin\> to other machines | \<origin\>
-3 | `cortx-hare` and `cortx-s3server` RPMs are installed | all machines
-4 | `/opt/seagate/cortx/hare/bin` is in \<user\>'s PATH | all machines
-5 | \<user\> is a member of `hare` group | all machines
-6 | CDF exists and corresponds to the actual cluster configuration | \<origin\>
+### Get source code
+
+1. Fork [cortx-hare](https://github.com/Seagate/cortx-hare) repo using Github
+   interface.
+2. Clone created cortx-hare with submodules.
+3. Add Seagate remote:
+```
+git remote add seagate git@github.com:Seagate/cortx-hare.git
+```
+Please refer to [README_developers.md](README_developers.md) for instructions
+on how to build and install hare from source code.
 
 ### Install RPM packages
 
-* Install `cortx-hare` and `cortx-s3server` packages by running these commands
-  on every machine of the cluster:
+**WARNING:** This part of instruction is valid only for Seagate engineers so
+far. It will be updated once public CI is operational.
+
+Installing `cortx-hare` and `cortx-s3server` packages by running these commands
+on every machine in the cluster:
   ```bash
   (set -eu
 
@@ -57,6 +71,34 @@ ensure that
   )
   ```
 
+## Prerequisites
+
+### Choose a configuration to setup
+
+* Single node with Hare + Motr up and running.  
+  _Recommended for fast proof of concept check to get familiar with software._
+* Cluster setup  
+  _Intended mode of operation. Several nodes/VM is required. RPM installation
+  is recommended._  
+  **WARNING: will be available once public CI is operational.**
+
+The difference is obviously a number or nodes to configure and the content of
+CDF file to be used later in this guide.
+
+### :ballot_box_with_check: Checklist
+
+Before starting the cluster as \<user\> at \<origin\> machine,
+ensure that
+
+\# | Check | Where
+--- | --- | ---
+1 | passwordless `sudo` works for \<user\> | all machines
+2 | \<user\> can `ssh` from \<origin\> to other machines | \<origin\>
+3 | `cortx-hare` and `cortx-s3server` rpms are installed | all machines
+4 | `/opt/seagate/cortx/hare/bin` is in \<user\>'s PATH | all machines
+5 | \<user\> is a member of `hare` group | all machines
+6 | CDF exists and reflects actual cluster configuration | \<origin\>
+
 * Add `/opt/seagate/cortx/hare/bin` to PATH.
   ```sh
   export PATH="/opt/seagate/cortx/hare/bin:$PATH"
@@ -66,7 +108,7 @@ ensure that
   ```sh
   sudo usermod --append --groups hare $USER
   ```
-  Log out and log back in.
+  Log out and log back in to apply changes.
 
 ### Prepare a CDF
 
@@ -74,18 +116,34 @@ To start the cluster for the first time you will need a cluster
 description file (CDF).
 
 Make a copy of
-`/opt/seagate/cortx/hare/share/cfgen/examples/ees-cluster.yaml` (or
-`singlenode.yaml` in case of single-node setup) and adapt it to match
-your cluster.  `host`, `data_iface`, and `io_disks` fields may require
-modifications.
+* `/opt/seagate/cortx/hare/share/cfgen/examples/ees-cluster.yaml` for 2-node
+  setup
+* `/opt/seagate/cortx/hare/share/cfgen/examples/singlenode.yaml` for
+  single-node setup.
+
+Adapt file to match your cluster configuration: `host`, `data_iface`, and
+`io_disks` fields may require modifications.
 
 ```sh
-cp /opt/seagate/cortx/hare/share/cfgen/examples/ees-cluster.yaml ~/CDF.yaml
+cp /opt/seagate/cortx/hare/share/cfgen/examples/singlenode.yaml ~/CDF.yaml
 vi ~/CDF.yaml
 ```
 Make sure interface used for configuration parameter `data_iface` is
 configured for lnet.
 `sudo lctl list_nids` should show IP address of data_iface.
+
+It is possible to make Hare + Motr work without having real block devices.
+Loop devices are used in this case.
+Create loop devices, if necessary:
+```bash
+sudo mkdir -p /var/motr
+for i in {0..9}; do
+    sudo dd if=/dev/zero of=/var/motr/disk$i.img bs=1M seek=9999 count=1
+    sudo losetup /dev/loop$i /var/motr/disk$i.img
+done
+```
+Ensure that information in `io_disks` section of CDF file corresponds to
+existing devices.
 
 See `cfgen --help-schema` for the description of CDF format.
 
@@ -151,6 +209,15 @@ sudo modprobe lnet
 sudo lctl network configure
 ```
 
+### hctl reportbug
+
+hctl provides command which gathers all required logs from consul, hax and motr
+services.  
+Those logs can be attached to GitHub issue.
+```
+hctl reportbug
+```
+
 ### RC Leader cannot be elected
 
 If `hctl bootstrap` cannot complete and keeps printing dots similarly
@@ -170,3 +237,9 @@ hctl shutdown
 sudo systemctl reset-failed hare-hax
 ```
 and bootstrap again.
+
+## See also:
+
+* Contributing guide: [CONTRIBUTING.md](CONTRIBUTING.md).
+* Developers guide: [README_developers.md](README_developers.md).
+* Additional documents and API description: [RFCs](rfc/)
