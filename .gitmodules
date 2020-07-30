@@ -1,9 +1,9 @@
 [submodule "vendor/consul-bin"]
 	path = vendor/consul-bin
-	url = ../consul-bin
+	url = ../../seagate/consul-bin
 [submodule "vendor/dhall-bin"]
 	path = vendor/dhall-bin
-	url = ../dhall-bin
+	url = ../../seagate/dhall-bin
 [submodule "vendor/dhall-prelude"]
 	path = vendor/dhall-prelude
-	url = ../dhall-prelude
+	url = ../../seagate/dhall-prelude
