@@ -1,24 +1,25 @@
 # Hare Developer Guide
 
-The scripts in this repository form a middleware layer between
-[Consul](https://www.consul.io/) and
-[Motr](https://github.com/seagate/cortx-motr) services.
+Current document covers building from sources and detailed configuration of Hare service.
 
-Hare responsibilities:
-
-- Generate initial configuration of Motr cluster.
-- Mediate communication between Motr processes and Consul agents.
+Topics described here may require access to Seagate infrastructure.
 
 ## 0. Prerequisites
 
-* Python &geq; 3.6 and the header files.
+* Repository is cloned along with all submodules. [Link to readme.](README.md#get-source-code)  
+  Quick clone from Seagate repo: `git clone --recursive https://github.com/Seagate/cortx-hare.git`
+
+* Python &geq; 3.6 and the corresponding header files.
 
   To install on CentOS 7, run
   ```sh
   sudo yum install python3 python3-devel
   ```
 
-* Ensure that [Motr](https://github.com/seagate/cortx-motr) is installed.
+* Ensure that [Motr](https://github.com/seagate/cortx-motr) is built and its systemd services are installed.  
+  _Note: check [cortx-motr](https://github.com/Seagate/cortx-motr/blob/dev/README.md) repo for more details_
+  ```sh
+  M0_SRC_DIR=/data/mero  # YMMV
 
   * To install Motr from RPMs:
     ```sh
@@ -38,8 +39,7 @@ Hare responsibilities:
 
 1. Build and install Hare:
    ```sh
-   git clone --recursive https://github.com/Seagate/cortx-hare.git hare
-   cd hare
+   # Run from cortx-hare directory
    make
    sudo make devinstall
    ```
@@ -101,32 +101,7 @@ sudo $M0_SRC_DIR/clovis/m0crate/m0crate -S /tmp/m0crate-io.yaml
 
 ### 3.2. Install RPMs
 
-  Run the following code snippet on each of the nodes (VMs):
-
-  <!-- XXX Is it OK to use "centos-7.7.1908" RPMs on a RHEL system? -->
-  ```bash
-  (set -eu
-
-  ci='ci-storage.mero.colo.seagate.com'
-  ssc='ssc-satellite1.colo.seagate.com'
-  repos=(
-      $ci/releases/eos/integration/centos-7.7.1908/last_successful
-      $ci/releases/eos/lustre/custom/tcp
-      $ci/releases/eos/s3server_uploads
-      $ssc/pulp/repos/EOS/Library/custom/CentOS-7/CentOS-7-OS
-  )
-
-  for repo in ${repos[@]}; do
-      repo_file="/etc/yum.repos.d/${repo//\//_}.repo"
-      if ! [[ -e $repo_file ]]; then
-          sudo yum-config-manager --add-repo="http://$repo"
-          sudo tee -a $repo_file <<< 'gpgcheck=0'
-      fi
-  done
-
-  sudo yum install -y eos-core eos-core-devel eos-s3server s3cmd eos-hare
-  )
-  ```
+Execute following step on all nodes: [README.md#install-rpm-packages]
 
 ### 3.3. Create loop devices
 
@@ -314,9 +289,9 @@ has been elected.
   journalctl --since <HH:MM> # bootstrap time
   ```
 
-## 6. Miscellanea
+## 6. Miscellaneous
 
-* Get an entrypoint:
+* Get an entry point:
 
   ```sh
   $ ./get-entrypoint
@@ -350,3 +325,10 @@ has been elected.
 
   The timeout resets automatically (for demo purposes), so you will
   see it in the log file every other minute.
+
+## 7. Links
+
+- [Halon replacement: a simpler, better HA subsystem for EOS](https://docs.google.com/presentation/d/17Pn61WBbTHpeR4NxGtaDfmmHxgoLW9BnQHRW7WJO0gM/view) (slides)
+- [Halon replacement: Consul, design highlights](https://docs.google.com/document/d/1cR-BbxtMjGuZPj8NOc95RyFjqmeFsYf4JJ5Hw_tL1zA/view)
+- Bootstrap guide: [README.md](README.md): _how to get source code and run hare + motr instance_.
+- Contributing guide: [CONTRIBUTING.md](CONTRIBUTING.md).

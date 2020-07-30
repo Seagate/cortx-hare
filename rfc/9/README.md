@@ -215,22 +215,23 @@ specific goals:
 
 <!-- Copied from https://rfc.zeromq.org/spec:42/C4/ -->
 
-1. The project SHALL have one branch ("master") that always holds the
+1. The project SHALL have one branch that always holds the
    latest in-progress version and SHOULD always build.
+   Current branch name: dev.
 
 2. The project SHALL NOT use topic branches for any reason. Personal
    forks MAY use topic branches.
 
 3. To make a stable release a Maintainer SHALL tag the repository.
    Stable releases SHALL always be released from the repository
-   master.
+   dev branch.
 
 <!-- XXX http://hintjens.com/blog:23#toc7 specifies this differently:
   --
   -- ```
   -- ## Creating Stable Releases
   --
-  -- * The project SHALL have one branch ("master") that always holds the
+  -- * The project SHALL have one branch ("dev") that always holds the
   --   latest in-progress version and SHOULD always build.
   --
   -- * The project SHALL NOT use topic branches for any reason. Personal
