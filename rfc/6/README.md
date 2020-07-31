@@ -1,5 +1,5 @@
 ---
-domain: gitlab.mero.colo.seagate.com
+domain: github.com
 shortname: 6/BOOT
 name: Motr Cluster Bootstrap
 status: stable

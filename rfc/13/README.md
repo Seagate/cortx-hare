@@ -1,5 +1,5 @@
 ---
-domain: gitlab.mero.colo.seagate.com
+domain: github.com
 shortname: 13/HALC
 name: EES HA, Loosely Coupled
 status: draft

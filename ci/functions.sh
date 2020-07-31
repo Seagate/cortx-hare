@@ -41,15 +41,15 @@ ci_init_m0vg() (
         # Get `m0vg` script.
         #
         # Notes:
-        # 1. We download the latest Motr, disregarding `MERO_COMMIT_REF`.
+        # 1. We download the latest Motr, disregarding `MOTR_COMMIT_REF`.
         # 2. We use no `--recursive`, because we don't need submodules.
-        git clone --depth 1 http://gitlab.mero.colo.seagate.com/mero/mero.git \
+        git clone --depth 1 git@github.com:Seagate/cortx-motr.git \
             ${M0VG%%/*}
     fi
 
     $M0VG env add <<EOF
 M0_VM_BOX=centos77/dev
-M0_VM_BOX_URL='http://ci-storage.mero.colo.seagate.com/vagrant/centos77/dev'
+M0_VM_BOX_URL='cortx-storage.colo.seagate.com/vagrant/centos77/dev'
 M0_VM_CMU_MEM_MB=4096
 M0_VM_NAME_PREFIX=$(ci_vm_name_prefix)
 M0_VM_HOSTNAME_PREFIX=$(ci_vm_name_prefix)
@@ -74,10 +74,10 @@ ci_success() {
 }
 
 XXX_with_s3server() {
-    if [[ -n ${MERO_COMMIT_REF:-} ]]; then
+    if [[ -n ${MOTR_COMMIT_REF:-} ]]; then
         cat >&2 <<'EOF'
 *WARNING* CI cannot test s3server with custom Motr.
-See http://gitlab.mero.colo.seagate.com/mero/hare/issues/216
+See https://github.com/Seagate/cortx-hare/issues/566
 EOF
         return 1
     else

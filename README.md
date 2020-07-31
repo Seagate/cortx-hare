@@ -59,7 +59,7 @@ on every machine in the cluster:
       if ! sudo yum install -y cortx-hare cortx-s3server; then
           for x in 'integration/centos-7.7.1908/last_successful' 's3server_uploads'
           do
-              repo="ci-storage.mero.colo.seagate.com/releases/eos/$x"
+              repo="cortx-storage.colo.seagate.com/releases/eos/$x"
               sudo yum-config-manager --add-repo="http://$repo"
               sudo tee -a /etc/yum.repos.d/${repo//\//_}.repo <<< 'gpgcheck=0'
           done

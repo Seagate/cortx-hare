@@ -1,7 +1,7 @@
 ---
 original-author: Pieter Hintjens <ph@imatix.com>
 original-url: http://hintjens.com/blog:23
-domain: gitlab.mero.colo.seagate.com
+domain: github.com
 shortname: 9/PC3
 name: Pedantic Code Construction Contract
 status: stable

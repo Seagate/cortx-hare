@@ -1,5 +1,5 @@
 ---
-domain: gitlab.mero.colo.seagate.com
+domain: github.com
 shortname: 12/CHECK
 name: EES HA Health Checks
 status: raw

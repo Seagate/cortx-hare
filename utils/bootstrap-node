@@ -78,7 +78,7 @@ Oftentimes this belief is contradicted by reality.
 EES developers need your help.
 
 Please add a comment to
-http://gitlab.mero.colo.seagate.com/mero/hare/issues/242
+https://github.com/Seagate/cortx-hare/issues/625
 with the following output:
 
 ----------BEGIN OUTPUT----------
@@ -98,8 +98,8 @@ fi
 
 if [[ $do_mkfs ]] && [[ ! -e /etc/sysconfig/motr-kernel ]]; then
     # Auto-start of `motr-kernel` systemd unit will cause kernel panic
-    # unless `MERO_NODE_UUID` configuration option is provided.
-    echo "MERO_NODE_UUID='$(uuidgen --time)'" |
+    # unless `MOTR_NODE_UUID` configuration option is provided.
+    echo "MOTR_NODE_UUID='$(uuidgen --time)'" |
         sudo tee /etc/sysconfig/motr-kernel >/dev/null
 fi
 

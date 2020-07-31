@@ -74,7 +74,7 @@ def get_motr_libs_dir():
         # the system
         pass
 
-    libs_dir = get_motr_dir() + '/mero/.libs'
+    libs_dir = get_motr_dir() + '/motr/.libs'
     libmotr = libs_dir + '/libmotr.so'
     assert P.isfile(libmotr), f'{libmotr}: No such file'
     return libs_dir

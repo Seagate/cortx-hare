@@ -5,7 +5,7 @@ set -x
 
 KERNEL=$(yum list installed kernel | tail -n1 | awk '{ print $2 }')
 
-cd /data/mero
+cd /data/motr
 ./autogen.sh
 ./configure --with-linux=/lib/modules/$KERNEL.x86_64/build
 make -j10

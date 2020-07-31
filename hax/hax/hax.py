@@ -51,7 +51,7 @@ def main():
     _setup_logging()
 
     # [KN] The elements in the queue will appear if
-    # 1. A callback is invoked from ha_link (this will happen in a mero
+    # 1. A callback is invoked from ha_link (this will happen in a motr
     #    thread which must be free ASAP)
     # 2. A new HA notification has come form Consul via HTTP
     # [KN] The messages are consumed by Python thread created by

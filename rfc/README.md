@@ -6,7 +6,7 @@ processes.
 * A specification is created and modified by pull requests according to
   [PC3](rfc/9/README.md).
 * Each specification has an editor who publishes the RFC to
-  http://gitlab.mero.colo.seagate.com as needed.
+  github.com as needed.
 * Specification lifecycle SHOULD follow the lifecycle defined in
   [COSS](http://rfc.unprotocols.org/spec:2/COSS).
 * Non-cosmetic changes are allowed only on Raw and Draft specifications.
