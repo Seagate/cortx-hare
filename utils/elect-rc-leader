@@ -70,8 +70,7 @@ create_session() {
     local checks_a=($(consul kv get -recurse m0conf/nodes/$(node-name) |
                       egrep -w 'confd|ha' |
                       sed -r 's/.*processes.([0-9]+).*/"service:\1"/'))
-    # See the trick comma separated list explained here:
-    # https://stackoverflow.com/questions/38625176/store-array-output-to-comma-separated-list-in-bash-scripting
+    # Join array items into a comma-separated string.
     local checks=$(IFS=,; echo "[\"serfHealth\", ${checks_a[*]}]")
     local payld="{\"Name\": \"leader\", \"Checks\": $checks, \"LockDelay\": \"2s\"}"
     local res=$(curl -sX PUT -d "$payld" http://localhost:8500/v1/session/create)
