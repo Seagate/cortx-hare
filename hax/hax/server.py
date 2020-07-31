@@ -16,85 +16,73 @@
 # please email opensource@seagate.com or cortx-questions@seagate.com.
 #
 
-import json
+import asyncio
 import logging
-from http.server import BaseHTTPRequestHandler, HTTPServer
-from typing import Any, Dict, List, Tuple
+from queue import Queue
+from typing import Any, Dict, List
 
+from aiohttp import web
+from aiohttp.web_response import json_response
+
+from hax.message import BroadcastHAStates
 from hax.types import HAState, StoppableThread
 from hax.util import ConsulUtil, create_process_fid
 
 
-class KVHandler(BaseHTTPRequestHandler):
-    def __init__(self, req, client_addr, server):
-        super().__init__(req, client_addr, server)
-        self.server = server
-
-    def _set_headers(self):
-        self.send_response(200)
-        self.send_header('Content-type', 'application/json')
-        self.end_headers()
-
-    def do_GET(self):
-        self._set_headers()
-        result = json.dumps({'message': 'I am alive'})
-        self.wfile.write(result.encode())
-
-    def do_HEAD(self):
-        self._set_headers()
-
-    def do_POST(self):
-        self._set_headers()
-        content_length = int(self.headers['Content-Length'])
-        post_data = self.rfile.read(content_length)
-        logging.debug('POST request received: %s', post_data)
-
-        ha_states = self.to_ha_states(KVHandler.parse_json(post_data))
-        logging.info('HA states: %s', ha_states)
-        self.server.halink.broadcast_ha_states(ha_states)
-        logging.debug('POST request processed')
-
-    @staticmethod
-    def parse_json(raw_data: bytes) -> Any:
-        try:
-            return json.loads(raw_data.decode('utf-8'))
-        except json.JSONDecodeError:
-            logging.warning('Invalid JSON object received')
-
-    @staticmethod
-    def to_ha_states(data: Any) -> List[HAState]:
-        """Converts a dictionary, obtained from JSON data, into a list of
-        HA states.
-
-        Format of an HA state: HAState(fid= <service fid>, status= <state>),
-        where <state> is either 'online' or 'offline'.
-        """
-        if not data:
-            return []
-
-        def get_status(checks: List[Dict[str, Any]]) -> str:
-            ok = all(x.get('Status') == 'passing' for x in checks)
-            return 'online' if ok else 'offline'
-
-        return [
-            HAState(fid=create_process_fid(int(t['Service']['ID'])),
-                    status=get_status(t['Checks'])) for t in data
-        ]
+async def hello_reply(request):
+    return json_response(text="I'm alive! Sincerely, HaX")
 
 
-def run_server(threads_to_wait: List[StoppableThread] = [],
-               server_class=HTTPServer,
-               port=8008,
-               halink=None):
+def to_ha_states(data: Any) -> List[HAState]:
+    """Converts a dictionary, obtained from JSON data, into a list of
+    HA states.
+
+    Format of an HA state: HAState(fid= <service fid>, status= <state>),
+    where <state> is either 'online' or 'offline'.
+    """
+    if not data:
+        return []
+
+    def get_status(checks: List[Dict[str, Any]]) -> str:
+        ok = all(x.get('Status') == 'passing' for x in checks)
+        return 'online' if ok else 'offline'
+
+    return [
+        HAState(fid=create_process_fid(int(t['Service']['ID'])),
+                status=get_status(t['Checks'])) for t in data
+    ]
+
+
+def process_ha_states(queue: Queue):
+    async def _process(request):
+        data = await request.json()
+
+        loop = asyncio.get_event_loop()
+        # Note that queue.put is potentially a blocking call
+        await loop.run_in_executor(
+            None, lambda: queue.put(BroadcastHAStates(to_ha_states(data))))
+        return web.Response()
+
+    return _process
+
+
+def run_server(
+    queue: Queue,
+    threads_to_wait: List[StoppableThread] = [],
+    port=8008,
+):
     addr = ConsulUtil().get_hax_ip_address()
-    server_address: Tuple[str, int] = (addr, port)
-    httpd = server_class(server_address, KVHandler)
-    httpd.halink = halink
 
+    app = web.Application()
+    app.add_routes(
+        [web.get('/', hello_reply),
+         web.post('/', process_ha_states(queue))])
     logging.info(f'Starting HTTP server at {addr}:{port} ...')
     try:
-        httpd.serve_forever()
+        web.run_app(app, host=addr, port=port)
+        logging.debug('Server stopped normally')
     finally:
+        logging.debug('Stopping the threads')
         for thread in threads_to_wait:
             thread.stop()
         for thread in threads_to_wait:

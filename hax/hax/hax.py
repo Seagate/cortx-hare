@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 # Copyright (c) 2020 Seagate Technology LLC and/or its Affiliates
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,8 +17,6 @@
 # For any questions about this software or licensing,
 # please email opensource@seagate.com or cortx-questions@seagate.com.
 #
-
-#!/usr/bin/env python3
 
 import logging
 from queue import Queue
@@ -99,7 +99,9 @@ def main():
         stats_updater = _run_stats_updater_thread(halink)
         # [KN] This is a blocking call. It will work until the program is
         # terminated by signal
-        run_server(threads_to_wait=[consumer, stats_updater], halink=halink)
+        run_server(q, threads_to_wait=[consumer, stats_updater])
+    except Exception:
+        logging.exception('Exiting due to an exception')
     finally:
         halink.close()
 

@@ -125,7 +125,7 @@ setup(
     version=get_hax_version(),
     packages=find_packages(),
     setup_requires=['flake8', 'mypy', 'pkgconfig'],
-    install_requires=['python-consul>=1.1.0', 'simplejson'],
+    install_requires=['python-consul>=1.1.0', 'simplejson', 'aiohttp'],
     entry_points={'console_scripts': ['hax=hax.hax:main']},
     ext_modules=[
         Extension(
