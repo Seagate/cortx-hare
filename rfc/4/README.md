@@ -27,6 +27,7 @@ Key | Value | Description
 `sspl.SYSTEM_INFORMATION.log_level` | | This key is used by SSPL.
 `stats/filesystem` | JSON object | See ['stats/filesystem' value](#statsfilesystem-value) below.
 `timeout` | YYYYmmddHHMM.SS | This value is used by the RC timeout mechanism.
+`m0conf/nodes/<name>/processes/<process_fidk>/be_seg` | BE seg path | BE segment path, it is used to create BE segment wile m0mkfs.
 
 **Note:** Fid keys are non-negative integers, base 10.
 

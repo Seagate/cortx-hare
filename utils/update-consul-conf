@@ -48,6 +48,11 @@ id2fid() {
     printf '0x7200000000000001:%#x\n' $1
 }
 
+get_ios_be_seg() {
+    local id=$1
+    consul kv get m0conf/nodes/$(node-name)/processes/$id/be_seg
+}
+
 HAX_ID=$(get_service_ids 'grep -iw ha')
 [[ $HAX_ID ]] || {
     cat >&2 <<.
@@ -58,9 +63,10 @@ Please verify that the host name matches the one stored in the Consul KV.
     exit 1
 }
 CONFD_IDs=$(get_service_ids 'grep -iw confd')
-IOS_IDs=$(get_service_ids 'grep -iw ios | grep -iwv confd')
+IOS_IDs=$(get_service_ids 'grep -iw ios | grep -iwv be_seg | grep -iwv confd')
 S3_IDs=$(get_service_ids 'grep -iw m0_client_s3')
 HAX_EP=$(get_service_ep $HAX_ID)
+
 
 if $dry_run; then
     return 0  # we must not `exit`, because the script is sourced
@@ -129,6 +135,7 @@ append_ios_svc() {
     local ep=$(get_service_ep $id)
     local addr=$(get_service_addr $ep)
     local port=$(get_service_port $ep)
+    local be_seg=$(get_ios_be_seg $id)
     SVCS_CONF+="${SVCS_CONF:+,}{
       \"id\": \"$id\",
       \"name\": \"ios\",
@@ -147,6 +154,7 @@ append_ios_svc() {
 MERO_M0D_EP='$ep'
 MERO_HA_EP='$HAX_EP'
 MERO_PROCESS_FID='$fid'
+MERO_BE_SEG_PATH='$be_seg'
 EOF
 }
 

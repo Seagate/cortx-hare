@@ -76,7 +76,10 @@ nodes:
                                # optional, defaults to "tcp"
     m0_servers:
       - runs_confd: <bool>  # optional, defaults to false
-        io_disks: [ <str> ] # e.g. [ "/dev/loop0", "/dev/loop1", "/dev/loop2" ]
+        io_disks:
+          be_seg: <str>     # device path for BE segment
+                            # optional, default path @ /var/motr/m0d-<FID>/
+          data: [ <str> ]   # e.g. [ "/dev/loop0", "/dev/loop1", "/dev/loop2" ]
                             # Empty list means no IO service.
     m0_clients:
         s3: <int>     # number of S3 servers to start
@@ -209,8 +212,11 @@ def enrich_cluster_desc(desc: Dict[str, Any], mock_p: bool) -> None:
 
         for m0d in node['m0_servers']:
             m0d.setdefault('runs_confd', False)
+            m0d.setdefault('_be_seg', None)
             m0d['_io_disks'] = get_disks(node['hostname'], mock_p,
-                                         m0d['io_disks'])
+                                         m0d['io_disks']['data'])
+        if 'be_seg' in m0d['io_disks']:
+            m0d['_be_seg'] = m0d['io_disks']['be_seg']
 
 
 def validate_cluster_desc(desc: Dict[str, Any]) -> None:
@@ -530,12 +536,13 @@ class ConfProcess(ToDhall):
     _downlinks = {Downlink('services', ObjT.service)}
 
     def __init__(self, nr_cpu: int, memsize_MB: int, endpoint: Endpoint,
-                 services: List[Oid]):
+                 be_seg: str, services: List[Oid]):
         assert nr_cpu > 0
         self.nr_cpu = nr_cpu
         assert memsize_MB > 0
         self.memsize_MB = memsize_MB
         self.endpoint = endpoint
+        self.be_seg = be_seg
         assert all(x.type is ObjT.service for x in services)
         self.services = services
 
@@ -572,9 +579,15 @@ class ConfProcess(ToDhall):
                       ipaddr=facts[ipaddr_key(node_desc['data_iface'])],
                       portal=proc_t.value)
         proc_id = new_oid(ObjT.process)
+        if proc_desc is not None and proc_t is ProcT.m0_server:
+            bs = proc_desc['_be_seg']
+        else:
+            bs = ''
+
         m0conf[proc_id] = cls(nr_cpu=facts['processorcount'],
                               memsize_MB=facts['_memsize_MB'],
                               endpoint=ep,
+                              be_seg=bs,
                               services=[])
         m0conf[parent].processes.append(proc_id)
 
@@ -1187,7 +1200,7 @@ def generate_consul_kv(cluster: Cluster, dhall_dir: str) -> str:
 
     ConsulService = NamedTuple('ConsulService', [
         ('node_name', str), ('proc_id', Oid), ('ep', Endpoint),
-        ('svc_id', Oid), ('stype', str)])
+        ('svc_id', Oid), ('stype', str), ('be_seg', str)])
 
     def profile() -> str:
         profiles = [x for x in m0conf.keys() if x.type is ObjT.profile]
@@ -1214,7 +1227,8 @@ def generate_consul_kv(cluster: Cluster, dhall_dir: str) -> str:
                     yield ConsulService(node_name=node.name,
                                         proc_id=proc_id,
                                         ep=m0conf[proc_id].endpoint,
-                                        svc_id=svc_id, stype=stype)
+                                        svc_id=svc_id, stype=stype,
+                                        be_seg=m0conf[proc_id].be_seg)
                 # Add clovis clients to consul kv
                 if proc_id in cluster.m0_clients:
                     proc_ep = m0conf[proc_id].endpoint
@@ -1222,7 +1236,8 @@ def generate_consul_kv(cluster: Cluster, dhall_dir: str) -> str:
                                         proc_id=proc_id,
                                         ep=m0conf[proc_id].endpoint,
                                         svc_id=cluster.m0_clients[proc_id],
-                                        stype=ProcT(proc_ep.portal).name)
+                                        stype=ProcT(proc_ep.portal).name,
+                                        be_seg='')
 
     return json.dumps([dict(key=k, value=v) for k, v in (
         ('epoch', 1),
@@ -1232,6 +1247,8 @@ def generate_consul_kv(cluster: Cluster, dhall_dir: str) -> str:
         ('m0conf/profiles/pools', sns_pools()),
         *[(f'm0conf/nodes/{x.node_name}/processes/{x.proc_id.fidk}/services/'
            f'{x.stype}', x.svc_id.fidk) for x in processes()],
+        *[(f'm0conf/nodes/{x.node_name}/processes/{x.proc_id.fidk}/'
+           f'be_seg', x.be_seg) for x in processes() if x.stype == 'ios'],
         *[(f'm0conf/nodes/{x.node_name}/processes/{x.proc_id.fidk}/endpoint',
            str(x.ep))
           for x in processes()])],

@@ -38,8 +38,13 @@ nodes:
                                # optional, defaults to "tcp"
     m0_servers:
       - runs_confd: <bool>  # optional, defaults to false
-        io_disks: [ <str> ] # e.g. [ "/dev/loop0", "/dev/loop1", "/dev/loop2" ]
+        io_disks:
+          be_seg: <str>     # device path for BE segment
+                            # optional, default path @ /var/motr/m0d-<FID>/
+          data: [ <str> ]   # e.g. [ "/dev/loop0", "/dev/loop1", "/dev/loop2" ]
                             # Empty list means no IO service.
+                            # Empty list means no IO service.
+
     m0_clients:
         s3: <int>     # number of S3 servers to start
         other: <int>  # max quantity of other Motr clients this host may have
