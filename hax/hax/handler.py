@@ -3,9 +3,10 @@ import time
 from queue import Empty, Queue
 
 from hax.ffi import HaxFFI
-from hax.message import EntrypointRequest, HaNvecGetEvent, ProcessEvent
-from hax.util import ConsulUtil, repeat_if_fails
+from hax.message import (BroadcastHAStates, EntrypointRequest, HaNvecGetEvent,
+                         ProcessEvent)
 from hax.types import StoppableThread
+from hax.util import ConsulUtil, repeat_if_fails
 
 
 class ConsumerThread(StoppableThread):
@@ -66,6 +67,9 @@ class ConsumerThread(StoppableThread):
                         # intermittent error gets resolved.
                         decorated = (repeat_if_fails(wait_seconds=5))(fn)
                         decorated(item)
+                    elif isinstance(item, BroadcastHAStates):
+                        logging.info('HA states: %s', item.states)
+                        ha_link.broadcast_ha_states(item.states)
                     else:
                         logging.warning('Unsupported event type received: %s',
                                         item)

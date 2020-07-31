@@ -81,7 +81,9 @@ def main():
         stats_updater = _run_stats_updater_thread(halink)
         # [KN] This is a blocking call. It will work until the program is
         # terminated by signal
-        run_server(threads_to_wait=[consumer, stats_updater], halink=halink)
+        run_server(q, threads_to_wait=[consumer, stats_updater])
+    except Exception:
+        logging.exception('Exiting due to an exception')
     finally:
         halink.close()
 

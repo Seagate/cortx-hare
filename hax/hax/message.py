@@ -1,7 +1,7 @@
 from typing import Any, List
 
 from hax import halink
-from hax.types import Fid, HaNote, Uint128
+from hax.types import Fid, HaNote, HAState, Uint128
 
 
 class BaseMessage:
@@ -31,6 +31,11 @@ class EntrypointRequest(BaseMessage):
 class ProcessEvent(BaseMessage):
     def __init__(self, evt):
         self.evt = evt
+
+
+class BroadcastHAStates(BaseMessage):
+    def __init__(self, states: List[HAState]):
+        self.states = states
 
 
 class HaNvecGetEvent(BaseMessage):
