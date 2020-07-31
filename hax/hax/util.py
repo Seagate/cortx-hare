@@ -1,12 +1,12 @@
 import json
-import simplejson
 import logging
 import os
 import re
 from functools import wraps
 from time import sleep
-from typing import Any, Dict, List, NamedTuple, Tuple
+from typing import Any, Dict, List, NamedTuple, Optional, Tuple
 
+import simplejson
 from consul import Consul, ConsulException
 from requests.exceptions import RequestException
 from urllib3.exceptions import HTTPError
@@ -94,32 +94,40 @@ def repeat_if_fails(wait_seconds=5, max_retries=-1):
     return callable
 
 
-class ConsulUtil:
-    def __init__(self):
-        self.cns: Consul = Consul()
+class ConsulKVBasic:
+    def __init__(self, cns: Optional[Consul] = None):
+        self.cns = cns or Consul()
 
-    def _kv_get(self, key: str, **kwargs) -> Any:
+    def kv_get_raw(self, key: str, **kwargs) -> Tuple[int, Any]:
         """
         Helper method that should be used by default in this class whenver
         we want to invoke Consul.kv.get()
         """
         assert key
         try:
-            return self.cns.kv.get(key, **kwargs)[1]
+            return self.cns.kv.get(key, **kwargs)
         except (ConsulException, HTTPError, RequestException) as e:
-            raise HAConsistencyException('Could not access Consul KV')\
-                from e
+            raise HAConsistencyException('Could not access Consul KV') from e
 
-    def _kv_put(self, key: str, data: str) -> None:
+    def kv_get(self, key: str, **kwargs) -> Any:
+        return self.kv_get_raw(key, **kwargs)[1]
+
+    def kv_put(self, key: str, data: str, **kwargs) -> bool:
         """
         Helper method that should be used by default in this class whenver
         we want to invoke Consul.kv.put()
         """
         assert key
         try:
-            self.cns.kv.put(key, data)
+            return self.cns.kv.put(key, data, **kwargs)
         except (ConsulException, HTTPError, RequestException) as e:
             raise HAConsistencyException('Failed to put value to KV') from e
+
+
+class ConsulUtil:
+    def __init__(self):
+        self.cns: Consul = Consul()
+        self.kv = ConsulKVBasic(cns=self.cns)
 
     def _catalog_service_names(self) -> List[str]:
         """
@@ -130,15 +138,15 @@ class ConsulUtil:
             services: Dict[str, List[Any]] = self.cns.catalog.services()[1]
             return list(services.keys())
         except (ConsulException, HTTPError, RequestException) as e:
-            raise HAConsistencyException('Could not access Consul Catalog')\
-                from e
+            raise HAConsistencyException(
+                'Could not access Consul Catalog') from e
 
     def _catalog_service_get(self, svc_name: str) -> List[Dict[str, Any]]:
         try:
             return self.cns.catalog.service(service=svc_name)[1]
         except (ConsulException, HTTPError, RequestException) as e:
-            raise HAConsistencyException('Could not access Consul Catalog')\
-                from e
+            raise HAConsistencyException(
+                'Could not access Consul Catalog') from e
 
     def _service_by_name(self, hostname: str, svc_name: str) -> Dict[str, Any]:
         for svc in self._catalog_service_get(svc_name):
@@ -184,8 +192,8 @@ class ConsulUtil:
         rm_node = self.get_session_node(self.get_leader_session())
         confd = self._service_by_name(rm_node, 'confd')
         pfidk = int(confd['ServiceID'])
-        fidk = self._kv_get(f'm0conf/nodes/{rm_node}/processes/{pfidk}/'
-                            'services/rms')
+        fidk = self.kv.kv_get(f'm0conf/nodes/{rm_node}/processes/{pfidk}/'
+                              'services/rms')
         return mk_fid(ObjT.SERVICE, int(fidk['Value']))
 
     def get_hax_endpoint(self) -> str:
@@ -208,7 +216,7 @@ class ConsulUtil:
         Returns the RC leader session. HAConsistencyException is raised
         immediately if there is no RC leader selected at the moment.
         """
-        leader = self._kv_get('leader')
+        leader = self.kv.kv_get('leader')
         try:
             return str(leader['Session'])
         except KeyError:
@@ -231,7 +239,7 @@ class ConsulUtil:
         def get_status(srv: ServiceData) -> str:
             try:
                 key = f'processes/{srv.fid}'
-                raw_data = self._kv_get(key)
+                raw_data = self.kv.kv_get(key)
                 logging.debug('Raw value from KV: %s', raw_data)
                 data = raw_data['Value']
                 value: str = json.loads(data)['state']
@@ -258,7 +266,7 @@ class ConsulUtil:
 
     def get_services_by_parent_process(self,
                                        process_fid: Fid) -> List[FidWithType]:
-        node_items = self._kv_get('m0conf/nodes', recurse=True)
+        node_items = self.kv.kv_get('m0conf/nodes', recurse=True)
         fidk = str(process_fid.key)
 
         # This is the RegExp to match the keys in Consul KV that describe
@@ -288,7 +296,7 @@ class ConsulUtil:
 
     def get_conf_obj_status(self, obj_t: ObjT, fidk: int) -> str:
         # 'node/<node_name>/process/<process_fidk>/service/type'
-        node_items = self._kv_get('m0conf/nodes', recurse=True)
+        node_items = self.kv.kv_get('m0conf/nodes', recurse=True)
         # TODO [KN] This code is too cryptic. To be refactored.
         keys = getattr(self,
                        'get_{}_keys'.format(obj_t.name.lower()))(node_items,
@@ -316,8 +324,8 @@ class ConsulUtil:
             node_data = self.cns.health.node(node)[1]
             return str(node_data[0]['Status'])
         except (ConsulException, HTTPError, RequestException) as e:
-            raise HAConsistencyException(f'Failed to get {node} node health')\
-                from e
+            raise HAConsistencyException(
+                f'Failed to get {node} node health') from e
 
     @staticmethod
     def _to_canonical_service_data(service: Dict[str, Any]) -> ServiceData:
@@ -335,7 +343,7 @@ class ConsulUtil:
         # TODO investigate whether we can replace json with simplejson in
         # all the cases
         data_str = simplejson.dumps(stats_data)
-        self._kv_put('stats/filesystem', data_str)
+        self.kv.kv_put('stats/filesystem', data_str)
 
     def update_process_status(self, event: ConfHaProcess) -> None:
         assert 0 <= event.chp_event < len(ha_process_events), \
@@ -344,4 +352,4 @@ class ConsulUtil:
         data = json.dumps({'state': ha_process_events[event.chp_event]})
         key = f'processes/{event.fid}'
         logging.debug('Setting process status in KV: %s:%s', key, data)
-        self._kv_put(key, data)
+        self.kv.kv_put(key, data)
