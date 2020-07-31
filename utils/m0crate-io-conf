@@ -42,11 +42,11 @@ m0crate_io_conf() {
     local process_fid=$3
 
     cat <<EOF
-CrateConfig_Sections: [MERO_CONFIG, WORKLOAD_SPEC]
+CrateConfig_Sections: [MOTR_CONFIG, WORKLOAD_SPEC]
 
-MERO_CONFIG:
-   MERO_LOCAL_ADDR: $local_ep
-   MERO_HA_ADDR:    $hax_ep
+MOTR_CONFIG:
+   MOTR_LOCAL_ADDR: $local_ep
+   MOTR_HA_ADDR:    $hax_ep
    CLOVIS_PROF: <$(profile_fid)>  # Profile fid
    LAYOUT_ID: 9                      # Defines the UNIT_SIZE (9: 1MB)
    IS_OOSTORE: 1                     # Is oostore-mode?

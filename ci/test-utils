@@ -8,4 +8,4 @@ set -x
 cd $WORKSPACE_DIR
 
 time docker run --rm --name $(ci_vm_name_prefix) -v $PWD:/data -w /data/hare \
-     $DOCKER_REGISTRY/mero/hare:$CENTOS_RELEASE ci/docker/test-utils
+     $DOCKER_REGISTRY/Seagate/cortx-hare:$CENTOS_RELEASE ci/docker/test-utils

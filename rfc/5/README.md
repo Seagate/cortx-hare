@@ -1,5 +1,5 @@
 ---
-domain: gitlab.mero.colo.seagate.com
+domain: github.com
 shortname: 5/HAX
 name: HAlink eXchange
 status: draft
@@ -43,7 +43,7 @@ M0_HA_MSG_EVENT_RPC | Ignore.
 M0_HA_MSG_BE_IO_ERR | `m0_panic()`
 M0_HA_MSG_SNS_ERR | `m0_panic()`
 
-[m0_ha_msg_type]: http://gitlab.mero.colo.seagate.com/mero/mero/blob/master/ha/msg.h#L70
+[m0_ha_msg_type]: https://github.com/Seagate/cortx-motr/blob/dev/ha/msg.h#L70
 
 ### Interaction Use Cases
 
@@ -176,7 +176,7 @@ Hax processes the following callbacks from `ha_link` (via `m0_ha_halon_interface
 **Notes:**
 
 1. Hax MUST NOT make any assumption whether the service is registered in Consul. Service registering and watching the KV with the service status is out of  hax' responsibilty.
-2. In the future we might want to support Motr service update events (namely, `M0_HA_MSG_EVENT_SERVICE` message with event type `M0_CONF_HA_SERVICE_FAILED`, `M0_CONF_HA_SERVICE_STOPPED` or `M0_CONF_HA_SERVICE_FAILED` - see `m0_conf_ha_service_event` enum in `mero/conf/ha.h`). For the current version this functionality more like an overkill.
+2. In the future we might want to support Motr service update events (namely, `M0_HA_MSG_EVENT_SERVICE` message with event type `M0_CONF_HA_SERVICE_FAILED`, `M0_CONF_HA_SERVICE_STOPPED` or `M0_CONF_HA_SERVICE_FAILED` - see `m0_conf_ha_service_event` enum in `motr/conf/ha.h`). For the current version this functionality more like an overkill.
 3. In the future versions process update events must be forwarded through Consul-based Event Queue.
 
 ### Storing process status in Consul KV

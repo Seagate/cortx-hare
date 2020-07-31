@@ -1,5 +1,5 @@
 ---
-domain: gitlab.mero.colo.seagate.com
+domain: github.com
 shortname: 8/STYLE
 name: Coding Style Guidelines
 status: stable

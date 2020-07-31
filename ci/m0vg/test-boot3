@@ -17,7 +17,7 @@ cd /data/hare/
 test_cluster ci/m0vg/_test-boot3.yaml
 
 # XXX-TODO: Remove this block after
-# http://gitlab.mero.colo.seagate.com/mero/hare/issues/216 is resolved.
+# https://github.com/Seagate/cortx-hare/issues/566 is resolved.
 . ci/_env
 . ci/functions.sh
 XXX_with_s3server || exit 0

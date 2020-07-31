@@ -6,7 +6,7 @@ set -x
 . ci/functions.sh  # ci_vm_name_prefix, die
 
 # Make sure that the build image is up to date.
-docker pull $DOCKER_REGISTRY/mero/hare:$CENTOS_RELEASE
+docker pull $DOCKER_REGISTRY/Seagate/cortx-hare:$CENTOS_RELEASE
 
 [[ -d $WORKSPACE_DIR ]] &&
     die "${FUNCNAME[0]}: \$WORKSPACE_DIR is not expected to exist"
@@ -20,7 +20,7 @@ if [[ $CI_PROJECT_NAME != hare && ! -d hare ]]; then
 fi
 
 cat >hare/ci/_env <<EOF
-MERO_COMMIT_REF=${MERO_COMMIT_REF:-}
+MOTR_COMMIT_REF=${MOTR_COMMIT_REF:-}
 RPMSYNC_DIR=$RPMSYNC_DIR
 WORKSPACE_NAME=$WORKSPACE_NAME
 
@@ -36,10 +36,10 @@ set -\$_orig_set_flags
 unset _orig_set_flags
 EOF
 
-[[ -z ${MERO_COMMIT_REF:-} ]] && exit
+[[ -z ${MOTR_COMMIT_REF:-} ]] && exit
 
 # --------------------------------------------------------------------
-# $MERO_COMMIT_REF is non-empty
+# $MOTR_COMMIT_REF is non-empty
 
 ci_docker() {
     (($# > 0)) || die "${FUNCNAME[0]}: Arguments expected"
@@ -48,17 +48,17 @@ ci_docker() {
         die "${FUNCNAME[0]}: Wrong working directory"
 
     _time docker run --rm --name $(ci_vm_name_prefix) -v $PWD:/data \
-        -w /data/hare $DOCKER_REGISTRY/mero/hare:$CENTOS_RELEASE "$@"
+        -w /data/hare $DOCKER_REGISTRY/Seagate/cortx-hare:$CENTOS_RELEASE "$@"
 
     # Containers run commands as 'root' user.  Restore the ownership.
     sudo chown -R $(id -u):$(id -g) .
 }
 
-git clone --recursive http://gitlab.mero.colo.seagate.com/mero/mero.git cortx-motr
+git clone --recursive git@github.com:Seagate/cortx-motr.git cortx-motr
 cd cortx-motr
-git checkout $MERO_COMMIT_REF
+git checkout $MOTR_COMMIT_REF
 cd -
 
-ci_docker ci/docker/build-mero
+ci_docker ci/docker/build-motr
 #ci_docker ci/docker/build-s3server  # XXX-FIXME issue #216
 ci_docker make build  # build Hare

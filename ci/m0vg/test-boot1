@@ -3,18 +3,18 @@ set -eu -o pipefail
 export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
 set -x
 
-. /data/hare/ci/_env  # MERO_COMMIT_REF
+. /data/hare/ci/_env  # MOTR_COMMIT_REF
 . /data/hare/ci/functions.sh  # _time
 
 # XXX `m0crate-io-conf` executes `consul`, which is /opt/seagate/cortx/hare/bin.
 # There should be a better way to add that directory to PATH; see
-# http://gitlab.mero.colo.seagate.com/mero/hare/merge_requests/248#note_16669
+# https://github.com/Seagate/cortx-hare/pull/382#issuecomment-661012209
 export PATH="/opt/seagate/cortx/hare/bin:$PATH"
 
 do_io() {
     utils/m0crate-io-conf >_m0crate-io.yaml
     dd if=/dev/urandom of=/tmp/128M bs=1M count=128
-    _time sudo ${MERO_COMMIT_REF:+/data/mero/clovis/m0crate/}m0crate \
+    _time sudo ${MOTR_COMMIT_REF:+/data/motr/clovis/m0crate/}m0crate \
           -S _m0crate-io.yaml
 }
 

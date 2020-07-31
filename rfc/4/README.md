@@ -1,5 +1,5 @@
 ---
-domain: gitlab.mero.colo.seagate.com
+domain: github.com
 shortname: 4/KV
 name: Consul KV Schema
 status: draft
@@ -95,4 +95,4 @@ Field | Description
 
 Corresponding Motr structure: [`struct m0_fs_stats`][spiel/m0_fs_stats]
 
-[spiel/m0_fs_stats]: http://gitlab.mero.colo.seagate.com/mero/mero/blob/3c6e1148ff5fb18b81236700396bd7881ad61c18/spiel/spiel.h#L1251
+[spiel/m0_fs_stats]: https://github.com/Seagate/cortx-motr/blob/dev/spiel/spiel.h#L1268

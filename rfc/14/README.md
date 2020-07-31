@@ -1,5 +1,5 @@
 ---
-domain: gitlab.mero.colo.seagate.com
+domain: github.com
 shortname: 14/HW
 name: EES Hardware
 status: raw

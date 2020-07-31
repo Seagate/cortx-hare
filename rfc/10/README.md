@@ -1,5 +1,5 @@
 ---
-domain: gitlab.mero.colo.seagate.com
+domain: github.com
 shortname: 10/GLOSS
 name: Hare User's Glossary
 status: raw

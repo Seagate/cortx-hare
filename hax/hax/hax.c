@@ -33,8 +33,8 @@
 #include "lib/thread.h"   /* m0_thread_{adopt, shun} */
 #include "lib/string.h"   /* m0_strdup */
 #include "lib/trace.h"    /* M0_LOG, M0_DEBUG */
-#include "mero/version.h" /* M0_VERSION_GIT_REV_ID */
-#include "mero/iem.h"
+#include "motr/version.h" /* M0_VERSION_GIT_REV_ID */
+#include "motr/iem.h"
 #include "ha/msg.h"
 #include "ha/link.h"
 #include "hax.h"
@@ -244,7 +244,7 @@ static void __ha_failvec_reply_send(const struct hax_msg *hm,
 	m0_free(repmsg);
 }
 
-/* Tests hax - mero nvec reply send. */
+/* Tests hax - motr nvec reply send. */
 static void handle_nvec(const struct hax_msg *hm)
 {
 	struct hax_msg *hmsg;

@@ -1,5 +1,5 @@
 ---
-domain: gitlab.mero.colo.seagate.com
+domain: github.com
 shortname: 3/CFGEN
 name: Configuration Generation
 status: stable

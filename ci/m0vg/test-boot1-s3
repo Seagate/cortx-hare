@@ -12,7 +12,7 @@ generate_s3cfg() {
     . update-consul-conf --dry-run  # import CONFD_IDs, IOS_IDs, id2fid()
     local id=${S3_IDs[0]}  # In absence of haproxy using 1st S3 server instance
     local ip_addr=$(get_service_ip_addr $(get_service_ep $id))
-    local port=$(awk -F= '$1 == "MERO_S3SERVER_PORT" {print $2}' \
+    local port=$(awk -F= '$1 == "MOTR_S3SERVER_PORT" {print $2}' \
                      /etc/sysconfig/s3server-$(id2fid $id))
     cat <<EOF
 [default]

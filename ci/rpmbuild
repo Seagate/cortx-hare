@@ -5,8 +5,8 @@ set -x
 
 . ci/functions.sh  # _time, die
 
-[[ -z ${MERO_COMMIT_REF:-} ]] ||
-    die "$0 expects MERO_COMMIT_REF to be unset or empty"
+[[ -z ${MOTR_COMMIT_REF:-} ]] ||
+    die "$0 expects MOTR_COMMIT_REF to be unset or empty"
 
 # `BLATEST` is a symlink, which may be reset at any moment.
 # Store the path of its current target into a variable.
@@ -31,6 +31,6 @@ cd $RPMSYNC_DIR
 createrepo -v .  # see https://wiki.centos.org/HowTos/CreateLocalRepos
 
 ## The repository should have been created at
-## http://ci-storage.mero.colo.seagate.com${RPMSYNC_DIR}
+## http://cortx-storage.colo.seagate.com${RPMSYNC_DIR}
 ## e.g.
-## http://ci-storage.mero.colo.seagate.com/releases/dev/vvv/hare/ci-rpm/B63632/
+## http://cortx-storage.colo.seagate.com/releases/dev/vvv/hare/ci-rpm/B63632/
