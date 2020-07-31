@@ -8,18 +8,20 @@ nodes:
                             # supported values: "tcp" (default), "o2ib"
     m0_servers:
       - runs_confd: true
-        io_disks: []
+        io_disks:
+          data: []
       - io_disks:
-          - /dev/loop0
-          - /dev/loop1
-          - /dev/loop2
-          - /dev/loop3
-          - /dev/loop4
-          - /dev/loop5
-          - /dev/loop6
-          - /dev/loop7
-          - /dev/loop8
-          - /dev/loop9
+          data:
+            - /dev/loop0
+            - /dev/loop1
+            - /dev/loop2
+            - /dev/loop3
+            - /dev/loop4
+            - /dev/loop5
+            - /dev/loop6
+            - /dev/loop7
+            - /dev/loop8
+            - /dev/loop9
     m0_clients:
       s3: 0         # number of S3 servers to start
       other: 2      # max quantity of other Motr clients this host may have

@@ -18,7 +18,7 @@ from typing import Any, Callable, Dict, Iterator, List, NamedTuple, Optional, \
 import yaml
 
 
-__version__ = '0.9.1'
+__version__ = '0.10'
 
 
 def parse_opts(argv):
@@ -76,7 +76,11 @@ nodes:
                                # optional, defaults to "tcp"
     m0_servers:
       - runs_confd: <bool>  # optional, defaults to false
-        io_disks: [ <str> ] # e.g. [ "/dev/loop0", "/dev/loop1", "/dev/loop2" ]
+        io_disks:
+          meta_data: <str>  # device path for meta-data;
+                            # optional, Motr will use "/var/motr/m0d-<FID>/"
+                            # by default
+          data: [ <str> ]   # e.g. [ "/dev/loop0", "/dev/loop1", "/dev/loop2" ]
                             # Empty list means no IO service.
     m0_clients:
         s3: <int>     # number of S3 servers to start
@@ -212,7 +216,7 @@ def enrich_cluster_desc(desc: Dict[str, Any], mock_p: bool) -> None:
         for m0d in node['m0_servers']:
             m0d.setdefault('runs_confd', False)
             m0d['_io_disks'] = get_disks(node['hostname'], mock_p,
-                                         m0d['io_disks'])
+                                         m0d['io_disks']['data'])
 
 
 def validate_cluster_desc(desc: Dict[str, Any]) -> None:
@@ -243,8 +247,16 @@ Make sure the value of data_iface in the CDF is correct."""
         total_nr_confds += nr_confds
 
         for m0d in node['m0_servers']:
-            assert m0d['runs_confd'] or m0d['io_disks'], \
-                f"{name}: Either 'runs_confd' or 'io_disks' must be set"
+            d = m0d['io_disks']
+            assert m0d['runs_confd'] or d['data'], \
+                f"{name}: Either 'runs_confd' or 'io_disks.data' must be set"
+            assert '' not in d['data'], \
+                f"{name}: Empty strings in 'io_disks.data' are not allowed"
+            if 'meta_data' in d:
+                assert d['meta_data'], \
+                    f"{name}: 'io_disks.meta_data' must not be an empty string"
+                assert d['meta_data'] not in d['data'], \
+                    f"{name}: Meta-data disk must not belong io_disks.data"
 
         disks: List[Disk] = []
         for m0d in node['m0_servers']:
@@ -532,12 +544,13 @@ class ConfProcess(ToDhall):
     _downlinks = {Downlink('services', ObjT.service)}
 
     def __init__(self, nr_cpu: int, memsize_MB: int, endpoint: Endpoint,
-                 services: List[Oid]):
+                 services: List[Oid], meta_data: str = None):
         assert nr_cpu > 0
         self.nr_cpu = nr_cpu
         assert memsize_MB > 0
         self.memsize_MB = memsize_MB
         self.endpoint = endpoint
+        self.meta_data = meta_data
         assert all(x.type is ObjT.service for x in services)
         self.services = services
 
@@ -574,9 +587,15 @@ class ConfProcess(ToDhall):
                       ipaddr=facts[ipaddr_key(node_desc['data_iface'])],
                       portal=proc_t.value)
         proc_id = new_oid(ObjT.process)
+
+        meta_data = None
+        if proc_desc is not None and proc_t is ProcT.m0_server:
+            meta_data = proc_desc['io_disks'].get('meta_data')
+
         m0conf[proc_id] = cls(nr_cpu=facts['processorcount'],
                               memsize_MB=facts['_memsize_MB'],
                               endpoint=ep,
+                              meta_data=meta_data,
                               services=[])
         m0conf[parent].processes.append(proc_id)
 
@@ -1207,7 +1226,7 @@ def generate_consul_kv(cluster: Cluster, dhall_dir: str) -> str:
 
     ConsulService = NamedTuple('ConsulService', [
         ('node_name', str), ('proc_id', Oid), ('ep', Endpoint),
-        ('svc_id', Oid), ('stype', str)])
+        ('svc_id', Oid), ('stype', str), ('meta_data', Optional[str])])
 
     def profile() -> str:
         profiles = [x for x in m0conf.keys() if x.type is ObjT.profile]
@@ -1231,18 +1250,22 @@ def generate_consul_kv(cluster: Cluster, dhall_dir: str) -> str:
                 assert proc_id.type is ObjT.process
                 for svc_id in m0conf[proc_id].services:
                     stype = m0conf[svc_id].type.name[len('M0_CST_'):].lower()
+                    proc = m0conf[proc_id]
                     yield ConsulService(node_name=node.name,
                                         proc_id=proc_id,
-                                        ep=m0conf[proc_id].endpoint,
-                                        svc_id=svc_id, stype=stype)
+                                        ep=proc.endpoint,
+                                        svc_id=svc_id,
+                                        stype=stype,
+                                        meta_data=proc.meta_data)
                 # Add clovis clients to consul kv
                 if proc_id in cluster.m0_clients:
                     proc_ep = m0conf[proc_id].endpoint
                     yield ConsulService(node_name=node.name,
                                         proc_id=proc_id,
-                                        ep=m0conf[proc_id].endpoint,
+                                        ep=proc.endpoint,
                                         svc_id=cluster.m0_clients[proc_id],
-                                        stype=ProcT(proc_ep.portal).name)
+                                        stype=ProcT(proc_ep.portal).name,
+                                        meta_data=None)
 
     return json.dumps([dict(key=k, value=v) for k, v in (
         ('epoch', 1),
@@ -1252,6 +1275,9 @@ def generate_consul_kv(cluster: Cluster, dhall_dir: str) -> str:
         ('m0conf/profiles/pools', sns_pools()),
         *[(f'm0conf/nodes/{x.node_name}/processes/{x.proc_id.fidk}/services/'
            f'{x.stype}', x.svc_id.fidk) for x in processes()],
+        *[(f'm0conf/nodes/{x.node_name}/processes/{x.proc_id.fidk}/'
+           f'meta_data', x.meta_data)
+          for x in processes() if x.stype == 'ios' and x.meta_data],
         *[(f'm0conf/nodes/{x.node_name}/processes/{x.proc_id.fidk}/endpoint',
            str(x.ep))
           for x in processes()])],

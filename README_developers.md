@@ -158,12 +158,14 @@ node_desc() {
     data_iface: $iface
     m0_servers:
       - runs_confd: true
-        io_disks: []
+        io_disks:
+          data: []
       - io_disks:
-          - /dev/loop1
-          - /dev/loop2
-          - /dev/loop3
-          - /dev/loop4
+          data:
+            - /dev/loop1
+            - /dev/loop2
+            - /dev/loop3
+            - /dev/loop4
     m0_clients:
         s3: 1
         other: 2
