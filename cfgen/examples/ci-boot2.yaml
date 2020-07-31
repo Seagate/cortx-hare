@@ -3,14 +3,16 @@ nodes:
     data_iface: eth1
     m0_servers:
       - runs_confd: true
-        io_disks: []
+        io_disks:
+          data: []
       - io_disks:
-          - /dev/vdb
-          - /dev/vdc
-          - /dev/vdd
-          - /dev/vde
-          - /dev/vdf
-          - /dev/vdg
+          data:
+            - /dev/vdb
+            - /dev/vdc
+            - /dev/vdd
+            - /dev/vde
+            - /dev/vdf
+            - /dev/vdg
     m0_clients:
         s3: 0
         other: 2
@@ -18,14 +20,16 @@ nodes:
     data_iface: eth1
     m0_servers:
       - runs_confd: true
-        io_disks: []
+        io_disks:
+          data: []
       - io_disks:
-          - /dev/vdb
-          - /dev/vdc
-          - /dev/vdd
-          - /dev/vde
-          - /dev/vdf
-          - /dev/vdg
+          data:
+            - /dev/vdb
+            - /dev/vdc
+            - /dev/vdd
+            - /dev/vde
+            - /dev/vdf
+            - /dev/vdg
     m0_clients:
         s3: 0
         other: 2

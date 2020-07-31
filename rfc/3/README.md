@@ -38,7 +38,11 @@ nodes:
                                # optional, defaults to "tcp"
     m0_servers:
       - runs_confd: <bool>  # optional, defaults to false
-        io_disks: [ <str> ] # e.g. [ "/dev/loop0", "/dev/loop1", "/dev/loop2" ]
+        io_disks:
+          meta_data: <str>  # device path for meta-data;
+                            # optional, Motr will use "/var/motr/m0d-<FID>/"
+                            # by default
+          data: [ <str> ]   # e.g. [ "/dev/loop0", "/dev/loop1", "/dev/loop2" ]
                             # Empty list means no IO service.
     m0_clients:
         s3: <int>     # number of S3 servers to start

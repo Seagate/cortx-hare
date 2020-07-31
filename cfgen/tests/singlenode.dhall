@@ -8,12 +8,18 @@ in
       , data_iface_type = None types.Protocol
       , m0_servers =
           [ { runs_confd = Some True
-            , io_disks = [] : List Text
+            , io_disks =
+                { meta_data = None Text
+                , data = [] : List Text
+                }
             }
           , { runs_confd = None Bool
             , io_disks =
-                let mkPath = \(i : Natural) -> "/dev/loop" ++ Natural/show i
-                in Prelude.List.generate 10 Text mkPath
+                { meta_data = None Text
+                , data =
+                    let mkPath = \(i : Natural) -> "/dev/loop" ++ Natural/show i
+                    in Prelude.List.generate 10 Text mkPath
+                }
             }
           ]
       , m0_clients =

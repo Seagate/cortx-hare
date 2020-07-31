@@ -32,6 +32,11 @@ get_service_ep() {
     consul kv get m0conf/nodes/$(node-name)/processes/$process_fidk/endpoint
 }
 
+get_ios_meta_data() {
+    local process_fidk=$1
+    consul kv get m0conf/nodes/$(node-name)/processes/$process_fidk/meta_data
+}
+
 get_service_addr() {
     echo ${1%:*}
 }
@@ -58,7 +63,7 @@ Please verify that the host name matches the one stored in the Consul KV.
     exit 1
 }
 CONFD_IDs=$(get_service_ids 'grep -iw confd')
-IOS_IDs=$(get_service_ids 'grep -iw ios | grep -iwv confd')
+IOS_IDs=$(get_service_ids 'grep -iw ios')
 S3_IDs=$(get_service_ids 'grep -iw m0_client_s3')
 HAX_EP=$(get_service_ep $HAX_ID)
 
@@ -129,6 +134,7 @@ append_ios_svc() {
     local ep=$(get_service_ep $id)
     local addr=$(get_service_addr $ep)
     local port=$(get_service_port $ep)
+    local meta_data=$(get_ios_meta_data $id)
     SVCS_CONF+="${SVCS_CONF:+,}{
       \"id\": \"$id\",
       \"name\": \"ios\",
@@ -148,6 +154,11 @@ MOTR_M0D_EP='$ep'
 MOTR_HA_EP='$HAX_EP'
 MOTR_PROCESS_FID='$fid'
 EOF
+    if [[ $meta_data ]]; then
+        cat <<EOF | sudo tee -a /etc/sysconfig/m0d-$fid > /dev/null
+MOTR_BE_SEG_PATH='$meta_data'
+EOF
+    fi
 }
 
 append_s3_svc() {

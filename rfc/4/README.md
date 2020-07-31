@@ -19,6 +19,7 @@ Key | Value | Description
 `last_fidk` | last generated fid key | Atomically incremented counter that is used to generate fids.
 `leader` | node name | This key is used for RC leader election.  Created with [`consul lock`](https://www.consul.io/docs/commands/lock.html) command.
 `m0conf/nodes/<name>/processes/<process_fidk>/endpoint` | endpoint address | Endpoint address of the Motr process (Consul service) with fid key `<process_fidk>`.  Example: `192.168.180.162@tcp:12345:44:101`.
+`m0conf/nodes/<name>/processes/<process_fidk>/meta_data` | path to meta-data disk | `m0mkfs` uses this value to create meta-data pool.
 `m0conf/nodes/<name>/processes/<process_fidk>/services/<svc_type>` | Fid key | Fid key of the Motr service, specified by its type, parent process, and node.
 `m0conf/profiles/<profile_fidk>` | `[ <pool_fidk> ]` | Array of fid keys of the SNS pools associated with this profile.
 `processes/<fid>` | `{ "state": "<HA state>" }` | The items are created and updated by `hax` processes.  Supported values of \<HA state\>: `M0_CONF_HA_PROCESS_STARTING`, `M0_CONF_HA_PROCESS_STARTED`, `M0_CONF_HA_PROCESS_STOPPING`, `M0_CONF_HA_PROCESS_STOPPED`.
