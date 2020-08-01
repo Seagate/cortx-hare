@@ -1,32 +1,44 @@
-# Hare - Halon replacement
+# Hare Developer Guide
 
-The scripts in this repository constitute a middleware layer between [Consul](https://www.consul.io/) and [Mero](http://gitlab.mero.colo.seagate.com/mero/mero) services.  Their responsibilities:
+The scripts in this repository form a middleware layer between
+[Consul](https://www.consul.io/) and
+[Motr](https://github.com/seagate/cortx-motr) services.
 
-- generate initial configuration of Motr cluster;
-- mediate communications between Motr services and Consul agents.
+Hare responsibilities:
+
+- Generate initial configuration of Motr cluster.
+- Mediate communication between Motr processes and Consul agents.
 
 ## 0. Prerequisites
 
-* Python &geq; 3.6 and the corresponding header files.
+* Python &geq; 3.6 and the header files.
 
-  To install them on CentOS 7.6, run
+  To install on CentOS 7, run
   ```sh
   sudo yum install python3 python3-devel
   ```
 
-* Ensure that Motr is built and its systemd services are installed.
-  ```sh
-  M0_SRC_DIR=/data/mero  # YMMV
+* Ensure that [Motr](https://github.com/seagate/cortx-motr) is installed.
 
-  $M0_SRC_DIR/scripts/m0 make
-  sudo $M0_SRC_DIR/scripts/install-mero-service --link
-  ```
+  * To install Motr from RPMs:
+    ```sh
+    sudo yum install cortx-motr cortx-motr-devel
+    ```
+
+  * Alternatively, Motr can be compiled and installed from sources:
+    ```sh
+    git clone --recursive https://github.com/Seagate/cortx-motr.git motr
+    M0_SRC_DIR=$PWD/motr
+
+    $M0_SRC_DIR/scripts/m0 make
+    sudo $M0_SRC_DIR/scripts/install-motr-service --link
+    ```
 
 ## 1. Single-node setup
 
 1. Build and install Hare:
    ```sh
-   git clone --recursive http://gitlab.mero.colo.seagate.com/mero/hare.git
+   git clone --recursive https://github.com/Seagate/cortx-hare.git hare
    cd hare
    make
    sudo make devinstall
@@ -66,12 +78,16 @@ dd if=/dev/urandom of=/tmp/128M bs=1M count=128
 sudo $M0_SRC_DIR/clovis/m0crate/m0crate -S /tmp/m0crate-io.yaml
 ```
 
-## 3. 3-node VM setup
+## 3. 3-node SSC VM setup
+
+<!-- XXX Why do we need this section at all?
+  -- Is section '4. Multi-node setup' not enough?
+  -->
 
 ### 3.1. Create VMs
 
 * Login to [Red Hat CloudForms](https://ssc-cloud.colo.seagate.com)
-  using your Seagate GID and password.
+  (aka SSC) using your Seagate GID and password.
 
 * Open
   [Service Catalogs](https://ssc-cloud.colo.seagate.com/catalog/explorer#/).
@@ -83,7 +99,7 @@ sudo $M0_SRC_DIR/clovis/m0crate/m0crate -S /tmp/m0crate-io.yaml
   [Active Services](https://ssc-cloud.colo.seagate.com/service/explorer#/)
   page.
 
-### 3.2. Install Cortx RPM packages
+### 3.2. Install RPMs
 
   Run the following code snippet on each of the nodes (VMs):
 
@@ -190,8 +206,8 @@ pools:
     data_units: 2
     parity_units: 1
 EOF
-   )
-   ```
+)
+```
 
 ### 3.7. Disable S3 authentication
 
@@ -334,8 +350,3 @@ has been elected.
 
   The timeout resets automatically (for demo purposes), so you will
   see it in the log file every other minute.
-
-## 7. Links
-
-- [Halon replacement: a simpler, better HA subsystem for EOS](https://docs.google.com/presentation/d/17Pn61WBbTHpeR4NxGtaDfmmHxgoLW9BnQHRW7WJO0gM/view) (slides)
-- [Halon replacement: Consul, design highlights](https://docs.google.com/document/d/1cR-BbxtMjGuZPj8NOc95RyFjqmeFsYf4JJ5Hw_tL1zA/view)
