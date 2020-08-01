@@ -77,6 +77,7 @@ pipeline {
                         #XXX# hare/ci/test-boot1
                         export
                         echo 'XXX Test completed'
+                        sleep 3600
                     '''
                     echo "Result: " + commandResult
                 }
