@@ -1,4 +1,4 @@
-# Hare
+# Hare User Guide
 
 ## Welcome
 
@@ -8,14 +8,15 @@ disguised as a software project.
 
 ## What Hare does?
 
-1. Configures components of the distributed Motr object store.
-2. Makes arrangements to ensure that Motr system remains available even
-   if some of its components fail.
-3. Provides CLI for starting/stopping Motr system.
+1. Configures components of Motr object store system.
+2. Provides CLI for starting/stopping Motr system.
+3. Makes arrangements to ensure that Motr system remains available even
+   when some of its components fail.
 
-Hare implementation leverages the key-value store and health-checking
-mechanisms of [Consul](https://www.consul.io) service networking
-solution.
+Hare implementation uses [Consul](https://www.consul.io) key-value store
+and health-checking mechanisms.
+
+<!------------------------------------------------------------------->
 
 ## Prerequisites
 
@@ -28,12 +29,12 @@ ensure that
 --- | --- | ---
 1 | passwordless `sudo` works for \<user\> | all machines
 2 | \<user\> can `ssh` from \<origin\> to other machines | \<origin\>
-3 | `cortx-hare` and `cortx-s3server` rpms are installed | all machines
+3 | `cortx-hare` and `cortx-s3server` RPMs are installed | all machines
 4 | `/opt/seagate/cortx/hare/bin` is in \<user\>'s PATH | all machines
 5 | \<user\> is a member of `hare` group | all machines
-6 | CDF exists and reflects actual cluster configuration | \<origin\>
+6 | CDF exists and corresponds to the actual cluster configuration | \<origin\>
 
-### Install rpm packages
+### Install RPM packages
 
 * Install `cortx-hare` and `cortx-s3server` packages by running these commands
   on every machine of the cluster:
@@ -67,28 +68,6 @@ ensure that
   ```
   Log out and log back in.
 
-### Check motr-kernel service
-
-Motr processes require Motr kernel module to be inserted.
-Make sure Motr kernel service is running:
-```sh
-[[ $(systemctl is-active motr-kernel) == active ]] ||
-    sudo systemctl start motr-kernel
-```
-
-### Check LNet network ids
-
-Check if LNet network ids are configured:
-```sh
-sudo lctl list_nids
-```
-
-If not configured, run
-```sh
-sudo modprobe lnet
-sudo lctl network configure
-```
-
 ### Prepare a CDF
 
 To start the cluster for the first time you will need a cluster
@@ -116,6 +95,8 @@ See `cfgen --help-schema` for the description of CDF format.
 ```sh
 /opt/seagate/cortx/hare/libexec/s3auth-disable
 ```
+
+<!------------------------------------------------------------------->
 
 ## Hare we go
 
@@ -151,11 +132,29 @@ See `cfgen --help-schema` for the description of CDF format.
   hctl shutdown
   ```
 
+<!------------------------------------------------------------------->
+
 ## Troubleshooting
+
+### Ensure that LNet is configured
+
+<!-- XXX When does one have to check this? -->
+
+Run this command:
+```sh
+sudo lctl list_nids
+```
+
+If LNet (Lustre network) is not configured, run
+```sh
+sudo modprobe lnet
+sudo lctl network configure
+```
 
 ### RC Leader cannot be elected
 
-If `hctl bootstrap` cannot complete and keeps printing dots similarly to the output below,
+If `hctl bootstrap` cannot complete and keeps printing dots similarly
+to the output below,
 ```
 2020-01-14 10:57:25: Generating cluster configuration... Ok.
 2020-01-14 10:57:26: Starting Consul server agent on this node.......... Ok.
@@ -171,11 +170,3 @@ hctl shutdown
 sudo systemctl reset-failed hare-hax
 ```
 and bootstrap again.
-
-## Contributing
-
-This project uses
-[PC3 (Pedantic Code Construction Contract)](rfc/9/README.md)
-process for contributions.
-
-To build from sources, see the README_developers.md file.
