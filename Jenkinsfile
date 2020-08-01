@@ -42,22 +42,22 @@ pipeline {
             steps {
                 retry(2) {
                     script {
-                        withCredentials([usernameColonPassword(credentialsId: "$MANAGEIQ_TOKEN_CRED_ID", variable: 'manageiq_cred'),usernamePassword(credentialsId: "$VM_USER_PASS_CRED_ID", passwordVariable: 'pass', usernameVariable: 'user')]) {
+                        withCredentials([usernameColonPassword(credentialsId: "$MANAGEIQ_TOKEN_CRED_ID", variable: 'manageiq_cred'), usernamePassword(credentialsId: "$VM_USER_PASS_CRED_ID", passwordVariable: 'pass', usernameVariable: 'user')]) {
                             // Step reverts teh snapshot to clean version
                             sh label: 'manageif_infra', returnStdout: true, script: '''
                                 yum install -y sshpass
                                 curl -s http://gitlab.mero.colo.seagate.com/shailesh.vaidya/scripts/raw/master/cloudform/setup.sh | bash /dev/stdin -h ${VM_HOST_FQDN} -x "${manageiq_cred}"
                             '''
                             // Step validates the VM access
-                            sh label: 'test_infra', returnStdout: true, script:"""
+                            sh label: 'test_infra', returnStdout: true, script: '''
                                 set -x
                                 sleep 30
                                 sshpass -p '${pass}' ssh -o StrictHostKeyChecking=no -q $user@$VM_HOST_FQDN exit
-                                if [ "\$?" -ne 0 ]; then
+                                if [ \$? -ne 0 ]; then
                                     echo 'ssh command failed' >&2
                                     exit 1
                                 fi
-                            """
+                            '''
                         }
                     }
                 }
@@ -69,14 +69,14 @@ pipeline {
                 script {
                     def remote = getTestMachine(VM_HOST_FQDN)
 
-                    def commandResult = sshCommand remote: remote, command: """
+                    def commandResult = sshCommand remote: remote, command: '''
                         echo 'Test Started on Node'
                         echo '---------------------------'
                         #XXX# git clone https://$GITHUB_TOKEN@github.com/shailesh-vaidya/hare.git
                         #XXX# ls -ltr
                         #XXX# hare/ci/test-boot1
                         echo 'XXX Test completed'
-                    """
+                    '''
                     echo "Result: " + commandResult
                 }
             }
