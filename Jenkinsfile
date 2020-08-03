@@ -18,29 +18,38 @@ pipeline {
         lock('hare-ci-vm')  // get exclusive access to the SSC VM
     }
 
-    // parameters {
-    //     string(name: 'vm_host', defaultValue: 'ssc-vm-0581.colo.seagate.com', description: 'Machine to run tests on')
-    // }
-
     environment {
-        // VM_HOST = "${vm_host}"
-        VM_HOST = 'ssc-vm-0581.colo.seagate.com'
-        MANAGEIQ_TOKEN_CRED_ID = 'shailesh-cloudform-cred'
+        VM_FQDN = 'ssc-vm-0581.colo.seagate.com'
+
+        //XXX-DELETEME MANAGEIQ_TOKEN_CRED_ID = 'shailesh-cloudform-cred'
+
+        // XXX FIXME: Take this value from Jenkins credentials also.
         VM_USER_PASS_CRED_ID = 'bb694996-b19f-4f1a-8686-46cc9ba7d120'
-        // GITHUB_TOKEN = credentials('shailesh-github-token')
+
+        //XXX-DELETEME GITHUB_TOKEN = credentials('shailesh-github-token')
     }
 
     stages {
         stage('Build') {
             steps {
                 sh(
-                    label: 'XXX-DELETEME',
+                    label: 'XXX export',
                     script: '''
 export
 ''')
             }
         }
 
+        stage('Prepare VM') {
+            environment {
+                SSC_AUTH = credentials('shailesh-cloudform-cred')
+            }
+            steps {
+                sh 'VERBOSE=true jenkins/vm-reset'
+            }
+        }
+
+/* XXX-RESTOREME
         stage('Prepare VM') {
             steps {
                 retry(2) {
@@ -59,14 +68,14 @@ export
                             script: '''
 yum install -y sshpass
 # XXX
-curl -s http://gitlab.mero.colo.seagate.com/shailesh.vaidya/scripts/raw/master/cloudform/setup.sh | bash /dev/stdin -h $VM_HOST -x $manageiq_cred
+curl -s http://gitlab.mero.colo.seagate.com/shailesh.vaidya/scripts/raw/master/cloudform/setup.sh | bash /dev/stdin -h $VM_FQDN -x $manageiq_cred
 ''')
                         // XXX-TODO: use `sshCommand` instead
                         sh(
                             label: 'Check if VM is accessible',
                             script: '''
 sleep 30  # XXX-DELETEME
-sshpass -p '$pass' ssh -o StrictHostKeyChecking=no -q $user@$VM_HOST :
+sshpass -p '$pass' ssh -o StrictHostKeyChecking=no -q $user@$VM_FQDN :
 ''')
                     }
                 }
@@ -82,8 +91,8 @@ sshpass -p '$pass' ssh -o StrictHostKeyChecking=no -q $user@$VM_HOST :
                             passwordVariable: 'pass',
                             usernameVariable: 'user')]) {
                         def remote = [:]
-                        remote.name = '$VM_HOST'
-                        remote.host = '$VM_HOST'
+                        remote.name = '$VM_FQDN'
+                        remote.host = '$VM_FQDN'
                         remote.user = user
                         remote.password = pass
                         remote.allowAnyHosts = true
@@ -96,5 +105,6 @@ echo XXX; export
                 }
             }
         }
+XXX */
     }
 }
