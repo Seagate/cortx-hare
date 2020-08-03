@@ -215,9 +215,8 @@ specific goals:
 
 <!-- Copied from https://rfc.zeromq.org/spec:42/C4/ -->
 
-1. The project SHALL have one branch that always holds the
+1. The project SHALL have one branch ("dev") that always holds the
    latest in-progress version and SHOULD always build.
-   Current branch name: dev.
 
 2. The project SHALL NOT use topic branches for any reason. Personal
    forks MAY use topic branches.
@@ -231,8 +230,8 @@ specific goals:
   -- ```
   -- ## Creating Stable Releases
   --
-  -- * The project SHALL have one branch ("dev") that always holds the
-  --   latest in-progress version and SHOULD always build.
+  -- * The project SHALL have one branch ("mas<censored>ter") that always
+  --   holds the latest in-progress version and SHOULD always build.
   --
   -- * The project SHALL NOT use topic branches for any reason. Personal
   --   forks MAY use topic branches.
@@ -257,9 +256,9 @@ specific goals:
   -- The same section existed in [16/C4][] (retired) and [22/C4][]
   -- (deprecated), but not in [42/C4][] (stable).
   --
-  -- [16/C4]: https://github.com/zeromq/rfc/tree/master/16#creating-stable-releases
-  -- [22/C4]: https://github.com/zeromq/rfc/tree/master/22#creating-stable-releases
-  -- [42/C4]: https://github.com/zeromq/rfc/tree/master/42
+  -- [16/C4]: https://rfc.zeromq.org/spec/16/#creating-stable-releases
+  -- [22/C4]: https://rfc.zeromq.org/spec/22/#creating-stable-releases
+  -- [42/C4]: https://rfc.zeromq.org/spec/42/
   -->
 
 ### 2.6. Evolution of Public Contracts
