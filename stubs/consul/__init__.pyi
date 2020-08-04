@@ -12,6 +12,7 @@ class Consul:
     health: Health
     kv: KV
     session: Session
+    txn: Txn
 
 class Health:
     def node(
@@ -94,3 +95,6 @@ class Session:
     ) -> Tuple[int, Any]: ...
 
 class ConsulException(Exception): ...
+
+class Txn:
+    def put(self, payload: List[Dict[str, Any]]) -> bool: ...

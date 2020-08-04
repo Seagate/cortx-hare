@@ -21,7 +21,7 @@ def main():
         logging.info('Written to epoch: %s', offset)
 
     except Exception:
-        logging.exception()
+        logging.exception('Exiting with failure')
 
 
 if __name__ == '__main__':

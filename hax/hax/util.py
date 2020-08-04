@@ -7,7 +7,9 @@ from time import sleep
 from typing import Any, Dict, List, NamedTuple, Optional, Tuple
 
 import simplejson
+from base64 import b64encode
 from consul import Consul, ConsulException
+from consul.base import ClientError
 from requests.exceptions import RequestException
 from urllib3.exceptions import HTTPError
 
@@ -94,6 +96,10 @@ def repeat_if_fails(wait_seconds=5, max_retries=-1):
     return callable
 
 
+TxPutKV = NamedTuple('TxPutKV', [('key', str), ('value', str),
+                                 ('cas', Optional[Any])])
+
+
 class ConsulKVBasic:
     def __init__(self, cns: Optional[Consul] = None):
         self.cns = cns or Consul()
@@ -120,6 +126,36 @@ class ConsulKVBasic:
         assert key
         try:
             return self.cns.kv.put(key, data, **kwargs)
+        except (ConsulException, HTTPError, RequestException) as e:
+            raise HAConsistencyException('Failed to put value to KV') from e
+
+    def kv_put_in_transaction(self, tx_payload: List[TxPutKV]) -> bool:
+        def to_payload(v: TxPutKV) -> Dict[str, Any]:
+            b64: bytes = b64encode(v.value.encode())
+            b64_str = b64.decode()
+
+            if v.cas:
+                return {
+                    'KV': {
+                        'Key': v.key,
+                        'Value': b64_str,
+                        'Verb': 'cas',
+                        'Index': v.cas
+                    }
+                }
+            return {'KV': {'Key': v.key, 'Value': b64_str, 'Verb': 'set'}}
+
+        try:
+            self.cns.txn.put([to_payload(i) for i in tx_payload])
+            return True
+        except ClientError:
+            # If a transaction fails, Consul returns HTTP 409 with the
+            # JSON payload describing the reason why the transaction
+            # was rejected.
+            # The library transforms HTTP 409 into generic ClientException.
+            # Unfortunately, we can't easily extract the payload from it.
+            logging.exception('Oops')
+            return False
         except (ConsulException, HTTPError, RequestException) as e:
             raise HAConsistencyException('Failed to put value to KV') from e
 

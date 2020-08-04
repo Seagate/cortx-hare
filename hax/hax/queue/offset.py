@@ -50,7 +50,6 @@ class InboxFilter:
                                  Optional[str]]]) -> List[Tuple[int, Any]]:
         def to_tuple(value: Dict[str, Any]) -> Tuple[int, Any]:
             key = value['Key']
-            logging.info(f'KEY: {key}')
             match = re.match(r'^.*\/(\d+)$', key)
             assert match
             key = int(match.group(1))
