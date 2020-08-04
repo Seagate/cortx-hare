@@ -11,7 +11,7 @@ pipeline {
 
     options {
         timeout(90)  // abort the build after that many minutes
-        disableConcurrentBuilds()
+        disableConcurrentBuilds()  // XXX Do we need this? We do take `lock`...
         timestamps()
         ansiColor('xterm')  // XXX Delete if not useful.
 
@@ -21,9 +21,9 @@ pipeline {
     environment {
         VM_FQDN = 'ssc-vm-0581.colo.seagate.com'
 
-        //XXX-DELETEME MANAGEIQ_TOKEN_CRED_ID = 'shailesh-cloudform-cred'
+        MANAGEIQ_TOKEN_CRED_ID = 'shailesh-cloudform-cred'  // XXX-DELETEME
 
-        // XXX FIXME: Take this value from Jenkins credentials also.
+        // XXX-FIXME: Take this value from Jenkins credentials also.
         VM_USER_PASS_CRED_ID = 'bb694996-b19f-4f1a-8686-46cc9ba7d120'
 
         //XXX-DELETEME GITHUB_TOKEN = credentials('shailesh-github-token')
@@ -33,24 +33,14 @@ pipeline {
         stage('Build') {
             steps {
                 sh(
-                    label: 'XXX export',
+                    label: 'XXX-DELETEME export',
                     script: '''
 export
 ''')
             }
         }
 
-        stage('Prepare VM') {
-            environment {
-                SSC_AUTH = credentials('shailesh-cloudform-cred')
-            }
-            steps {
-                sh 'VERBOSE=true jenkins/vm-reset'
-            }
-        }
-
-/* XXX-RESTOREME
-        stage('Prepare VM') {
+        stage('Shailesh VM') {
             steps {
                 retry(2) {
                     withCredentials([
@@ -73,12 +63,23 @@ curl -s http://gitlab.mero.colo.seagate.com/shailesh.vaidya/scripts/raw/master/c
                         // XXX-TODO: use `sshCommand` instead
                         sh(
                             label: 'Check if VM is accessible',
-                            script: '''
+                            // NB: Double quotes are needed here.
+                            script: """
 sleep 30  # XXX-DELETEME
 sshpass -p '$pass' ssh -o StrictHostKeyChecking=no -q $user@$VM_FQDN :
-''')
+""")
                     }
                 }
+            }
+        }
+
+/* XXX-RESTOREME
+        stage('Prepare VM') {
+            environment {
+                SSC_AUTH = credentials('shailesh-cloudform-cred')
+            }
+            steps {
+                sh 'VERBOSE=true jenkins/vm-reset'
             }
         }
 
