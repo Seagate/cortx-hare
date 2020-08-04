@@ -45,10 +45,15 @@ class Publisher:
         self.provider = EpochProvider(consul=self.kv, key=epoch_key)
 
     @repeat_if_fails(wait_seconds=0.1)
-    def publish(self, data: str) -> None:
-        epoch = self.provider.get_next()
+    def publish(self, data: str) -> int:
+        """
+        Publishes the given message to the queue. The key (epoch)
+        is provided by EpochProvider.
+        """
+        epoch: int = self.provider.get_next()
         new_key = f'{self.queue_prefix}/{epoch}'
         self.kv.kv_put(new_key, data)
+        return epoch
 
 
 class BQPublisher(Publisher):
