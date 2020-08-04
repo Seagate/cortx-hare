@@ -26,6 +26,16 @@
       "args": [ "/opt/seagate/cortx/hare/libexec/elect-rc-leader" ]
     },
     {
+      "type": "keyprefix",
+      "prefix": "bq/",
+      "handler_type": "http",
+      "http_handler_config": {
+        "path": "http://localhost:8008/watcher/bq",
+        "method": "POST",
+        "timeout": "10s"
+      }
+    },
+    {
       "type": "service",
       "service": "confd",
       "handler_type": "http",
