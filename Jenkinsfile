@@ -40,7 +40,16 @@ export
             }
         }
 
-        stage('Shailesh VM') {
+        stage('Prepare VM') {
+            environment {
+                SSC_AUTH = credentials('shailesh-cloudform-cred')
+            }
+            steps {
+                sh 'VERBOSE=true jenkins/vm-reset'
+            }
+        }
+
+        stage('Shailesh VM') {  // XXX-DELETEME
             steps {
                 retry(2) {
                     withCredentials([
@@ -73,16 +82,6 @@ sshpass -p '$pass' ssh -o StrictHostKeyChecking=no -q $user@$VM_FQDN :
             }
         }
 
-/* XXX-RESTOREME
-        stage('Prepare VM') {
-            environment {
-                SSC_AUTH = credentials('shailesh-cloudform-cred')
-            }
-            steps {
-                sh 'VERBOSE=true jenkins/vm-reset'
-            }
-        }
-
         stage('Test') {
             steps {
                 script {
@@ -106,6 +105,5 @@ echo XXX; export
                 }
             }
         }
-XXX */
     }
 }
