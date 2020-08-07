@@ -18,7 +18,7 @@ from typing import Any, Callable, Dict, Iterator, List, NamedTuple, Optional, \
 import yaml
 
 
-__version__ = '0.9'
+__version__ = '0.9.1'
 
 
 def parse_opts(argv):
@@ -174,7 +174,7 @@ def check_dhall_versions() -> None:
             proc = subprocess.Popen([exe, '--version'], stdout=subprocess.PIPE)
         except FileNotFoundError as err:
             print(str(err), file=sys.stderr)
-            die(f'{exe} >= {ver} required')
+            die(f'{exe} >= {ver} required, none found')
 
         out = proc.communicate(timeout=15)[0]
         if version(out.strip().decode()) < ver:
