@@ -1,0 +1,17 @@
+@startuml
+skinparam defaultFontName "Ubuntu Mono"
+autonumber "<b>[0]"
+participant Client
+participant Queue
+participant KV as "Consul KV"
+Client -> Queue: put my message X
+loop until success
+    Queue -> KV: get epoch value
+    KV --> Queue
+    Queue -> KV: put epoch <- epoch+1 AND put message to bq/{epoch+1} key
+    KV --> Queue
+end
+Queue --> Client: written epoch value
+
+@enduml
+

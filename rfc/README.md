@@ -37,6 +37,7 @@ processes.
   * [12/CHECK](12/README.md) - EES HA Health Checks
   * [13/HALC](13/README.md) — EES HA, Loosely Coupled
   * [14/HW](14/README.md) — EES Hardware
+  * [15/BQ](15/README.md) — Broadcast Queue
 * Draft
   * [4/KV](4/README.md) — Consul KV Schema
   * [5/HAX](5/README.md) — HAlink eXchange
