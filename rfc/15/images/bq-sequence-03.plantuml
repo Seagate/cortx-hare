@@ -1,0 +1,34 @@
+@startuml
+skinparam defaultFontName "Ubuntu Mono"
+
+Consul -> Watch: new state of bq/ collection
+note right 
+Either HTTP call 
+or a script invocation
+end note
+
+Watch -> InboxFilter: prepare
+note right 
+sort by epoch (as int),
+base64 decode
+end note
+
+InboxFilter -> OffsetStorage: get_last_read_epoch()
+OffsetStorage -> KV: get 'queue-offsets/bq/{node-name}/last-read-epoch'
+KV --> OffsetStorage
+OffsetStorage --> InboxFilter: int value
+InboxFilter -> InboxFilter: drop old messages
+InboxFilter --> Watch: messages yet to be processed
+Watch -> BQProcessor: proccess(messages)
+BQProcessor --> Watch
+Watch -> OffsetStorage: mark_last_read()
+note right 
+put epoch of the last 
+message in the list
+end note
+
+OffsetStorage -> KV: put 'queue-offsets/bq/{node-name}/last-read-epoch'
+KV --> OffsetStorage
+OffsetStorage --> Watch
+Watch --> Consul: OK
+@enduml
