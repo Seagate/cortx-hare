@@ -1,0 +1,73 @@
+@startuml
+start
+
+split
+    -> either;
+    :'dev' of __any__ component changes;
+split again
+    -> or;
+    :custom build is triggered
+    ----
+    input:
+    * specific combination of component refs;
+end split
+
+partition build {
+    :CI pipeline builds RPMs
+    of **all** components
+    from 'dev' branches;
+
+    if (all RPMs built successfully?) then (yes)
+    else (no)
+        #OrangeRed:report problems;
+        end
+    endif
+}
+
+#LightGrey:outputs:
+* build directory (e.g. 'b1234')
+* ChangeLog
+* notification (email, IM)|
+
+if (continue?) then (yes)
+else (no)
+    stop
+endif
+
+partition provision {
+    :run ""'deploy'"" script;
+    note right
+        can be automated with CI
+    end note
+    if (provisioned successfully?) then (yes)
+    else (no)
+        #OrangeRed:report problems;
+        end
+    endif
+}
+
+#LightGrey:output:
+* provisioned cluster
+  (VM or HW)|
+
+if (continue?) then (yes)
+else (no)
+    stop
+endif
+
+partition test {
+    :run the tests;
+    if (all tests passed?) then (yes)
+        :execute ""'tag-repos [--release] <build-id>'"" command
+        ----
+        This creates 'rc-<build-id>' tags
+        ('release-<build-id>' if '--release' option is provided)
+        and pushes them to **all** components' repositories.;
+    else (no)
+        #OrangeRed:report problems;
+        end
+    endif
+}
+
+stop
+@enduml
