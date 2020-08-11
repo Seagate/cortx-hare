@@ -65,7 +65,15 @@ Topics described here may require access to Seagate infrastructure.
    * Make sure that `data_iface` value refers to existing network
      interface (it should be present in the output of `ip a` command).
 
-4. Start the cluster.
+4. Configure LNet
+
+* Execute these commands (assuming Motr uses `eth0` network interface):
+  ```bash
+  sudo tee /etc/modprobe.d/lnet.conf <<< \
+      'options lnet networks=tcp(eth0) config_on_load=1'
+  ```
+
+5. Start the cluster.
    ```sh
    hctl bootstrap --mkfs cfgen/examples/singlenode.yaml
    ```

@@ -132,6 +132,17 @@ Make sure interface used for configuration parameter `data_iface` is
 configured for lnet.
 `sudo lctl list_nids` should show IP address of data_iface.
 
+### Configure lnet driver
+
+Execute these commands on each node (assuming Motr uses `eth0` network
+interface):
+```bash
+sudo tee /etc/modprobe.d/lnet.conf <<< \
+    'options lnet networks=tcp(eth0) config_on_load=1'
+```
+
+### Create loopback devices
+
 It is possible to make Hare + Motr work without having real block devices.
 Loop devices are used in this case.
 Create loop devices, if necessary:
@@ -208,6 +219,11 @@ If LNet (Lustre network) is not configured, run
 sudo modprobe lnet
 sudo lctl network configure
 ```
+
+### `lctl list_nids` shows no available interfaces
+
+This is caused by missing `/etc/modprobe.d/lnet.conf` file. Check [Configure lnet driver](#configure-lnet-driver) section.
+
 
 ### hctl reportbug
 
