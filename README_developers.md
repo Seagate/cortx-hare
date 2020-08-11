@@ -328,7 +328,31 @@ has been elected.
   The timeout resets automatically (for demo purposes), so you will
   see it in the log file every other minute.
 
-## 7. Links
+## 7. Troubleshooting
+
+### Unknown tag: package package is not installed
+
+Example with `make rpm` command:
+```
+--> Preparing rpmbuild environment
+‘cortx-hare-1.0.0.tar.gz’ -> ‘/home/vagrant/rpmbuild/SOURCES/cortx-hare-1.0.0.tar.gz’
+‘hare.spec’ -> ‘/home/vagrant/rpmbuild/SPECS/hare.spec’
+make[1]: Leaving directory `/tmp/cortx-hare'
+make[1]: Entering directory `/tmp/cortx-hare'
+--> Building rpm packages
+error: line 33: Unknown tag: package package is not installed
+make[1]: *** [__rpm] Error 1
+make[1]: Leaving directory `/tmp/cortx-hare'
+make: *** [rpm] Error 2
+```
+This caused by missing submodules. It happens when repository is cloned without
+`--recursive` flag.  
+Solution: initialize following submodules
+* cortx-hare/vendor/consul-bin/
+* cortx-hare/vendor/dhall-bin/
+* cortx-hare/vendor/dhall-prelude/
+
+## 8. Links
 
 - [Halon replacement: a simpler, better HA subsystem for EOS](https://docs.google.com/presentation/d/17Pn61WBbTHpeR4NxGtaDfmmHxgoLW9BnQHRW7WJO0gM/view) (slides)
 - [Halon replacement: Consul, design highlights](https://docs.google.com/document/d/1cR-BbxtMjGuZPj8NOc95RyFjqmeFsYf4JJ5Hw_tL1zA/view)
