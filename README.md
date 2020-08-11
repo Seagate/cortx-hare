@@ -1,5 +1,6 @@
 # Hare User Guide
 
+
 ## Welcome
 
 Hare is an experiment in
