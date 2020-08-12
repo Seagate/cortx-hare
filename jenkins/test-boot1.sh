@@ -3,9 +3,6 @@ set -eu -o pipefail
 export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
 set -x
 
-# XXX `m0crate-io-conf` executes `consul`, which is /opt/seagate/cortx/hare/bin.
-# There should be a better way to add that directory to PATH; see
-# http://gitlab.mero.colo.seagate.com/mero/hare/merge_requests/248#note_16669
 export PATH="/opt/seagate/cortx/hare/bin:$PATH"
 
 do_io() {

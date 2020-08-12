@@ -1,6 +1,6 @@
 #!/usr/bin/env groovy
 /*
- * Job URL: http://eos-jenkins.mero.colo.seagate.com/job/Hare/job/vvv.hare-multibranch
+ * Job URL: http://eos-jenkins.mero.colo.seagate.com/job/Hare/job/hare-test-ci/
  *
  * Pipeline syntax: https://www.jenkins.io/doc/book/pipeline/syntax/
  * Groovy syntax: http://groovy-lang.org/syntax.html

@@ -4,10 +4,10 @@ set -e -o pipefail
 export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
 
 export
-MERO_REPO_FILE=/etc/yum.repos.d/motr_last_successful.repo
+MOTR_REPO_FILE=/etc/yum.repos.d/motr_last_successful.repo
 LUSTRE_REPO_FILE=/etc/yum.repos.d/lustre_release.repo
 
-cat <<EOT > $MERO_REPO_FILE
+cat <<EOT > $MOTR_REPO_FILE
 [motr-dev]
 baseurl=http://ci-storage.mero.colo.seagate.com/releases/eos/components/github/master/rhel-7.7.1908/dev/mero/last_successful/
 gpgcheck=0
