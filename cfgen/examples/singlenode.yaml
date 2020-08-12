@@ -28,6 +28,7 @@ nodes:
         io_disks:
           data: []
       - io_disks:
+          #meta_data: /path/to/meta-data/drive
           data:
             - /dev/loop0
             - /dev/loop1
