@@ -1,22 +1,3 @@
-<!--
-  Copyright (c) 2020 Seagate Technology LLC and/or its Affiliates
-
-  Licensed under the Apache License, Version 2.0 (the "License");
-  you may not use this file except in compliance with the License.
-  You may obtain a copy of the License at
-
-      http://www.apache.org/licenses/LICENSE-2.0
-
-  Unless required by applicable law or agreed to in writing, software
-  distributed under the License is distributed on an "AS IS" BASIS,
-  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-  See the License for the specific language governing permissions and
-  limitations under the License.
-
-  For any questions about this software or licensing,
-  please email opensource@seagate.com or cortx-questions@seagate.com.
--->
-
 # Hare Developer Guide
 
 Current document covers building from sources and detailed configuration of Hare service.
@@ -25,7 +6,7 @@ Topics described here may require access to Seagate infrastructure.
 
 ## 0. Prerequisites
 
-* Repository is cloned along with all submodules. [Link to readme.](README.md#get-source-code)  
+* Repository is cloned along with all submodules. [Link to readme.](README.md#get-source-code)
   Quick clone from Seagate repo: `git clone --recursive https://github.com/Seagate/cortx-hare.git`
 
 * Python &geq; 3.6 and the corresponding header files.
@@ -35,7 +16,7 @@ Topics described here may require access to Seagate infrastructure.
   sudo yum install python3 python3-devel
   ```
 
-* Ensure that [Motr](https://github.com/seagate/cortx-motr) is built and its systemd services are installed.  
+* Ensure that [Motr](https://github.com/seagate/cortx-motr) is built and its systemd services are installed.
   _Note: check [cortx-motr](https://github.com/Seagate/cortx-motr/blob/dev/README.md) repo for more details_
   ```sh
   M0_SRC_DIR=/data/mero  # YMMV
@@ -373,7 +354,7 @@ make[1]: Leaving directory `/tmp/cortx-hare'
 make: *** [rpm] Error 2
 ```
 This caused by missing submodules. It happens when repository is cloned without
-`--recursive` flag.  
+`--recursive` flag.
 Solution: initialize following submodules
 * cortx-hare/vendor/consul-bin/
 * cortx-hare/vendor/dhall-bin/
