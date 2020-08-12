@@ -52,7 +52,9 @@ get_service_ep() {
 
 get_ios_meta_data() {
     local process_fidk=$1
-    consul kv get m0conf/nodes/$(node-name)/processes/$process_fidk/meta_data
+    consul kv export \
+           m0conf/nodes/$(node-name)/processes/$process_fidk/meta_data |
+        jq -r '.[].value | @base64d'
 }
 
 get_service_addr() {
