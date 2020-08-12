@@ -6,3 +6,6 @@ pkgconfig
 python-consul
 setuptools
 wheel
+
+# this will work just because aiohttp is already specified in hax/setup.py
+aiohttp
