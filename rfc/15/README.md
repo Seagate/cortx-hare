@@ -4,13 +4,11 @@ shortname: 15/BQ
 name: Broadcast Queue
 status: raw
 editor: Konstantin Nekrasov <konstantin.nekrasov@seagate.com>
-contributors:
-  - Konstantin Nekrasov <konstantin.nekrasov@seagate.com>
 ---
 
 ## Abstract
 
-Broadcast Queue (BQ) is a transport for distributing broadcast messages from Recovery Coordinator (RC). 
+Broadcast Queue (BQ) is a transport for distributing broadcast messages from Recovery Coordinator (RC).
 
 Topology: RC node is the only publisher in the cluster; every node in the cluster is subscribed to those messages.
 
@@ -20,8 +18,7 @@ BQ is built on top of Consul KV. In other words, the Queue API invokes one or mo
 
 ### Message publishing
 
-![img](images/bq-sequence-01.png)
-
+![img](bq-sequence-01.png)
 
 Notes:
 1. Step \[4] is executed by means of [Consul Transaction](https://www.consul.io/api-docs/txn).
@@ -31,9 +28,12 @@ Notes:
 
 Receiver must be registered as a [keyprefix watch](https://www.consul.io/docs/agent/watches.html#keyprefix) for `bq/` prefix in Consul. Thus anytime a new message is published to BQ, the receiver will acquire the new whole state of `bq/` collection.
 
+Steps:
 
-![img](images/bq-activity-02.png)
-
+- Sort messages by epoch.
+- Discard the messages that have been read already.
+- Process remaining messages.
+- Mark the last epoch from the list as 'read'.
 
 Notes:
 1. Definition of "Process the rest of messages" is not in the scope of this document.
@@ -46,8 +46,7 @@ Consul KV stores the last-read BQ epoch for every node.
 Assumption:
 - There can be no more than 1 subscriber at a node in the cluster.
 
-![img](images/bq-sequence-03.png)
-
+![img](bq-sequence-02.png)
 
 ## See also
 
