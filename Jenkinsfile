@@ -29,7 +29,7 @@ pipeline {
     agent { label 'docker-nightly-node' }
 
     options {
-        timeout(90)  // abort the build after that many minutes
+        timeout(40)  // abort the build after that many minutes
         disableConcurrentBuilds()
         timestamps()
         ansiColor('xterm')  // XXX Delete if not useful.
@@ -121,6 +121,9 @@ pipeline {
         }
 
         stage('Bootstrap singlenode') {
+            options {
+                timeout(time: 120, unit: 'SECONDS')
+            }
             steps {
                 script {
                     def remote = getTestMachine(VM_FQDN)
@@ -148,6 +151,9 @@ pipeline {
         }
 
         stage('Stop cluster') {
+            options {
+                timeout(time: 600, unit: 'SECONDS')
+            }
             steps {
                 script {
                     def remote = getTestMachine(VM_FQDN)
@@ -161,6 +167,9 @@ pipeline {
         }
 
         stage('I/O test with m0crate') {
+            options {
+                timeout(time: 600, unit: 'SECONDS')
+            }
             steps {
                 script {
                     def remote = getTestMachine(VM_FQDN)
