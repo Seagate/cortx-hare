@@ -1,22 +1,3 @@
-<!--
-  Copyright (c) 2020 Seagate Technology LLC and/or its Affiliates
-
-  Licensed under the Apache License, Version 2.0 (the "License");
-  you may not use this file except in compliance with the License.
-  You may obtain a copy of the License at
-
-      http://www.apache.org/licenses/LICENSE-2.0
-
-  Unless required by applicable law or agreed to in writing, software
-  distributed under the License is distributed on an "AS IS" BASIS,
-  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-  See the License for the specific language governing permissions and
-  limitations under the License.
-
-  For any questions about this software or licensing,
-  please email opensource@seagate.com or cortx-questions@seagate.com.
--->
-
 # Hare User Guide
 
 ## Welcome
@@ -47,9 +28,9 @@ cotrx-motr must be installed for proper operation. cotrx-motr can be either
 installed from packages of build from sources.
 
 Available options:
-* Install RPMs from CI build.  
+* Install RPMs from CI build.
   _The easiest way to get Hare + Motr instances up and running._
-* Build and install from source code.  
+* Build and install from source code.
   _Works for contribution process._
 
 ### Get source code
@@ -94,11 +75,11 @@ on every machine in the cluster:
 
 ### Choose a configuration to setup
 
-* Single node with Hare + Motr up and running.  
+* Single node with Hare + Motr up and running.
   _Recommended for fast proof of concept check to get familiar with software._
-* Cluster setup  
+* Cluster setup
   _Intended mode of operation. Several nodes/VM is required. RPM installation
-  is recommended._  
+  is recommended._
   **WARNING: will be available once public CI is operational.**
 
 The difference is obviously a number or nodes to configure and the content of
@@ -247,7 +228,7 @@ This is caused by missing `/etc/modprobe.d/lnet.conf` file. Check [Configure lne
 ### hctl reportbug
 
 hctl provides command which gathers all required logs from consul, hax and motr
-services.  
+services.
 Those logs can be attached to GitHub issue.
 ```
 hctl reportbug

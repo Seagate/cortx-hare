@@ -18,7 +18,6 @@
 # please email opensource@seagate.com or cortx-questions@seagate.com.
 #
 
-
 set usage "Usage: $argv0 <timeout (seconds)> <program> \[<arguments>\]"
 
 proc die {msg {rc 1}} {
