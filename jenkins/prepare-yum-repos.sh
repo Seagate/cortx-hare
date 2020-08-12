@@ -9,7 +9,7 @@ LUSTRE_REPO_FILE=/etc/yum.repos.d/lustre_release.repo
 
 cat <<EOT > $MOTR_REPO_FILE
 [motr-dev]
-baseurl=http://ci-storage.mero.colo.seagate.com/releases/eos/components/github/master/rhel-7.7.1908/dev/mero/last_successful/
+baseurl=http://cortx-storage.colo.seagate.com/releases/eos/github/release/rhel-7.7.1908/last_successful/
 gpgcheck=0
 name=motr-dev
 enabled=1
