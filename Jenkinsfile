@@ -160,6 +160,7 @@ pipeline {
                     def commandResult = sshCommand remote: remote, command: """
                         PATH=/opt/seagate/cortx/hare/bin/:\$PATH
                         hctl shutdown
+                        systemctl status hare-hax || systemctl reset-failed hare-hax
                         """
                     echo "Result: " + commandResult
                 }
