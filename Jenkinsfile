@@ -52,14 +52,32 @@ pipeline {
                 sh 'VERBOSE=true jenkins/vm-reset'
             }
         }
-
         stage('Prepare environment') {
             parallel {
-                stage('Download cortx-hare repo') {
+                stage('Download cortx-hare repo from static branch') {
+                    when { not { changeRequest() } }
                     steps {
                         script {
                             def remote = getTestMachine(VM_FQDN)
-
+                            def commandResult = sshCommand remote: remote, command: """
+                            rm -rf $REPO_NAME
+                            mkdir $REPO_NAME
+                            cd $REPO_NAME
+                            git init
+                            git clone --recursive https://$GITHUB_TOKEN@github.com/Seagate/'$REPO_NAME'.git
+                            git checkout $BRANCH_NAME
+                            git log -1
+                            ls -la
+                            """
+                            echo "Result: " + commandResult
+                        }
+                    }
+                }
+                stage('Download cortx-hare repo from pull request') {
+                    when { changeRequest() }
+                    steps {
+                        script {
+                            def remote = getTestMachine(VM_FQDN)
                             def commandResult = sshCommand remote: remote, command: """
                             rm -rf $REPO_NAME
                             mkdir $REPO_NAME
@@ -142,8 +160,6 @@ pipeline {
                         export PATH=/opt/seagate/cortx/hare/bin:\$PATH
                         make check 2>&1
                         make test 2>&1
-                        #XXX
-                        #make install
                         """
                     echo "Result: " + commandResult
                 }
