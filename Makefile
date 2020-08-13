@@ -273,7 +273,10 @@ devinstall-systemd: $(wildcard systemd/*)
 .PHONY: devinstall-hax
 devinstall-hax: HAX_INSTALL_CMD = $(SETUP_PY) develop --prefix $(DESTDIR)/$(PREFIX)
 devinstall-hax: export PYTHONPATH = $(DESTDIR)/$(PREFIX)/lib/python3.$(PY3_VERSION_MINOR)/site-packages
-devinstall-hax: $(HAX_EGG_LINK)
+devinstall-hax: hax/requirements.txt $(HAX_EGG_LINK)
+	@$(call _info,Installing hax development dependencies)
+	@$(PIP) install --ignore-installed --prefix $(DESTDIR)/$(PREFIX) \
+					--requirement <(sed -ne '/^#:runtime-requirements:/,$$p' $<)
 
 .PHONY: devinstall-vendor
 devinstall-vendor: vendor/consul-bin/current/consul \

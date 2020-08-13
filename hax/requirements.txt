@@ -1,11 +1,12 @@
-# NOTE: this particular file contains the packages required to BUILD the project only.
-# Runtime dependencies must be specified in setup.py (see install_requires list).
+#:build-requirements:
 flake8
 mypy
 pkgconfig
-python-consul
 setuptools
 wheel
 
-# this will work just because aiohttp is already specified in hax/setup.py
+#:runtime-requirements:
 aiohttp
+click
+python-consul
+simplejson

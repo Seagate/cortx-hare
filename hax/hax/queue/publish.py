@@ -1,6 +1,12 @@
-from typing import Optional
+from typing import NamedTuple, Optional
 
+import simplejson
 from hax.util import ConsulKVBasic, TxPutKV, repeat_if_fails
+
+# XXX do we want to make payload definition more strict?
+# E.g. there could be a type hierarchy for payload objects that depends
+# on the type name.
+Message = NamedTuple('Message', [('message_type', str), ('payload', str)])
 
 
 class Publisher:
@@ -15,10 +21,13 @@ class Publisher:
         self.epoch_key = epoch_key
 
     @repeat_if_fails(wait_seconds=0.1)
-    def publish(self, data: str) -> int:
+    def publish(self, message_type: str, payload: str) -> int:
         """
         Publishes the given message to the queue.
         """
+        message = Message(message_type=message_type, payload=payload)
+        data = simplejson.dumps(message)
+
         while True:
             index, value = self.kv.kv_get_raw(self.epoch_key)
             value = int(value['Value'])
@@ -38,3 +47,9 @@ class Publisher:
 class BQPublisher(Publisher):
     def __init__(self, kv=None):
         super().__init__('bq', kv=kv)
+
+
+class EQPublisher(Publisher):
+    def __init__(self, kv=None):
+        # TODO think of better names for epoch keys in KV
+        super().__init__('eq', kv=kv, epoch_key='eq-epoch')
