@@ -61,10 +61,8 @@ pipeline {
                             def remote = getTestMachine(VM_FQDN)
                             def commandResult = sshCommand remote: remote, command: """
                             rm -rf $REPO_NAME
-                            mkdir $REPO_NAME
-                            cd $REPO_NAME
-                            git init
                             git clone --recursive https://$GITHUB_TOKEN@github.com/Seagate/'$REPO_NAME'.git
+                            cd $REPO_NAME
                             git checkout $BRANCH_NAME
                             git log -1
                             ls -la
