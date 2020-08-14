@@ -1,3 +1,5 @@
+[![Codacy Badge](https://app.codacy.com/project/badge/Grade/0642a6f7d92542e39f2dd68139cd5586)](https://www.codacy.com?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=Seagate/cortx-hare&amp;utm_campaign=Badge_Grade)
+
 # Hare User Guide
 
 ## Welcome
