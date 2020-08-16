@@ -18,7 +18,7 @@ from typing import Any, Callable, Dict, Iterator, List, NamedTuple, Optional, \
 import yaml
 
 
-__version__ = '0.10'
+__version__ = '0.11'
 
 
 def parse_opts(argv):
@@ -271,7 +271,19 @@ Make sure the value of data_iface in the CDF is correct."""
 
     assert total_nr_confds > 0, 'At least one confd is required'
     assert total_nr_disks > 0, 'No disks found'
-    assert desc['pools'], 'List of pools must not be empty'
+
+    pool_types = set()
+    for pool in desc['pools']:
+        t = pool.get('type', 'sns')
+        if t != 'sns':
+            assert pool.data_units == 1, \
+                f"""{pool.name}: Wrong number of data_units ({pool.data_units})
+Pools of {t!r} type can only have 1 data unit."""
+            assert t not in pool_types, \
+                f'{pool.name}: No more than one {t!r} pool can be defined'
+        pool_types.add(t)
+    assert 'sns' in pool_types, \
+        "At least one pool of 'sns' type must be defined"
 
 
 @lru_cache(maxsize=1)
@@ -1361,27 +1373,22 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
     # XXX-TODO: support multiple profiles
     prof_id = ConfProfile.build(conf, root_id)
 
-    md_pool_defined = False
-    dix_pool_defined = False
+    pool_types_CDF = set()
     for pool in cluster_desc['pools']:
-        ptype = pool.get('type', 'sns')
-        if ptype != 'sns':
-            assert pool['data_units'] == 1
-
+        t = pool.get('type', 'sns')
+        pool_types_CDF.add(t)
         pool_id = ConfPool.build(conf, root_id)
         pver = ConfPver.build(conf, pool_id,
                               PDClustAttrs0(pool['data_units'],
                                             pool['parity_units']),
                               pool_drives(conf, pool['disks']))
         conf[prof_id].pools.append(pool_id)
-        if ptype == 'dix':
-            dix_pool_defined = True
+        if t == 'dix':
             conf[root_id].imeta_pver = pver
-        if ptype == 'md':
-            md_pool_defined = True
+        elif t == 'md':
             conf[root_id].mdpool = pool_id
 
-    if not dix_pool_defined:
+    if 'dix' not in pool_types_CDF:
         pool_id = ConfPool.build(conf, root_id)
         #  if dix pool not described lets create pool with 1 + 0
         pver = ConfPver.build(conf, pool_id, PDClustAttrs0(1, 0),
@@ -1389,7 +1396,7 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
         conf[prof_id].pools.append(pool_id)
         conf[root_id].imeta_pver = pver
 
-    if not md_pool_defined:
+    if 'md' not in pool_types_CDF:
         pool_id = ConfPool.build(conf, root_id)
         #  if md pool not described lets create pool with 1 + 0
         pver = ConfPver.build(conf, pool_id, PDClustAttrs0(1, 0),
