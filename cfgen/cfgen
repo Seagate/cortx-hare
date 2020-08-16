@@ -1390,17 +1390,28 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
 
     if 'dix' not in pool_types_CDF:
         pool_id = ConfPool.build(conf, root_id)
-        #  if dix pool not described lets create pool with 1 + 0
-        pver = ConfPver.build(conf, pool_id, PDClustAttrs0(1, 0),
-                              pool_drives(conf, 'per_cas'))
+        pver = ConfPver.build(
+            conf,
+            pool_id,
+            PDClustAttrs0(
+                # For CAS service N must always be equal to 1
+                # as CAS records are indivisible pieces of data:
+                # the whole CAS record is always stored on one node.
+                data_units=1,
+                parity_units=0),
+            drives=pool_drives(conf, 'per_cas'),
+            tolerance=Failures(0, 0, 0, 1, 0))
         conf[prof_id].pools.append(pool_id)
         conf[root_id].imeta_pver = pver
 
     if 'md' not in pool_types_CDF:
         pool_id = ConfPool.build(conf, root_id)
-        #  if md pool not described lets create pool with 1 + 0
-        pver = ConfPver.build(conf, pool_id, PDClustAttrs0(1, 0),
-                              pool_drives(conf, 'first_disk'))
+        first_drives = pool_drives(conf, 'first_disk')
+        pver = ConfPver.build(conf, pool_id,
+                              PDClustAttrs0(data_units=len(first_drives),
+                                            parity_units=0),
+                              drives=first_drives,
+                              tolerance=Failures(0, 0, 0, 1, 0))
         conf[prof_id].pools.append(pool_id)
         conf[root_id].mdpool = pool_id
 
