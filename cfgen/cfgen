@@ -14,7 +14,7 @@ import socket
 import subprocess
 import sys
 from typing import Any, Callable, Dict, Iterator, List, NamedTuple, Optional, \
-    Set, Tuple, Union
+    Set, Tuple
 import yaml
 
 
@@ -87,8 +87,8 @@ nodes:
         other: <int>  # max quantity of other Motr clients this host may have
 pools:
   - name: <str>
-    type: sns|dix|md   # optional, default to "sns"
-                       # "sns" for data, "dix" for KV and md for meta-data
+    type: sns|dix|md   # optional, defaults to "sns";
+                       # "sns" - data pool, "dix" - KV, "md" - meta-data pool.
     allowed_failures:  # optional section; no failures will be allowed
                        # if this section is missing or all of its elements
                        # are zeroes
@@ -100,13 +100,13 @@ pools:
     data_units: <int>
     parity_units: <int>
     #
-    # There are several ways of assigning disks to pool.
+    # There are several ways of assigning disks to pool:
     #
     # 1) Use all available disks of all nodes for this pool.
-    #disks: all
-    # 2) Use one disk per CAS service
+    disks: all
+    # 2) Use one disk per CAS service.
     #disks: per_cas
-    # 3) Use first drive on controller
+    # 3) Use the first disk of the controller.
     #disks: first_disk
 ...  # end of the document (optional)""")
         sys.exit()
@@ -907,16 +907,13 @@ class ConfDrive(ToDhall):
         return drive_id
 
 
-def pool_drives(m0conf: Dict[Oid, Any],
-                pattern: Union[str, List[Dict[str, str]]]) -> List[Oid]:
-
+def pool_drives(m0conf: Dict[Oid, Any], pattern: str) -> List[Oid]:
     if pattern == 'per_cas':
         cas = [(svc_id, ctrl_id)
                for ctrl_id in m0conf if ctrl_id.type is ObjT.controller
                for proc_id in m0conf[m0conf[ctrl_id].node].processes
                for svc_id in m0conf[proc_id].services
                if m0conf[svc_id].type is SvcT.M0_CST_CAS]
-
         return [ConfDrive.build(m0conf, ctrl_id,
                                 ConfSdev.build(m0conf, svc_id,
                                                Disk(path='/dev/null',

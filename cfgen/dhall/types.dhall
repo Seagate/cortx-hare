@@ -41,6 +41,7 @@
 , ClusterDesc = ./types/ClusterDesc.dhall
 , FailVec     = ./types/FailVec.dhall
 , PoolDisks   = ./types/PoolDisks.dhall
+, PoolType    = ./types/PoolType.dhall
 
 , Obj         = ./types/Obj.dhall
 , ObjT        = ./types/ObjT.dhall
@@ -63,7 +64,6 @@
 , Drive       = ./types/Drive.dhall
 -- pools subtree
 , Pool        = ./types/Pool.dhall
-, PoolType    = ./types/PoolType.dhall
 , Pver        = ./types/Pver.dhall
 , PverF       = ./types/PverF.dhall
 , Objv        = ./types/Objv.dhall

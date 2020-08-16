@@ -91,9 +91,9 @@ if ! grep -qE '^motr-kernel\.service\>' <<< "$out_systemctl"; then
 SNAP!  You've stumbled on an insufficiently tested branch of code.
 
 bootstrap-node script believes that 'motr-kernel' is not installed.
-Oftentimes this belief is contradicted by reality.
+Sometimes this belief contradicts reality.
 
-EES developers need your help.
+Hare developers need your help.
 
 Please add a comment to
 https://github.com/Seagate/cortx-hare/issues/625

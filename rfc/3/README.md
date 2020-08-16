@@ -49,8 +49,8 @@ nodes:
         other: <int>  # max quantity of other Motr clients this host may have
 pools:
   - name: <str>
-    type: sns|dix|md   # type of pool; optional, default is "sns"
-                       # "sns" for data, "dix" for "kv" and md for meta-data
+    type: sns|dix|md   # optional, defaults to "sns";
+                       # "sns" - data pool, "dix" - KV, "md" - meta-data pool.
     allowed_failures:  # optional section; no failures will be allowed
                        # if this section is missing or all of its elements
                        # are zeroes
@@ -62,13 +62,13 @@ pools:
     data_units: <int>
     parity_units: <int>
     #
-    # There are several ways of assigning disks to pool.
+    # There are several ways of assigning disks to pool:
     #
     # 1) Use all available disks of all nodes for this pool.
-    #disks: all
-    # 2) Use one disk per CAS service
+    disks: all
+    # 2) Use one disk per CAS service.
     #disks: per_cas
-    # 3) Use first disk on controller
+    # 3) Use the first disk of the controller.
     #disks: first_disk
 ```
 
