@@ -138,7 +138,7 @@ pipeline {
 
         stage('Bootstrap singlenode') {
             options {
-                timeout(time: 120, unit: 'SECONDS')
+                timeout(time: 2, unit: 'MINUTES')
             }
             steps {
                 script {
@@ -166,7 +166,7 @@ pipeline {
 
         stage('Stop cluster') {
             options {
-                timeout(time: 600, unit: 'SECONDS')
+                timeout(time: 10, unit: 'MINUTES')
             }
             steps {
                 script {
@@ -183,7 +183,7 @@ pipeline {
 
         stage('I/O test with m0crate') {
             options {
-                timeout(time: 600, unit: 'SECONDS')
+                timeout(time: 10, unit: 'MINUTES')
             }
             steps {
                 script {
