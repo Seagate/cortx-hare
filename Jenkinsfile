@@ -127,9 +127,9 @@ pipeline {
                     def remote = getTestMachine(VM_FQDN)
                     def commandResult = sshCommand remote: remote, command: """
                         cd $REPO_NAME
-                        make rpm 2>&1
+                        make rpm
                         package_path=\$(find /root/rpmbuild/RPMS/x86_64/ | grep -E "cortx\\-hare\\-[0-9]+.*\\.rpm")
-                        yum install -y \$package_path 2>&1
+                        yum install -y \$package_path
                         """
                     echo "Result: " + commandResult
                 }
@@ -156,8 +156,8 @@ pipeline {
                     def commandResult = sshCommand remote: remote, command: """
                         cd $REPO_NAME
                         export PATH=/opt/seagate/cortx/hare/bin:\$PATH
-                        make check 2>&1
-                        make test 2>&1
+                        make check
+                        make test
                         """
                     echo "Result: " + commandResult
                 }
