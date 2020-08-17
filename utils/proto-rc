@@ -37,8 +37,19 @@ export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
 #
 
 # Redirect all printouts to the log file with the timestamp prefix:
-exec &>> /var/log/hare/consul-${0##*/}.log
-exec &> >(stdbuf -oL gawk '{ print strftime("%Y-%m-%d %H:%M:%S"), $0 }')
+LOGFILE="/var/log/hare/consul-${0##*/}.log"
+exec &>> ${LOGFILE}
+exec &> >(stdbuf --output=L gawk '{ print strftime("%Y-%m-%d %H:%M:%S"), $0 }')
+
+CURR_DIR="$(dirname $(readlink -f $0))"
+RULES_DIR=${CURR_DIR%/*}/rules
+RULES_DEFAULT_TIMEOUT_SEC=4
+RULES_CRITICAL_TIMEOUT_SEC=6
+
+HARE_BASE_DIR=/opt/seagate/cortx/hare
+PYTHONPATH="$HARE_BASE_DIR/lib/python3.6/site-packages"
+export PYTHONPATH="$HARE_BASE_DIR/lib64/python3.6/site-packages:$PYTHONPATH"
+export PATH="$HARE_BASE_DIR/bin:$PATH"
 
 STOP=0
 sig_handler() {
@@ -52,11 +63,16 @@ check4signal() {
     fi
 }
 
+# Simple log helper to output to stderr and syslog
+log() {
+    logger --stderr "$*"
+}
+
 # Users can use this function to set timeouts.
 set_timeout() {
     local after=$1 # seconds
     local event=$2
-    local tmo=$(date -d @$(($(date '+%s') + $after)) '+%Y%m%d%H%M.%S')
+    local tmo=$(date -d @$(($(date '+%s') + $after)) '+%Y%m%d%H%M%S')
     local event_s=$(consul kv get timeout/$tmo 2>/dev/null || true)
     if [[ $event_s ]]; then
         event="$event_s,$event"
@@ -64,19 +80,42 @@ set_timeout() {
     consul kv put timeout/$tmo $event
 }
 
+# Wrapper to call given script with timeout util. See 'man 1 timeout'
+exec_with_timeout() {
+    local script=$1
+    local timeout=${2:-$RULES_DEFAULT_TIMEOUT_SEC}
+    local rc=0
+    timeout --kill-after $RULES_CRITICAL_TIMEOUT_SEC $timeout $script || rc=$?
+    # 124 - timed out code returned by timeout utility. See 'man 1 timeout'
+    if (( $rc == 124 )); then
+        log "Script $script timed out ($rc). See $LOGFILE"
+    elif (( $rc != 0 )); then
+        log "Script $script failed with code $rc. See $LOGFILE"
+    fi
+}
+
 # Process events:
-sed 's/null//' | jq -r '.[] | "\(.Key) \(.Value | @base64d)"' | {
+# Example of incoming JSON:
+# [{"Key":"eq/3","CreateIndex":1618,"ModifyIndex":1618,"LockIndex":0,"Flags":0,"Value":"eyJtZXNzYWdlX3R5cGUiOiAiZGVidWdfUkMiLCAicGF5bG9hZCI6ICJQQVlMT0FEIn0=","Session":""}]
+# Where Value is base64-encoded JSON
+sed 's/null//' | jq --raw-output '.[] | "\(.Key) \(.Value | @base64d)"' | {
     trap sig_handler TERM
     while read EPOCH EVENT; do
-        echo "$CONSUL_INDEX: Process $EPOCH $EVENT..."
-        case $EVENT in
-          'wake_RC')
-            ;;
+        log "$CONSUL_INDEX: Process epoch: $EPOCH value: $EVENT..."
+        export HARE_RC_EVENT_TYPE=$(echo $EVENT | jq --raw-output '.message_type')
+        export HARE_RC_EVENT_PAYLOAD=$(echo $EVENT | jq --raw-output '.payload')
+        case $HARE_RC_EVENT_TYPE in
+          wake_RC)
+              log "${0} is woken up"
+              ;;
           tmo*)
-            set_timeout 60 "tmo$CONSUL_INDEX"
+            set_timeout $HARE_RC_EVENT_PAYLOAD "tmo$CONSUL_INDEX"
+            ;;
+          debug_RC)
+            exec_with_timeout $RULES_DIR/debug.sh
             ;;
           *)
-            sleep 10
+            exec_with_timeout $RULES_DIR/_default.sh
             ;;
         esac
         consul kv delete $EPOCH
@@ -89,7 +128,7 @@ scheduled_wake_pid() {
 }
 
 wake_rc() {
-    consul kv put eq/0 wake_RC &>/dev/null
+    q eq 'wake_RC' 'null' &>/dev/null
 }
 
 wake_me_after() {
@@ -99,14 +138,14 @@ wake_me_after() {
 }
 
 schedule_timeout() {
-    local tmo=${1#*/} # [timeout/]YYYYmmddHHMM.SS
+    local tmo=${1#*/} # [timeout/]YYYYmmddHHMMSS
+    local tmo_f tmo_s now_s after_s
     unset IFS # otherwise tmo_f might be invalid
-    # Convert 'YYYYmmddHHMM.SS' to 'YYYY-mm-dd HH:MM:SS'.
-    local tmo_f=$(sed -r 's/(....)(..)(..)(..)(..)\.(..)/\1-\2-\3 \4:\5:\6/' \
-                      <<< $tmo)
-    local tmo_s=$(date -d "$tmo_f" '+%s')
-    local now_s=$(date -d 'now' '+%s')
-    local after_s=$((tmo_s - now_s))
+    # Convert 'YYYYmmddHHMMSS' to 'YYYY-mm-dd HH:MM:SS'.
+    tmo_f=$(sed -r 's/(....)(..)(..)(..)(..)(..)/\1-\2-\3 \4:\5:\6/' <<< $tmo)
+    tmo_s=$(date -d "$tmo_f" '+%s')
+    now_s=$(date -d 'now' '+%s')
+    after_s=$((tmo_s - now_s))
     (( after_s > 0 )) || wake_rc
     wake_me_after $after_s
 }
@@ -117,16 +156,11 @@ consul kv get -recurse timeout | {
     trap sig_handler TERM
     while read TMO EVENT; do
         tmo=${TMO#*/}
-        now=$(date +%Y%m%d%H%M.%S)
+        now=$(date +%Y%m%d%H%M%S)
         if (( tmo > now )); then
             schedule_timeout $tmo
             exit 0
         fi
-        IFS=','
-        for ev in $EVENT; do
-            consul kv put $(printf "eq/%09d\n" $(next-epoch)) $ev
-        done
-        IFS=':'
         consul kv delete $TMO
         check4signal
     done
