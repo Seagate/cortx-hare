@@ -5,6 +5,7 @@ import argparse
 import ast
 from enum import Enum, auto
 from functools import lru_cache
+import itertools
 import json
 import os
 from pprint import pprint
@@ -18,7 +19,7 @@ from typing import Any, Callable, Dict, Iterator, List, NamedTuple, Optional, \
 import yaml
 
 
-__version__ = '0.11'
+__version__ = '0.12'
 
 
 def parse_opts(argv):
@@ -89,6 +90,8 @@ pools:
   - name: <str>
     type: sns|dix|md   # optional, defaults to "sns";
                        # "sns" - data pool, "dix" - KV, "md" - meta-data pool.
+    data_units: <int>
+    parity_units: <int>
     allowed_failures:  # optional section; no failures will be allowed
                        # if this section is missing or all of its elements
                        # are zeroes
@@ -97,17 +100,6 @@ pools:
       encl: <int>
       ctrl: <int>
       disk: <int>
-    data_units: <int>
-    parity_units: <int>
-    #
-    # There are several ways of assigning disks to pool:
-    #
-    # 1) Use all available disks of all nodes for this pool.
-    disks: all
-    # 2) Use one disk per CAS service.
-    #disks: per_cas
-    # 3) Use the first disk of the controller.
-    #disks: first_disk
 ...  # end of the document (optional)""")
         sys.exit()
 
@@ -274,13 +266,20 @@ Make sure the value of data_iface in the CDF is correct."""
 
     pool_types = set()
     for pool in desc['pools']:
+        name = pool['name']
         t = pool.get('type', 'sns')
-        if t != 'sns':
-            assert pool.data_units == 1, \
-                f"""{pool.name}: Wrong number of data_units ({pool.data_units})
+        if t == 'sns':
+            d = pool.get('allowed_failures')
+            assert d is None or d['disk'] <= pool['parity_units'], """\
+{}: Cannot allow that many disk failures ({})
+The number of allowed disk failures must not exceed the number of spare disks\
+ (parity_units={}).""".format(name, d['disk'], pool['parity_units'])
+        else:
+            assert pool.data_units == 1, f"""\
+{name}: Wrong number of data_units ({pool.data_units})
 Pools of {t!r} type can only have 1 data unit."""
             assert t not in pool_types, \
-                f'{pool.name}: No more than one {t!r} pool can be defined'
+                f'{name}: No more than one {t!r} pool can be defined'
         pool_types.add(t)
     assert 'sns' in pool_types, \
         "At least one pool of 'sns' type must be defined"
@@ -488,16 +487,17 @@ class ConfRoot(ToDhall):
 
     def to_dhall(self, oid: Oid) -> str:
         assert oid.type is ObjT.root
+        assert self.imeta_pver is not None
         assert self.mdpool is not None
-        imeta_pver = 'None types.Oid' if self.imeta_pver is None \
-            else f'Some ({oid_to_dhall(self.imeta_pver)})'
-        args = ', '.join([f'id = {oid_to_dhall(oid)}',
-                          f'mdpool = {oid_to_dhall(self.mdpool)}',
-                          f'imeta_pver = {imeta_pver}',
-                          f'nodes = {oids_to_dhall(self.nodes)}',
-                          f'sites = {oids_to_dhall(self.sites)}',
-                          f'pools = {oids_to_dhall(self.pools)}',
-                          f'profiles = {oids_to_dhall(self.profiles)}'])
+        args = ', '.join([
+            f'id = {oid_to_dhall(oid)}',
+            f'mdpool = {oid_to_dhall(self.mdpool)}',
+            f'imeta_pver = Some ({oid_to_dhall(self.imeta_pver)})',
+            f'nodes = {oids_to_dhall(self.nodes)}',
+            f'sites = {oids_to_dhall(self.sites)}',
+            f'pools = {oids_to_dhall(self.pools)}',
+            f'profiles = {oids_to_dhall(self.profiles)}'
+        ])
         return '{ %s }' % args
 
     @classmethod
@@ -548,7 +548,7 @@ class ConfNode(ToDhall):
 
 
 ProcT = Enum('ProcT', 'hax m0_server m0_client_s3 m0_client_other')
-ProcT.__doc__ = 'Type of the process'
+ProcT.__doc__ = 'Type of process'
 
 
 class ConfProcess(ToDhall):
@@ -919,8 +919,11 @@ class ConfDrive(ToDhall):
         return drive_id
 
 
-def pool_drives(m0conf: Dict[Oid, Any], pattern: str) -> List[Oid]:
-    if pattern == 'per_cas':
+PoolT = Enum('PoolT', 'sns dix md')  # PoolType.dhall
+
+
+def pool_drives(m0conf: Dict[Oid, Any], ptype: PoolT) -> List[Oid]:
+    if ptype == PoolT.dix:
         cas = [(svc_id, ctrl_id)
                for ctrl_id in m0conf if ctrl_id.type is ObjT.controller
                for proc_id in m0conf[m0conf[ctrl_id].node].processes
@@ -933,38 +936,12 @@ def pool_drives(m0conf: Dict[Oid, Any], pattern: str) -> List[Oid]:
                                                     blksize=1)))
                 for (svc_id, ctrl_id) in cas]
 
-    if pattern == 'first_disk':
+    if ptype == PoolT.md:
         return [m0conf[ctrl_id].drives[0]
                 for ctrl_id in m0conf if ctrl_id.type is ObjT.controller]
 
-    assert pattern == 'all'
+    assert ptype == PoolT.sns
     return [oid for oid in m0conf if oid.type is ObjT.drive]
-
-
-class ConfPool(ToDhall):
-    _objt = ObjT.pool
-    _downlinks = {Downlink('pvers', ObjT.pver)}
-
-    def __init__(self, pvers: List[Oid]):
-        assert all(x.type is ObjT.pver for x in pvers)
-        self.pvers = pvers
-
-    def __repr__(self):
-        return f'{self.__class__.__name__}(pvers={self.pvers})'
-
-    def to_dhall(self, oid: Oid) -> str:
-        assert oid.type is ObjT.pool
-        args = ', '.join([f'id = {oid_to_dhall(oid)}',
-                          f'pvers = {oids_to_dhall(self.pvers)}'])
-        return '{ %s }' % args
-
-    @classmethod
-    def build(cls, m0conf: Dict[Oid, Any], parent: Oid) -> Oid:
-        assert parent.type is ObjT.root
-        pool_id = new_oid(ObjT.pool)
-        m0conf[pool_id] = cls(pvers=[])
-        m0conf[parent].pools.append(pool_id)
-        return pool_id
 
 
 Failures = NamedTuple('Failures', [('site', int),
@@ -990,6 +967,89 @@ floor((nr_encls)/(N+K)), though distributional issues may result
 in a lower value.
 """
 pver_levels = Failures._fields
+
+
+class ConfPool(ToDhall):
+    _objt = ObjT.pool
+    _downlinks = {Downlink('pvers', ObjT.pver)}
+
+    def __init__(self, pvers: List[Oid]):
+        assert all(x.type in (ObjT.pver, ObjT.pver_f) for x in pvers)
+        self.pvers = pvers
+
+    def __repr__(self):
+        return f'{self.__class__.__name__}(pvers={self.pvers})'
+
+    def to_dhall(self, oid: Oid) -> str:
+        assert oid.type is ObjT.pool
+        args = ', '.join([f'id = {oid_to_dhall(oid)}',
+                          f'pvers = {oids_to_dhall(self.pvers)}'])
+        return '{ %s }' % args
+
+    @classmethod
+    def build(cls, m0conf: Dict[Oid, Any], parent: Oid,
+              pool_desc: Dict[str, Any], profile: Oid) -> Oid:
+        assert parent.type is ObjT.root
+        assert profile.type is ObjT.profile
+
+        pool_id = new_oid(ObjT.pool)
+        m0conf[pool_id] = cls(pvers=[])
+        m0conf[profile].pools.append(pool_id)
+        m0conf[parent].pools.append(pool_id)
+
+        t = PoolT[pool_desc.get('type', 'sns')]
+        drives = pool_drives(m0conf, t)
+        assert ('data_units' in pool_desc) == ('parity_units' in pool_desc)
+        if 'data_units' in pool_desc:
+            pd_attrs = PDClustAttrs0(pool_desc['data_units'],
+                                     pool_desc['parity_units'])
+        else:
+            if t == PoolT.dix:
+                # For CAS service N must be equal to 1.  CAS records are
+                # indivisible pieces of data, the whole CAS record is
+                # always stored on one node.
+                data_units = 1
+            else:
+                assert t == PoolT.md
+                data_units = len(drives)
+            pd_attrs = PDClustAttrs0(data_units=data_units, parity_units=0)
+        tolerance = None if t == PoolT.sns else Failures(0, 0, 0, 1, 0)
+        pver = ConfPver.build(m0conf, pool_id, pd_attrs, drives, tolerance)
+        if t == PoolT.dix:
+            m0conf[parent].imeta_pver = pver
+        elif t == PoolT.md:
+            m0conf[parent].mdpool = pool_id
+        else:
+            assert t == PoolT.sns
+            d = pool_desc.get('allowed_failures')
+            for v in gen_allowances(Failures(0, 0, 0, 0, 0) if d is None else
+                                    Failures(d['site'],
+                                             d['rack'],
+                                             d['encl'],
+                                             d['ctrl'],
+                                             d['disk'])):
+                ConfPverF.build(m0conf, pool_id, base=pver, allowance=v)
+
+        return pool_id
+
+
+def gen_allowances(allowed: Failures) -> List[Failures]:
+    """Generate all combinations of failures from CDF's `allowed_failures`
+    vector.
+
+    >>> gen_allowances(Failures(0, 0, 0, 0, 2))
+    [Failures(0, 0, 0, 0, 1), Failures(0, 0, 0, 0, 2)]
+    >>> gen_allowances(Failures(0, 0, 0, 1, 2))
+    [Failures(0, 0, 0, 0, 1),
+     Failures(0, 0, 0, 0, 2),
+     Failures(0, 0, 0, 1, 0),
+     Failures(0, 0, 0, 1, 1),
+     Failures(0, 0, 0, 1, 2)]
+    >>> gen_allowances(Failures(0, 0, 0, 0, 0))
+    []
+    """
+    return [Failures(*v) for v in
+            filter(any, itertools.product(*(range(n+1) for n in allowed)))]
 
 
 # m0_pdclust_attr
@@ -1102,7 +1162,48 @@ class ConfPver(ToDhall):
             sitevs=[])
         m0conf[parent].pvers.append(pver_id)
         build_pver_subtree(m0conf, pver_id, drives)
-        # XXX-TODO: add formulaic pool versions; see addPVerFormulaic in Halon
+        return pver_id
+
+
+class ConfPverF(ToDhall):
+    _cuid = _infinite_counter()  # cluster-unique pver_f identifier
+    _objt = ObjT.pver_f
+    _downlinks: Set[Downlink] = set()
+
+    def __init__(self, cuid: int, base: Oid, allowance: List[int]):
+        assert cuid >= 0
+        assert base.type is ObjT.pver
+        assert len(allowance) == len(pver_levels)
+        all(n >= 0 for n in allowance)
+
+        self.cuid = cuid
+        self.base = base
+        self.allowance = allowance
+
+    def __repr__(self):
+        args = ', '.join([f'cuid={self.cuid}',
+                          f'base={self.base}',
+                          f'allowance={self.allowance}'])
+        return f'{self.__class__.__name__}({args})'
+
+    def to_dhall(self, oid: Oid) -> str:
+        assert oid.type is ObjT.pver_f
+        args = ', '.join([f'id = {oid_to_dhall(oid)}',
+                          f'cuid = {self.cuid}',
+                          f'base = {oid_to_dhall(self.base)}',
+                          f'allowance = {self.allowance}'])
+        return '{ %s }' % args
+
+    @classmethod
+    def build(cls, m0conf: Dict[Oid, Any], parent: Oid,
+              base: Oid, allowance: Failures) -> Oid:
+        assert parent.type is ObjT.pool
+
+        pver_id = new_oid(ObjT.pver_f)
+        m0conf[pver_id] = cls(cuid=next(cls._cuid),
+                              base=base,
+                              allowance=list(allowance))
+        m0conf[parent].pvers.append(pver_id)
         return pver_id
 
 
@@ -1320,11 +1421,16 @@ def validate_m0conf(m0conf: Dict[Oid, Any]) -> None:
         dict((parent_t, {}) for parent_t in ObjT)
     for oid, obj in m0conf.items():
         assert oid.type is obj._objt
-        assert oid.type.name == obj.__class__.__name__[len('Conf'):].lower()
+        assert obj.__class__.__name__ == \
+            'Conf' + ''.join(s.capitalize() for s in oid.type.name.split('_'))
         for rel in obj._downlinks:
             children = getattr(obj, rel.name)
             assert all_unique(children)
-            assert all(x.type is rel.children_t for x in children)
+            assert all(
+                (x.type is rel.children_t or
+                 # XXX leaky abstraction
+                 (x.type is ObjT.pver_f and rel.children_t is ObjT.pver))
+                for x in children)
             children_by_parent_type[oid.type].setdefault(rel.name, []) \
                                              .extend(children)
     assert all(all_unique(children)
@@ -1373,47 +1479,14 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
     # XXX-TODO: support multiple profiles
     prof_id = ConfProfile.build(conf, root_id)
 
-    pool_types_CDF = set()
     for pool in cluster_desc['pools']:
-        t = pool.get('type', 'sns')
-        pool_types_CDF.add(t)
-        pool_id = ConfPool.build(conf, root_id)
-        pver = ConfPver.build(conf, pool_id,
-                              PDClustAttrs0(pool['data_units'],
-                                            pool['parity_units']),
-                              pool_drives(conf, pool['disks']))
-        conf[prof_id].pools.append(pool_id)
-        if t == 'dix':
-            conf[root_id].imeta_pver = pver
-        elif t == 'md':
-            conf[root_id].mdpool = pool_id
+        ConfPool.build(conf, root_id, pool, prof_id)
 
-    if 'dix' not in pool_types_CDF:
-        pool_id = ConfPool.build(conf, root_id)
-        pver = ConfPver.build(
-            conf,
-            pool_id,
-            PDClustAttrs0(
-                # For CAS service N must always be equal to 1
-                # as CAS records are indivisible pieces of data:
-                # the whole CAS record is always stored on one node.
-                data_units=1,
-                parity_units=0),
-            drives=pool_drives(conf, 'per_cas'),
-            tolerance=Failures(0, 0, 0, 1, 0))
-        conf[prof_id].pools.append(pool_id)
-        conf[root_id].imeta_pver = pver
+    if conf[root_id].imeta_pver is None:  # no DIX pool defined in the CDF
+        ConfPool.build(conf, root_id, {'type': 'dix'}, prof_id)
 
-    if 'md' not in pool_types_CDF:
-        pool_id = ConfPool.build(conf, root_id)
-        first_drives = pool_drives(conf, 'first_disk')
-        pver = ConfPver.build(conf, pool_id,
-                              PDClustAttrs0(data_units=len(first_drives),
-                                            parity_units=0),
-                              drives=first_drives,
-                              tolerance=Failures(0, 0, 0, 1, 0))
-        conf[prof_id].pools.append(pool_id)
-        conf[root_id].mdpool = pool_id
+    if conf[root_id].mdpool is None:  # no Metadata pool defined in the CDF
+        ConfPool.build(conf, root_id, {'type': 'md'}, prof_id)
 
     validate_m0conf(conf)
     assert cluster.consul_servers
