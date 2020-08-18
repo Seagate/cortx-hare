@@ -40,7 +40,6 @@
 
 , ClusterDesc = ./types/ClusterDesc.dhall
 , FailVec     = ./types/FailVec.dhall
-, PoolDisks   = ./types/PoolDisks.dhall
 , PoolType    = ./types/PoolType.dhall
 
 , Obj         = ./types/Obj.dhall
