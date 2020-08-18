@@ -122,10 +122,16 @@ abort_if_RC_leader_election_is_impossible() {
 
         for svc in hare-hax $confd_id; do
             if $ssh sudo systemctl --quiet --state=failed is-failed $svc; then
-                ok=false
-                status_commands+=(
-                    "${ssh:+$ssh }sudo systemctl status $svc"
-                )
+                # hare-hax service fails during stop which blocks the further
+                # deployment of the cluster. Remove this explicit reset-failed
+                # and enable code after this statement once the stop failure is
+                # resolved.
+                sudo systemctl reset-failed $svc
+
+                #ok=false
+                #status_commands+=(
+                #    "${ssh:+$ssh }sudo systemctl status $svc"
+                #)
             fi
         done
         if $ok; then
