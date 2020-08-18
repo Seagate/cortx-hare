@@ -276,11 +276,11 @@ Make sure the value of data_iface in the CDF is correct."""
     for pool in desc['pools']:
         t = pool.get('type', 'sns')
         if t != 'sns':
-            assert pool.data_units == 1, \
-                f"""{pool.name}: Wrong number of data_units ({pool.data_units})
+            assert pool['data_units'] == 1, \
+                f"""{pool['name']}: Wrong number of data_units ({pool['data_units']})
 Pools of {t!r} type can only have 1 data unit."""
             assert t not in pool_types, \
-                f'{pool.name}: No more than one {t!r} pool can be defined'
+                f"""{pool['name']}: No more than one {t!r} pool can be defined."""
         pool_types.add(t)
     assert 'sns' in pool_types, \
         "At least one pool of 'sns' type must be defined"
