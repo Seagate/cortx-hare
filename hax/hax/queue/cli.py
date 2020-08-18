@@ -15,14 +15,20 @@ def _setup_logging():
 
 
 @click.command()
-@click.option('-q',
-              '--queue',
-              default='eq',
-              type=click.Choice(['eq', 'bq'], case_sensitive=False))
-@click.option('-t', '--message-type', type=str)
-@click.argument('payload')
+@click.argument('queue',
+                type=click.Choice(['eq', 'bq'], case_sensitive=False),
+                required=True)
+@click.argument('type', type=str, required=True)
+@click.argument('payload', type=str, required=True)
 @click.pass_context
-def parse_opts(ctx, queue: str, message_type: str, payload: str):
+def parse_opts(ctx, queue: str, type: str, payload: str):
+    """Send entry to target queue.
+
+    \b
+    QUEUE   Name of the target queue. Supported values: "eq" (Event Queue), "bq" (Broadcast Queue).
+    TYPE    Type of the entry.
+    PAYLOAD Entry payload encoded as JSON value.
+    """
     ctx.ensure_object(dict)
     name = queue.lower()
     types = {'eq': EQPublisher, 'bq': BQPublisher}
@@ -32,7 +38,7 @@ def parse_opts(ctx, queue: str, message_type: str, payload: str):
     # If the things change, such oneliner must be refactored.
     publisher: Publisher = types[name]()
     ctx.obj['result'] = AppCtx(payload=payload,
-                               type=message_type,
+                               type=type,
                                publisher=publisher)
     return ctx.obj
 
@@ -49,6 +55,5 @@ def main():
         pub = app_context.publisher
         offset = pub.publish(app_context.type, app_context.payload)
         logging.info('Written to epoch: %s', offset)
-
     except Exception:
         logging.exception('Exiting with failure')
