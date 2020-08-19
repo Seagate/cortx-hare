@@ -366,22 +366,28 @@ class ConsulUtil:
         keys = getattr(self,
                        'get_{}_keys'.format(obj_t.name.lower()))(node_items,
                                                                  fidk)
-        assert keys
-        node_name = keys[0].split('/', 3)[2]
+        assert len(keys) == 1
+        key = keys[0].split('/')
+        node_key = ('/'.join(key[:3]))
+        node_val = self.kv.kv_get(node_key)
+        data = node_val['Value']
+        node_name: str = json.loads(data)['name']
         return self.get_node_health(node_name)
 
     @staticmethod
     def get_process_keys(node_items: List[Any], fidk: int) -> List[Any]:
+        fid = mk_fid(ObjT.PROCESS, fidk)
         return [
             x['Key'] for x in node_items
-            if '/processes/' in x['Key'] and str(fidk) in x['Key']
+            if f'{fid}' == x['Key'].split('/')[-1]
         ]
 
     @staticmethod
     def get_service_keys(node_items: List[Any], fidk: int) -> List[Any]:
+        fid = mk_fid(ObjT.SERVICE, fidk)
         return [
             x['Key'] for x in node_items
-            if '/services/' in x['Key'] and int(x['Value']) == fidk
+            if f'{fid}' == x['Key'].split('/')[-1]
         ]
 
     def get_node_health(self, node: str) -> str:

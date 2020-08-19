@@ -19,12 +19,13 @@
 
 # :help: show cluster status
 
+import json
 import argparse
 import io
 import logging
 import sys
 from subprocess import PIPE, Popen
-from typing import Any, Dict, List, NamedTuple, Optional, Set
+from typing import Any, Dict, List, NamedTuple, Optional
 
 import simplejson as j
 from consul import Consul, ConsulException
@@ -97,9 +98,10 @@ def sns_pools(cns: Consul) -> List[str]:
     return get_kv_safe(cns, 'm0conf/profiles/pools').split(' ')
 
 
-def hosts(cns: Consul) -> Set[str]:
+def hosts(cns: Consul) -> List[str]:
     data = get_kv(cns, 'm0conf/nodes', recurse=True)
-    host_names = {(x['Key'].split('/'))[2] for x in data}
+    host_names = [json.loads(x['Value'])['name'] for x in data
+                  if len(x['Key'].split('/')) == 3]
     return host_names
 
 
@@ -128,18 +130,37 @@ def proc_id2name(cns: Consul, node: str, proc_id: int) -> str:
     return 'm0_client'
 
 
-def processes(cns: Consul, node_id: str) -> List[Process]:
+def fid_key(fid: str) -> int:
+    key = fid.split(':')[1]
+    return int(key, 16)
+
+
+def node_name2id(cns: Consul, node_name: str) -> Any:
+    data = get_kv(cns, 'm0conf/nodes/', recurse=True)
+    for x in data:
+        if len(x['Key'].split('/')) == 3 and \
+           json.loads(x['Value'])['name'] == node_name:
+            return x['Key'].split('/')[-1]
+
+    assert False
+    return ''
+
+
+def processes(cns: Consul, node_name: str) -> List[Process]:
     # Get 'm0conf/nodes/<node_id>/processes/<process_fidk>/...' entries
     # from the KV.  See 'Consul KV Schema' in [4/KV](rfc/4/README.md).
+    node_id = node_name2id(cns, node_name)
     data = get_kv(cns, f'm0conf/nodes/{node_id}/processes', recurse=True)
-    fidk_list: List[int] = list({int(x['Key'].split('/')[4]) for x in data})
+    proc_ids = [x['Key'].split('/')[-1] for x in data
+                if len(x['Key'].split('/')) == 5]
+    fidk_list = list(map(fid_key, proc_ids))
     fidk_list.sort()
     return [
-        Process(name=proc_id2name(cns, node_id, k),
+        Process(name=proc_id2name(cns, node_name, k),
                 fid=Fid(0x7200000000000001, k),
                 ep=get_kv_safe(
-                    cns, f'm0conf/nodes/{node_id}/processes/{k}/endpoint'),
-                status=process_status(cns, node_id, k)) for k in fidk_list
+                    cns, f'm0conf/nodes/{node_name}/processes/{k}/endpoint'),
+                status=process_status(cns, node_name, k)) for k in fidk_list
     ]
 
 
