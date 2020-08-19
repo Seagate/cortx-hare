@@ -25,7 +25,8 @@ def parse_opts(ctx, queue: str, type: str, payload: str):
     """Send entry to target queue.
 
     \b
-    QUEUE   Name of the target queue. Supported values: "eq" (Event Queue), "bq" (Broadcast Queue).
+    QUEUE   Name of the target queue. Supported values: "eq" (Event Queue), \
+"bq" (Broadcast Queue).
     TYPE    Type of the entry.
     PAYLOAD Entry payload encoded as JSON value.
     """
