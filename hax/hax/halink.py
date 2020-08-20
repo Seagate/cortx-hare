@@ -25,7 +25,7 @@ from hax.exception import ConfdQuorumException
 from hax.ffi import HaxFFI, make_array, make_c_str
 from hax.message import EntrypointRequest, HaNvecGetEvent, ProcessEvent
 from hax.types import (ConfHaProcess, Fid, FidStruct, FsStats, HaNote,
-                       HaNoteStruct, HAState, ObjT)
+                       HaNoteStruct, HAState, StobIoqError, ObjT)
 from hax.util import ConsulUtil
 
 
@@ -168,6 +168,14 @@ class HaLink:
                               chp_type=chp_type,
                               chp_pid=chp_pid,
                               fid=fid)))
+
+    def _stob_ioq_event_cb(self, fid, sie_conf_sdev, sie_stob_id, sie_fd,
+                           sie_opcode, sie_rc, sie_offset, sie_size,
+                           sie_bshift):
+        logging.info('fid=%s, sie_conf_sdev=%s', fid, sie_conf_sdev)
+        self.queue.put(
+            StobIoqError(fid, sie_conf_sdev, sie_stob_id, sie_fd, sie_opcode,
+                         sie_rc, sie_offset, sie_size, sie_bshift))
 
     @log_exception
     def ha_nvec_get(self, hax_msg: int, nvec: List[HaNote]) -> None:

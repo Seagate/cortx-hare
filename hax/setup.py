@@ -126,7 +126,7 @@ setup(
     packages=find_packages(),
     setup_requires=['flake8', 'mypy', 'pkgconfig'],
     install_requires=[
-        'python-consul>=1.1.0', 'simplejson', 'aiohttp', 'click'
+        'python-consul>=1.1.0', 'simplejson', 'aiohttp', 'click',
     ],
     entry_points={
         'console_scripts': ['hax=hax.hax:main', 'h0q=hax.queue.cli:main']

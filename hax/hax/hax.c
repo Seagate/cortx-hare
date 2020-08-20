@@ -34,12 +34,14 @@
 #include "lib/memory.h"   /* M0_ALLOC_ARR */
 #include "lib/thread.h"   /* m0_thread_{adopt, shun} */
 #include "lib/string.h"   /* m0_strdup */
-#include "lib/trace.h"    /* M0_LOG, M0_DEBUG */
 #include "motr/version.h" /* M0_VERSION_GIT_REV_ID */
 #include "motr/iem.h"
 #include "ha/msg.h"
 #include "ha/link.h"
 #include "hax.h"
+
+#define M0_TRACE_SUBSYSTEM M0_TRACE_SUBSYS_HA
+#include "lib/trace.h"    /* M0_LOG, M0_DEBUG */
 
 static struct hax_context *hc0;
 static __thread struct m0_thread m0thread;
@@ -400,8 +402,8 @@ static void __ha_nvec_reply_send(const struct hax_msg *hm,
 static void handle_process_event(const struct hax_msg *hm)
 {
 	if (!hm->hm_hc->hc_alive) {
-		M0_LOG(M0_DEBUG, "Skipping the event processing since"
-				 " Python object is already destructed");
+		M0_LOG(M0_WARN, "Skipping the event processing since"
+				" Python object is already destructed");
 		return;
 	}
 	PyGILState_STATE gstate;
@@ -422,7 +424,50 @@ static void handle_process_event(const struct hax_msg *hm)
 
 static void handle_stob_ioq(const struct hax_msg *hm)
 {
-	/* just ignore it for now */
+	M0_ENTRY();
+	M0_LOG(M0_WARN, "Got STOB_IOQ");
+
+	if (!hm->hm_hc->hc_alive) {
+		M0_LOG(M0_WARN, "Skipping the event processing since"
+				 " Python object is already destructed");
+		M0_LEAVE();
+		return;
+	}
+
+	PyGILState_STATE gstate;
+	gstate = PyGILState_Ensure();
+
+	struct hax_context *hc = hm->hm_hc;
+	const struct m0_ha_msg *hmsg = &hm->hm_msg;
+
+	M0_LOG(M0_INFO, "Stob fid: " FID_F, FID_P(&hmsg->hm_fid));
+
+	PyObject *py_fid = toFid(&hmsg->hm_fid);
+	PyObject *py_conf_sdev = toFid(&hmsg->hm_data.u.hed_stob_ioq.sie_conf_sdev);
+	PyObject *py_stob_id_dom_fid = toFid(&hmsg->hm_data.u.hed_stob_ioq.sie_stob_id.si_domain_fid);
+	PyObject *py_stob_id_fid = toFid(&hmsg->hm_data.u.hed_stob_ioq.sie_stob_id.si_fid);
+	PyObject *hax_mod = getModule("hax.types");
+	PyObject *py_stob_id = PyObject_CallMethod(hax_mod, "StobId", "(OO)",
+					py_stob_id_dom_fid, py_stob_id_fid);
+
+	PyObject_CallMethod(hc->hc_handler, "_stob_ioq_event_cb", "(OOOKKKKKI)",
+			    py_fid, py_conf_sdev, py_stob_id,
+			    hmsg->hm_data.u.hed_stob_ioq.sie_fd,
+			    hmsg->hm_data.u.hed_stob_ioq.sie_opcode,
+			    hmsg->hm_data.u.hed_stob_ioq.sie_rc,
+			    hmsg->hm_data.u.hed_stob_ioq.sie_offset,
+			    hmsg->hm_data.u.hed_stob_ioq.sie_size,
+			    hmsg->hm_data.u.hed_stob_ioq.sie_bshift);
+
+	Py_DECREF(py_stob_id);
+	Py_DECREF(hax_mod);
+	Py_DECREF(py_stob_id_fid);
+	Py_DECREF(py_stob_id_dom_fid);
+	Py_DECREF(py_conf_sdev);
+	Py_DECREF(py_fid);
+	PyGILState_Release(gstate);
+
+	M0_LEAVE();
 }
 
 static void _dummy_handle(const struct hax_msg *msg)
@@ -460,7 +505,7 @@ static void msg_received_cb(struct m0_halon_interface *hi,
 	const enum m0_ha_msg_type msg_type = m0_ha_msg_type_get(msg);
 
 	M0_PRE(M0_HA_MSG_INVALID < msg_type && msg_type <= M0_HA_MSG_SNS_ERR);
-	M0_LOG(M0_INFO, "Received msg of type %d", m0_ha_msg_type_get(msg));
+	M0_LOG(M0_INFO, "Received msg of type %d\n", m0_ha_msg_type_get(msg));
 
 	hax_action[msg_type](
 	    &(struct hax_msg) { .hm_hc = hc0, .hm_hl = hl, .hm_msg = *msg });
@@ -587,9 +632,22 @@ int start(unsigned long long ctx, const char *local_rpc_endpoint,
 {
 	struct hax_context *hc = (struct hax_context *)ctx;
 	struct m0_halon_interface *hi = hc->hc_hi;
+	int rc;
+
+	rc = m0_trace_set_immediate_mask("ha");
+	if (rc != 0) {
+		M0_LOG(M0_ERROR, "Failed to set m0_trace_immediate_mask");
+		return rc;
+	}
+
+	rc = m0_trace_set_level("info+");
+	if (rc != 0) {
+		M0_LOG(M0_ERROR, "Failed to set m0_trace_level");
+		return rc;
+	}
 
 	M0_LOG(M0_INFO, "Starting hax interface..\n");
-	int rc = m0_halon_interface_start(
+	rc = m0_halon_interface_start(
 	    hi, local_rpc_endpoint,
 	    &M0_FID_TINIT('r', process_fid->f_container, process_fid->f_key),
 	    &M0_FID_TINIT('s', ha_service_fid->f_container,
@@ -707,6 +765,8 @@ void shun_motr_thread(void)
 {
 	m0_halon_interface_thread_shun();
 }
+
+#undef M0_TRACE_SUBSYSTEM
 
 /*
  *  Local variables:

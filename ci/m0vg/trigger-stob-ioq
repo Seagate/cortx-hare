@@ -1,0 +1,106 @@
+#!/usr/bin/env bash
+set -eu -o pipefail
+shopt -s expand_aliases
+
+export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
+
+# constants
+readonly PROG_NAME="${0##*/}"
+readonly SELF="$(readlink -f $0)"
+readonly TOP_SRCDIR="${SELF%/*/*/*}"
+
+: ${M0_SRC_DIR:=$(
+    for mdir in cortx-motr motr mero; do
+        if [[ -d $TOP_SRCDIR/../$mdir ]] ; then
+            readlink -f $TOP_SRCDIR/../$mdir
+            break
+        fi
+    done
+)}
+
+log() {
+    echo -e >&2 "==> $*"
+}
+
+die() {
+    echo -e >&2 "$PROG_NAME: ERROR: $*"
+    exit 1
+}
+
+[[ -n $M0_SRC_DIR ]] ||
+    die "Motr sources not found, please set M0_SRC_DIR env variable"
+
+[[ -r $M0_SRC_DIR/motr/.libs/libmotr.so ]] ||
+    die "libmotr.so is missing in '$M0_SRC_DIR', please build Motr first"
+
+if [[ $USER != root ]] ; then
+    alias sudo='sudo -E'
+else
+    alias sudo='env'
+fi
+
+log 'Installing Motr services'
+sudo $M0_SRC_DIR/../mero/scripts/install-motr-service --link
+
+log 'Setting up loop devices for Motr'
+sudo mkdir -p /var/motr
+for i in {0..9}; do
+    sudo dd if=/dev/zero of=/var/motr/disk$i.img bs=1M seek=9999 count=1
+    sudo losetup --verbose /dev/loop$i /var/motr/disk$i.img
+done
+
+log 'Installing Hare'
+(cd $TOP_SRCDIR; sudo make devinstall)
+
+log 'Bootstrapping singlenode configuration'
+sudo hctl bootstrap --mkfs $TOP_SRCDIR/cfgen/examples/singlenode.yaml
+hctl status
+
+log 'Enabling emulate_disk_errors_nr in ioservice'
+journal_marker=$(sudo journalctl -n0 --show-cursor | awk '/cursor/ {print $NF}')
+sleep 2 # doh
+# [started]  ioservice  0x7200000000000001:0xc   172.28.128.62@tcp:12345:2:2
+ios_fid=$(hctl status | grep ioservice | awk '{print $3}')
+sudo gdb --quiet --pid $(pgrep -f "lt-m0d.*$ios_fid") --batch -nh -nx \
+         -ex 'set emulate_disk_errors_nr = 3' \
+         2>/dev/null \
+| grep -v 'New LWP'
+sudo gdb --quiet --pid $(pgrep -f "lt-m0d.*$ios_fid") --batch -nh -nx \
+         -ex 'print emulate_disk_errors_nr' \
+         2>/dev/null \
+| grep -v 'New LWP'
+sleep 2 # doh
+
+log 'Running m0crate IO workload'
+$TOP_SRCDIR/utils/m0crate-io-conf > /tmp/m0crate-io.yaml
+dd if=/dev/urandom of=/tmp/128M bs=1M count=128
+sudo $M0_SRC_DIR/utils/m0crate -vvv -S /tmp/m0crate-io.yaml
+
+log 'Cluster status'
+hctl status
+
+log 'STOB_IOQ events'
+if sudo journalctl --no-pager --full --after-cursor="$journal_marker" \
+   | grep -E 'handle_stob_ioq|ioq_io_error'
+then
+    ioq_logs_found=true
+else
+    ioq_logs_found=false
+fi
+
+log 'Shutting down cluster'
+sudo hctl shutdown
+sudo systemctl reset-failed hare-consul-agent.service
+sudo systemctl reset-failed hare-hax.service
+
+log 'Removing loop devices'
+sudo losetup --verbose --detach-all
+
+log 'Uninstalling Hare'
+(cd $TOP_SRCDIR; sudo make uninstall)
+
+log 'Uninstalling Motr services'
+sudo $M0_SRC_DIR/../mero/scripts/install-motr-service --uninstall
+
+$ioq_logs_found ||
+    die "No STOB IOQ logs found for hare-hax.service"
