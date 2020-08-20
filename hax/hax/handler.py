@@ -23,8 +23,9 @@ from queue import Empty, Queue
 from hax.ffi import HaxFFI
 from hax.message import (BroadcastHAStates, EntrypointRequest, HaNvecGetEvent,
                          ProcessEvent)
-from hax.types import StoppableThread
-from hax.util import ConsulUtil, repeat_if_fails
+from hax.queue.publish import EQPublisher
+from hax.types import StoppableThread, StobIoqError
+from hax.util import ConsulUtil, repeat_if_fails, dump_json
 
 
 class ConsumerThread(StoppableThread):
@@ -34,6 +35,7 @@ class ConsumerThread(StoppableThread):
                          args=(q, hax_ffi))
         self.is_stopped = False
         self.consul = ConsulUtil()
+        self.eq_publisher = EQPublisher()
 
     def stop(self) -> None:
         self.is_stopped = True
@@ -88,6 +90,12 @@ class ConsumerThread(StoppableThread):
                     elif isinstance(item, BroadcastHAStates):
                         logging.info('HA states: %s', item.states)
                         ha_link.broadcast_ha_states(item.states)
+                    elif isinstance(item, StobIoqError):
+                        logging.info('Stob IOQ: %s', item.fid)
+                        payload = dump_json(item)
+                        logging.debug('Stob IOQ JSON: %s', payload)
+                        offset = self.eq_publisher.publish('STOB_IOQ', payload)
+                        logging.debug('Written to epoch: %s', offset)
                     else:
                         logging.warning('Unsupported event type received: %s',
                                         item)

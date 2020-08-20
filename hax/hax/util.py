@@ -406,3 +406,11 @@ class ConsulUtil:
         key = f'processes/{event.fid}'
         logging.debug('Setting process status in KV: %s:%s', key, data)
         self.kv.kv_put(key, data)
+
+
+def dump_json(obj) -> str:
+    """
+    Interface wrapper to automatically apply correct parameters for json
+    serialization obj.
+    """
+    return simplejson.dumps(obj, for_json=True)

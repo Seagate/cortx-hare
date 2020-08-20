@@ -118,6 +118,9 @@ class Fid:
         return type(other) is Fid and \
             other.container == self.container and other.key == self.key
 
+    def for_json(self):
+        return self.__repr__()
+
 
 class Uint128:
     def __init__(self, hi, lo):
@@ -144,6 +147,20 @@ FsStatsWithTime = NamedTuple('FsStatsWithTime', [('stats', FsStats),
 HaNote = NamedTuple('HaNote', [('obj_t', str), ('note', HaNoteStruct)])
 
 HAState = NamedTuple('HAState', [('fid', Fid), ('status', str)])
+
+# struct m0_stob_id
+StobId = NamedTuple('StobId', [('si_domain_fid', Fid), ('si_fid', Fid)])
+
+# struct m0_stob_ioq_error
+StobIoqError = NamedTuple('StobIoqError', [('fid', Fid),
+                                           ('sie_conf_sdev', Fid),
+                                           ('sie_stob_id', StobId),
+                                           ('sie_fd', int),
+                                           ('sie_opcode', int),
+                                           ('sie_rc', int),
+                                           ('sie_offset', int),
+                                           ('sie_size', int),
+                                           ('sie_bshift', int)])
 
 
 class StoppableThread(Thread):
