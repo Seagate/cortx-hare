@@ -34,7 +34,7 @@ from urllib3.exceptions import HTTPError
 from hax.exception import HAConsistencyException
 from hax.types import ConfHaProcess, Fid, FsStatsWithTime, ObjT
 
-__all__ = ['ConsulUtil', 'create_process_fid']
+__all__ = ['ConsulUtil', 'create_process_fid', 'create_drive_fid']
 
 # XXX What is the difference between `ip_addr` and `address`?
 # The names are hard to discern.
@@ -63,11 +63,23 @@ def create_process_fid(key: int) -> Fid:
     return mk_fid(ObjT.PROCESS, key)
 
 
+def create_drive_fid(key: int) -> Fid:
+    return mk_fid(ObjT.DRIVE, key)
+
+
 # See enum m0_conf_ha_process_event in Motr source code.
 ha_process_events = ('M0_CONF_HA_PROCESS_STARTING',
                      'M0_CONF_HA_PROCESS_STARTED',
                      'M0_CONF_HA_PROCESS_STOPPING',
                      'M0_CONF_HA_PROCESS_STOPPED')
+
+ha_conf_obj_states = ('M0_NC_UNKNOWN',
+                      'M0_NC_ONLINE',
+                      'M0_NC_FAILED',
+                      'M0_NC_TRANSIENT',
+                      'M0_NC_REPAIR',
+                      'M0_NC_REPAIRED',
+                      'M0_NC_REBALANCE')
 
 
 def repeat_if_fails(wait_seconds=5, max_retries=-1):
@@ -405,6 +417,24 @@ class ConsulUtil:
         data = json.dumps({'state': ha_process_events[event.chp_event]})
         key = f'processes/{event.fid}'
         logging.debug('Setting process status in KV: %s:%s', key, data)
+        self.kv.kv_put(key, data)
+
+    def drive_name_to_id(self, uid: str) -> str:
+        drive_id = ''
+        # 'm0conf/nodes/<node_name>/processes/<process_fidk>/disks/<disk_uuid>'
+        node_items = self.kv.kv_get('m0conf/nodes', recurse=True)
+        for x in node_items:
+            if '/disks/' in x['Key'] and uid in x['Key']:
+                drive_id = x['Value']
+        return drive_id
+
+    def set_m0_disk_state(self, fid: str, objstate: int) -> None:
+        assert 0 <= objstate < len(ha_conf_obj_states), \
+            f'Invalid object state: {objstate}'
+
+        data = json.dumps({'state': ha_conf_obj_states[objstate]})
+        key = f'process/{fid}'
+        logging.debug('Setting disk state in KV: %s:%s', key, data)
         self.kv.kv_put(key, data)
 
 

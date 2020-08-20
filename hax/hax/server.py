@@ -101,7 +101,8 @@ def run_server(
     app.add_routes([
         web.get('/', hello_reply),
         web.post('/', process_ha_states(queue)),
-        web.post('/watcher/bq', process_bq_update(inbox_filter, BQProcessor()))
+        web.post('/watcher/bq', process_bq_update(inbox_filter,
+                                                  BQProcessor(queue)))
     ])
     logging.info(f'Starting HTTP server at {addr}:{port} ...')
     try:

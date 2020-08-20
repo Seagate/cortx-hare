@@ -35,7 +35,9 @@ ObjT = Enum(
     [
         # These are the only conf object types we care about.
         ('PROCESS', 0x7200000000000001),
-        ('SERVICE', 0x7300000000000001)
+        ('SERVICE', 0x7300000000000001),
+        ('SDEV', 0x6400000000000001),
+        ('DRIVE', 0x6b00000000000001),
     ])
 ObjT.__doc__ = 'Motr conf object types and their m0_fid.f_container values'
 
