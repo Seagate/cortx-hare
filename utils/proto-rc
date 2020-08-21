@@ -128,7 +128,7 @@ scheduled_wake_pid() {
 }
 
 wake_rc() {
-    q eq 'wake_RC' 'null' &>/dev/null
+    h0q eq 'wake_RC' 'null' &>/dev/null
 }
 
 wake_me_after() {

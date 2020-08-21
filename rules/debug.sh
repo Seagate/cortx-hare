@@ -27,5 +27,5 @@ Printing environment variables:"
 # TODO: Consider to output only RC-specific variables
 env
 # XXX: Bypass debug event to BQ for further processing if needed
-q bq ${HARE_RC_EVENT_TYPE} ${HARE_RC_EVENT_PAYLOAD}
+h0q bq ${HARE_RC_EVENT_TYPE} ${HARE_RC_EVENT_PAYLOAD}
 

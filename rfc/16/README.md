@@ -45,11 +45,11 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 
 * Consul KV store MUST have `eq/` and `bq` key prefix.
 
-* Hare software package MUST provide `q` CLI utility.  Users SHOULD use this utility to put entries into EQ and BQ.
+* Hare software package MUST provide `h0q` CLI utility.  Users SHOULD use this utility to put entries into EQ and BQ.
 
   Usage:
   ```sh
-  CONSUL_ACL_TOKEN=<eq-write-token> q <key-prefix> <value>
+  CONSUL_ACL_TOKEN=<eq-write-token> h0q <key-prefix> <value>
   ```
 
 ### Event Queue (EQ)
@@ -62,7 +62,7 @@ The EQ is represented by Consul KV entries with `eq/` prefix.
 
 Adding event to the EQ:
 ```sh
-CONSUL_ACL_TOKEN=<eq-write-token> q eq \
+CONSUL_ACL_TOKEN=<eq-write-token> hoq eq \
     '{ "type": "<event-type>", "payload": "<event-payload>" }'
 ```
 
@@ -119,10 +119,10 @@ The BQ is represented by Consul KV entries with `bq/` prefix.
 
 Adding message to the BQ:
 ```sh
-CONSUL_ACL_TOKEN=<bq-write-token> q bq <message>
+CONSUL_ACL_TOKEN=<bq-write-token> hoq bq <message>
 ```
 
-<!-- XXX-OPTIMIZATION: `q` uses Consul transaction mechanism and CAS to increment the epoch.  If only RC is allowed to modify the BQ, we may want to use a more lightweight mechanism. -->
+<!-- XXX-OPTIMIZATION: `h0q` uses Consul transaction mechanism and CAS to increment the epoch.  If only RC is allowed to modify the BQ, we may want to use a more lightweight mechanism. -->
 
 * Only RC SHOULD be able to modify the BQ.  <!-- XXX How to ensure that? -->
 
