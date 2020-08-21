@@ -92,6 +92,7 @@ Supported event types and their payload are specified in XXX/EVERULES.
   -->
 
 1. The RC MUST abort a rule that runs longer than predetermined \<timeout\>.
+1. If rule terminates with nonzero exit code, the RC SHALL log this error in the systemd log.
 
 <!-- XXX How is RC to be configured?  Do we want to reconfigure it at runtime?
   -->
