@@ -154,6 +154,10 @@ install: install-dirs install-cfgen install-hax install-systemd install-vendor
 	@$(call _log,linking hctl -> $(DESTDIR)/usr/bin)
 	@install --verbose --directory $(DESTDIR)/usr/bin
 	@ln -sf /$(PREFIX)/bin/hctl $(DESTDIR)/usr/bin
+	@$(call _log,copying h0q -> $(DESTDIR)/$(PREFIX)/bin)
+	@install utils/h0q $(DESTDIR)/$(PREFIX)/bin
+	@$(call _log,linking h0q -> $(DESTDIR)/usr/bin)
+	@ln -sf /$(PREFIX)/bin/h0q $(DESTDIR)/usr/bin
 
 .PHONY: install-dirs
 install-dirs:
@@ -235,6 +239,8 @@ devinstall: install-dirs devinstall-cfgen devinstall-hax devinstall-systemd devi
 	@$(call _log,linking hctl -> $(DESTDIR)/usr/bin)
 	@install --verbose --directory $(DESTDIR)/usr/bin
 	@ln -sf $(TOP_SRC_DIR)hctl $(DESTDIR)/usr/bin
+	@$(call _log,linking h0q -> $(DESTDIR)/usr/bin)
+	@ln -sf $(TOP_SRC_DIR)/utils/h0q $(DESTDIR)/usr/bin
 	@$(call _log,creating hare group)
 	@groupadd --force hare
 	@$(call _log,changing permission of $(DESTDIR)/var/lib/hare)

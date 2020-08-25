@@ -129,7 +129,7 @@ setup(
         'python-consul>=1.1.0', 'simplejson', 'aiohttp', 'click',
     ],
     entry_points={
-        'console_scripts': ['hax=hax.hax:main', 'h0q=hax.queue.cli:main']
+        'console_scripts': ['hax=hax.hax:main', 'q=hax.queue.cli:main']
     },
     ext_modules=[
         Extension(
