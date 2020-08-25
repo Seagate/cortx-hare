@@ -46,11 +46,6 @@ RULES_DIR=${CURR_DIR%/*}/rules
 RULES_DEFAULT_TIMEOUT_SEC=4
 RULES_CRITICAL_TIMEOUT_SEC=6
 
-HARE_BASE_DIR=/opt/seagate/cortx/hare
-PYTHONPATH="$HARE_BASE_DIR/lib/python3.6/site-packages"
-export PYTHONPATH="$HARE_BASE_DIR/lib64/python3.6/site-packages:$PYTHONPATH"
-export PATH="$HARE_BASE_DIR/bin:$PATH"
-
 STOP=0
 sig_handler() {
     echo 'Signal caught! Exiting...'
