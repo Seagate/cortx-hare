@@ -615,10 +615,6 @@ void destroy_halink(unsigned long long ctx)
 
 	hc->hc_alive = false;
 	Py_DECREF(hc->hc_handler);
-	if (hc->hc_rconfc_initialized) {
-		struct m0_spiel *spiel = m0_halon_interface_spiel(hc0->hc_hi);
-		m0_spiel_rconfc_stop(spiel);
-	}
 
 	m0_halon_interface_stop(hc->hc_hi);
 	m0_halon_interface_fini(hc->hc_hi);
@@ -685,6 +681,19 @@ int start_rconfc(unsigned long long ctx, const struct m0_fid *process_fid)
 		return rc;
 	}
 	hc->hc_rconfc_initialized = true;
+	return 0;
+}
+
+
+int stop_rconfc(unsigned long long ctx)
+{	
+        struct hax_context *hc = (struct hax_context *)ctx;
+
+	if (hc->hc_rconfc_initialized) {
+		struct m0_spiel *spiel = m0_halon_interface_spiel(hc->hc_hi);
+		m0_spiel_rconfc_stop(spiel);
+	}
+
 	return 0;
 }
 

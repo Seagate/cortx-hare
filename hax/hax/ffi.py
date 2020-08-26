@@ -64,6 +64,10 @@ class HaxFFI:
         self.start_rconfc = lib.start_rconfc
         self.destroy = py_func_proto(('destroy_halink', lib))
 
+        lib.stop_rconfc.argtypes = [c.c_void_p]
+        lib.stop_rconfc.restype = c.c_int
+        self.stop_rconfc = lib.stop_rconfc
+
         lib.m0_ha_entrypoint_reply_send.argtypes = [
             c.c_void_p,  # unsigned long long epr
             c.POINTER(Uint128Struct),  # const struct m0_uint128    *req_id

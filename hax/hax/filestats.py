@@ -71,6 +71,10 @@ class FsStatsUpdater(StoppableThread):
         except Exception:
             logging.exception('Aborting due to an error')
         finally:
+            try:
+                halink.stop_rconfc()
+            except Exception:
+                logging.error('Failed to stop rconfc')
             logging.debug('Releasing motr-related resources for this thread')
             ffi.shun_motr_thread()
             logging.debug('filesystem stats updater thread exited')
