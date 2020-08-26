@@ -79,6 +79,17 @@ class HaLink:
         logging.debug('rconfc started')
         return result
 
+    def stop_rconfc(self) -> int:
+        logging.debug('Stopping rconfc')
+        result: int = self._ffi.stop_rconfc(self._ha_ctx)
+        if result:
+            logging.error('Cannot stop rconfc. rconfc stop operation' +
+                          'returned non-zero code (%s)', result)
+            raise RuntimeError('Cannot stop rconfc.' +
+                               'Please check Motr logs for more details.')
+        logging.debug('confc has been stopped successfuly')
+        return result
+
     @log_exception
     def _entrypoint_request_cb(self, reply_context: Any, req_id: Any,
                                remote_rpc_endpoint: str, process_fid: Fid,

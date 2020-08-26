@@ -72,6 +72,8 @@ int start(unsigned long long ctx, const char *local_rpc_endpoint,
 int start_rconfc(unsigned long long   ctx,
 		 const struct m0_fid *process_fid);
 
+int stop_rconfc(unsigned long long ctx);
+
 void test(unsigned long long ctx );
 void m0_ha_entrypoint_reply_send(unsigned long long epr,
 				 const struct m0_uint128    *req_id,
