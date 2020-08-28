@@ -104,7 +104,7 @@ def hosts(cns: Consul) -> Set[str]:
 
 
 def get_fs_stats(cns: Consul) -> Optional[Any]:
-    data = get_kv(cns, 'stats/filesystem')
+    data = get_kv(cns, 'stats/filesystem') or '{"stats": {}}'
     return j.loads(data)
 
 
