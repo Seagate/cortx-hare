@@ -132,6 +132,7 @@ CONSUL_LIBEXEC     = $(DESTDIR)/$(PREFIX)/libexec/consul
 CONSUL_SHARE       = $(DESTDIR)/$(PREFIX)/share/consul
 HARE_CONF          = $(DESTDIR)/$(PREFIX)/conf
 HARE_LIBEXEC       = $(DESTDIR)/$(PREFIX)/libexec
+HARE_RULES         = $(DESTDIR)/$(PREFIX)/rules
 HAX_EXE            = $(DESTDIR)/$(PREFIX)/bin/hax
 HAX_EGG_LINK       = $(DESTDIR)/$(PREFIX)/lib/python3.$(PY3_VERSION_MINOR)/site-packages/hax.egg-link
 SYSTEMD_CONFIG_DIR = $(DESTDIR)/usr/lib/systemd/system
@@ -149,6 +150,11 @@ install: install-dirs install-cfgen install-hax install-systemd install-vendor
 	     $(call _log,copying $$f -> $(HARE_CONF)); \
 	     install $$f $(HARE_CONF); \
 	 done
+	@$(call _info,Installing RC rules)
+	@for f in rules/*; do \
+	     $(call _log,copying $$f -> $(HARE_RULES)); \
+	     install $$f $(HARE_RULES); \
+	 done
 	@$(call _log,copying hctl -> $(DESTDIR)/$(PREFIX)/bin)
 	@install hctl $(DESTDIR)/$(PREFIX)/bin
 	@$(call _log,linking hctl -> $(DESTDIR)/usr/bin)
@@ -163,6 +169,7 @@ install: install-dirs install-cfgen install-hax install-systemd install-vendor
 install-dirs:
 	@for d in $(HARE_CONF) \
 		  $(HARE_LIBEXEC) \
+		  $(HARE_RULES) \
 		  $(DESTDIR)/run/cortx \
 		  $(DESTDIR)/var/log/hare \
 		  $(DESTDIR)/var/motr/hax; \
@@ -234,6 +241,11 @@ devinstall: install-dirs devinstall-cfgen devinstall-hax devinstall-systemd devi
 	     $(call _log,linking $$f -> $(HARE_LIBEXEC)); \
 	     ln -sf $(TOP_SRC_DIR)$$f $(HARE_LIBEXEC); \
 	 done
+	@$(call _info,linking RC rules)
+	@for f in rules/*; do \
+	     $(call _log,linking $$f -> $(HARE_RULES)); \
+	     ln -sf $(TOP_SRC_DIR)$$f $(HARE_RULES); \
+	 done
 	@$(call _log,linking hctl -> $(DESTDIR)/$(PREFIX)/bin)
 	@ln -sf $(TOP_SRC_DIR)hctl $(DESTDIR)/$(PREFIX)/bin
 	@$(call _log,linking hctl -> $(DESTDIR)/usr/bin)
@@ -303,6 +315,7 @@ uninstall:
 	@$(call _info,Un-installing)
 	@for d in $(CFGEN_EXE) $(CFGEN_SHARE) \
 	          $(HARE_CONF) \
+			  $(HARE_RULES) \
 	          $(HAX_EXE) $(HAX_EGG_LINK) $(HAX_EGG) $(HAX_MODULE) \
 	          $(EASY_INST_PTH) \
 	          $(CONSUL_LIBEXEC) $(CONSUL_SHARE) \
