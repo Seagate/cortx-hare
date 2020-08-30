@@ -18,16 +18,21 @@
 
 import asyncio
 import logging
+from json.decoder import JSONDecodeError
 from queue import Queue
-from typing import Any, Dict, List
+from typing import Any, Callable, Dict, List
 
 from aiohttp import web
+from aiohttp.web import HTTPBadRequest, HTTPNotFound
 from aiohttp.web_response import json_response
 
-from hax.message import BroadcastHAStates
+from hax.message import (BaseMessage, BroadcastHAStates, SnsDiskAttach,
+                         SnsDiskDetach, SnsRebalanceAbort, SnsRebalancePause,
+                         SnsRebalanceResume, SnsRebalanceStart, SnsRepairAbort,
+                         SnsRepairPause, SnsRepairResume, SnsRepairStart)
 from hax.queue import BQProcessor
 from hax.queue.offset import InboxFilter, OffsetStorage
-from hax.types import HAState, StoppableThread
+from hax.types import Fid, HAState, StoppableThread
 from hax.util import create_process_fid
 
 
@@ -63,6 +68,47 @@ def process_ha_states(queue: Queue):
         # Note that queue.put is potentially a blocking call
         await loop.run_in_executor(
             None, lambda: queue.put(BroadcastHAStates(to_ha_states(data))))
+        return web.Response()
+
+    return _process
+
+
+def process_sns_operation(queue: Queue):
+    async def _process(request):
+        op_name = request.match_info.get('operation')
+
+        def create_handler(
+            a_type: Callable[[Fid], BaseMessage]
+        ) -> Callable[[Dict[str, Any]], BaseMessage]:
+            def fn(data: Dict[str, Any]):
+                fid = Fid.parse(data['fid'])
+                return a_type(fid)
+
+            return fn
+
+        msg_factory = {
+            'rebalance-start': create_handler(SnsRebalanceStart),
+            'rebalance-abort': create_handler(SnsRebalanceAbort),
+            'rebalance-pause': create_handler(SnsRebalancePause),
+            'rebalance-resume': create_handler(SnsRebalanceResume),
+            'repair-start': create_handler(SnsRepairStart),
+            'repair-abort': create_handler(SnsRepairAbort),
+            'repair-pause': create_handler(SnsRepairPause),
+            'repair-resume': create_handler(SnsRepairResume),
+            'disk-attach': create_handler(SnsDiskAttach),
+            'disk-detach': create_handler(SnsDiskDetach),
+        }
+
+        if op_name not in msg_factory:
+            raise HTTPNotFound()
+        try:
+            data = await request.json()
+            message = msg_factory[op_name](data)
+
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(None, lambda: queue.put(message))
+        except (JSONDecodeError, KeyError):
+            raise HTTPBadRequest()
         return web.Response()
 
     return _process
@@ -104,8 +150,9 @@ def run_server(
     app.add_routes([
         web.get('/', hello_reply),
         web.post('/', process_ha_states(queue)),
-        web.post('/watcher/bq', process_bq_update(inbox_filter,
-                                                  BQProcessor(queue)))
+        web.post('/watcher/bq',
+                 process_bq_update(inbox_filter, BQProcessor(queue))),
+        web.post('/api/v1/sns/{operation}', process_sns_operation(queue))
     ])
     logging.info(f'Starting HTTP server at {addr}:{port} ...')
     try:

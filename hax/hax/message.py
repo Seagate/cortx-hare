@@ -16,6 +16,7 @@
 # please email opensource@seagate.com or cortx-questions@seagate.com.
 #
 
+from dataclasses import dataclass
 from typing import Any, List
 
 from hax import halink
@@ -26,42 +27,83 @@ class BaseMessage:
     pass
 
 
+@dataclass
 class Message(BaseMessage):
-    def __init__(self, s):
-        self.s = s
+    s: str
 
 
+@dataclass
 class EntrypointRequest(BaseMessage):
-    def __init__(self, reply_context: Any, req_id: Uint128,
-                 remote_rpc_endpoint: str, process_fid: Fid, git_rev: str,
-                 pid: int, is_first_request: bool,
-                 ha_link_instance: 'halink.HaLink'):
-        self.reply_context = reply_context
-        self.req_id = req_id
-        self.remote_rpc_endpoint = remote_rpc_endpoint
-        self.process_fid = process_fid
-        self.git_rev = git_rev
-        self.pid = pid
-        self.is_first_request = is_first_request
-        self.ha_link_instance = ha_link_instance
+    reply_context: Any
+    req_id: Uint128
+    remote_rpc_endpoint: str
+    process_fid: Fid
+    git_rev: str
+    pid: int
+    is_first_request: bool
+    ha_link_instance: 'halink.HaLink'
 
 
+@dataclass
 class ProcessEvent(BaseMessage):
-    def __init__(self, evt):
-        self.evt = evt
+    evt: Any
 
 
+@dataclass
 class BroadcastHAStates(BaseMessage):
-    def __init__(self, states: List[HAState]):
-        self.states = states
+    states: List[HAState]
 
 
+@dataclass
 class HaNvecGetEvent(BaseMessage):
-    def __init__(self, hax_msg: int, nvec: List[HaNote],
-                 ha_link_instance: 'halink.HaLink'):
-        self.hax_msg = hax_msg
-        self.nvec = nvec
-        self.ha_link_instance = ha_link_instance
+    hax_msg: int
+    nvec: List[HaNote]
+    ha_link_instance: 'halink.HaLink'
+
+
+@dataclass
+class SnsOperation(BaseMessage):
+    fid: Fid
+
+
+class SnsRebalanceStart(SnsOperation):
+    pass
+
+
+class SnsRebalanceAbort(SnsOperation):
+    pass
+
+
+class SnsRebalancePause(SnsOperation):
+    pass
+
+
+class SnsRebalanceResume(SnsOperation):
+    pass
+
+
+class SnsRepairStart(SnsOperation):
+    pass
+
+
+class SnsRepairAbort(SnsOperation):
+    pass
+
+
+class SnsRepairPause(SnsOperation):
+    pass
+
+
+class SnsRepairResume(SnsOperation):
+    pass
+
+
+class SnsDiskAttach(SnsOperation):
+    pass
+
+
+class SnsDiskDetach(SnsOperation):
+    pass
 
 
 class Die(BaseMessage):
