@@ -315,7 +315,7 @@ uninstall:
 	@$(call _info,Un-installing)
 	@for d in $(CFGEN_EXE) $(CFGEN_SHARE) \
 	          $(HARE_CONF) \
-			  $(HARE_RULES) \
+	          $(HARE_RULES) \
 	          $(HAX_EXE) $(HAX_EGG_LINK) $(HAX_EGG) $(HAX_MODULE) \
 	          $(EASY_INST_PTH) \
 	          $(CONSUL_LIBEXEC) $(CONSUL_SHARE) \
