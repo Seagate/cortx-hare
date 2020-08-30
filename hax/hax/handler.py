@@ -29,6 +29,14 @@ from hax.util import ConsulUtil, repeat_if_fails, dump_json
 
 
 class ConsumerThread(StoppableThread):
+    """
+    The only Motr-aware thread in whole HaX. This thread pulls messages from
+    the multithreaded Queue and considers the messages as commands. Every such
+    a command describes what should be sent to Motr land.
+
+    The thread exits gracefully when it receives message of type Die (i.e.
+    it is a 'poison pill').
+    """
     def __init__(self, q: Queue, hax_ffi: HaxFFI):
         super().__init__(target=self._do_work,
                          name='qconsumer',

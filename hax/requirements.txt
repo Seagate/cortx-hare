@@ -8,5 +8,6 @@ wheel
 #:runtime-requirements:
 aiohttp
 click
+dataclasses
 python-consul
 simplejson
