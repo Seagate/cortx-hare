@@ -36,13 +36,11 @@ test_cluster() {
     do_io
     hctl reportbug
     time hctl shutdown
-    systemctl status hare-hax || systemctl reset-failed hare-hax
 
     time hctl bootstrap --conf-dir /var/lib/hare  # bootstrap on existing conf
     do_io
     hctl reportbug bundle-id /tmp
     time hctl shutdown
-    systemctl status hare-hax || systemctl reset-failed hare-hax
 }
 
 # XXX
