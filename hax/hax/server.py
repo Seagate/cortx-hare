@@ -28,7 +28,7 @@ from hax.message import BroadcastHAStates
 from hax.queue import BQProcessor
 from hax.queue.offset import InboxFilter, OffsetStorage
 from hax.types import HAState, StoppableThread
-from hax.util import ConsulUtil, create_process_fid
+from hax.util import create_process_fid
 
 
 async def hello_reply(request):
@@ -93,7 +93,10 @@ def run_server(
     threads_to_wait: List[StoppableThread] = [],
     port=8008,
 ):
-    addr = ConsulUtil().get_hax_ip_address()
+    # Bind to ANY interface so scripts can use localhost to send requests
+    # FIXME: This introduces security related concerns since hax becomes
+    # available from network.
+    addr = '0.0.0.0'
     inbox_filter = InboxFilter(
         OffsetStorage(addr, key_prefix='queue-offsets/bq'))
 
