@@ -98,7 +98,10 @@ pipeline {
                             steps {
                                 script {
                                     def remote = getTestMachine(VM_FQDN)
-                                    def commandResult = sshScript remote: remote, script: "jenkins/prepare-yum-repos.sh"
+                                    def commandResult = sshScript(
+                                        remote: remote,
+                                        script: "jenkins/prepare-yum-repos"
+                                    )
                                     echo "Result: " + commandResult
                                 }
                             }
@@ -143,7 +146,10 @@ pipeline {
             steps {
                 script {
                     def remote = getTestMachine(VM_FQDN)
-                    def commandResult = sshScript remote: remote, script: "jenkins/bootstrap-singlenode.sh"
+                    def commandResult = sshScript(
+                        remote: remote,
+                        script: "jenkins/bootstrap-singlenode"
+                    )
                     echo "Result: " + commandResult
                 }
             }
@@ -190,7 +196,7 @@ pipeline {
                     // sshScript does not work in this case for unknown reason
                     def commandResult = sshCommand remote: remote, command: """
                         cd $REPO_NAME
-                        ./jenkins/test-boot1.sh
+                        jenkins/test-boot1
                         """
                     echo "Result: " + commandResult
                 }
