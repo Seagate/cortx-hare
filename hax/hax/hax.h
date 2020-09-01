@@ -87,7 +87,7 @@ void m0_ha_entrypoint_reply_send(unsigned long long epr,
 void m0_ha_failvec_reply_send(unsigned long long hm, struct m0_fid *pool_fid,
 			      uint32_t nr_notes);
 void m0_ha_nvec_reply_send(unsigned long long hm, struct m0_ha_note *notes, uint32_t nr_notes);
-void m0_ha_notify(unsigned long long ctx, struct m0_ha_note *notes, uint32_t nr_notes);
+PyObject *m0_ha_notify(unsigned long long ctx, struct m0_ha_note *notes, uint32_t nr_notes);
 void m0_ha_broadcast_test(unsigned long long ctx);
 
 /*

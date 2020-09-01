@@ -86,6 +86,7 @@ class HaxFFI:
             c.POINTER(HaNoteStruct),  # struct m0_ha_note *notes
             c.c_uint32  # uint32_t nr_notes
         ]
+        lib.m0_ha_notify.restype = c.py_object
         self.ha_broadcast = lib.m0_ha_notify
 
         lib.m0_ha_nvec_reply_send.argtypes = [
