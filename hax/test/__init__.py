@@ -16,22 +16,4 @@
 # please email opensource@seagate.com or cortx-questions@seagate.com.
 #
 
-
-class HaxAPIException(RuntimeError):
-    def __init__(self, message: str):
-        super().__init__()
-        self.message = message
-
-
-class HAConsistencyException(HaxAPIException):
-    pass
-
-
-class ConfdQuorumException(HaxAPIException):
-    pass
-
-
-class NotDelivered(RuntimeError):
-    def __init__(self, message: str):
-        super().__init__()
-        self.message = message
+# empty
