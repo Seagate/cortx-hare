@@ -1,0 +1,92 @@
+#!/usr/bin/env bash
+#
+# Copyright (c) 2020 Seagate Technology LLC and/or its Affiliates
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# For any questions about this software or licensing,
+# please email opensource@seagate.com or cortx-questions@seagate.com.
+
+set -eu -o pipefail
+# set -x
+export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
+
+# :help: post drive event to Motr
+
+PROG=${0##*/}
+
+usage() {
+    cat <<EOF
+Usage: $PROG [<option>]
+
+Post drive events to Motr
+
+Positional arguments:
+  <drive name> Universal drive name
+
+Options:
+  -s, --state <drive state> Drive state to notify Motr
+  -h, --help   Show this help and exit.
+EOF
+}
+
+TEMP=$(getopt --options hs: \
+              --longoptions help,state: \
+              --name "$PROG" -- "$@" || true)
+
+(($? == 0)) || { usage >&2; exit 1; }
+
+eval set -- "$TEMP"
+
+state=
+
+while true; do
+    case "$1" in
+        -h|--help)           usage; exit ;;
+        -s|--state)          state=$2; shift 2 ;;
+        --)                  shift; break ;;
+        *)                   break ;;
+    esac
+done
+
+drive=${1:-}
+
+[[ $drive ]] || {
+    usage >&2
+    exit 1
+}
+
+die() {
+    echo "$PROG: $*" >&2
+    exit 1
+}
+
+state_set() {
+    payload=$(jq --null-input --compact-output \
+            --arg obj_type "drive" \
+            --arg obj_name "$drive" \
+            --arg obj_state "$state" \
+            '{ obj_type: $obj_type, obj_name: $obj_name, obj_state: $obj_state }')
+    h0q eq 'device-state-set' $payload
+}
+
+state_get() {
+    #Implement me.
+    :
+}
+
+if [[ $state ]]; then
+    state_set
+else
+    state_get
+fi

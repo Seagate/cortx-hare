@@ -109,6 +109,9 @@ sed 's/null//' | jq --raw-output '.[] | "\(.Key) \(.Value | @base64d)"' | {
           debug_RC)
             exec_with_timeout $RULES_DIR/debug.sh
             ;;
+          device-state-set)
+            exec_with_timeout $RULES_DIR/device-state-set $HARE_RC_EVENT_PAYLOAD
+            ;;
           *)
             exec_with_timeout $RULES_DIR/_default.sh
             ;;
