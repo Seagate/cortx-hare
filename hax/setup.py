@@ -134,7 +134,7 @@ setup(
     ext_modules=[
         Extension(
             name='libhax',
-            sources=['hax/hax.c'],
+            sources=['hax/motr/hax.c'],
             include_dirs=[get_motr_dir(),
                           get_galois_include_dir()],
             define_macros=[('M0_INTERNAL', ''), ('M0_EXTERN', 'extern')],

@@ -20,12 +20,12 @@ import logging
 import time
 from queue import Empty, Queue
 
-from hax.ffi import HaxFFI
 from hax.message import (BroadcastHAStates, EntrypointRequest, HaNvecGetEvent,
                          ProcessEvent)
+from hax.motr.ffi import HaxFFI
 from hax.queue.publish import EQPublisher
-from hax.types import StoppableThread, StobIoqError
-from hax.util import ConsulUtil, repeat_if_fails, dump_json
+from hax.types import StobIoqError, StoppableThread
+from hax.util import ConsulUtil, dump_json, repeat_if_fails
 
 
 class ConsumerThread(StoppableThread):
