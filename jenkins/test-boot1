@@ -35,6 +35,8 @@ test_cluster() {
     local cdf=$1
 
     time hctl bootstrap --mkfs $cdf
+    hctl status
+    hctl status --json
     do_io
     hctl reportbug
     time hctl shutdown
