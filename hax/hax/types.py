@@ -17,9 +17,9 @@
 #
 
 import ctypes as c
-from threading import Thread
 from enum import Enum
-from typing import NamedTuple
+from threading import Thread
+from typing import List, NamedTuple, Set
 
 
 class FidStruct(c.Structure):
@@ -154,17 +154,33 @@ HAState = NamedTuple('HAState', [('fid', Fid), ('status', str)])
 StobId = NamedTuple('StobId', [('si_domain_fid', Fid), ('si_fid', Fid)])
 
 # struct m0_stob_ioq_error
-StobIoqError = NamedTuple('StobIoqError', [('fid', Fid),
-                                           ('sie_conf_sdev', Fid),
-                                           ('sie_stob_id', StobId),
-                                           ('sie_fd', int),
-                                           ('sie_opcode', int),
-                                           ('sie_rc', int),
-                                           ('sie_offset', int),
-                                           ('sie_size', int),
-                                           ('sie_bshift', int)])
+StobIoqError = NamedTuple('StobIoqError',
+                          [('fid', Fid), ('sie_conf_sdev', Fid),
+                           ('sie_stob_id', StobId), ('sie_fd', int),
+                           ('sie_opcode', int), ('sie_rc', int),
+                           ('sie_offset', int), ('sie_size', int),
+                           ('sie_bshift', int)])
 
 
 class StoppableThread(Thread):
     def stop(self) -> None:
         pass
+
+
+class MessageId(NamedTuple):
+    halink_ctx: int
+    tag: int
+
+    def __repr__(self):
+        return f'MessageId(0x{self.halink_ctx:x}, {self.tag})'
+
+
+class HaLinkMessagePromise:
+    def __init__(self, message_ids: List[MessageId]):
+        self._ids: Set[MessageId] = set(message_ids)
+
+    def __contains__(self, message_id: MessageId) -> bool:
+        return message_id in self._ids
+
+    def __repr__(self):
+        return 'HaLinkMessagePromise' + str(self._ids)

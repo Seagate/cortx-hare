@@ -350,7 +350,7 @@ check-hax: $(PY_VENV_DIR)
 	@$(call _info,Checking hax)
 	@cd hax &&\
 	  $(PY_VENV) &&\
-	  MYPYPATH=../stubs $(PYTHON) setup.py flake8 mypy
+	  MYPYPATH=../stubs $(PYTHON) setup.py flake8 mypy test
 
 .PHONY: flake8
 flake8: $(PYTHON_SCRIPTS)
