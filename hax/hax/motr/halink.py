@@ -22,11 +22,11 @@ from errno import EAGAIN
 from typing import Any, List
 
 from hax.exception import ConfdQuorumException
-from hax.ffi import HaxFFI, make_array, make_c_str
-from hax.message import (EntrypointRequest, HaNvecGetEvent,
-                         ProcessEvent, BroadcastHAStates)
+from hax.message import (BroadcastHAStates, EntrypointRequest, HaNvecGetEvent,
+                         ProcessEvent)
+from hax.motr.ffi import HaxFFI, make_array, make_c_str
 from hax.types import (ConfHaProcess, Fid, FidStruct, FsStats, HaNote,
-                       HaNoteStruct, HAState, StobIoqError, ObjT)
+                       HaNoteStruct, HAState, ObjT, StobIoqError)
 from hax.util import ConsulUtil
 
 
@@ -83,8 +83,9 @@ class HaLink:
         logging.debug('Stopping rconfc')
         result: int = self._ffi.stop_rconfc(self._ha_ctx)
         if result:
-            logging.error('Cannot stop rconfc. rconfc stop operation' +
-                          'returned non-zero code (%s)', result)
+            logging.error(
+                'Cannot stop rconfc. rconfc stop operation' +
+                'returned non-zero code (%s)', result)
             raise RuntimeError('Cannot stop rconfc.' +
                                'Please check Motr logs for more details.')
         logging.debug('confc has been stopped successfuly')

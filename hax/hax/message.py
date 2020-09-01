@@ -19,7 +19,7 @@
 from dataclasses import dataclass
 from typing import Any, List
 
-from hax import halink
+from hax.motr import halink
 from hax.types import Fid, HaNote, HAState, Uint128
 
 
