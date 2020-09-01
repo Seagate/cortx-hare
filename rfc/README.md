@@ -21,6 +21,7 @@ processes.
   * [15/BQ](15/README.md) — Broadcast Queue
   * [16/RCE](16/README.md) — Recovery Coordination Engine
   * [17/CICD](17/README.md) — Continuous Integration and Continuous Deployment
+  * [19/EVERULES](19/README.md) — Events and Rules
 * Draft
   * [4/KV](4/README.md) — Consul KV Schema
   * [5/HAX](5/README.md) — HAlink eXchange
