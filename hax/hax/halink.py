@@ -169,8 +169,11 @@ class HaLink:
             notes.append(note)
             notes += self._generate_sub_services(note, cns)
 
-        self._ffi.ha_broadcast(self._ha_ctx, make_array(HaNoteStruct, notes),
-                               len(notes))
+        tags: List[int] = self._ffi.ha_broadcast(self._ha_ctx,
+                                                 make_array(HaNoteStruct,
+                                                            notes),
+                                                 len(notes))
+        logging.debug('Broadcast HA state complete with tag = %s', tags)
 
     def _process_event_cb(self, fid, chp_event, chp_type, chp_pid):
         logging.info('fid=%s, chp_event=%s', fid, chp_event)
@@ -191,6 +194,12 @@ class HaLink:
         self.queue.put(
             StobIoqError(fid, sie_conf_sdev, sie_stob_id, sie_fd, sie_opcode,
                          sie_rc, sie_offset, sie_size, sie_bshift))
+
+    def _msg_delivered_cb(self, proc_fid, proc_endpoint: str, tag: int):
+        logging.info('Delivered to endpoint'
+                     "'{}', process fid = {}".format(proc_endpoint,
+                                                     str(proc_fid)) +
+                     'tag= %d', tag)
 
     @log_exception
     def ha_nvec_get(self, hax_msg: int, nvec: List[HaNote]) -> None:

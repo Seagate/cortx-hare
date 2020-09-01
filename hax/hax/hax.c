@@ -515,7 +515,20 @@ static void msg_received_cb(struct m0_halon_interface *hi,
 static void msg_is_delivered_cb(struct m0_halon_interface *hi,
 				struct m0_ha_link *hl, uint64_t tag)
 {
-	M0_LOG(M0_DEBUG, "noop");
+	struct m0_fid *proc_fid = &hl->hln_conn_cfg.hlcc_rpc_service_fid;
+
+	PyGILState_STATE gstate;
+	gstate = PyGILState_Ensure();
+
+	M0_LOG(M0_DEBUG, "msg delivered, tag=%"PRIu64,
+		hl->hln_tag_broadcast_delivery);
+
+	PyObject *py_fid = toFid(proc_fid);
+	PyObject_CallMethod(hc0->hc_handler, "_msg_delivered_cb", "(OsK)",
+			    py_fid, hl->hln_conn_cfg.hlcc_rpc_endpoint,
+			    hl->hln_tag_broadcast_delivery);
+	Py_DECREF(py_fid);
+	PyGILState_Release(gstate);
 }
 
 static void msg_is_not_delivered_cb(struct m0_halon_interface *hi,
@@ -718,8 +731,8 @@ void m0_ha_broadcast_test(unsigned long long ctx)
 	m0_ha_notify(ctx, &note, 1);
 }
 
-void m0_ha_notify(unsigned long long ctx, struct m0_ha_note *notes,
-		  uint32_t nr_notes)
+PyObject* m0_ha_notify(unsigned long long ctx, struct m0_ha_note *notes,
+		       uint32_t nr_notes)
 {
 	struct hax_context *hc = (struct hax_context *)ctx;
 	struct m0_ha_nvec nvec = { .nv_nr = nr_notes, .nv_note = notes };
@@ -730,12 +743,16 @@ void m0_ha_notify(unsigned long long ctx, struct m0_ha_note *notes,
 
 	msg = _ha_nvec_msg_alloc(&nvec, 0, M0_HA_NVEC_SET);
 	hax_lock(hc0);
+	PyObject* broadcast_tags = PyList_New(0);
 	m0_tl_for(hx_links, &hc->hc_links, hxl)
 	{
 		m0_halon_interface_send(hi, hxl->hxl_link, msg, &tag);
+		PyList_Append(broadcast_tags, PyLong_FromUnsignedLongLong(tag));
 	}
 	m0_tl_endfor;
 	hax_unlock(hc0);
+
+	return broadcast_tags;
 }
 
 static struct m0_ha_msg *_ha_nvec_msg_alloc(const struct m0_ha_nvec *nvec,
