@@ -22,10 +22,10 @@ import logging
 from queue import Queue
 from typing import NamedTuple
 
-from hax.ffi import HaxFFI
 from hax.filestats import FsStatsUpdater
-from hax.halink import HaLink
 from hax.handler import ConsumerThread
+from hax.motr.ffi import HaxFFI
+from hax.motr.halink import HaLink
 from hax.server import run_server
 from hax.types import Fid
 from hax.util import ConsulUtil, repeat_if_fails

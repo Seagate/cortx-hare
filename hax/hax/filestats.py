@@ -19,11 +19,11 @@
 import datetime
 import logging
 import time
+from typing import List
 
 from hax.exception import HAConsistencyException
-from hax.halink import HaLink, log_exception
+from hax.motr.halink import HaLink, log_exception
 from hax.types import FsStatsWithTime, StoppableThread
-from typing import List
 from hax.util import ConsulUtil
 
 
@@ -62,11 +62,10 @@ class FsStatsUpdater(StoppableThread):
                 try:
                     self.consul.update_fs_stats(data)
                 except HAConsistencyException:
-                    logging.debug(
-                        'Failed to update Consul KV '
-                        'due to an intermittent error. The error is '
-                        'swallowed since new attempts will be made '
-                        'timely')
+                    logging.debug('Failed to update Consul KV '
+                                  'due to an intermittent error. The error is '
+                                  'swallowed since new attempts will be made '
+                                  'timely')
                 time.sleep(self.interval_sec)
         except Exception:
             logging.exception('Aborting due to an error')
