@@ -29,7 +29,7 @@ pipeline {
     agent { label 'docker-nightly-node' }
 
     options {
-        timeout(40)  // abort the build after that many minutes
+        timeout(50)  // abort the build after that many minutes
         disableConcurrentBuilds()
         timestamps()
         ansiColor('xterm')  // XXX Delete if not useful.
