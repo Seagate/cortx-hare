@@ -33,14 +33,14 @@ profile_fid() {
     consul kv get m0conf/profiles
 }
 
-## Return process fid and endpoint of every Clovis client.
+## Return process fid and endpoint of every motr client.
 ##
 ## Sample output:
 ## ```
 ## 0x7200000000000001:0x28 172.28.128.150@tcp:12345:4:1
 ## 0x7200000000000001:0x2b 172.28.128.150@tcp:12345:4:2
 ## ```
-clovis_clients() {
+motr_clients() {
     consul kv get -recurse m0conf/nodes |
         # Sample input:
         # ```
@@ -52,7 +52,7 @@ clovis_clients() {
                  /m0_client_other/ {printf("0x7200000000000001:0x%x %s\n", $5, ep)}'
 }
 
-## Parameterized version of `clovis/m0crate/tests/test1_io.yaml` from
+## Parameterized version of `motr/m0crate/tests/test1_io.yaml` from
 ## Motr sources.
 m0crate_io_conf() {
     local local_ep=$1
@@ -65,14 +65,14 @@ CrateConfig_Sections: [MOTR_CONFIG, WORKLOAD_SPEC]
 MOTR_CONFIG:
    MOTR_LOCAL_ADDR: $local_ep
    MOTR_HA_ADDR:    $hax_ep
-   CLOVIS_PROF: <$(profile_fid)>  # Profile fid
+   PROF: <$(profile_fid)>  # Profile fid
    LAYOUT_ID: 9                      # Defines the UNIT_SIZE (9: 1MB)
    IS_OOSTORE: 1                     # Is oostore-mode?
    IS_READ_VERIFY: 0                 # Enable read-verify?
-   CLOVIS_TM_RECV_QUEUE_MIN_LEN: 16  # Minimum length of the receive queue
-   CLOVIS_MAX_RPC_MSG_SIZE: 65536    # Maximum rpc message size
-   CLOVIS_PROCESS_FID: <$process_fid>
-   CLOVIS_IDX_SERVICE_ID: 1
+   TM_RECV_QUEUE_MIN_LEN: 16  # Minimum length of the receive queue
+   MAX_RPC_MSG_SIZE: 65536    # Maximum rpc message size
+   PROCESS_FID: <$process_fid>
+   IDX_SERVICE_ID: 1
 
 LOG_LEVEL: 4  # err(0), warn(1), info(2), trace(3), debug(4)
 
@@ -81,9 +81,9 @@ WORKLOAD_SPEC:                # Workload specification section
       WORKLOAD_TYPE: 1        # Index(0), IO(1)
       WORKLOAD_SEED: tstamp   # SEED to the random number generator
       OPCODE: 3               # Operation(s) to test: 2-WRITE, 3-WRITE+READ
-      CLOVIS_IOSIZE: 10m      # Total Size of IO to perform per object
+      IOSIZE: 10m      # Total Size of IO to perform per object
       BLOCK_SIZE: 2m          # In N+K conf set to (N * UNIT_SIZE) for max perf
-      BLOCKS_PER_OP: 1        # Number of blocks per Clovis operation
+      BLOCKS_PER_OP: 1        # Number of blocks per motr operation
       MAX_NR_OPS: 1           # Max concurrent operations per thread
       NR_OBJS: 10             # Number of objects to create by each thread
       NR_THREADS: 4           # Number of threads to run in this workload
@@ -96,7 +96,7 @@ WORKLOAD_SPEC:                # Workload specification section
 EOF
 }
 
-clovis_clients | while read fid ep; do
+motr_clients | while read fid ep; do
     ip=${ep%@*}
     if ip a | grep -q $ip; then  # our IP
         m0crate_io_conf $ep ${ep%:*:*}:1:1 $fid
