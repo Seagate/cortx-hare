@@ -16,8 +16,6 @@ Keywords: BQ, EQ, RC, event, rule
 
 <!-- XXX TODO:
   --
-  -- * Write the "EVERULES" (Events & Rules) RFC.
-  --
   -- * Logging & observability.
   --
   -- * Add new terms to 10/GLOSS.
@@ -66,7 +64,7 @@ CONSUL_ACL_TOKEN=<eq-write-token> hoq eq \
     '{ "type": "<event-type>", "payload": "<event-payload>" }'
 ```
 
-Supported event types and their payload are specified in XXX/EVERULES.
+Supported event types and their payload are specified in [19/EVERULES](../19/README.md).
 
 ### Recovery Coordinator (RC)
 
@@ -84,7 +82,7 @@ Supported event types and their payload are specified in XXX/EVERULES.
 
    1. Rules SHOULD have _effects_.  E.g.: put an item into the BQ/EQ, add new entry to the system log, execute a shell command.
 
-   Supported rules and their effects are specified in XXX/EVERULES.
+   Supported rules and their effects are specified in [19/EVERULES](../19/README.md).
 
 1. It is RECOMMENDED to define a special `_default` rule.  The RC SHALL apply the `_default` rule if there is no rule associated with the type of processed event.
 
