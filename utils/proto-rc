@@ -60,7 +60,7 @@ check4signal() {
 
 # Simple log helper to output to stderr and syslog
 log() {
-    logger --stderr "$*"
+    logger --tag "hare/${0##*/}" --stderr "$*"
 }
 
 # Users can use this function to set timeouts.
@@ -90,32 +90,60 @@ exec_with_timeout() {
 }
 
 # Process events:
-# Example of incoming JSON:
-# [{"Key":"eq/3","CreateIndex":1618,"ModifyIndex":1618,"LockIndex":0,"Flags":0,"Value":"eyJtZXNzYWdlX3R5cGUiOiAiZGVidWdfUkMiLCAicGF5bG9hZCI6ICJQQVlMT0FEIn0=","Session":""}]
-# Where Value is base64-encoded JSON
-sed 's/null//' | jq --raw-output '.[] | "\(.Key) \(.Value | @base64d)"' | {
+#
+#   Example of incoming JSON:
+#
+#     [{"Key":"eq/3","CreateIndex":1618,"ModifyIndex":1618,"LockIndex":0,"Flags":0,"Value":"eyJtZXNzYWdlX3R5cGUiOiAiZGVidWdfUkMiLCAicGF5bG9hZCI6ICJQQVlMT0FEIn0=","Session":""}]
+#
+#   Where Value is base64-encoded JSON
+#
+#   When there are no changes, Consul sends us 'null' string, which
+#   confuses `jq '.[]'`:
+#
+#     jq: error (at <stdin>:1): Cannot iterate over null (null)
+#
+#   So 'null' strings are filtered out with `sed`.
+sed '/^null$/d' | jq --compact-output '.[]' | {
     trap sig_handler TERM
-    while read EPOCH EVENT; do
-        log "$CONSUL_INDEX: Process epoch: $EPOCH value: $EVENT..."
-        export HARE_RC_EVENT_TYPE=$(echo $EVENT | jq --raw-output '.message_type')
-        export HARE_RC_EVENT_PAYLOAD=$(echo $EVENT | jq --raw-output '.payload')
+
+    while read EQ_ITEM; do
+        EPOCH=$(jq --raw-output '.Key' <<<"$EQ_ITEM")
+        EVENT=$(jq --raw-output '.Value | @base64d' <<<"$EQ_ITEM")
+        log "$CONSUL_INDEX: Process epoch: $EPOCH: $EVENT"
+
+        export HARE_RC_EVENT_TYPE=$(jq --raw-output '.message_type' <<<"$EVENT")
+        export HARE_RC_EVENT_PAYLOAD=$(jq --raw-output '.payload' <<<"$EVENT")
+        log "HARE_RC_EVENT_TYPE: $HARE_RC_EVENT_TYPE, HARE_RC_EVENT_PAYLOAD: $HARE_RC_EVENT_PAYLOAD"
+
         case $HARE_RC_EVENT_TYPE in
+          # wake_RC and tmo* are examples of legacy functionality the relevance
+          # of which can be reconsidered and removed if needed.
           wake_RC)
-              log "${0} is woken up"
-              ;;
+            log "${0} is woken up"
+            ;;
           tmo*)
             set_timeout $HARE_RC_EVENT_PAYLOAD "tmo$CONSUL_INDEX"
             ;;
+          # Example when type does not correspond to rule script. Not
+          # recommended for use.
           debug_RC)
-            exec_with_timeout $RULES_DIR/debug.sh
+            exec_with_timeout $RULES_DIR/_debug
             ;;
           device-state-set)
             exec_with_timeout $RULES_DIR/device-state-set $HARE_RC_EVENT_PAYLOAD
             ;;
+          # Run rule script with the name equal to incoming event type.
+          # Recommended option for new rule scripts and event types.
           *)
-            exec_with_timeout $RULES_DIR/_default.sh
+            if [[ -x $RULES_DIR/$HARE_RC_EVENT_TYPE \
+               && -f $RULES_DIR/$HARE_RC_EVENT_TYPE ]]; then
+                exec_with_timeout $RULES_DIR/$HARE_RC_EVENT_TYPE
+            else
+                exec_with_timeout $RULES_DIR/_default
+            fi
             ;;
         esac
+
         consul kv delete $EPOCH
         check4signal
     done
