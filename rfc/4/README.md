@@ -7,6 +7,7 @@ editor: Valery V. Vorotyntsev <valery.vorotyntsev@seagate.com>
 contributors:
   - Andriy Tkachuk <andriy.tkachuk@seagate.com>
   - Mandar Sawant <mandar.sawant@seagate.com>
+  - Rajanikant Chirmade <rajanikant.chirmade@seagate.com>
 ---
 
 ## Consul KV Schema
@@ -21,10 +22,15 @@ Key | Value | Description
 `m0conf/nodes/<name>/processes/<process_fidk>/endpoint` | endpoint address | Endpoint address of the Motr process (Consul service) with fid key `<process_fidk>`.  Example: `192.168.180.162@tcp:12345:44:101`.
 `m0conf/nodes/<name>/processes/<process_fidk>/meta_data` | path to meta-data disk | `m0mkfs` uses this value to create meta-data pool.
 `m0conf/nodes/<name>/processes/<process_fidk>/services/<svc_type>` | Fid key | Fid key of the Motr service, specified by its type, parent process, and node.
-`m0conf/nodes/<node_fid>` | `{ "name": "Host name", "state": "<HA state>" }` | Node name and ha state.
-`m0conf/nodes/<node_fid>/processes/<process_fid>` | `{ "name": "Process name", "state": "<HA state>" }` | Process name and ha state.
-`m0conf/nodes/<node_fid>/processes/<process_fid>/services/<svc_fid>` | `{ "name": "Service name", "state": "<HA state>" }` | Service name and ha state.
-`m0conf/nodes/<node_fid>/processes/<process_fid>/services/<svc_fid>/sdevs/<sdev_fid>` | `{ "path": "Sdev Path", "state": "<HA state>" }` | Storage device path and ha state.
+`m0conf/nodes/<node_fid>` | `{ "name": "<node name>", "state": "<HA state>" }` |
+`m0conf/nodes/<node_fid>/processes/<process_fid>` | `{ "name": "<process name>", "state": "<HA state>" }` |
+`m0conf/nodes/<node_fid>/processes/<process_fid>/services/<svc_fid>` | `{ "name": "<service name>", "state": "<HA state>" }` |
+`m0conf/nodes/<node_fid>/processes/<process_fid>/services/<svc_fid>/sdevs/<sdev_fid>` | `{ "path": "<sdev path>", "state": "<HA state>" }` |
+`m0conf/sites/<site_fid>` | `{ "state": "<HA state>" }` | [HA state](#ha-state) of this site.
+`m0conf/sites/<site_fid>/racks/<rack_fid>` | `{ "state": "<HA state>" }` | [HA state](#ha-state) of this rack.
+`m0conf/sites/<site_fid>/racks/<rack_fid>/encls/<encl_fid>` | `{ "state": "<HA state>" }` | [HA state](#ha-state) of this enclosure.
+`m0conf/sites/<site_fid>/racks/<rack_fid>/encls/<encl_fid>/ctrls/<ctrl_fid>` | `{ "node": "<node_fid>", "state": "<HA state>" }` | Fid of the corresponding node and [HA state](#ha-state) of this controller.
+`m0conf/sites/<site_fid>/racks/<rack_fid>/encls/<encl_fid>/ctrls/<ctrl_fid>/drives/<drive_fid>` | `{ "dev": "<sdev_fid>", "state": "<HA state>" }` | Fid of the corresponding storage device and [HA state](#ha-state) of this drive.
 `m0conf/profiles/<profile_fidk>` | `[ <pool_fidk> ]` | Array of fid keys of the SNS pools associated with this profile.
 `processes/<fid>` | `{ "state": "<HA state>" }` | The items are created and updated by `hax` processes.  Supported values of \<HA state\>: `M0_CONF_HA_PROCESS_STARTING`, `M0_CONF_HA_PROCESS_STARTED`, `M0_CONF_HA_PROCESS_STOPPING`, `M0_CONF_HA_PROCESS_STOPPED`.
 `profile` | fid | Profile fid in string format.  Example: `"0x7000000000000001:0x4"`.
@@ -67,6 +73,10 @@ Key | Value | Description
   to 'sspl/log-level'.
   See https://jts.seagate.com/browse/EOS-6473?focusedCommentId=1818633&page=com.atlassian.jira.plugin.system.issuetabpanels:comment-tabpanel#comment-1818633
 -->
+
+### HA state
+
+See [`enum m0_ha_obj_state`](https://github.com/Seagate/cortx-motr/blob/dev/ha/note.h#L119) in Motr code, `ha/note.h`.
 
 ### 'stats/filesystem' value
 

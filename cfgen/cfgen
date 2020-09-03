@@ -1377,6 +1377,42 @@ def generate_consul_kv(cluster: Cluster, dhall_dir: str) -> str:
                                         stype=ProcT(proc_ep.portal).name,
                                         meta_data=None)
 
+    def drives() -> List:
+        site_drives = []
+        for site_id, site in m0conf.items():
+            if site_id.type is not ObjT.site:
+                continue
+            site_key = f'm0conf/sites/{fid2str(site_id)}'
+            site_val = json.dumps({'state': 'M0_NC_UNKNOWN'})
+            site_drives.append((site_key, site_val))
+            for rack_id in site.racks:
+                assert rack_id.type is ObjT.rack
+                rack = m0conf[rack_id]
+                rack_key = f'{site_key}/racks/{fid2str(rack_id)}'
+                rack_val = json.dumps({'state': 'M0_NC_UNKNOWN'})
+                site_drives.append((rack_key, rack_val))
+                for encl_id in rack.encls:
+                    assert encl_id.type is ObjT.enclosure
+                    encl = m0conf[encl_id]
+                    encl_key = f'{rack_key}/encls/{fid2str(encl_id)}'
+                    encl_val = json.dumps({'state': 'M0_NC_UNKNOWN'})
+                    site_drives.append((encl_key, encl_val))
+                    for ctrl_id in encl.ctrls:
+                        assert ctrl_id.type is ObjT.controller
+                        ctrl = m0conf[ctrl_id]
+                        ctrl_key = f'{encl_key}/ctrls/{fid2str(ctrl_id)}'
+                        ctrl_val = json.dumps({'node': fid2str(ctrl.node),
+                                               'state': 'M0_NC_UNKNOWN'})
+                        site_drives.append((ctrl_key, ctrl_val))
+                        for drive_id in ctrl.drives:
+                            assert drive_id.type is ObjT.drive
+                            drive = m0conf[drive_id]
+                            key = f'{ctrl_key}/drives/{fid2str(drive_id)}'
+                            val = json.dumps({'sdev': fid2str(drive.sdev),
+                                              'state': 'M0_NC_UNKNOWN'})
+                            site_drives.append((key, val))
+        return site_drives
+
     def sdevs() -> List:
         node_sdevs = []
         for node_id, node in m0conf.items():
@@ -1410,6 +1446,7 @@ def generate_consul_kv(cluster: Cluster, dhall_dir: str) -> str:
         return node_sdevs
 
     node_sdevs = [dict(key=k, value=v) for k, v in sdevs()]
+    site_drives = [dict(key=k, value=v) for k, v in drives()]
     return json.dumps([dict(key=k, value=v) for k, v in (
         ('epoch', 1),
         ('eq-epoch', 1),
@@ -1424,7 +1461,7 @@ def generate_consul_kv(cluster: Cluster, dhall_dir: str) -> str:
           for x in processes() if x.stype == 'ios' and x.meta_data],
         *[(f'm0conf/nodes/{x.node_name}/processes/{x.proc_id.fidk}/endpoint',
            str(x.ep))
-          for x in processes()])] + node_sdevs,
+          for x in processes()])] + node_sdevs + site_drives,
                       indent=2) + '\n'
 
 
