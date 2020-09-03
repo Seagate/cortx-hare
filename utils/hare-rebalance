@@ -43,13 +43,13 @@ Usage: $PROG <command> [options]
 Control SNS re-balance procedure for previously selected drives.
 
 Commands:
-
   start       Start SNS re-balance procedure
   stop        Stop SNS re-balance procedure
   pause       Pause ongoing SNS re-balance procedure
   resume      Resume paused SNS re-balance procedure
-  progess     XXX: to be added
+  progess     Return progress percentage of ongoning SNS re-balance procedure
   help        Show this help and exit.
+
 EOF
 }
 
@@ -71,10 +71,13 @@ case $cmd in
         --arg cmd_arg "$cmd" \
         '{ cmd: $cmd_arg }')
     h0q eq 'sns-rebalance' "$payload"
+    ;;
     progess)
-    # TODO: Direct HTTP API request to get persentage of rebalance operation
+    # Access HTTP API request to get percentage of re-balance operation
     # This request is synchronous.
-    # curl -X POST http://localhost:8008/api/v1/sns/${cmd}
+    curl -X POST http://localhost:8008/api/v1/sns/rebalance-progress
+    # TODO: JSON is expected. Additional processing may be needed depending on
+    # output.
     ;;
     *) die "Unknown command: '$cmd'" ;;
 esac
