@@ -113,7 +113,7 @@ done
 # process commands
 case $cmd in
     help) usage; exit ;;
-    bootstrap|reportbug|shutdown|status|drive|rebalance)
+    bootstrap|reportbug|shutdown|status|drive|rebalance|repair)
         if [[ -d $M0_SRC_DIR/utils ]]; then
             PATH="$M0_SRC_DIR/utils:$PATH"
         fi
