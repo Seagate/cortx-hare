@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+#
+# Copyright (c) 2020 Seagate Technology LLC and/or its Affiliates
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# For any questions about this software or licensing,
+# please email opensource@seagate.com or cortx-questions@seagate.com.
+
+# Rule script to process SNS rebalance EQ events.
+# Expected payload is JSON: "{ cmd: <command_name> }"
+# Where command_name can be: start, stop, pause, resume.
+# Script uses HTTP API hax endpoint to control SNS rebalance process.
+# Expected output: none
+
+set -e -o pipefail
+# set -x
+export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
+
+log() {
+    logger --stderr --tag "$0" "$*"
+}
+
+cmd=$(jq --raw-output '.cmd' <<<"$HARE_RC_EVENT_PAYLOAD")
+fid=$(jq --raw-output '.fid' <<<"$HARE_RC_EVENT_PAYLOAD")
+
+if [[ -z "$cmd" || -z "$fid" ]]; then
+    logger --stderr "Invalid payload $HARE_RC_EVENT_PAYLOAD"
+    exit 1
+fi
+
+case $cmd in
+    start) op_name='rebalance-start' ;;
+    stop) op_name='rebalance-abort' ;;
+    pause) op_name='rebalance-pause' ;;
+    resume) op_name='rebalance-resume' ;;
+    *)
+    log "handler is called for unknown operation"
+    exit 1
+    ;;
+esac
+
+log "handler is called for $cmd, $fid"
+
+status_code="$(curl -s -w "%{http_code}\n" \
+    -X POST http://localhost:8008/api/v1/sns/${op_name} -o /dev/null)"
+rc=$?
+[[ status_code -eq 200 && rc -eq 0 ]] \
+    || log "rule failed. http: $status_code, rc: $rc"
