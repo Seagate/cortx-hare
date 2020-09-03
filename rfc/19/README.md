@@ -31,7 +31,7 @@ Event payload MUST be in following JSON format:
 
 (Case sensitive.)
 
-| Type | ID | state |
+| Type | ID | [state](https://github.com/Seagate/cortx-motr/blob/dev/ha/note.h#L119) |
 | --- | --- | --- |
 | rack | rack identifier | Online, Failed |
 | enclosure | enclosure identifier | Online, Failed |
@@ -41,9 +41,17 @@ Event payload MUST be in following JSON format:
 | process | process identifier | Online, Failed |
 
 
-## Rules
+## Rules and effects
 
-Rule files MUST start with `rule_{obj_type}_{state}` e.g. `rule_drive_failed`.
+| Rule | Effect |
+| --- | --- |
+| device-state-set | Set the given device (rack/enclosure/controller/drive) state in consul and Motr. |
+| sns-repair | Set the device and pool state to `M0_NC_REPAIR` in Consul and Motr ioservices and start SNS repair. |
+| sns-rebalance | Set the device and pool state to `M0_NC_REBALANCE` in Consul and Motr io services and start SNS rebalance. |
+| sns-repair-pause | Pause ongoing SNS repair operation, ioservices MUST return status as [CM_STATUS_PAUSED](https://github.com/Seagate/cortx-motr/blob/dev/cm/repreb/cm.h#L54)|
+| sns-rebalance-pause | Pause ongoing SNS rebalance operation, ioservices MUST return status as CM_STATUS_PAUSED. |
+| sns-repair-abort | Abort ongoing SNS repair operation, ioservices MUST return CM_STATUS_IDLE on successful abort. |
+| sns-rebalance-abort | Abort ongoing SNS rebalance operation, ioservices MUST return CM_STATUS_IDLE on successful abort. |
 
 ## Motr event types and handling
 
