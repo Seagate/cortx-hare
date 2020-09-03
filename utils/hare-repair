@@ -21,7 +21,7 @@ set -e -o pipefail
 #set -x
 export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
 
-# :help: control SNS re-balance procedure
+# :help: control SNS repair procedure
 
 # constants
 PROG=${0##*/}
@@ -40,14 +40,14 @@ usage() {
     cat <<EOF
 Usage: $PROG <command> [options]
 
-Control SNS re-balance procedure for previously selected drives.
+Control SNS repair procedure for previously selected drives.
 
 Commands:
-  start       Start SNS re-balance procedure
-  stop        Stop SNS re-balance procedure
-  pause       Pause ongoing SNS re-balance procedure
-  resume      Resume paused SNS re-balance procedure
-  progess     Return progress percentage of ongoning SNS re-balance procedure
+  start       Start SNS repair procedure
+  stop        Stop SNS repair procedure
+  pause       Pause ongoing SNS repair procedure
+  resume      Resume paused SNS repair procedure
+  progess     Return progress percentage of ongoning SNS repair procedure
   help        Show this help and exit.
 
 EOF
@@ -70,12 +70,12 @@ case $cmd in
     payload=$(jq --null-input --compact-output \
         --arg cmd_arg "$cmd" \
         '{ cmd: $cmd_arg }')
-    h0q eq 'sns-rebalance' "$payload"
+    h0q eq 'sns-repair' "$payload"
     ;;
     progess)
-    # Access HTTP API request to get percentage of re-balance operation
+    # Access HTTP API request to get percentage of repair operation
     # This request is synchronous.
-    curl http://localhost:8008/api/v1/sns/rebalance-progress
+    curl http://localhost:8008/api/v1/sns/repair-progress
     # TODO: JSON is expected. Additional processing may be needed depending on
     # output.
     ;;
