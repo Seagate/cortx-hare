@@ -23,7 +23,7 @@ from queue import Queue
 from typing import Any, Callable, Dict, List
 
 from aiohttp import web
-from aiohttp.web import HTTPBadRequest, HTTPNotFound
+from aiohttp.web import HTTPError, HTTPNotFound
 from aiohttp.web_response import json_response
 
 from hax.message import (BaseMessage, BroadcastHAStates, SnsDiskAttach,
@@ -103,14 +103,11 @@ def process_sns_operation(queue: Queue):
 
         if op_name not in msg_factory:
             raise HTTPNotFound()
-        try:
-            data = await request.json()
-            message = msg_factory[op_name](data)
+        data = await request.json()
+        message = msg_factory[op_name](data)
 
-            loop = asyncio.get_event_loop()
-            await loop.run_in_executor(None, lambda: queue.put(message))
-        except (JSONDecodeError, KeyError):
-            raise HTTPBadRequest()
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, lambda: queue.put(message))
         return web.Response()
 
     return _process
@@ -138,6 +135,30 @@ def process_bq_update(inbox_filter: InboxFilter, processor: BQProcessor):
     return _process
 
 
+@web.middleware
+async def encode_exception(request, handler):
+    def error_response(e: Exception, code=500, reason=""):
+        payload = {
+            "status_code": code,
+            "error_message": str(e),
+            "error_type": e.__class__.__name__,
+            "reason": reason
+        }
+        return json_response(data=payload, status=code)
+
+    try:
+        response = await handler(request)
+        return response
+    except HTTPError:
+        raise
+    except (JSONDecodeError, KeyError) as e:
+        return error_response(e, code=400, reason="Bad JSON provided")
+    except Exception as e:
+        return error_response(e,
+                              code=500,
+                              reason="Unexpected error has happened")
+
+
 def run_server(
     queue: Queue,
     herald: DeliveryHerald,
@@ -151,7 +172,7 @@ def run_server(
     inbox_filter = InboxFilter(
         OffsetStorage(addr, key_prefix='queue-offsets/bq'))
 
-    app = web.Application()
+    app = web.Application(middlewares=[encode_exception])
     app.add_routes([
         web.get('/', hello_reply),
         web.post('/', process_ha_states(queue)),
