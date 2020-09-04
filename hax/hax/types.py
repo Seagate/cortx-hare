@@ -174,6 +174,10 @@ StobIoqError = NamedTuple('StobIoqError',
                            ('sie_offset', int), ('sie_size', int),
                            ('sie_bshift', int)])
 
+SnsRepairStatusItem = NamedTuple('SnsRepairStatusItem', [('fid', Fid),
+                                                         ('status', str),
+                                                         ('progress', int)])
+
 
 class StoppableThread(Thread):
     def stop(self) -> None:
