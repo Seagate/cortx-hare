@@ -31,6 +31,10 @@ class ConfdQuorumException(HaxAPIException):
     pass
 
 
+class RepairRebalanceException(HaxAPIException):
+    pass
+
+
 class NotDelivered(RuntimeError):
     def __init__(self, message: str):
         super().__init__()

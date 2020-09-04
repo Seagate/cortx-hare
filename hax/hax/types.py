@@ -146,6 +146,19 @@ FsStatsWithTime = NamedTuple('FsStatsWithTime', [('stats', FsStats),
                                                  ('timestamp', float),
                                                  ('date', str)])
 
+
+class SnsCmStatus(Enum):
+    CM_STATUS_INVALID = 0
+    CM_STATUS_IDLE = 1
+    CM_STATUS_STARTED = 2
+    CM_STATUS_FAILED = 3
+    CM_STATUS_PAUSED = 4
+
+
+ReprebStatus = NamedTuple('ReprebStatus', [('srs_fid', Fid),
+                                           ('srs_state', SnsCmStatus),
+                                           ('srs_progress', c.c_uint32)])
+
 HaNote = NamedTuple('HaNote', [('obj_t', str), ('note', HaNoteStruct)])
 
 HAState = NamedTuple('HAState', [('fid', Fid), ('status', str)])

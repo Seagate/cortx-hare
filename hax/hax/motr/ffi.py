@@ -104,3 +104,43 @@ class HaxFFI:
         lib.m0_ha_filesystem_stats_fetch.argtypes = [c.c_void_p]
         lib.m0_ha_filesystem_stats_fetch.restype = c.py_object
         self.filesystem_stats_fetch = lib.m0_ha_filesystem_stats_fetch
+
+        lib.repair_status.argtypes = [c.c_void_p, c.POINTER(FidStruct)]
+        lib.repair_status.restype = c.py_object
+        self.repair_status = lib.repair_status
+
+        lib.rebalance_status.argtypes = [c.c_void_p, c.POINTER(FidStruct)]
+        lib.rebalance_status.restype = c.py_object
+        self.rebalance_status = lib.rebalance_status
+
+        lib.start_repair.argtypes = [c.c_void_p, c.POINTER(FidStruct)]
+        lib.start_repair.restype = c.c_int
+        self.start_repair = lib.start_repair
+
+        lib.start_rebalance.argtypes = [c.c_void_p, c.POINTER(FidStruct)]
+        lib.start_rebalance.restype = c.c_int
+        self.start_rebalance = lib.start_rebalance
+
+        lib.stop_repair.argtypes = [c.c_void_p, c.POINTER(FidStruct)]
+        lib.stop_repair.restype = c.c_int
+        self.stop_repair = lib.stop_repair
+
+        lib.stop_rebalance.argtypes = [c.c_void_p, c.POINTER(FidStruct)]
+        lib.stop_rebalance.restype = c.c_int
+        self.stop_rebalance = lib.stop_rebalance
+
+        lib.pause_repair.argtypes = [c.c_void_p, c.POINTER(FidStruct)]
+        lib.pause_repair.restype = c.c_int
+        self.pause_repair = lib.pause_repair
+
+        lib.pause_rebalance.argtypes = [c.c_void_p, c.POINTER(FidStruct)]
+        lib.pause_rebalance.restype = c.c_int
+        self.pause_rebalance = lib.pause_rebalance
+
+        lib.resume_repair.argtypes = [c.c_void_p, c.POINTER(FidStruct)]
+        lib.resume_repair.restype = c.c_int
+        self.resume_repair = lib.resume_repair
+
+        lib.resume_rebalance.argtypes = [c.c_void_p, c.POINTER(FidStruct)]
+        lib.resume_rebalance.restype = c.c_int
+        self.resume_rebalance = lib.resume_rebalance
