@@ -38,6 +38,7 @@
 #include "motr/iem.h"
 #include "ha/msg.h"
 #include "ha/link.h"
+#include "cm/repreb/cm.h" /* CM_OP_REPAIR etc. */
 #include "hax.h"
 
 #define M0_TRACE_SUBSYSTEM M0_TRACE_SUBSYS_HA
@@ -481,7 +482,13 @@ static void _dummy_handle(const struct hax_msg *msg)
 
 static void _impossible(const struct hax_msg *hm)
 {
-	M0_IMPOSSIBLE("Unsupported ha_msg type: %d",
+	M0_IMPOSSIBLE("Unexpected ha_msg type: %d",
+		      m0_ha_msg_type_get(&hm->hm_msg));
+}
+
+static void _warn_handle(const struct hax_msg *hm)
+{
+	M0_LOG(M0_WARN, "Unsupported ha_msg type: %d, ignoring",
 		      m0_ha_msg_type_get(&hm->hm_msg));
 }
 
@@ -496,7 +503,7 @@ static void (*hax_action[])(const struct hax_msg *hm) =
      [M0_HA_MSG_EVENT_SERVICE] = _dummy_handle,
      [M0_HA_MSG_EVENT_RPC] = _dummy_handle,
      [M0_HA_MSG_BE_IO_ERR] = _impossible,
-     [M0_HA_MSG_SNS_ERR] = _impossible, };
+     [M0_HA_MSG_SNS_ERR] = _warn_handle, };
 
 static void msg_received_cb(struct m0_halon_interface *hi,
 			    struct m0_ha_link *hl, const struct m0_ha_msg *msg,
@@ -802,6 +809,169 @@ void adopt_motr_thread(void)
 void shun_motr_thread(void)
 {
 	m0_halon_interface_thread_shun();
+}
+
+/* ---------------------------- SNS operations ---------------------------- */
+
+static int (*sns_action[])(struct m0_spiel *spiel,
+			   const struct m0_fid *pool_fid) = {
+	[CM_OP_REPAIR]            = m0_spiel_sns_repair_start,
+	[CM_OP_REBALANCE]         = m0_spiel_sns_rebalance_start,
+	[CM_OP_REPAIR_QUIESCE]    = m0_spiel_sns_repair_quiesce,
+	[CM_OP_REBALANCE_QUIESCE] = m0_spiel_sns_rebalance_quiesce,
+	[CM_OP_REPAIR_RESUME]     = m0_spiel_sns_repair_continue,
+	[CM_OP_REBALANCE_RESUME]  = m0_spiel_sns_rebalance_continue,
+	[CM_OP_REPAIR_ABORT]      = m0_spiel_sns_repair_abort,
+	[CM_OP_REBALANCE_ABORT]   = m0_spiel_sns_rebalance_abort,
+};
+
+static int (*sns_status[])(struct m0_spiel *spiel,
+			   const struct m0_fid *pool_fid,
+			   struct m0_spiel_repreb_status **statuses) = {
+	[CM_OP_REPAIR_STATUS]     = m0_spiel_sns_repair_status,
+	[CM_OP_REBALANCE_STATUS]  = m0_spiel_sns_rebalance_status,
+};
+
+static int spiel_sns_op(enum m0_cm_op sns_copy_machine_op,
+			unsigned long long ctx,
+			const struct m0_fid *pool_fid,
+			struct m0_spiel_repreb_status **sns_statuses)
+{
+	struct hax_context *hc = (struct hax_context *)ctx;
+	struct m0_spiel *spiel = m0_halon_interface_spiel(hc->hc_hi);
+	int rc = 0;
+
+	M0_ENTRY();
+
+	if (!hc->hc_alive) {
+		M0_LOG(M0_WARN, "Cannot make SPIEL API call as HAX Python"
+				" context has been already destructed");
+		return M0_ERR(-ESHUTDOWN);
+	}
+
+	if (!hc->hc_rconfc_initialized) {
+		M0_LOG(M0_WARN, "Cannot make SPIEL API call as libmotr 'rconfc'"
+				" susbsystem hasn't been initialised");
+		return M0_ERR(-EDESTADDRREQ);
+	}
+
+	switch (sns_copy_machine_op) {
+	case CM_OP_REPAIR:
+	case CM_OP_REBALANCE:
+	case CM_OP_REPAIR_QUIESCE:
+	case CM_OP_REBALANCE_QUIESCE:
+	case CM_OP_REPAIR_RESUME:
+	case CM_OP_REBALANCE_RESUME:
+	case CM_OP_REPAIR_ABORT:
+	case CM_OP_REBALANCE_ABORT:
+		rc = sns_action[sns_copy_machine_op](spiel, pool_fid);
+		break;
+	case CM_OP_REPAIR_STATUS:
+	case CM_OP_REBALANCE_STATUS:
+		if (sns_statuses == NULL) {
+			M0_LOG(M0_ERROR, "m0_spiel_repreb_status cannot be NULL"
+			       " for CM_OP_REPAIR_STATUS and"
+			       " CM_OP_REBALANCE_STATUS");
+			rc = -EINVAL;
+			break;
+		}
+		rc = sns_status[sns_copy_machine_op](spiel, pool_fid,
+						     sns_statuses);
+		break;
+	default:
+		M0_LOG(M0_WARN, "Unknown m0_cm_op: %u", sns_copy_machine_op);
+		rc = -EINVAL;
+	}
+
+	return rc < 0 ? M0_ERR(rc) : M0_RC(rc);
+}
+
+int start_repair(unsigned long long ctx, const struct m0_fid *pool_fid)
+{
+	return spiel_sns_op(CM_OP_REPAIR, ctx, pool_fid, NULL);
+}
+
+int start_rebalance(unsigned long long ctx, const struct m0_fid *pool_fid)
+{
+	return spiel_sns_op(CM_OP_REBALANCE, ctx, pool_fid, NULL);
+}
+
+int pause_repair(unsigned long long ctx, const struct m0_fid *pool_fid)
+{
+	return spiel_sns_op(CM_OP_REPAIR_QUIESCE, ctx, pool_fid, NULL);
+}
+
+int pause_rebalance(unsigned long long ctx, const struct m0_fid *pool_fid)
+{
+	return spiel_sns_op(CM_OP_REBALANCE_QUIESCE, ctx, pool_fid, NULL);
+}
+
+int resume_repair(unsigned long long ctx, const struct m0_fid *pool_fid)
+{
+	return spiel_sns_op(CM_OP_REPAIR_RESUME, ctx, pool_fid, NULL);
+}
+
+int resume_rebalance(unsigned long long ctx, const struct m0_fid *pool_fid)
+{
+	return spiel_sns_op(CM_OP_REBALANCE_RESUME, ctx, pool_fid, NULL);
+}
+
+int stop_repair(unsigned long long ctx, const struct m0_fid *pool_fid)
+{
+	return spiel_sns_op(CM_OP_REPAIR_ABORT, ctx, pool_fid, NULL);
+}
+
+int stop_rebalance(unsigned long long ctx, const struct m0_fid *pool_fid)
+{
+	return spiel_sns_op(CM_OP_REBALANCE_ABORT, ctx, pool_fid, NULL);
+}
+
+static PyObject *spiel_sns_status(enum m0_cm_op sns_copy_machine_op,
+				  unsigned long long ctx,
+				  const struct m0_fid *pool_fid)
+{
+	struct m0_spiel_repreb_status *statuses;
+	int rc, i;
+
+	rc = spiel_sns_op(CM_OP_REPAIR_STATUS, ctx, pool_fid, &statuses);
+	M0_LOG(M0_DEBUG, "number of m0_spiel_repreb_status'es received %d", rc);
+	if (rc <= 0) {
+		if (rc < 0)
+			M0_LOG(M0_ERROR,
+			       "m0_spiel_sns_{repair,rebalance}_status"
+			       " error %d", rc);
+		Py_RETURN_NONE;
+	}
+
+	PyGILState_STATE gstate;
+	gstate = PyGILState_Ensure();
+
+	PyObject *hax_mod = getModule("hax.types");
+	PyObject *list = PyList_New(rc);
+
+	for (i = 0; i < rc; ++i) {
+		PyObject *py_fid = toFid(&statuses[i].srs_fid);
+		PyObject *status = PyObject_CallMethod(
+			hax_mod, "ReprebStatus", "(OKI)", py_fid,
+			statuses[i].srs_state, statuses[i].srs_progress);
+		PyList_SET_ITEM(list, i, status);
+	}
+	m0_free(statuses);
+
+	Py_DECREF(hax_mod);
+	PyGILState_Release(gstate);
+
+	return list;
+}
+
+PyObject *repair_status(unsigned long long ctx, const struct m0_fid *pool_fid)
+{
+	return spiel_sns_status(CM_OP_REPAIR_STATUS, ctx, pool_fid);
+}
+
+PyObject *rebalance_status(unsigned long long ctx, const struct m0_fid *pool_fid)
+{
+	return spiel_sns_status(CM_OP_REBALANCE_STATUS, ctx, pool_fid);
 }
 
 #undef M0_TRACE_SUBSYSTEM

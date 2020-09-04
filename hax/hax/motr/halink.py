@@ -21,13 +21,14 @@ import logging
 from errno import EAGAIN
 from typing import Any, List
 
-from hax.exception import ConfdQuorumException
+from hax.exception import ConfdQuorumException, RepairRebalanceException
 from hax.message import (BroadcastHAStates, EntrypointRequest, HaNvecGetEvent,
                          ProcessEvent)
 from hax.motr.delivery import DeliveryHerald
 from hax.motr.ffi import HaxFFI, make_array, make_c_str
 from hax.types import (ConfHaProcess, Fid, FidStruct, FsStats, HaNote,
-                       HaNoteStruct, HAState, MessageId, ObjT, StobIoqError)
+                       HaNoteStruct, HAState, MessageId, ObjT, ReprebStatus,
+                       StobIoqError)
 from hax.util import ConsulUtil
 
 
@@ -268,3 +269,93 @@ class HaLink:
             raise ConfdQuorumException(
                 'Confd quorum lost, filesystem statistics is unavailable')
         return stats
+
+    def get_repair_status(self, pool_fid: Fid) -> List[ReprebStatus]:
+        logging.debug('Fetching repair status for pool %s', pool_fid)
+        status: List[ReprebStatus] = self._ffi.repair_status(
+                                            self._ha_ctx, pool_fid.to_c())
+        if status is None:
+            raise RepairRebalanceException('Repair status unavailable')
+        logging.debug('Repair status for pool %s: %s', pool_fid, status)
+        return status
+
+    def get_rebalance_status(self, pool_fid: Fid) -> List[ReprebStatus]:
+        logging.debug('Fetching rebalance status for pool %s', pool_fid)
+        status: List[ReprebStatus] = self._ffi.rebalance_status(
+                                            self._ha_ctx, pool_fid.to_c())
+        if status is None:
+            raise RepairRebalanceException('rebalance status unavailable')
+        logging.debug('rebalance status for pool %s: %s', pool_fid, status)
+        return status
+
+    def start_repair(self, pool_fid: Fid):
+        logging.debug('Initiating repair for pool %s', pool_fid)
+        result: int = self._ffi.start_repair(self._ha_ctx, pool_fid.to_c())
+        if result:
+            raise RepairRebalanceException(
+                    'Failed to send SPIEL request "sns_repair_start", please' +
+                    ' check Motr logs for more details.')
+        logging.debug('Repairing started for pool %s', pool_fid)
+
+    def start_rebalance(self, pool_fid: Fid):
+        logging.debug('Initiating rebalance for pool %s', pool_fid)
+        result: int = self._ffi.start_rebalance(self._ha_ctx, pool_fid.to_c())
+        if result:
+            raise RepairRebalanceException(
+                    'Failed to send SPIEL request "sns_rebalance_start",' +
+                    'please check Motr logs for more details.')
+        logging.debug('Rebalancing started for pool %s', pool_fid)
+
+    def stop_repair(self, pool_fid: Fid):
+        logging.debug('Stopping repair for pool %s', pool_fid)
+        result: int = self._ffi.stop_repair(self._ha_ctx, pool_fid.to_c())
+        if result:
+            raise RepairRebalanceException(
+                    'Failed to send SPIEL request "sns_repair_stop", please' +
+                    ' check Motr logs for more details.')
+        logging.debug('Repairing stoped for pool %s', pool_fid)
+
+    def stop_rebalance(self, pool_fid: Fid):
+        logging.debug('Stopping rebalance for pool %s', pool_fid)
+        result: int = self._ffi.stop_rebalance(self._ha_ctx, pool_fid.to_c())
+        if result:
+            raise RepairRebalanceException(
+                    'Failed to send SPIEL request "sns_rebalance_stop",' +
+                    'please check Motr logs for more details.')
+        logging.debug('Rebalancing stoped for pool %s', pool_fid)
+
+    def pause_repair(self, pool_fid: Fid):
+        logging.debug('Pausing repair for pool %s', pool_fid)
+        result: int = self._ffi.pause_repair(self._ha_ctx, pool_fid.to_c())
+        if result:
+            raise RepairRebalanceException(
+                    'Failed to send SPIEL request "sns_repair_pause", please' +
+                    ' check Motr logs for more details.')
+        logging.debug('Repairing paused for pool %s', pool_fid)
+
+    def pause_rebalance(self, pool_fid: Fid):
+        logging.debug('Pausing rebalance for pool %s', pool_fid)
+        result: int = self._ffi.pause_rebalance(self._ha_ctx, pool_fid.to_c())
+        if result:
+            raise RepairRebalanceException(
+                    'Failed to send SPIEL request "sns_rebalance_pause",' +
+                    'please check Motr logs for more details.')
+        logging.debug('Rebalancing paused for pool %s', pool_fid)
+
+    def resume_repair(self, pool_fid: Fid):
+        logging.debug('Resuming repair for pool %s', pool_fid)
+        result: int = self._ffi.resume_repair(self._ha_ctx, pool_fid.to_c())
+        if result:
+            raise RepairRebalanceException(
+                    'Failed to send SPIEL request "sns_repair_resume",'
+                    'please check Motr logs for more details.')
+        logging.debug('Repairing resumed for pool %s', pool_fid)
+
+    def resume_rebalance(self, pool_fid: Fid):
+        logging.debug('Resuming rebalance for pool %s', pool_fid)
+        result: int = self._ffi.resume_rebalance(self._ha_ctx, pool_fid.to_c())
+        if result:
+            raise RepairRebalanceException(
+                    'Failed to send SPIEL request "sns_rebalance_resume",' +
+                    'please check Motr logs for more details.')
+        logging.debug('Rebalancing resumed for pool %s', pool_fid)
