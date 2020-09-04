@@ -29,12 +29,13 @@ from aiohttp.web_response import json_response
 from hax.message import (BaseMessage, BroadcastHAStates, SnsDiskAttach,
                          SnsDiskDetach, SnsRebalanceAbort, SnsRebalancePause,
                          SnsRebalanceResume, SnsRebalanceStart, SnsRepairAbort,
-                         SnsRepairPause, SnsRepairResume, SnsRepairStart)
+                         SnsRepairPause, SnsRepairResume, SnsRepairStart,
+                         SnsRepairStatus)
 from hax.motr.delivery import DeliveryHerald
 from hax.queue import BQProcessor
 from hax.queue.offset import InboxFilter, OffsetStorage
 from hax.types import Fid, HAState, StoppableThread
-from hax.util import create_process_fid
+from hax.util import create_process_fid, dump_json
 
 
 async def hello_reply(request):
@@ -113,6 +114,20 @@ def process_sns_operation(queue: Queue):
     return _process
 
 
+def get_sns_status(motr_queue: Queue):
+    def fn():
+        queue = Queue(1)
+        motr_queue.put(SnsRepairStatus(reply_to=queue))
+        return queue.get(timeout=10)
+
+    async def _process(request):
+        loop = asyncio.get_event_loop()
+        payload = await loop.run_in_executor(None, fn)
+        return json_response(data=payload, dumps=dump_json)
+
+    return _process
+
+
 def process_bq_update(inbox_filter: InboxFilter, processor: BQProcessor):
     async def _process(request):
         data = await request.json()
@@ -178,7 +193,8 @@ def run_server(
         web.post('/', process_ha_states(queue)),
         web.post('/watcher/bq',
                  process_bq_update(inbox_filter, BQProcessor(queue, herald))),
-        web.post('/api/v1/sns/{operation}', process_sns_operation(queue))
+        web.post('/api/v1/sns/{operation}', process_sns_operation(queue)),
+        web.get('/api/v1/sns/rebalance-progress', get_sns_status(queue)),
     ])
     logging.info(f'Starting HTTP server at {addr}:{port} ...')
     try:

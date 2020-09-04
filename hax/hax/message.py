@@ -16,6 +16,7 @@
 # please email opensource@seagate.com or cortx-questions@seagate.com.
 #
 
+import queue as q
 from dataclasses import dataclass
 from typing import Any, List, Optional
 
@@ -26,11 +27,6 @@ from queue import Queue
 
 class BaseMessage:
     pass
-
-
-@dataclass
-class Message(BaseMessage):
-    s: str
 
 
 @dataclass
@@ -106,6 +102,11 @@ class SnsDiskAttach(SnsOperation):
 
 class SnsDiskDetach(SnsOperation):
     pass
+
+
+@dataclass
+class SnsRepairStatus:
+    reply_to: q.Queue
 
 
 class Die(BaseMessage):

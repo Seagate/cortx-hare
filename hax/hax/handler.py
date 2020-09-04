@@ -22,10 +22,11 @@ from queue import Empty, Queue
 from typing import List
 
 from hax.message import (BroadcastHAStates, EntrypointRequest, HaNvecGetEvent,
-                         ProcessEvent)
+                         ProcessEvent, SnsRepairStatus)
 from hax.motr.ffi import HaxFFI
 from hax.queue.publish import EQPublisher
-from hax.types import MessageId, StobIoqError, StoppableThread
+from hax.types import (Fid, MessageId, SnsRepairStatusItem, StobIoqError,
+                       StoppableThread)
 from hax.util import ConsulUtil, dump_json, repeat_if_fails
 
 
@@ -108,6 +109,18 @@ class ConsumerThread(StoppableThread):
                         logging.debug('Stob IOQ JSON: %s', payload)
                         offset = self.eq_publisher.publish('STOB_IOQ', payload)
                         logging.debug('Written to epoch: %s', offset)
+                    elif isinstance(item, SnsRepairStatus):
+                        logging.info('Requesting SNS status')
+                        time.sleep(5)
+                        # FIXME implement a real logic here
+                        logging.info('SNS status is received')
+                        item.reply_to.put([
+                            SnsRepairStatusItem(
+                                progress=25,
+                                status='M0_CMS_ACTIVE',
+                                fid=Fid.parse('0x7200000000000001:deadbeef'))
+                        ])
+
                     else:
                         logging.warning('Unsupported event type received: %s',
                                         item)
