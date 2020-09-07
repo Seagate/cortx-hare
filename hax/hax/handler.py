@@ -19,12 +19,13 @@
 import logging
 import time
 from queue import Empty, Queue
+from typing import List
 
 from hax.message import (BroadcastHAStates, EntrypointRequest, HaNvecGetEvent,
                          ProcessEvent)
 from hax.motr.ffi import HaxFFI
 from hax.queue.publish import EQPublisher
-from hax.types import StobIoqError, StoppableThread
+from hax.types import MessageId, StobIoqError, StoppableThread
 from hax.util import ConsulUtil, dump_json, repeat_if_fails
 
 
@@ -97,7 +98,10 @@ class ConsumerThread(StoppableThread):
                         decorated(item)
                     elif isinstance(item, BroadcastHAStates):
                         logging.info('HA states: %s', item.states)
-                        ha_link.broadcast_ha_states(item.states)
+                        result: List[MessageId] = ha_link.broadcast_ha_states(
+                            item.states)
+                        if item.reply_to:
+                            item.reply_to.put(result)
                     elif isinstance(item, StobIoqError):
                         logging.info('Stob IOQ: %s', item.fid)
                         payload = dump_json(item)

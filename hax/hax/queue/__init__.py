@@ -1,10 +1,12 @@
 import json
 import logging
-from typing import Any, List, Tuple, Optional
-from hax.types import HAState
-from hax.util import create_drive_fid
-from hax.queue.confobjutil import ConfObjUtil
 from queue import Queue
+from typing import Any, List, Optional, Tuple
+
+from hax.motr.delivery import DeliveryHerald
+from hax.queue.confobjutil import ConfObjUtil
+from hax.types import HaLinkMessagePromise, HAState, MessageId
+from hax.util import create_drive_fid
 
 
 class BQProcessor:
@@ -12,14 +14,15 @@ class BQProcessor:
     This is the place where a real processing logic should be located.
     Currently it is effectively a no-op.
     """
-    def __init__(self, queue: Queue):
+    def __init__(self, queue: Queue, delivery_herald: DeliveryHerald):
         self.queue = queue
         self.confobjutil = ConfObjUtil()
+        self.herald = delivery_herald
 
     def process(self, messages: List[Tuple[int, Any]]) -> None:
         for i, msg in messages:
-            logging.debug('Message #%s received: %s (type: %s)',
-                          i, msg, type(msg).__name__)
+            logging.debug('Message #%s received: %s (type: %s)', i, msg,
+                          type(msg).__name__)
             self.payload_process(msg)
 
     def payload_process(self, msg: str) -> None:
@@ -48,7 +51,11 @@ class BQProcessor:
         if not hastates:
             logging.debug('No ha states to broadcast')
             return
-        self.queue.put(BroadcastHAStates(hastates))
+
+        q: Queue = Queue(1)
+        self.queue.put(BroadcastHAStates(states=hastates, reply_to=q))
+        ids: List[MessageId] = q.get()
+        self.herald.wait_for_any(HaLinkMessagePromise(ids))
 
     def to_ha_state(self, objinfo: dict) -> Optional[HAState]:
         try:

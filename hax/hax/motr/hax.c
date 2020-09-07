@@ -524,9 +524,9 @@ static void msg_is_delivered_cb(struct m0_halon_interface *hi,
 		hl->hln_tag_broadcast_delivery);
 
 	PyObject *py_fid = toFid(proc_fid);
-	PyObject_CallMethod(hc0->hc_handler, "_msg_delivered_cb", "(OsK)",
+	PyObject_CallMethod(hc0->hc_handler, "_msg_delivered_cb", "(OsKK)",
 			    py_fid, hl->hln_conn_cfg.hlcc_rpc_endpoint,
-			    hl->hln_tag_broadcast_delivery);
+			    hl->hln_tag_broadcast_delivery, hl);
 	Py_DECREF(py_fid);
 	PyGILState_Release(gstate);
 }
@@ -743,13 +743,25 @@ PyObject* m0_ha_notify(unsigned long long ctx, struct m0_ha_note *notes,
 
 	msg = _ha_nvec_msg_alloc(&nvec, 0, M0_HA_NVEC_SET);
 	hax_lock(hc0);
+
+	PyGILState_STATE gstate;
+	gstate = PyGILState_Ensure();
+
+	PyObject* hax_mod = getModule("hax.types");
 	PyObject* broadcast_tags = PyList_New(0);
 	m0_tl_for(hx_links, &hc->hc_links, hxl)
 	{
+		Py_BEGIN_ALLOW_THREADS
 		m0_halon_interface_send(hi, hxl->hxl_link, msg, &tag);
-		PyList_Append(broadcast_tags, PyLong_FromUnsignedLongLong(tag));
+		Py_END_ALLOW_THREADS
+		PyObject *instance = PyObject_CallMethod(hax_mod,
+							 "MessageId", "(KK)",
+							 hxl->hxl_link, tag);
+		PyList_Append(broadcast_tags, instance);
 	}
 	m0_tl_endfor;
+	Py_DECREF(hax_mod);
+	PyGILState_Release(gstate);
 	hax_unlock(hc0);
 
 	return broadcast_tags;

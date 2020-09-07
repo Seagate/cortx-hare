@@ -30,6 +30,7 @@ from hax.message import (BaseMessage, BroadcastHAStates, SnsDiskAttach,
                          SnsDiskDetach, SnsRebalanceAbort, SnsRebalancePause,
                          SnsRebalanceResume, SnsRebalanceStart, SnsRepairAbort,
                          SnsRepairPause, SnsRepairResume, SnsRepairStart)
+from hax.motr.delivery import DeliveryHerald
 from hax.queue import BQProcessor
 from hax.queue.offset import InboxFilter, OffsetStorage
 from hax.types import Fid, HAState, StoppableThread
@@ -67,7 +68,8 @@ def process_ha_states(queue: Queue):
         loop = asyncio.get_event_loop()
         # Note that queue.put is potentially a blocking call
         await loop.run_in_executor(
-            None, lambda: queue.put(BroadcastHAStates(to_ha_states(data))))
+            None, lambda: queue.put(
+                BroadcastHAStates(states=to_ha_states(data), reply_to=None)))
         return web.Response()
 
     return _process
@@ -136,6 +138,7 @@ def process_bq_update(inbox_filter: InboxFilter, processor: BQProcessor):
 
 def run_server(
     queue: Queue,
+    herald: DeliveryHerald,
     threads_to_wait: List[StoppableThread] = [],
     port=8008,
 ):
@@ -151,7 +154,7 @@ def run_server(
         web.get('/', hello_reply),
         web.post('/', process_ha_states(queue)),
         web.post('/watcher/bq',
-                 process_bq_update(inbox_filter, BQProcessor(queue))),
+                 process_bq_update(inbox_filter, BQProcessor(queue, herald))),
         web.post('/api/v1/sns/{operation}', process_sns_operation(queue))
     ])
     logging.info(f'Starting HTTP server at {addr}:{port} ...')
