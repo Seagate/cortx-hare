@@ -24,9 +24,10 @@ from typing import Any, List
 from hax.exception import ConfdQuorumException
 from hax.message import (BroadcastHAStates, EntrypointRequest, HaNvecGetEvent,
                          ProcessEvent)
+from hax.motr.delivery import DeliveryHerald
 from hax.motr.ffi import HaxFFI, make_array, make_c_str
 from hax.types import (ConfHaProcess, Fid, FidStruct, FsStats, HaNote,
-                       HaNoteStruct, HAState, ObjT, StobIoqError)
+                       HaNoteStruct, HAState, MessageId, ObjT, StobIoqError)
 from hax.util import ConsulUtil
 
 
@@ -41,13 +42,19 @@ def log_exception(fn):
 
 
 class HaLink:
-    def __init__(self, ffi: HaxFFI, queue, rm_fid: Fid, node_uuid: str = ''):
+    def __init__(self,
+                 ffi: HaxFFI,
+                 queue,
+                 rm_fid: Fid,
+                 herald: DeliveryHerald,
+                 node_uuid: str = ''):
         self._ffi = ffi or HaxFFI()
         # [KN] Note that node_uuid is currently ignored by the corresponding
         # hax.c function
         self._ha_ctx = self._ffi.init_halink(self, make_c_str(node_uuid))
         self.queue = queue
         self.rm_fid = rm_fid
+        self.herald = herald
 
         if not self._ha_ctx:
             logging.error(
@@ -156,7 +163,7 @@ class HaLink:
                                    self.rm_fid.to_c(), make_c_str(rm_eps))
         logging.debug('Entrypoint request has been replied to')
 
-    def broadcast_ha_states(self, ha_states: List[HAState]):
+    def broadcast_ha_states(self, ha_states: List[HAState]) -> List[MessageId]:
         logging.debug('Broadcasting HA states %s over ha_link', ha_states)
         cns = ConsulUtil()
 
@@ -170,11 +177,12 @@ class HaLink:
             notes.append(note)
             notes += self._generate_sub_services(note, cns)
 
-        tags: List[int] = self._ffi.ha_broadcast(self._ha_ctx,
-                                                 make_array(HaNoteStruct,
-                                                            notes),
-                                                 len(notes))
-        logging.debug('Broadcast HA state complete with tag = %s', tags)
+        message_ids: List[MessageId] = self._ffi.ha_broadcast(
+            self._ha_ctx, make_array(HaNoteStruct, notes), len(notes))
+        logging.debug(
+            'Broadcast HA state complete with the following message_ids = %s',
+            message_ids)
+        return message_ids
 
     def _process_event_cb(self, fid, chp_event, chp_type, chp_pid):
         logging.info('fid=%s, chp_event=%s', fid, chp_event)
@@ -186,7 +194,8 @@ class HaLink:
                               fid=fid)))
         if chp_event == 3:
             self.queue.put(
-                BroadcastHAStates([HAState(fid=fid, status='offline')]))
+                BroadcastHAStates(states=[HAState(fid=fid, status='offline')],
+                                  reply_to=None))
 
     def _stob_ioq_event_cb(self, fid, sie_conf_sdev, sie_stob_id, sie_fd,
                            sie_opcode, sie_rc, sie_offset, sie_size,
@@ -196,11 +205,13 @@ class HaLink:
             StobIoqError(fid, sie_conf_sdev, sie_stob_id, sie_fd, sie_opcode,
                          sie_rc, sie_offset, sie_size, sie_bshift))
 
-    def _msg_delivered_cb(self, proc_fid, proc_endpoint: str, tag: int):
-        logging.info('Delivered to endpoint'
-                     "'{}', process fid = {}".format(proc_endpoint,
-                                                     str(proc_fid)) +
-                     'tag= %d', tag)
+    def _msg_delivered_cb(self, proc_fid, proc_endpoint: str, tag: int,
+                          halink_ctx: int):
+        logging.info(
+            'Delivered to endpoint'
+            "'{}', process fid = {}".format(proc_endpoint, str(proc_fid)) +
+            'tag= %d', tag)
+        self.herald.notify_delivered(MessageId(halink_ctx=halink_ctx, tag=tag))
 
     @log_exception
     def ha_nvec_get(self, hax_msg: int, nvec: List[HaNote]) -> None:

@@ -17,10 +17,11 @@
 #
 
 from dataclasses import dataclass
-from typing import Any, List
+from typing import Any, List, Optional
 
 from hax.motr import halink
 from hax.types import Fid, HaNote, HAState, Uint128
+from queue import Queue
 
 
 class BaseMessage:
@@ -52,6 +53,7 @@ class ProcessEvent(BaseMessage):
 @dataclass
 class BroadcastHAStates(BaseMessage):
     states: List[HAState]
+    reply_to: Optional[Queue]
 
 
 @dataclass
