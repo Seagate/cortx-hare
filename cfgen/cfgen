@@ -1419,29 +1419,29 @@ def generate_consul_kv(cluster: Cluster, dhall_dir: str) -> str:
             if node_id.type is not ObjT.node:
                 continue
             node_key = f'm0conf/nodes/{fid2str(node_id)}'
-            node_val = json.dumps(dict(name=node.name,
-                                       state='M0_NC_UNKNOWN'))
+            node_val = json.dumps({'name': node.name,
+                                   'state': 'M0_NC_UNKNOWN'})
             node_sdevs.append((node_key, node_val))
             for proc_id in node.processes:
                 assert proc_id.type is ObjT.process
                 proc = m0conf[proc_id]
                 proc_key = f'{node_key}/processes/{fid2str(proc_id)}'
                 proc_name = ProcT(proc.endpoint.portal).name
-                proc_val = json.dumps(dict(name=proc_name,
-                                           state='M0_NC_UNKNOWN'))
+                proc_val = json.dumps({'name': proc_name,
+                                       'state': 'M0_NC_UNKNOWN'})
                 node_sdevs.append((proc_key, proc_val))
                 for svc_id in m0conf[proc_id].services:
                     stype = m0conf[svc_id].type.name[len('M0_CST_'):].lower()
                     svc_key = f'{proc_key}/services/{fid2str(svc_id)}'
-                    svc_val = json.dumps(dict(name=stype,
-                                              state='M0_NC_UNKNOWN'))
+                    svc_val = json.dumps({'name': stype,
+                                          'state': 'M0_NC_UNKNOWN'})
                     node_sdevs.append((svc_key, svc_val))
                     for sdev_id in m0conf[svc_id].sdevs:
                         assert sdev_id.type is ObjT.sdev
                         sdev = m0conf[sdev_id]
                         disk_key = f'{svc_key}/sdevs/{fid2str(sdev_id)}'
-                        disk_val = json.dumps(dict(path=sdev.filename,
-                                                   state='M0_NC_UNKNOWN'))
+                        disk_val = json.dumps({'path': sdev.filename,
+                                               'state': 'M0_NC_UNKNOWN'})
                         node_sdevs.append((disk_key, disk_val))
         return node_sdevs
 
