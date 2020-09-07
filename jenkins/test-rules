@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+#
+# Copyright (c) 2020 Seagate Technology LLC and/or its Affiliates
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# For any questions about this software or licensing,
+# please email opensource@seagate.com or cortx-questions@seagate.com.
+
+set -e -o pipefail
+export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
+set -x
+
+PROG=${0##*/}
+
+HARE_DIR=/opt/seagate/cortx/hare
+CDF_PATH=$HARE_DIR/share/cfgen/examples/singlenode.yaml
+
+die() {
+    echo "$PROG: ERROR: $*" >&2
+    exit 1
+}
+
+hctl bootstrap --mkfs $CDF_PATH
+hctl status
+
+# Execute the rule
+../rules/device-state-set '{"obj_type":"drive","obj_name":"vdb","obj_state":"Failed"}'
+
+if [[ $? -ne 0 ]]; then
+    die "$0 rule execution failed"
+fi
+
+# Check all process status
+hctl status --json | jq -r '.nodes[] | .svcs[] | .status' | \
+if ! grep -q 'started\|unknown'; then \
+die "one or more process is offline" ; \
+fi
