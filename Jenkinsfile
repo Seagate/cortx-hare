@@ -149,7 +149,7 @@ pipeline {
                         cd $REPO_NAME
                         export PATH=/opt/seagate/cortx/hare/bin:\$PATH
                         make check
-                        make test  # uses 'm0confgen'
+                        make test
                         """
                     echo "Result: " + commandResult
                 }
@@ -189,6 +189,7 @@ pipeline {
             }
         }
 
+/*
         stage('I/O test (m0crate)') {
             options { timeout(10) }
             steps {
@@ -203,9 +204,7 @@ pipeline {
                 }
             }
         }
-
-        // NOTE: Add here new stages with tests if needed
-
+*/
     }
 }
 
