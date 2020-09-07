@@ -70,7 +70,7 @@ DHALL_PRELUDE_URL     := https://github.com/dhall-lang/dhall-lang/archive/v$(DHA
 
 .PHONY: build
 build: hax
-	@$(MAKE) --quiet check
+	@$(MAKE) check
 
 .PHONY: hax
 HARE_VERSION := $(shell cat VERSION)
@@ -131,7 +131,7 @@ clean-mypy:
 
 .PHONY: clean-dhall-prelude
 clean-dhall-prelude:
-	$(MAKE) --quiet -C cfgen clean-dhall-prelude
+	$(MAKE) -C cfgen clean-dhall-prelude
 
 # Install --------------------------------------------- {{{1
 #
@@ -200,7 +200,7 @@ fetch-dhall-prelude: \
 
 .PHONY: unpack-dhall-prelude
 unpack-dhall-prelude: fetch-dhall-prelude
-	@$(MAKE) --quiet -C cfgen unpack-dhall-prelude
+	@$(MAKE) -C cfgen unpack-dhall-prelude
 
 # install {{{2
 .PHONY: install
@@ -403,7 +403,7 @@ check: check-cfgen check-hax flake8 mypy
 .PHONY: check-cfgen
 check-cfgen: $(PY_VENV_DIR)
 	@$(call _info,Checking cfgen)
-	@$(PY_VENV); $(MAKE) --quiet -C cfgen flake8 typecheck
+	@$(PY_VENV); $(MAKE) -C cfgen flake8 typecheck
 
 .PHONY: check-hax
 check-hax: $(PY_VENV_DIR)
@@ -434,7 +434,7 @@ test: test-cfgen
 test-cfgen: $(PY_VENV_DIR) unpack-dhall-bin unpack-dhall-prelude
 	@$(call _info,Testing cfgen)
 	@$(PY_VENV); PATH=$$PWD/vendor/dhall-bin/current:$$PATH \
-		$(MAKE) --quiet -C cfgen test-cfgen check-dhall
+		$(MAKE) -C cfgen test-cfgen check-dhall
 
 # RPM ------------------------------------------------- {{{1
 #
