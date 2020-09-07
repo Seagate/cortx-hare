@@ -124,9 +124,11 @@ def process_bq_update(inbox_filter: InboxFilter, processor: BQProcessor):
             messages = inbox_filter.prepare(data)
             if not messages:
                 return
-            processor.process(messages)
-            last_epoch = messages[-1][0]
-            inbox_filter.offset_mgr.mark_last_read(last_epoch)
+            for i, msg in messages:
+                processor.process((i, msg))
+                # Mark the message as read ASAP since the process can
+                # potentially die any time
+                inbox_filter.offset_mgr.mark_last_read(i)
 
         loop = asyncio.get_event_loop()
         await loop.run_in_executor(None, fn)

@@ -3,6 +3,7 @@ import logging
 from queue import Queue
 from typing import Any, List, Optional, Tuple
 
+from hax.message import BroadcastHAStates
 from hax.motr.delivery import DeliveryHerald
 from hax.queue.confobjutil import ConfObjUtil
 from hax.types import HaLinkMessagePromise, HAState, MessageId
@@ -19,23 +20,14 @@ class BQProcessor:
         self.confobjutil = ConfObjUtil()
         self.herald = delivery_herald
 
-    def process(self, messages: List[Tuple[int, Any]]) -> None:
-        for i, msg in messages:
-            logging.debug('Message #%s received: %s (type: %s)', i, msg,
-                          type(msg).__name__)
-            self.payload_process(msg)
+    def process(self, message: Tuple[int, Any]) -> None:
+        (i, msg) = message
+        logging.debug('Message #%d received: %s (type: %s)', i, msg,
+                      type(msg).__name__)
+        self.payload_process(msg)
+        logging.debug('Message #%d processed', i)
 
     def payload_process(self, msg: str) -> None:
-        #
-        # XXX:
-        # differing import temporarily due to following runtime error suspected
-        # due to
-        # import dependency,
-        # from hax.message import EntrypointRequest, HaNvecGetEvent,
-        # ProcessEvent
-        # ImportError: cannot import name 'EntrypointRequest'
-        #
-        from hax.message import BroadcastHAStates
         hastates = []
         try:
             msg_load = json.loads(msg)
