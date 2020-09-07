@@ -36,7 +36,7 @@ class BQProcessor:
         hastates = []
         try:
             msg_load = json.loads(msg)
-            payload = json.loads(msg_load['payload'])
+            payload = msg_load['payload']
         except json.JSONDecodeError:
             logging.error('Cannot parse payload, invalid json')
             return

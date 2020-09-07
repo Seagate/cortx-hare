@@ -1,4 +1,4 @@
-from typing import NamedTuple, Optional
+from typing import Any, Dict, NamedTuple, Optional
 
 import simplejson
 from hax.util import ConsulKVBasic, TxPutKV, repeat_if_fails
@@ -6,7 +6,8 @@ from hax.util import ConsulKVBasic, TxPutKV, repeat_if_fails
 # XXX do we want to make payload definition more strict?
 # E.g. there could be a type hierarchy for payload objects that depends
 # on the type name.
-Message = NamedTuple('Message', [('message_type', str), ('payload', str)])
+Message = NamedTuple('Message', [('message_type', str),
+                                 ('payload', Dict[str, Any])])
 
 
 class Publisher:
@@ -25,7 +26,8 @@ class Publisher:
         """
         Publishes the given message to the queue.
         """
-        message = Message(message_type=message_type, payload=payload)
+        data = simplejson.loads(payload)
+        message = Message(message_type=message_type, payload=data)
         data = simplejson.dumps(message)
 
         while True:
