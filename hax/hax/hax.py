@@ -24,6 +24,7 @@ from typing import NamedTuple
 
 from hax.filestats import FsStatsUpdater
 from hax.handler import ConsumerThread
+from hax.motr.delivery import DeliveryHerald
 from hax.motr.ffi import HaxFFI
 from hax.motr.halink import HaLink
 from hax.server import run_server
@@ -87,7 +88,8 @@ def main():
                  f'HA fid = {cfg.ha_fid}, RM fid = {cfg.rm_fid}')
 
     ffi = HaxFFI()
-    halink = HaLink(queue=q, rm_fid=cfg.rm_fid, ffi=ffi)
+    herald = DeliveryHerald()
+    halink = HaLink(queue=q, rm_fid=cfg.rm_fid, ffi=ffi, herald=herald)
     consumer = _run_qconsumer_thread(q, ffi)
 
     try:
@@ -102,7 +104,7 @@ def main():
         # stats_updater = _run_stats_updater_thread(halink)
         # [KN] This is a blocking call. It will work until the program is
         # terminated by signal
-        run_server(q, threads_to_wait=[consumer])
+        run_server(q, herald, threads_to_wait=[consumer])
     except Exception:
         logging.exception('Exiting due to an exception')
     finally:
