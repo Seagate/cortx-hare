@@ -1,0 +1,18 @@
+# Number of days of inactivity before an Issue or Pull Request becomes stale.
+daysUntilStale: 4
+# Issues or Pull Requests with these labels will never be considered stale.
+# Set to `[]` to disable.
+exemptLabels: []
+# Label to use when marking as stale.
+staleLabel: needs-attention
+# Comment to post when marking as stale. Set to `false` to disable.
+markComment: >
+  There's been no activity on this issue for 345600 seconds (that's 4 days for you, hoomans).
+  <br>
+  Let me ping some Hare maintainers on your behalf...
+  @mssawant, @vvv: Hello there! :wave:
+  OK, done.
+  <br>
+  I've also set `needs-attention` label.  Is this worth it?  I don't know.  But I'm keen to find out! _(Oh, who am I kidding.  I'm a stateless bot.  All those moments will be lost in time, like tears in rain.)_
+  <br>
+  Sorry for the delay.  And thank you for contributing to CORTX!  _(Not bad for a human.)_
