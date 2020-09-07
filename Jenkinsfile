@@ -44,7 +44,7 @@ pipeline {
     }
 
     stages {
-        stage('Prepare VM') {
+        stage('Reset VM') {
             environment {
                 SSC_AUTH = credentials('shailesh-cloudform-cred')
             }
@@ -52,7 +52,7 @@ pipeline {
                 sh 'VERBOSE=true jenkins/vm-reset'
             }
         }
-        stage('Prepare environment') {
+        stage('Prepare') {
             parallel {
                 stage('Download cortx-hare repo from static branch') {
                     when { not { changeRequest() } }
@@ -91,9 +91,9 @@ pipeline {
                         }
                     }
                 }
-                stage('Prepare RPM dependencies') {
+                stage('Install dependencies') {
                     stages {
-                        stage('Prepare repo files') {
+                        stage('Create yum .repo files') {
                             steps {
                                 script {
                                     def remote = getTestMachine(VM_FQDN)
@@ -106,7 +106,7 @@ pipeline {
                             }
                         }
                         // TODO: Revise when VM snapshot is ready
-                        stage('Install Dependencies') {
+                        stage('yum-install dependencies') {
                             steps {
                                 script {
                                     def remote = getTestMachine(VM_FQDN)
@@ -123,7 +123,7 @@ pipeline {
             }
         }
 
-        stage('RPM test: build & install') {
+        stage('Build & install RPM') {
             steps {
                 script {
                     def remote = getTestMachine(VM_FQDN)
@@ -138,23 +138,10 @@ pipeline {
             }
         }
 
-        stage('Bootstrap singlenode') {
-            options {
-                timeout(time: 2, unit: 'MINUTES')
-            }
-            steps {
-                script {
-                    def remote = getTestMachine(VM_FQDN)
-                    def commandResult = sshScript(
-                        remote: remote,
-                        script: "jenkins/bootstrap-singlenode"
-                    )
-                    echo "Result: " + commandResult
-                }
-            }
-        }
-
-        stage('Unit-tests') {
+        // This stage will fail unless 'm0confgen' executable is available.
+        // 'm0confgen' is provided by cortx-motr RPM, which cortx-hare RPM
+        // depends on.
+        stage('Linters & unit tests') {
             steps {
                 script {
                     def remote = getTestMachine(VM_FQDN)
@@ -162,33 +149,48 @@ pipeline {
                         cd $REPO_NAME
                         export PATH=/opt/seagate/cortx/hare/bin:\$PATH
                         make check
-                        make test
+                        make test  # uses 'm0confgen'
                         """
                     echo "Result: " + commandResult
                 }
             }
         }
 
-        stage('Stop cluster') {
-            options {
-                timeout(time: 10, unit: 'MINUTES')
-            }
-            steps {
-                script {
-                    def remote = getTestMachine(VM_FQDN)
-                    def commandResult = sshCommand remote: remote, command: """
+        stage('Smoke test (single node)') {
+            stages {
+                stage('hctl-bootstrap') {
+                    options { timeout(2) }
+                    steps {
+                        script {
+                            def remote = getTestMachine(VM_FQDN)
+                            def commandResult = sshScript(
+                                remote: remote,
+                                script: "jenkins/bootstrap-singlenode"
+                            )
+                            echo "Result: " + commandResult
+                        }
+                    }
+                }
+                stage('hctl-shutdown') {
+                    options { timeout(10) }
+                    steps {
+                        script {
+                            def remote = getTestMachine(VM_FQDN)
+                            def commandResult = sshCommand(
+                                remote: remote,
+                                command: """
                         PATH=/opt/seagate/cortx/hare/bin/:\$PATH
                         hctl shutdown
-                        """
-                    echo "Result: " + commandResult
+                        """)
+                            echo "Result: " + commandResult
+                        }
+                    }
                 }
             }
         }
 
-        stage('I/O test with m0crate') {
-            options {
-                timeout(time: 10, unit: 'MINUTES')
-            }
+        stage('I/O test (m0crate)') {
+            options { timeout(10) }
             steps {
                 script {
                     def remote = getTestMachine(VM_FQDN)
