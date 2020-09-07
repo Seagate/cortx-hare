@@ -19,11 +19,12 @@ class BQProcessor:
         self.confobjutil = ConfObjUtil()
         self.herald = delivery_herald
 
-    def process(self, messages: List[Tuple[int, Any]]) -> None:
-        for i, msg in messages:
-            logging.debug('Message #%s received: %s (type: %s)', i, msg,
-                          type(msg).__name__)
-            self.payload_process(msg)
+    def process(self, message: Tuple[int, Any]) -> None:
+        (i, msg) = message
+        logging.debug('Message #%d received: %s (type: %s)', i, msg,
+                      type(msg).__name__)
+        self.payload_process(msg)
+        logging.debug('Message #%d processed', i)
 
     def payload_process(self, msg: str) -> None:
         #
