@@ -71,7 +71,7 @@ HARE_VERSION := $(shell cat VERSION)
 HAX_WHL      := hax/dist/hax-$(HARE_VERSION)-cp$(PY3_VERSION)-cp$(PY3_VERSION)m-linux_x86_64.whl
 hax: $(HAX_WHL)
 
-HAX_SRC := $(wildcard hax/setup.py hax/hax/*.py hax/hax/*.[ch])
+HAX_SRC := $(wildcard hax/setup.py hax/hax/*.py hax/hax/motr/*.[ch] hax/hax/motr/*.py hax/hax/queue/*.py)
 $(HAX_WHL): $(PY_VENV_DIR) $(HAX_SRC)
 	@$(call _info,Building hax .whl package)
 	@cd hax && $(SETUP_PY) bdist_wheel

@@ -37,7 +37,6 @@ class EntrypointRequest(BaseMessage):
     git_rev: str
     pid: int
     is_first_request: bool
-    ha_link_instance: Any
 
 
 @dataclass
@@ -55,7 +54,6 @@ class BroadcastHAStates(BaseMessage):
 class HaNvecGetEvent(BaseMessage):
     hax_msg: int
     nvec: List[HaNote]
-    ha_link_instance: Any
 
 
 @dataclass
@@ -67,7 +65,7 @@ class SnsRebalanceStart(SnsOperation):
     pass
 
 
-class SnsRebalanceAbort(SnsOperation):
+class SnsRebalanceStop(SnsOperation):
     pass
 
 
@@ -83,7 +81,7 @@ class SnsRepairStart(SnsOperation):
     pass
 
 
-class SnsRepairAbort(SnsOperation):
+class SnsRepairStop(SnsOperation):
     pass
 
 
@@ -105,6 +103,13 @@ class SnsDiskDetach(SnsOperation):
 
 @dataclass
 class SnsRepairStatus:
+    fid: Fid
+    reply_to: q.Queue
+
+
+@dataclass
+class SnsRebalanceStatus:
+    fid: Fid
     reply_to: q.Queue
 
 

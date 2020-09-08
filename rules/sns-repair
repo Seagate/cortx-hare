@@ -41,7 +41,7 @@ fi
 
 case $cmd in
     start) op_name='repair-start' ;;
-    stop) op_name='repair-abort' ;;
+    stop) op_name='repair-stop' ;;
     pause) op_name='repair-pause' ;;
     resume) op_name='repair-resume' ;;
     *)
@@ -52,8 +52,17 @@ esac
 
 log "handler is called for $cmd, $fid"
 
-status_code="$(curl -s -w "%{http_code}\n" \
-    -X POST http://localhost:8008/api/v1/sns/${op_name} -o /dev/null)"
+payload=$(jq --null-input --compact-output \
+             --arg cmd "$cmd" \
+             --arg fid "$fid" \
+             '{ cmd: $cmd, fid: $fid }')
+
+status_code=$(curl http://localhost:8008/api/v1/sns/${op_name} \
+                   --silent \
+                   --output /dev/null \
+                   --request POST \
+                   --write-out '%{http_code}\n' \
+                   --data "$payload")
 rc=$?
 [[ status_code -eq 200 && rc -eq 0 ]] \
     || log "rule failed. http: $status_code, rc: $rc"
