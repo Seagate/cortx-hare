@@ -43,8 +43,8 @@ def _setup_logging():
         format='%(asctime)s [%(levelname)s] {%(threadName)s} %(message)s')
 
 
-def _run_qconsumer_thread(queue: Queue, ffi: HaxFFI) -> ConsumerThread:
-    thread = ConsumerThread(queue, ffi)
+def _run_qconsumer_thread(queue: Queue, halink: HaLink) -> ConsumerThread:
+    thread = ConsumerThread(queue, halink)
     thread.start()
     return thread
 
@@ -90,7 +90,7 @@ def main():
     ffi = HaxFFI()
     herald = DeliveryHerald()
     halink = HaLink(queue=q, rm_fid=cfg.rm_fid, ffi=ffi, herald=herald)
-    consumer = _run_qconsumer_thread(q, ffi)
+    consumer = _run_qconsumer_thread(q, halink)
 
     try:
         halink.start(cfg.hax_ep,
