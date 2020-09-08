@@ -20,7 +20,6 @@ import queue as q
 from dataclasses import dataclass
 from typing import Any, List, Optional
 
-from hax.motr import halink
 from hax.types import Fid, HaNote, HAState, Uint128
 from queue import Queue
 
@@ -38,7 +37,7 @@ class EntrypointRequest(BaseMessage):
     git_rev: str
     pid: int
     is_first_request: bool
-    ha_link_instance: 'halink.HaLink'
+    ha_link_instance: Any
 
 
 @dataclass
@@ -56,7 +55,7 @@ class BroadcastHAStates(BaseMessage):
 class HaNvecGetEvent(BaseMessage):
     hax_msg: int
     nvec: List[HaNote]
-    ha_link_instance: 'halink.HaLink'
+    ha_link_instance: Any
 
 
 @dataclass
