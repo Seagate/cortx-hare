@@ -38,9 +38,10 @@ Positional arguments:
                          ones from the specified directory.
 
 Options:
-  --debug      Print commands and their arguments as they are executed.
-  --mkfs       Execute m0mkfs.  *CAUTION* This wipes all Motr data!
-  -h, --help   Show this help and exit.
+  --debug       Print commands and their arguments as they are executed.
+  --mkfs        Execute m0mkfs.  *CAUTION* This wipes all Motr data!
+  --local       Start Consul, Hare and Motr services on the local node only.
+  -h, --help    Show this help and exit.
 EOF
 }
 
@@ -177,7 +178,7 @@ is_localhost() {
 # main
 
 TEMP=$(getopt --options hc: \
-              --longoptions help,mkfs,conf-dir:,debug \
+              --longoptions help,mkfs,conf-dir:,local,debug \
               --name "$PROG" -- "$@" || true)
 
 (($? == 0)) || { usage >&2; exit 1; }
@@ -187,12 +188,14 @@ eval set -- "$TEMP"
 conf_dir=
 opt_mkfs=
 debug_p=false
+local_only=
 
 while true; do
     case "$1" in
         -h|--help)           usage; exit ;;
         --mkfs)              opt_mkfs=--mkfs; shift ;;
         -c|--conf-dir)       conf_dir=$2; shift 2 ;;
+        --local)             local_only=true; shift ;;
         --debug)             debug_p=true; shift ;;
         --)                  shift; break ;;
         *)                   break ;;
@@ -202,7 +205,6 @@ done
 case $# in
     0) [[ -d $conf_dir ]] || die "'--conf-dir' argument is not a directory";;
     1) [[ -z $conf_dir ]] || { usage >&2; exit 1; };;
-    *) die 'Too many arguments';;  # unreachable (ruled out by getopt)
 esac
 
 $debug_p && set -x
@@ -246,6 +248,13 @@ EOF
             # Redirect stdin to /dev/null (`-n`) to prevent
             # accidental stealing of `get_all_nodes` output.
 	    ssh -n $node "echo $node > $conf_dir/node-name"
+            # Functions get_server_nodes, get_client_nodes and get_all_nodes use
+            # consul-kv.json and consul-agents.json to retrieve node information.
+            # In order to start services on a single node, in case of node reboot,
+            # consul-kv.json and consul-agents.json are replicated to peer nodes
+            # so that hctl bootstrap node can be run from rebooted node as well.
+            scp $conf_dir/consul-kv.json $node:$conf_dir 1>/dev/null
+            scp $conf_dir/consul-agents.json $node:$conf_dir 1>/dev/null
         fi
     done < <(get_all_nodes)
 
@@ -256,6 +265,10 @@ abort_if_RC_leader_election_is_impossible
 
 # Get my IP address (the one that the other agents will join to).
 read _ join_ip <<< $(get_server_nodes | grep -w $(node-name))
+
+# If a primary node reboots, on startup of local Consul service, the node needs
+# to join its peers in the cluster.
+read _ join_peers <<< $(get_server_nodes | grep -vw $(node-name))
 
 if [[ -z $join_ip ]]; then
     cat <<'EOF' >&2
@@ -268,19 +281,37 @@ EOF
 fi
 
 say 'Starting Consul server agent on this node...'
-# $join_ip is our bind_ip address
-mk-consul-env --mode server --bind $join_ip \
-              --extra-options '-ui -bootstrap-expect 1'
+# Make Consul environment file for the node from which the hctl bootstrap
+# command is executed.
+bootstrap_expect=true
+while read node bind_ip; do
+    if [[ $bootstrap_expect && ($node == $(node-name)) ]]; then
+        # $join_ip is our bind_ip address
+        mk-consul-env --mode server --bind $join_ip --join $join_peers \
+                      --extra-options '-ui -bootstrap-expect 1'
+    elif [[ $node == $(node-name) ]]; then
+        mk-consul-env --mode server --bind $join_ip --join $join_peers
+    fi
+    # bootstrap_expect parameter is set for the first node of the cluster only.
+    bootstrap_expect=
+done < <(get_server_nodes)
 
 sudo systemctl start hare-consul-agent
 
 # Wait for Consul's internal leader to be ready.
 # (Until then the KV store won't be accessible.)
-while ! consul info 2>/dev/null | grep -q 'leader.*true'; do
-    sleep 1
-    echo -n '.'
-done
-echo ' OK'
+# Here we are checking if any of the peer nodes is elected as a leader. This
+# is required in case of node reboots and starting services only on a given
+# node.
+while read node bind_ip; do
+    while ! consul info 2>/dev/null | grep -q 'leader.*true' &&
+          ! ssh $node "/opt/seagate/cortx/hare/bin/consul info 2>/dev/null | \
+                           grep -q 'leader.*true'"; do
+        sleep 1
+        echo -n '.'
+    done
+    echo ' OK'
+done < <(get_server_nodes | grep -vw $(node-name) || true)
 
 say 'Importing configuration into the KV store...'
 jq '[.[] | {key, value: (.value | @base64)}]' < $conf_dir/consul-kv.json |
@@ -289,20 +320,40 @@ echo ' OK'
 
 say 'Starting Consul agents on other cluster nodes...'
 pids=()
-while read node bind_ip; do
-    ssh $node "PATH=$PATH $(which mk-consul-env) \
-                          --mode server --bind $bind_ip --join $join_ip &&
-               sudo systemctl start hare-consul-agent" &
-    pids+=($!)
-done < <(get_server_nodes | grep -vw $(node-name) || true)
+if [[ ! $local_only ]]; then
+    while read node bind_ip; do
+        ssh $node "PATH=$PATH $(which mk-consul-env) \
+                              --mode server --bind $bind_ip --join $join_ip &&
+                   sudo systemctl start hare-consul-agent" &
+        pids+=($!)
+    done < <(get_server_nodes | grep -vw $(node-name) || true)
+fi
 
-while read node bind_ip; do
-    ssh $node "PATH=$PATH $(which mk-consul-env) \
-                          --mode client --bind $bind_ip --join $join_ip &&
-               sudo systemctl start hare-consul-agent" &
-    pids+=($!)
-done < <(get_client_nodes)
+if [[ ! $local_only ]]; then
+    while read node bind_ip; do
+        ssh $node "PATH=$PATH $(which mk-consul-env) \
+                              --mode client --bind $bind_ip --join $join_ip &&
+                   sudo systemctl start hare-consul-agent" &
+        pids+=($!)
+    done < <(get_client_nodes)
+fi
 wait4 ${pids[@]-}
+pids=()
+# This check is to account if all the Consul agents have started or not.
+# In case of a single node startup, total pids may not match the total
+# number of Consul agents. So we explicitly fetch the pids for all the
+# agents and check if the number of started agents matches the expected
+# number of total Consul agents in the cluster.
+while read node bind_ip; do
+    pids+=$(ssh $node 'pidof consul')
+done < <(get_server_nodes | grep -vw $(node-name) || true)
+while read node bind_ip; do
+    if [[ $node == $(node-name) ]]; then
+        pids+=$(pidof consul)
+    else
+        pids+=$(ssh $node 'pidof consul')
+    fi
+done < <(get_client_nodes)
 agents_nr=$(( ${#pids[@]} + 1 ))
 
 # Waiting for the agents to get ready...
@@ -324,12 +375,14 @@ echo ' OK'
 say 'Updating Consul agents configs from the KV store...'
 update-consul-conf &
 pids=($!)
-while read node _; do
-    ssh $node "PATH=$PATH $(which update-consul-conf)" &
-    pids+=($!)
-done < <(get_all_nodes | grep -vw $(node-name) || true)
-wait4 ${pids[@]}
-echo ' OK'
+if [[ ! $local_only ]]; then
+    while read node _; do
+        ssh $node "PATH=$PATH $(which update-consul-conf)" &
+        pids+=($!)
+    done < <(get_all_nodes | grep -vw $(node-name) || true)
+    wait4 ${pids[@]}
+    echo ' OK'
+fi
 
 say 'Installing Motr configuration files...'
 while read node _; do
@@ -371,10 +424,12 @@ start_motr() {
     bootstrap-node $op --phase $phase &
     pids=($!)
 
-    while read node _; do
-        ssh $node "PATH=$PATH $(which bootstrap-node) $op --phase $phase" &
-        pids+=($!)
-    done < <(get_nodes $phase | grep -vw $(node-name) || true)
+    if [[ ! $local_only ]]; then
+        while read node _; do
+            ssh $node "PATH=$PATH $(which bootstrap-node) $op --phase $phase" &
+            pids+=($!)
+        done < <(get_nodes $phase | grep -vw $(node-name) || true)
+    fi
     wait4 ${pids[@]}
     echo ' OK'
 }
