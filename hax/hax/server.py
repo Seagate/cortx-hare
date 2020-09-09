@@ -35,7 +35,7 @@ from hax.motr.delivery import DeliveryHerald
 from hax.queue import BQProcessor
 from hax.queue.offset import InboxFilter, OffsetStorage
 from hax.types import Fid, HAState, StoppableThread
-from hax.util import create_process_fid, dump_json
+from hax.util import create_process_fid, dump_json, ConsulUtil
 
 
 async def hello_reply(request):
@@ -180,12 +180,17 @@ def run_server(
     threads_to_wait: List[StoppableThread] = [],
     port=8008,
 ):
+    node_address = ConsulUtil().get_hax_ip_address()
+
     # Bind to ANY interface so scripts can use localhost to send requests
     # FIXME: This introduces security related concerns since hax becomes
     # available from network.
-    addr = '0.0.0.0'
+    web_address = '0.0.0.0'
+
+    # Note that bq-delivered mechanism must use a unique node name rather than
+    # broad '0.0.0.0' that doesn't identify the node from outside.
     inbox_filter = InboxFilter(
-        OffsetStorage(addr, key_prefix='bq-delivered'))
+        OffsetStorage(node_address, key_prefix='bq-delivered'))
 
     app = web.Application(middlewares=[encode_exception])
     app.add_routes([
@@ -196,9 +201,9 @@ def run_server(
         web.post('/api/v1/sns/{operation}', process_sns_operation(queue)),
         web.get('/api/v1/sns/rebalance-progress', get_sns_status(queue)),
     ])
-    logging.info(f'Starting HTTP server at {addr}:{port} ...')
+    logging.info(f'Starting HTTP server at {web_address}:{port} ...')
     try:
-        web.run_app(app, host=addr, port=port)
+        web.run_app(app, host=web_address, port=port)
         logging.debug('Server stopped normally')
     finally:
         logging.debug('Stopping the threads')
