@@ -185,7 +185,7 @@ def run_server(
     # available from network.
     addr = '0.0.0.0'
     inbox_filter = InboxFilter(
-        OffsetStorage(addr, key_prefix='queue-offsets/bq'))
+        OffsetStorage(addr, key_prefix='bq-delivered'))
 
     app = web.Application(middlewares=[encode_exception])
     app.add_routes([

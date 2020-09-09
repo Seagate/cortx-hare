@@ -7,7 +7,7 @@ from hax.util import ConsulKVBasic, repeat_if_fails
 
 
 def get_key_by_node(prefix: str, node_name: str):
-    return f'{prefix}/{node_name}/last-read-epoch'
+    return f'{prefix}/{node_name}'
 
 
 class OffsetStorage:
