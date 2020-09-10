@@ -1,98 +1,57 @@
 # Hare Developer Guide
 
-Current document covers building from sources and detailed configuration of Hare service.
+**Note:** Some of the steps below require access to Seagate infrastructure.
 
-Topics described here may require access to Seagate infrastructure.
+<!------------------------------------------------------------------->
+## Installation
 
-## 0. Prerequisites
+* Download Hare with submodules.
+  ```sh
+  git clone --recursive https://github.com/Seagate/cortx-hare.git hare
+  cd hare
+  ```
 
-* Repository is cloned along with all submodules. [Link to readme.](README.md#get-source-code)
-  Quick clone from Seagate repo: `git clone --recursive https://github.com/Seagate/cortx-hare.git`
-
-* Python &geq; 3.6 and the corresponding header files.
-
-  To install on CentOS 7, run
+* Install the dependencies: Python (≥ 3.6), libraries and header files
+  needed to compile Python extensions.
   ```sh
   sudo yum install python3 python3-devel
   ```
 
-* Ensure that [Motr](https://github.com/seagate/cortx-motr) is built and its systemd services are installed.
-  _Note: check [cortx-motr](https://github.com/Seagate/cortx-motr/blob/dev/README.md) repo for more details_
+* Install `cortx-motr` and `cortx-motr-devel` RPMs.
+
+* Alternatively, you can build and install Motr from sources:
   ```sh
-  M0_SRC_DIR=/data/mero  # YMMV
+  git clone --recursive https://github.com/Seagate/cortx-motr.git motr
+  cd motr
 
-  * To install Motr from RPMs:
-    ```sh
-    sudo yum install cortx-motr cortx-motr-devel
-    ```
+  scripts/m0 make
+  sudo scripts/install-motr-service --link
 
-  * Alternatively, Motr can be compiled and installed from sources:
-    ```sh
-    git clone --recursive https://github.com/Seagate/cortx-motr.git motr
-    M0_SRC_DIR=$PWD/motr
+  M0_SRC_DIR=$PWD
+  cd -
+  ```
+  See [Motr Quick Start Guide](https://github.com/Seagate/cortx-motr/blob/dev/doc/Quick-Start-Guide.rst#building-the-source-code) for more details.
 
-    $M0_SRC_DIR/scripts/m0 make
-    sudo $M0_SRC_DIR/scripts/install-motr-service --link
-    ```
-
-## 1. Single-node setup
-
-1. Build and install Hare:
-   ```sh
-   # Run from cortx-hare directory
-   make
-   sudo make devinstall
-   ```
-
-2. Add current user to `hare` group.
-   ```sh
-   sudo usermod --append --groups hare $USER
-   ```
-   Log out and log back in.
-
-3. Edit `cfgen/examples/singlenode.yaml` file.
-
-   * Ensure that the disks enumerated in the `io_disks` list exist.
-     Create loop devices, if necessary:
-     ```bash
-     sudo mkdir -p /var/motr
-     for i in {0..9}; do
-         sudo dd if=/dev/zero of=/var/motr/disk$i.img bs=1M seek=9999 count=1
-         sudo losetup /dev/loop$i /var/motr/disk$i.img
-     done
-     ```
-
-   * Make sure that `data_iface` value refers to existing network
-     interface (it should be present in the output of `ip a` command).
-
-4. Configure LNet
-
-* Execute these commands (assuming Motr uses `eth0` network interface):
-  ```bash
-  sudo tee /etc/modprobe.d/lnet.conf <<< \
-      'options lnet networks=tcp(eth0) config_on_load=1'
+* Build and install Hare.
+  ```sh
+  make
+  sudo make devinstall
   ```
 
-5. Start the cluster.
-   ```sh
-   hctl bootstrap --mkfs cfgen/examples/singlenode.yaml
-   ```
+* Add current user to `hare` group.
+  ```sh
+  sudo usermod --append --groups hare $USER
+  ```
+  Log out and log back in.
 
-## 2. Test I/O
-
-```sh
-utils/m0crate-io-conf >/tmp/m0crate-io.yaml
-dd if=/dev/urandom of=/tmp/128M bs=1M count=128
-sudo $M0_SRC_DIR/clovis/m0crate/m0crate -S /tmp/m0crate-io.yaml
-```
-
-## 3. 3-node SSC VM setup
+<!------------------------------------------------------------------->
+## 3-node SSC VM setup
 
 <!-- XXX Why do we need this section at all?
   -- Is section '4. Multi-node setup' not enough?
   -->
 
-### 3.1. Create VMs
+### Create VMs
 
 * Login to [Red Hat CloudForms](https://ssc-cloud.colo.seagate.com)
   (aka SSC) using your Seagate GID and password.
@@ -107,17 +66,35 @@ sudo $M0_SRC_DIR/clovis/m0crate/m0crate -S /tmp/m0crate-io.yaml
   [Active Services](https://ssc-cloud.colo.seagate.com/service/explorer#/)
   page.
 
-### 3.2. Install RPMs
+### Install RPMs
 
-Execute following step on all nodes: [README.md#install-rpm-packages]
+  Run the following code snippet on every node (VM):
+  ```bash
+  (set -eu
 
-### 3.3. Create loop devices
+  if ! rpm -q cortx-hare cortx-s3server; then
+      if ! sudo yum install -y cortx-hare cortx-s3server; then
+          for x in integration/centos-7.7.1908/last_successful s3server_uploads
+          do
+              repo="cortx-storage.colo.seagate.com/releases/eos/$x"
+              sudo yum-config-manager --add-repo="http://$repo"
+              sudo tee -a /etc/yum.repos.d/${repo//\//_}.repo <<< gpgcheck=0
+          done
+          unset repo x
 
-Execute `m0setup` on all nodes.
+          sudo yum install -y cortx-hare cortx-s3server
+      fi
+  fi
+  )
+  ```
 
-### 3.4. Configure LNet
+### Set up loop devices
 
-* Execute these commands on each node (assuming Motr uses `eth0`
+Run `m0setup` on all nodes.
+
+### Configure LNet
+
+* Execute these commands on every node (assuming Motr uses `eth0`
   network interface):
   ```bash
   sudo tee /etc/modprobe.d/lnet.conf <<< \
@@ -131,7 +108,7 @@ Execute `m0setup` on all nodes.
   ```
   The output should not be empty.
 
-### 3.5. Prepare SSH keys
+### Prepare SSH keys
 
 Execute these commands on the primary node (node-1):
 ```sh
@@ -140,12 +117,12 @@ ssh-copy-id <hostname of node-2>
 ssh-copy-id <hostname of node-3>
 ```
 
-### 3.6. Prepare the CDF
+### Prepare the CDF
 
 The code snippet below will create the cluster description file (CDF).
 You may want to update `OUT`, `NODES`, and `IFACE` values prior to
-running the code.  The value of `IFACE` should correspond to the value
-used in [step 3.4](#34-configure-lnet).
+running the code.  The value of `IFACE` should correspond to the one
+from [Configure LNet](#configure-lnet) step.
 
 ```bash
 (set -eu
@@ -194,20 +171,20 @@ EOF
 )
 ```
 
-### 3.7. Disable S3 authentication
+### Disable S3 authentication
 
 ```sh
 /opt/seagate/eos/hare/libexec/s3auth-disable
 ```
 
-### 3.8. Bootstrap the cluster
+### Bootstrap the cluster
 
 ```sh
 hctl bootstrap --mkfs /tmp/trinodes.yaml
 hctl status
 ```
 
-### 3.8. Configure S3 client
+### Configure S3 client
 
 * We deploy manually, so there is no Cluster IP.  The workaround:
   ```sh
@@ -235,7 +212,7 @@ hctl status
   s3cmd --configure
   ```
 
-### 3.8. Test S3 I/O
+### Test S3 I/O
 
 ```sh
 (set -eu
@@ -248,25 +225,15 @@ cmp /root/$fn /tmp/$fn || echo '**ERROR** S3 I/O test failed' >&2
 )
 ```
 
-## 4. Multi-node setup
+<!------------------------------------------------------------------->
+## Observe
 
-For multi-node cluster the steps are similar to
-[those of single-node](#1-single-node-setup).
-Steps 1–2 should be performed on each of the nodes.  The bootstrap
-command may be executed on any server node (i.e., on any of the nodes
-configured to run confd).
-
-Use `cfgen/examples/ees-cluster.yaml`, which describes a dual-node cluster,
-as an example.
-
-## 5. Observe
-
-### 5.1. Consul web UI
+### Consul web UI
 
 To view the [Consul UI](https://learn.hashicorp.com/consul/getting-started/ui#set-up-access-to-the-ui),
 open `http://<vm-ip-address>:8500/ui` URL in your browser.
 
-### 5.2. The RC leader
+### The RC leader
 
 ```
 $ consul kv get -detailed leader
@@ -279,10 +246,10 @@ Session          d5f3f364-6f79-48cd-b452-913321b2c743
 Value            sage75
 ```
 
-***Note:*** The presence of the `Session` line indicates that the leader
+**Note:** The presence of the `Session` line indicates that the leader
 has been elected.
 
-### 5.3. Logs
+### Logs
 
 * RC leader election log:
   ```sh
@@ -299,7 +266,8 @@ has been elected.
   journalctl --since <HH:MM> # bootstrap time
   ```
 
-## 6. Miscellaneous
+<!------------------------------------------------------------------->
+## Miscellanea
 
 * Get an entry point:
 
@@ -336,12 +304,14 @@ has been elected.
   The timeout resets automatically (for demo purposes), so you will
   see it in the log file every other minute.
 
-## 7. Troubleshooting
+<!------------------------------------------------------------------->
+## Troubleshooting
 
 ### Unknown tag: package package is not installed
 
-Example with `make rpm` command:
 ```
+$ make rpm
+[...]
 --> Preparing rpmbuild environment
 ‘cortx-hare-1.0.0.tar.gz’ -> ‘/home/vagrant/rpmbuild/SOURCES/cortx-hare-1.0.0.tar.gz’
 ‘hare.spec’ -> ‘/home/vagrant/rpmbuild/SPECS/hare.spec’
@@ -353,16 +323,8 @@ make[1]: *** [__rpm] Error 1
 make[1]: Leaving directory `/tmp/cortx-hare'
 make: *** [rpm] Error 2
 ```
-This caused by missing submodules. It happens when repository is cloned without
-`--recursive` flag.
-Solution: initialize following submodules
-* cortx-hare/vendor/consul-bin/
-* cortx-hare/vendor/dhall-bin/
-* cortx-hare/vendor/dhall-prelude/
 
-## 8. Links
+The likely cause is missing submodule.  Perhaps you've cloned
+cortx-hare repository without `--recursive` flag.
 
-- [Halon replacement: a simpler, better HA subsystem for EOS](https://docs.google.com/presentation/d/17Pn61WBbTHpeR4NxGtaDfmmHxgoLW9BnQHRW7WJO0gM/view) (slides)
-- [Halon replacement: Consul, design highlights](https://docs.google.com/document/d/1cR-BbxtMjGuZPj8NOc95RyFjqmeFsYf4JJ5Hw_tL1zA/view)
-- Bootstrap guide: [README.md](README.md): _how to get source code and run hare + motr instance_.
-- Contributing guide: [CONTRIBUTING.md](CONTRIBUTING.md).
+Solution: `git submodule update --init --recursive`.
