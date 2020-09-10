@@ -600,8 +600,8 @@ static void link_disconnected_cb(struct m0_halon_interface *hi,
 	hax_unlock(hc0);
 }
 
-M0_INTERNAL struct hax_context *init_halink(PyObject *obj,
-					    const char *node_uuid)
+M0_INTERNAL struct hax_context *init_motr_api(PyObject *obj,
+					      const char *node_uuid)
 {
 	int rc;
 
@@ -629,7 +629,7 @@ M0_INTERNAL struct hax_context *init_halink(PyObject *obj,
 	return hc0;
 }
 
-void destroy_halink(unsigned long long ctx)
+void destroy_motr_api(unsigned long long ctx)
 {
 	struct hax_context *hc = (struct hax_context *)ctx;
 

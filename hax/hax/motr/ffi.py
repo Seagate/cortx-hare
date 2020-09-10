@@ -45,8 +45,8 @@ class HaxFFI:
         lib_path = f'{dirname}/../../libhax.cpython-36m-x86_64-linux-gnu.so'
         logging.debug('Loading library from path: %s', lib_path)
         lib = c.cdll.LoadLibrary(lib_path)
-        lib.init_halink.argtypes = [c.py_object, c.c_char_p]
-        lib.init_halink.restype = c.c_void_p
+        lib.init_motr_api.argtypes = [c.py_object, c.c_char_p]
+        lib.init_motr_api.restype = c.c_void_p
 
         lib.start.argtypes = [
             c.c_void_p, c.c_char_p,
@@ -56,13 +56,13 @@ class HaxFFI:
         ]
         lib.start.restype = c.c_int
 
-        self.init_halink = lib.init_halink
+        self.init_motr_api = lib.init_motr_api
         self.start = lib.start
 
         lib.start_rconfc.argtypes = [c.c_void_p, c.POINTER(FidStruct)]
         lib.start_rconfc.restype = c.c_int
         self.start_rconfc = lib.start_rconfc
-        self.destroy = py_func_proto(('destroy_halink', lib))
+        self.destroy = py_func_proto(('destroy_motr_api', lib))
 
         lib.stop_rconfc.argtypes = [c.c_void_p]
         lib.stop_rconfc.restype = c.c_int

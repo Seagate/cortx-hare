@@ -24,9 +24,9 @@ from typing import NamedTuple
 
 from hax.filestats import FsStatsUpdater
 from hax.handler import ConsumerThread
+from hax.motr import Motr
 from hax.motr.delivery import DeliveryHerald
 from hax.motr.ffi import HaxFFI
-from hax.motr.halink import HaLink
 from hax.server import run_server
 from hax.types import Fid
 from hax.util import ConsulUtil, repeat_if_fails
@@ -43,20 +43,20 @@ def _setup_logging():
         format='%(asctime)s [%(levelname)s] {%(threadName)s} %(message)s')
 
 
-def _run_qconsumer_thread(queue: Queue, halink: HaLink) -> ConsumerThread:
-    thread = ConsumerThread(queue, halink)
+def _run_qconsumer_thread(queue: Queue, motr: Motr) -> ConsumerThread:
+    thread = ConsumerThread(queue, motr)
     thread.start()
     return thread
 
 
-def _run_stats_updater_thread(halink: HaLink) -> FsStatsUpdater:
-    thread = FsStatsUpdater(halink, interval_sec=30)
+def _run_stats_updater_thread(motr: Motr) -> FsStatsUpdater:
+    thread = FsStatsUpdater(motr, interval_sec=30)
     thread.start()
     return thread
 
 
 @repeat_if_fails()
-def _get_halink_fids(util: ConsulUtil) -> HL_Fids:
+def _get_motr_fids(util: ConsulUtil) -> HL_Fids:
     hax_ep: str = util.get_hax_endpoint()
     hax_fid: Fid = util.get_hax_fid()
     ha_fid: Fid = util.get_ha_fid()
@@ -80,7 +80,7 @@ def main():
     q = Queue(maxsize=8)
 
     util: ConsulUtil = ConsulUtil()
-    cfg = _get_halink_fids(util)
+    cfg = _get_motr_fids(util)
 
     logging.info('Welcome to HaX')
     logging.info(f'Setting up ha_link interface with the options as follows: '
@@ -89,26 +89,26 @@ def main():
 
     ffi = HaxFFI()
     herald = DeliveryHerald()
-    halink = HaLink(queue=q, rm_fid=cfg.rm_fid, ffi=ffi, herald=herald)
-    consumer = _run_qconsumer_thread(q, halink)
+    motr = Motr(queue=q, rm_fid=cfg.rm_fid, ffi=ffi, herald=herald)
+    consumer = _run_qconsumer_thread(q, motr)
 
     try:
-        halink.start(cfg.hax_ep,
-                     process=cfg.hax_fid,
-                     ha_service=cfg.ha_fid,
-                     rm_service=cfg.rm_fid)
-        logging.info('ha_link connection has been established')
+        motr.start(cfg.hax_ep,
+                   process=cfg.hax_fid,
+                   ha_service=cfg.ha_fid,
+                   rm_service=cfg.rm_fid)
+        logging.info('Motr API has been started')
         # FIXME XXX
         # We are disabling filesystem stats fetch till we have
         # clean fix for EOS-12405
-        # stats_updater = _run_stats_updater_thread(halink)
+        # stats_updater = _run_stats_updater_thread(motr)
         # [KN] This is a blocking call. It will work until the program is
         # terminated by signal
         run_server(q, herald, threads_to_wait=[consumer])
     except Exception:
         logging.exception('Exiting due to an exception')
     finally:
-        halink.close()
+        motr.close()
 
 
 if __name__ == '__main__':
