@@ -22,16 +22,16 @@ import time
 from typing import List
 
 from hax.exception import HAConsistencyException
-from hax.motr.halink import HaLink, log_exception
+from hax.motr import Motr, log_exception
 from hax.types import FsStatsWithTime, StoppableThread
 from hax.util import ConsulUtil
 
 
 class FsStatsUpdater(StoppableThread):
-    def __init__(self, halink: HaLink, interval_sec=5):
+    def __init__(self, motr: Motr, interval_sec=5):
         super().__init__(target=self._execute,
                          name='fs-stats-updater',
-                         args=(halink, ))
+                         args=(motr, ))
         self.stopped = False
         self.consul = ConsulUtil()
         self.interval_sec = interval_sec
@@ -41,19 +41,19 @@ class FsStatsUpdater(StoppableThread):
         self.stopped = True
 
     @log_exception
-    def _execute(self, halink: HaLink):
+    def _execute(self, motr: Motr):
         try:
-            ffi = halink._ffi
+            ffi = motr._ffi
             logging.info('filesystem stats updater thread has started')
             ffi.adopt_motr_thread()
             self._ensure_motr_all_started()
-            halink.start_rconfc()
+            motr.start_rconfc()
             logging.info('rconfc is initialized, FS stats can be polled now')
             while not self.stopped:
                 started = self._ioservices_running()
                 if not all(started):
                     continue
-                stats = halink.get_filesystem_stats()
+                stats = motr.get_filesystem_stats()
                 logging.debug('FS stats are as follows: %s', stats)
                 now_time = datetime.datetime.now()
                 data = FsStatsWithTime(stats=stats,
@@ -71,9 +71,10 @@ class FsStatsUpdater(StoppableThread):
             logging.exception('Aborting due to an error')
         finally:
             try:
-                halink.stop_rconfc()
+                motr.stop_rconfc()
             except Exception:
-                logging.error('Failed to stop rconfc')
+                logging.error('Failed to stop rconfc; the error is swallowed'
+                              ' to continue shutting down')
             logging.debug('Releasing motr-related resources for this thread')
             ffi.shun_motr_thread()
             logging.debug('filesystem stats updater thread exited')

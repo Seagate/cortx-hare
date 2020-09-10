@@ -22,13 +22,13 @@ from queue import Empty, Queue
 from typing import List
 
 from hax.message import (BroadcastHAStates, EntrypointRequest, HaNvecGetEvent,
-                         ProcessEvent, SnsRebalanceStop, SnsRebalancePause,
-                         SnsRebalanceResume, SnsRebalanceStart, SnsRepairStop,
-                         SnsRepairPause, SnsRepairResume, SnsRepairStart,
-                         SnsRebalanceStatus, SnsRepairStatus)
-from hax.motr.halink import HaLink
+                         ProcessEvent, SnsRebalancePause, SnsRebalanceResume,
+                         SnsRebalanceStart, SnsRebalanceStatus,
+                         SnsRebalanceStop, SnsRepairPause, SnsRepairResume,
+                         SnsRepairStart, SnsRepairStatus, SnsRepairStop)
+from hax.motr import Motr
 from hax.queue.publish import EQPublisher
-from hax.types import (MessageId, StobIoqError, StoppableThread)
+from hax.types import MessageId, StobIoqError, StoppableThread
 from hax.util import ConsulUtil, dump_json, repeat_if_fails
 
 
@@ -41,10 +41,10 @@ class ConsumerThread(StoppableThread):
     The thread exits gracefully when it receives message of type Die (i.e.
     it is a 'poison pill').
     """
-    def __init__(self, q: Queue, halink: HaLink):
+    def __init__(self, q: Queue, motr: Motr):
         super().__init__(target=self._do_work,
                          name='qconsumer',
-                         args=(q, halink))
+                         args=(q, motr))
         self.is_stopped = False
         self.consul = ConsulUtil()
         self.eq_publisher = EQPublisher()
@@ -52,8 +52,8 @@ class ConsumerThread(StoppableThread):
     def stop(self) -> None:
         self.is_stopped = True
 
-    def _do_work(self, q: Queue, halink: HaLink):
-        ffi = halink._ffi
+    def _do_work(self, q: Queue, motr: Motr):
+        ffi = motr._ffi
         logging.info('Handler thread has started')
         ffi.adopt_motr_thread()
 
@@ -80,7 +80,7 @@ class ConsumerThread(StoppableThread):
                         # While replying any Exception is catched. In such a
                         # case, the motr process will receive EAGAIN and
                         # hence will need to make new attempt by itself
-                        halink.send_entrypoint_request_reply(item)
+                        motr.send_entrypoint_request_reply(item)
                     elif isinstance(item, ProcessEvent):
                         fn = self.consul.update_process_status
                         # If a consul-related exception appears, it will
@@ -91,7 +91,7 @@ class ConsumerThread(StoppableThread):
                         decorated = (repeat_if_fails(wait_seconds=5))(fn)
                         decorated(item.evt)
                     elif isinstance(item, HaNvecGetEvent):
-                        fn = halink.ha_nvec_get_reply
+                        fn = motr.ha_nvec_get_reply
                         # If a consul-related exception appears, it will
                         # be processed by repeat_if_fails.
                         #
@@ -101,7 +101,7 @@ class ConsumerThread(StoppableThread):
                         decorated(item)
                     elif isinstance(item, BroadcastHAStates):
                         logging.info('HA states: %s', item.states)
-                        result: List[MessageId] = halink.broadcast_ha_states(
+                        result: List[MessageId] = motr.broadcast_ha_states(
                             item.states)
                         if item.reply_to:
                             item.reply_to.put(result)
@@ -113,40 +113,40 @@ class ConsumerThread(StoppableThread):
                         logging.debug('Written to epoch: %s', offset)
                     elif isinstance(item, SnsRepairStatus):
                         logging.info('Requesting SNS repair status')
-                        status = halink.get_repair_status(item.fid)
+                        status = motr.get_repair_status(item.fid)
                         logging.info('SNS repair status is received: %s',
                                      status)
                         item.reply_to.put(status)
                     elif isinstance(item, SnsRebalanceStatus):
                         logging.info('Requesting SNS rebalance status')
-                        status = halink.get_rebalance_status(item.fid)
+                        status = motr.get_rebalance_status(item.fid)
                         logging.info('SNS rebalance status is received: %s',
                                      status)
                         item.reply_to.put(status)
                     elif isinstance(item, SnsRebalanceStart):
                         logging.info('Requesting SNS rebalance start')
-                        halink.start_rebalance(item.fid)
+                        motr.start_rebalance(item.fid)
                     elif isinstance(item, SnsRebalanceStop):
                         logging.info('Requesting SNS rebalance stop')
-                        halink.stop_rebalance(item.fid)
+                        motr.stop_rebalance(item.fid)
                     elif isinstance(item, SnsRebalancePause):
                         logging.info('Requesting SNS rebalance pause')
-                        halink.pause_rebalance(item.fid)
+                        motr.pause_rebalance(item.fid)
                     elif isinstance(item, SnsRebalanceResume):
                         logging.info('Requesting SNS rebalance resume')
-                        halink.resume_rebalance(item.fid)
+                        motr.resume_rebalance(item.fid)
                     elif isinstance(item, SnsRepairStart):
                         logging.info('Requesting SNS repair start')
-                        halink.start_repair(item.fid)
+                        motr.start_repair(item.fid)
                     elif isinstance(item, SnsRepairStop):
                         logging.info('Requesting SNS repair stop')
-                        halink.stop_repair(item.fid)
+                        motr.stop_repair(item.fid)
                     elif isinstance(item, SnsRepairPause):
                         logging.info('Requesting SNS repair pause')
-                        halink.pause_repair(item.fid)
+                        motr.pause_repair(item.fid)
                     elif isinstance(item, SnsRepairResume):
                         logging.info('Requesting SNS repair resume')
-                        halink.resume_repair(item.fid)
+                        motr.resume_repair(item.fid)
 
                     else:
                         logging.warning('Unsupported event type received: %s',

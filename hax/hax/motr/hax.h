@@ -61,9 +61,9 @@ struct hax_msg {
 	struct m0_ha_msg    hm_msg;
 };
 
-struct hax_context *init_halink(PyObject *obj, const char *node_uuid);
+struct hax_context *init_motr_api(PyObject *obj, const char *node_uuid);
 
-void destroy_halink(unsigned long long ctx);
+void destroy_motr_api(unsigned long long ctx);
 
 int start(unsigned long long ctx, const char *local_rpc_endpoint,
 	  const struct m0_fid *process_fid, const struct m0_fid *ha_service_fid,
