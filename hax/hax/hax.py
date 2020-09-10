@@ -98,13 +98,10 @@ def main():
                    ha_service=cfg.ha_fid,
                    rm_service=cfg.rm_fid)
         logging.info('Motr API has been started')
-        # FIXME XXX
-        # We are disabling filesystem stats fetch till we have
-        # clean fix for EOS-12405
-        # stats_updater = _run_stats_updater_thread(motr)
+        stats_updater = _run_stats_updater_thread(motr)
         # [KN] This is a blocking call. It will work until the program is
         # terminated by signal
-        run_server(q, herald, threads_to_wait=[consumer])
+        run_server(q, herald, threads_to_wait=[consumer, stats_updater])
     except Exception:
         logging.exception('Exiting due to an exception')
     finally:

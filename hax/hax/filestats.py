@@ -47,34 +47,32 @@ class FsStatsUpdater(StoppableThread):
             logging.info('filesystem stats updater thread has started')
             ffi.adopt_motr_thread()
             self._ensure_motr_all_started()
-            motr.start_rconfc()
-            logging.info('rconfc is initialized, FS stats can be polled now')
             while not self.stopped:
                 started = self._ioservices_running()
                 if not all(started):
                     continue
-                stats = motr.get_filesystem_stats()
-                logging.debug('FS stats are as follows: %s', stats)
-                now_time = datetime.datetime.now()
-                data = FsStatsWithTime(stats=stats,
-                                       timestamp=now_time.timestamp(),
-                                       date=now_time.isoformat())
-                try:
-                    self.consul.update_fs_stats(data)
-                except HAConsistencyException:
-                    logging.debug('Failed to update Consul KV '
-                                  'due to an intermittent error. The error is '
-                                  'swallowed since new attempts will be made '
-                                  'timely')
+                result: int = motr.start_rconfc()
+                if result == 0:
+                    stats = motr.get_filesystem_stats()
+                    motr.stop_rconfc()
+                    if not stats:
+                        continue
+                    logging.debug('FS stats are as follows: %s', stats)
+                    now_time = datetime.datetime.now()
+                    data = FsStatsWithTime(stats=stats,
+                                           timestamp=now_time.timestamp(),
+                                           date=now_time.isoformat())
+                    try:
+                        self.consul.update_fs_stats(data)
+                    except HAConsistencyException:
+                        logging.debug('Failed to update Consul KV '
+                                      'due to an intermittent error. The '
+                                      'error is swallowed since new attempts '
+                                      'will be made timely')
                 time.sleep(self.interval_sec)
         except Exception:
             logging.exception('Aborting due to an error')
         finally:
-            try:
-                motr.stop_rconfc()
-            except Exception:
-                logging.error('Failed to stop rconfc; the error is swallowed'
-                              ' to continue shutting down')
             logging.debug('Releasing motr-related resources for this thread')
             ffi.shun_motr_thread()
             logging.debug('filesystem stats updater thread exited')
