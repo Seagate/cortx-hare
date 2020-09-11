@@ -47,7 +47,7 @@ Commands:
   stop        Stop SNS re-balance procedure
   pause       Pause ongoing SNS re-balance procedure
   resume      Resume paused SNS re-balance procedure
-  progess     Return progress percentage of ongoning SNS re-balance procedure
+  status      Return status of ongoning SNS re-balance procedure, if any
   help        Show this help and exit.
 
 EOF
@@ -67,17 +67,22 @@ done
 case $cmd in
     help) usage; exit ;;
     start|stop|pause|resume)
-    payload=$(jq --null-input --compact-output \
-        --arg cmd_arg "$cmd" \
-        '{ cmd: $cmd_arg }')
-    h0q eq 'sns-rebalance' "$payload"
-    ;;
-    progess)
-    # Access HTTP API request to get percentage of re-balance operation
-    # This request is synchronous.
-    curl http://localhost:8008/api/v1/sns/rebalance-progress
-    # TODO: JSON is expected. Additional processing may be needed depending on
-    # output.
-    ;;
+        pool_fid=$(consul kv get m0conf/profiles/pools | awk '{print $1}')
+        payload=$(jq --null-input --compact-output \
+                     --arg cmd "$cmd" \
+                     --arg pool_fid "$pool_fid" \
+                     '{ cmd: $cmd, fid: $pool_fid }')
+        h0q eq 'sns-rebalance' "$payload"
+        ;;
+    status)
+        # TODO: take pool fid from agrument if provided, otherwise make sure
+        # a default SNS pool is fetched from Consul KV
+        pool_fid=$(consul kv get m0conf/profiles/pools | awk '{print $1}')
+        # Access HTTP API request to get percentage of re-balance operation
+        # This request is synchronous.
+        curl http://localhost:8008/api/v1/sns/rebalance-status?pool_fid=$pool_fid
+        # TODO: JSON is expected. Additional processing may be needed depending on
+        # output.
+        ;;
     *) die "Unknown command: '$cmd'" ;;
 esac

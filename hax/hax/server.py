@@ -20,22 +20,22 @@ import asyncio
 import logging
 from json.decoder import JSONDecodeError
 from queue import Queue
-from typing import Any, Callable, Dict, List
+from typing import Any, Callable, Dict, List, Type, Union
 
 from aiohttp import web
 from aiohttp.web import HTTPError, HTTPNotFound
 from aiohttp.web_response import json_response
 
 from hax.message import (BaseMessage, BroadcastHAStates, SnsDiskAttach,
-                         SnsDiskDetach, SnsRebalanceAbort, SnsRebalancePause,
-                         SnsRebalanceResume, SnsRebalanceStart, SnsRepairAbort,
+                         SnsDiskDetach, SnsRebalanceStop, SnsRebalancePause,
+                         SnsRebalanceResume, SnsRebalanceStart, SnsRepairStop,
                          SnsRepairPause, SnsRepairResume, SnsRepairStart,
-                         SnsRepairStatus)
+                         SnsRebalanceStatus, SnsRepairStatus)
 from hax.motr.delivery import DeliveryHerald
 from hax.queue import BQProcessor
 from hax.queue.offset import InboxFilter, OffsetStorage
 from hax.types import Fid, HAState, StoppableThread
-from hax.util import create_process_fid, dump_json
+from hax.util import create_process_fid, dump_json, ConsulUtil
 
 
 async def hello_reply(request):
@@ -91,17 +91,18 @@ def process_sns_operation(queue: Queue):
 
         msg_factory = {
             'rebalance-start': create_handler(SnsRebalanceStart),
-            'rebalance-abort': create_handler(SnsRebalanceAbort),
+            'rebalance-stop': create_handler(SnsRebalanceStop),
             'rebalance-pause': create_handler(SnsRebalancePause),
             'rebalance-resume': create_handler(SnsRebalanceResume),
             'repair-start': create_handler(SnsRepairStart),
-            'repair-abort': create_handler(SnsRepairAbort),
+            'repair-stop': create_handler(SnsRepairStop),
             'repair-pause': create_handler(SnsRepairPause),
             'repair-resume': create_handler(SnsRepairResume),
             'disk-attach': create_handler(SnsDiskAttach),
             'disk-detach': create_handler(SnsDiskDetach),
         }
 
+        logging.debug(f'process_sns_operation: {op_name}')
         if op_name not in msg_factory:
             raise HTTPNotFound()
         data = await request.json()
@@ -114,15 +115,19 @@ def process_sns_operation(queue: Queue):
     return _process
 
 
-def get_sns_status(motr_queue: Queue):
-    def fn():
+def get_sns_status(motr_queue: Queue,
+                   status_type: Union[Type[SnsRepairStatus],
+                                      Type[SnsRebalanceStatus]]):
+    def fn(request):
         queue = Queue(1)
-        motr_queue.put(SnsRepairStatus(reply_to=queue))
+        motr_queue.put(status_type(reply_to=queue,
+                                   fid=Fid.parse(request.query['pool_fid'])))
         return queue.get(timeout=10)
 
     async def _process(request):
+        logging.debug('%s with params: %s', request, request.query)
         loop = asyncio.get_event_loop()
-        payload = await loop.run_in_executor(None, fn)
+        payload = await loop.run_in_executor(None, fn, request)
         return json_response(data=payload, dumps=dump_json)
 
     return _process
@@ -180,12 +185,17 @@ def run_server(
     threads_to_wait: List[StoppableThread] = [],
     port=8008,
 ):
+    node_address = ConsulUtil().get_hax_ip_address()
+
     # Bind to ANY interface so scripts can use localhost to send requests
     # FIXME: This introduces security related concerns since hax becomes
     # available from network.
-    addr = '0.0.0.0'
+    web_address = '0.0.0.0'
+
+    # Note that bq-delivered mechanism must use a unique node name rather than
+    # broad '0.0.0.0' that doesn't identify the node from outside.
     inbox_filter = InboxFilter(
-        OffsetStorage(addr, key_prefix='queue-offsets/bq'))
+        OffsetStorage(node_address, key_prefix='bq-delivered'))
 
     app = web.Application(middlewares=[encode_exception])
     app.add_routes([
@@ -194,11 +204,14 @@ def run_server(
         web.post('/watcher/bq',
                  process_bq_update(inbox_filter, BQProcessor(queue, herald))),
         web.post('/api/v1/sns/{operation}', process_sns_operation(queue)),
-        web.get('/api/v1/sns/rebalance-progress', get_sns_status(queue)),
+        web.get('/api/v1/sns/repair-status',
+                get_sns_status(queue, SnsRepairStatus)),
+        web.get('/api/v1/sns/rebalance-status',
+                get_sns_status(queue, SnsRebalanceStatus)),
     ])
-    logging.info(f'Starting HTTP server at {addr}:{port} ...')
+    logging.info(f'Starting HTTP server at {web_address}:{port} ...')
     try:
-        web.run_app(app, host=addr, port=port)
+        web.run_app(app, host=web_address, port=port)
         logging.debug('Server stopped normally')
     finally:
         logging.debug('Stopping the threads')

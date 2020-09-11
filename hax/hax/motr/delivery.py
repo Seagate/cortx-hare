@@ -68,7 +68,7 @@ class DeliveryHerald:
             del self.recently_delivered[promise]
 
     def notify_delivered(self, message_id: MessageId):
-        # [KN] This function is expected to be called from HaLink.
+        # [KN] This function is expected to be called from Motr.
         with self.lock:
             for promise, client in self.waiting_clients.items():
                 if message_id in promise:

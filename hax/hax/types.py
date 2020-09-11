@@ -147,6 +147,7 @@ FsStatsWithTime = NamedTuple('FsStatsWithTime', [('stats', FsStats),
                                                  ('date', str)])
 
 
+# enum m0_cm_status
 class SnsCmStatus(Enum):
     CM_STATUS_INVALID = 0
     CM_STATUS_IDLE = 1
@@ -155,9 +156,10 @@ class SnsCmStatus(Enum):
     CM_STATUS_PAUSED = 4
 
 
-ReprebStatus = NamedTuple('ReprebStatus', [('srs_fid', Fid),
-                                           ('srs_state', SnsCmStatus),
-                                           ('srs_progress', c.c_uint32)])
+# struct m0_spiel_repreb_status
+ReprebStatus = NamedTuple('ReprebStatus', [('fid', Fid),
+                                           ('state', SnsCmStatus),
+                                           ('progress', int)])
 
 HaNote = NamedTuple('HaNote', [('obj_t', str), ('note', HaNoteStruct)])
 
@@ -174,9 +176,9 @@ StobIoqError = NamedTuple('StobIoqError',
                            ('sie_offset', int), ('sie_size', int),
                            ('sie_bshift', int)])
 
-SnsRepairStatusItem = NamedTuple('SnsRepairStatusItem', [('fid', Fid),
-                                                         ('status', str),
-                                                         ('progress', int)])
+# SnsRepairStatusItem = NamedTuple('SnsRepairStatusItem', [('fid', Fid),
+#                                                          ('status', str),
+#                                                          ('progress', int)])
 
 
 class StoppableThread(Thread):
