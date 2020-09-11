@@ -188,7 +188,7 @@ eval set -- "$TEMP"
 conf_dir=
 opt_mkfs=
 debug_p=false
-local_only=
+local_only=false
 
 while true; do
     case "$1" in
@@ -205,6 +205,7 @@ done
 case $# in
     0) [[ -d $conf_dir ]] || die "'--conf-dir' argument is not a directory";;
     1) [[ -z $conf_dir ]] || { usage >&2; exit 1; };;
+    *) die 'Too many arguments';;  # unreachable (ruled out by getopt)
 esac
 
 $debug_p && set -x
@@ -253,8 +254,8 @@ EOF
             # In order to start services on a single node, in case of node reboot,
             # consul-kv.json and consul-agents.json are replicated to peer nodes
             # so that hctl bootstrap node can be run from rebooted node as well.
-            scp $conf_dir/consul-kv.json $node:$conf_dir 1>/dev/null
-            scp $conf_dir/consul-agents.json $node:$conf_dir 1>/dev/null
+            scp -q $conf_dir/consul-kv.json $node:$conf_dir
+            scp -q $conf_dir/consul-agents.json $node:$conf_dir
         fi
     done < <(get_all_nodes)
 
@@ -266,8 +267,8 @@ abort_if_RC_leader_election_is_impossible
 # Get my IP address (the one that the other agents will join to).
 read _ join_ip <<< $(get_server_nodes | grep -w $(node-name))
 
-# If a primary node reboots, on startup of local Consul service, the node needs
-# to join its peers in the cluster.
+# If a primary node reboots, the local Consul agent needs to join its peers
+# in the cluster.
 read _ join_peers <<< $(get_server_nodes | grep -vw $(node-name))
 
 if [[ -z $join_ip ]]; then
@@ -285,12 +286,9 @@ say 'Starting Consul server agent on this node...'
 # command is executed.
 bootstrap_expect=true
 while read node bind_ip; do
-    if [[ $bootstrap_expect && ($node == $(node-name)) ]]; then
-        # $join_ip is our bind_ip address
+    if [[ $node == $(node-name) ]]; then
         mk-consul-env --mode server --bind $join_ip --join $join_peers \
-                      --extra-options '-ui -bootstrap-expect 1'
-    elif [[ $node == $(node-name) ]]; then
-        mk-consul-env --mode server --bind $join_ip --join $join_peers
+            ${bootstrap_expect:+--extra-options '-ui -bootstrap-expect 1'}
     fi
     # bootstrap_expect parameter is set for the first node of the cluster only.
     bootstrap_expect=
@@ -300,7 +298,7 @@ sudo systemctl start hare-consul-agent
 
 # Wait for Consul's internal leader to be ready.
 # (Until then the KV store won't be accessible.)
-# Here we are checking if any of the peer nodes is elected as a leader. This
+# Here we are checking if any of the peer nodes is elected as the leader. This
 # is required in case of node reboots and starting services only on a given
 # node.
 while read node bind_ip; do
@@ -320,7 +318,7 @@ echo ' OK'
 
 say 'Starting Consul agents on other cluster nodes...'
 pids=()
-if [[ ! $local_only ]]; then
+if ! $local_only; then
     while read node bind_ip; do
         ssh $node "PATH=$PATH $(which mk-consul-env) \
                               --mode server --bind $bind_ip --join $join_ip &&
@@ -329,7 +327,7 @@ if [[ ! $local_only ]]; then
     done < <(get_server_nodes | grep -vw $(node-name) || true)
 fi
 
-if [[ ! $local_only ]]; then
+if ! $local_only; then
     while read node bind_ip; do
         ssh $node "PATH=$PATH $(which mk-consul-env) \
                               --mode client --bind $bind_ip --join $join_ip &&
@@ -375,7 +373,7 @@ echo ' OK'
 say 'Updating Consul agents configs from the KV store...'
 update-consul-conf &
 pids=($!)
-if [[ ! $local_only ]]; then
+if ! $local_only; then
     while read node _; do
         ssh $node "PATH=$PATH $(which update-consul-conf)" &
         pids+=($!)
@@ -424,7 +422,7 @@ start_motr() {
     bootstrap-node $op --phase $phase &
     pids=($!)
 
-    if [[ ! $local_only ]]; then
+    if ! $local_only; then
         while read node _; do
             ssh $node "PATH=$PATH $(which bootstrap-node) $op --phase $phase" &
             pids+=($!)

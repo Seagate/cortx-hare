@@ -1,0 +1,348 @@
+#!/usr/bin/env bash
+#
+# Copyright (c) 2020 Seagate Technology LLC and/or its Affiliates
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# For any questions about this software or licensing,
+# please email opensource@seagate.com or cortx-questions@seagate.com.
+
+set -eu -o pipefail
+# set -x
+export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
+
+# :help: bootstrap the cluster
+
+PROG=${0##*/}
+
+usage() {
+    cat <<EOF
+Usage: $PROG [<option>]... <CDF>
+       $PROG [<option>]... --conf-dir <dir>
+
+Bootstrap the cluster.
+
+Positional arguments:
+  <CDF>                        Path to the cluster description file.
+  -c, --conf-dir <dir>         Don't generate configuration files, use existing
+                               ones from the specified directory.
+  --conf-create                Re-create configuration on this node.
+  --consul-addr  <consul-addr> Active Consul server address.
+  --consul-port  <consul-port> Active Consul server port.
+Options:
+  -h, --help    Show this help and exit.
+EOF
+}
+
+CONSUL_ADDR=127.0.0.1
+CONSUL_PORT=8500
+
+die() {
+    echo "$PROG: $*" >&2
+    exit 1
+}
+
+say() {
+    echo -n "$(date '+%F %T'): $*"
+}
+
+get_server_nodes() {
+    curl -s http://$CONSUL_ADDR:$CONSUL_PORT/v1/catalog/nodes?service=confd | \
+        jq -r .[].Node
+}
+
+get_client_nodes() {
+    server_nodes=$(get_server_nodes)
+    curl -s http://$CONSUL_ADDR:$CONSUL_PORT/v1/catalog/nodes?service=ioservice | \
+        jq -r .[].Node | grep -vw $server_node
+}
+
+get_servers_from_conf() {
+    jq -r '.servers[] | "\(.node_name) \(.ipaddr)"' \
+       $conf_dir/consul-agents.json
+}
+
+get_clients_from_conf() {
+    jq -r '.clients[] | "\(.node_name) \(.ipaddr)"' \
+       $conf_dir/consul-agents.json
+}
+
+get_all_nodes_from_conf() {
+    jq -r '(.servers + .clients)[] | "\(.node_name) \(.ipaddr)"' \
+        $conf_dir/consul-agents.json
+}
+
+get_all_nodes() {
+    curl -s http://$CONSUL_ADDR:$CONSUL_PORT/v1/catalog/nodes | jq -r .[].Node
+}
+
+get_session() {
+    curl -s http://$CONSUL_ADDR:$CONSUL_PORT/v1/kv/leader?detailed | jq -r .[].Session
+}
+
+get_session_checks_nr() {
+    local sid=$1
+    curl -sX GET http://$CONSUL_ADDR:$CONSUL_PORT/v1/session/info/$sid |
+        jq -r '.[].Checks|length'
+}
+
+get_leader() {
+    curl -sX GET http://$CONSUL_ADDR:$CONSUL_PORT/v1/leader
+}
+
+wait4() {
+    for pid in $*; do
+        wait $pid
+    done
+}
+
+get_ready_agents() {
+    curl -s http://$CONSUL_ADDR:$CONSUL_PORT/v1/agent/members | jq -r .[].Name
+}
+
+get_ready_agents_nr() {
+    curl -s http://$CONSUL_ADDR:$CONSUL_PORT/v1/agent/members | jq -r .[].Name | wc -l
+}
+
+wait_rc_leader() {
+    local count=1
+    while [[ $(get_session) == '-' ]]; do
+        if (( $count > 5 )); then
+            consul kv put leader elect$RANDOM > /dev/null
+            count=1
+        fi
+        sleep 1
+        echo -n '.'
+        (( count++ ))
+    done
+}
+
+# --------------------------------------------------------------------
+# main
+
+TEMP=$(getopt --options hc: \
+              --longoptions help,conf-dir:,consul-addr:,consul-port:,conf-create,debug, \
+              --name "$PROG" -- "$@" || true)
+
+(($? == 0)) || { usage >&2; exit 1; }
+
+eval set -- "$TEMP"
+
+conf_dir=
+debug_p=false
+conf_create=false
+
+while true; do
+    case "$1" in
+        -h|--help)      usage; exit ;;
+        -c|--conf-dir)  conf_dir=$2; shift 2 ;;
+        --consul-addr)  CONSUL_ADDR=$2 shift 2 ;;
+        --consul-port)  CONSUL_PORT=$2 shift 2 ;;
+        --conf-create)  conf_create=true; shift ;; 
+        --)             shift; break ;;
+        *)              break ;;
+    esac
+done
+
+case $# in
+    0) [[ -d $conf_dir ]] || die "'--conf-dir' argument is not a directory";;
+    1) [[ -z $conf_dir ]] || { usage >&2; exit 1; };;
+    *) die 'Too many arguments';;  # unreachable (ruled out by getopt)
+esac
+
+$debug_p && set -x
+
+cdf=${1:-}
+
+if sudo systemctl --quiet is-active hare-consul-agent; then
+    die 'hare-consul-agent is active ==> cluster is already running'
+fi
+
+
+if [[ -z $conf_dir ]]; then
+    conf_dir=/var/lib/hare
+
+    if ! [[ -d $conf_dir ]]; then
+        cat <<EOF >&2
+$conf_dir directory does not exist.
+Try reinstalling Hare.
+EOF
+        exit 1
+    fi
+    if ! [[ -w $conf_dir ]]; then
+        cat <<EOF >&2
+Cannot write to $conf_dir directory.
+
+Did you forget to add current user ($USER) to 'hare' group?
+If so, run
+    sudo usermod --append --groups hare $USER
+then re-login and try to bootstrap again.
+EOF
+        exit 1
+    fi
+
+    if $conf_create; then
+        say 'Generating node configuration...'
+        while read node _; do
+            PATH="$(dirname $(readlink -f $0)):$PATH" cfgen -o $conf_dir $cdf
+            dhall text < $conf_dir/confd.dhall | m0confgen > $conf_dir/confd.xc
+            echo $node > $conf_dir/node-name
+        done < <(get_all_nodes)
+        echo ' OK'
+   fi
+fi
+
+# If a primary node reboots, the local Consul agent needs to join its peers
+# in the cluster.
+make_consul_env() {
+    read _ join_ip <<< $(get_servers_from_conf | grep -w $(node-name))
+    read _ join_peers <<< $(get_servers_from_conf | grep -vw $(node-name))
+    while read node bind_ip; do
+        if [[ $node == $(node-name) ]]; then
+            mk-consul-env --mode server --bind $join_ip --join $join_peers
+        fi
+    done < <(get_servers_from_conf)
+}
+
+say 'Starting Consul server agent on this node...'
+# Create Consul env only for this node.
+if [[ $conf_create ]]; then
+    make_consul_env
+fi
+
+sudo systemctl start hare-consul-agent
+
+# Wait for Consul's internal leader to be ready.
+# (Until then the KV store won't be accessible.)
+# Here we are checking if any of the peer nodes is already elected as the
+# leader. This is required in case of node reboots and starting services
+# only on a given node.
+while ! $(get_leader); do
+    sleep 1
+    echo -n '.'
+done
+echo ' OK'
+
+pids=()
+# This check is to account if all the Consul agents have started or not.
+# In case of a single node startup, total pids may not match the total
+# number of Consul agents. So we explicitly fetch the pids for all the
+# agents and check if the number of started agents matches the expected
+# number of total Consul agents in the cluster.
+while read node; do
+    pids+=$(ssh $node 'pidof consul')
+done < <(get_server_nodes | grep -vw $(node-name) || true)
+agents_nr=$(( ${#pids[@]} + 1 ))
+
+# Waiting for the agents to get ready...
+count=1
+while (( $(get_ready_agents_nr) != $agents_nr )); do
+    if (( $count > 5 )); then
+        echo 'Some agent(s) failed to start in due time:' >&2
+        diff <(get_ready_agents | sort) \
+             <(get_all_nodes | awk '{print $1}' | sort) | sed 1d >&2
+        echo 'Check connectivity and firewall (Consul ports must be opened)' >&2
+        exit 1
+    fi
+    echo -n '.'
+    sleep 1
+    (( count++ ))
+done
+echo ' OK'
+
+say 'Updating Consul agents configs from the KV store...'
+if [[ $conf_create ]]; then
+    update-consul-conf &
+    pids=($!)
+fi
+
+say 'Waiting for the RC Leader to get elected...'
+wait_rc_leader
+sid=$(get_session)
+# There is always the serfHealth check in the session. But
+# if it is the only one - we should destroy the current session
+# (and wait for re-election to happen) to make sure that the new
+# session will be bound to the Motr services checks also.
+while (( $(get_session_checks_nr $sid) == 1 )); do
+    curl -sX PUT http://localhost:8500/v1/session/destroy/$sid &>/dev/null
+    wait_rc_leader
+    sid=$(get_session)
+done
+echo ' OK'
+
+get_nodes() {
+    local phase=$1
+
+    if [[ $phase == phase1 ]]; then
+        # Note: confd-s are running on server nodes only.
+        get_server_nodes
+    else
+        get_all_nodes
+    fi
+}
+
+start_motr() {
+    local op=$1
+    local phase=$2
+
+    say "Starting Motr ($phase, $op)..."
+    bootstrap-node $op --phase $phase &
+    pids=($!)
+    wait4 ${pids[@]}
+    echo ' OK'
+}
+
+# Start Motr in two phases: 1st confd-s, then ios-es.
+bootstrap_nodes() {
+    local phase=$1
+    start_motr 'm0d' $phase
+}
+
+# Start confds first
+bootstrap_nodes phase1
+
+# Start ioservices
+bootstrap_nodes phase2
+
+. update-consul-conf --dry-run  # import S3_IDs
+if [[ -n $S3_IDs ]]; then
+    # Now the 3rd phase (s3servers).
+    say 'Starting S3 servers (phase3)...'
+    bootstrap-node --phase phase3 &
+    pids=($!)
+    wait4 ${pids[@]}
+    echo ' OK'
+fi
+
+say 'Checking health of services...'
+check_service() {
+    local svc=$1
+    curl -s http://127.0.0.1:8500/v1/health/service/$svc |
+        jq -r '.[] | "\(.Node.Node) \([.Checks[].Status]|unique)"' |
+        fgrep -v '["passing"]' || true
+}
+count=1
+for svc in confd ios s3service; do
+    svc_not_ready=$(check_service $svc)
+    while [[ $svc_not_ready ]]; do
+        if (( $count > 30 )); then
+            echo $svc_not_ready >&2
+            echo "Check '$svc' service on the node(s) listed above." >&2
+            exit 1
+        fi
+        (( count++ ))
+        sleep 1
+        svc_not_ready=$(check_service $svc)
+    done
+done
+echo ' OK'
