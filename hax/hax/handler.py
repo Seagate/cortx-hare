@@ -109,7 +109,7 @@ class ConsumerThread(StoppableThread):
                         logging.info('Stob IOQ: %s', item.fid)
                         payload = dump_json(item)
                         logging.debug('Stob IOQ JSON: %s', payload)
-                        offset = self.eq_publisher.publish('STOB_IOQ', payload)
+                        offset = self.eq_publisher.publish('stob-ioq', payload)
                         logging.debug('Written to epoch: %s', offset)
                     elif isinstance(item, SnsRepairStatus):
                         logging.info('Requesting SNS repair status')

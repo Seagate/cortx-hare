@@ -99,7 +99,7 @@ class Fid:
         self.key = key
 
     @staticmethod
-    def parse(val: str):
+    def parse(val: str) -> 'Fid':
         cont, key = tuple(int(s, 16) for s in val.split(':', 1))
         return Fid(cont, key)
 
@@ -107,11 +107,14 @@ class Fid:
     def from_struct(val: FidStruct):
         return Fid(val.f_container, val.f_key)
 
-    def to_c(self):
+    def to_c(self) -> FidStruct:
         return FidStruct(self.container, self.key)
 
-    def get_copy(self):
+    def get_copy(self) -> 'Fid':
         return Fid(self.container, self.key)
+
+    def is_null(self) -> bool:
+        return self.container == 0 and self.key == 0
 
     def __repr__(self):
         return f'{self.container:#x}:{self.key:#x}'
@@ -166,15 +169,14 @@ HaNote = NamedTuple('HaNote', [('obj_t', str), ('note', HaNoteStruct)])
 HAState = NamedTuple('HAState', [('fid', Fid), ('status', str)])
 
 # struct m0_stob_id
-StobId = NamedTuple('StobId', [('si_domain_fid', Fid), ('si_fid', Fid)])
+StobId = NamedTuple('StobId', [('domain_fid', Fid), ('fid', Fid)])
 
 # struct m0_stob_ioq_error
-StobIoqError = NamedTuple('StobIoqError',
-                          [('fid', Fid), ('sie_conf_sdev', Fid),
-                           ('sie_stob_id', StobId), ('sie_fd', int),
-                           ('sie_opcode', int), ('sie_rc', int),
-                           ('sie_offset', int), ('sie_size', int),
-                           ('sie_bshift', int)])
+StobIoqError = NamedTuple('StobIoqError', [('fid', Fid), ('conf_sdev', Fid),
+                                           ('stob_id', StobId), ('fd', int),
+                                           ('opcode', int), ('rc', int),
+                                           ('offset', int), ('size', int),
+                                           ('bshift', int)])
 
 # SnsRepairStatusItem = NamedTuple('SnsRepairStatusItem', [('fid', Fid),
 #                                                          ('status', str),
