@@ -50,6 +50,7 @@ class FsStatsUpdater(StoppableThread):
             while not self.stopped:
                 started = self._ioservices_running()
                 if not all(started):
+                    time.sleep(self.interval_sec)
                     continue
                 result: int = motr.start_rconfc()
                 if result == 0:
@@ -85,6 +86,8 @@ class FsStatsUpdater(StoppableThread):
 
     def _ensure_motr_all_started(self):
         while True:
+            if self.stopped:
+                return
             started = self._ioservices_running()
             if all(started):
                 logging.debug(
