@@ -16,9 +16,9 @@ Hare implementation uses [Consul](https://www.consul.io) key-value store and oth
 
 <!------------------------------------------------------------------->
 
-## Getting Hare
+## Installing Hare
 
-cortx-hare depends on cortx-motr libraries. Therefore, a correct version of
+Cortx-hare depends on cortx-motr libraries. Therefore, a correct version of
 cotrx-motr must be installed for proper operation. cotrx-motr can be either
 installed from packages of build from sources.
 
