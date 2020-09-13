@@ -38,16 +38,7 @@ This document provides detailed information on the installation of Hare componen
    
    sudo make devinstall
 
-## 1. Single-node setup
-
-1. Build and install Hare:
-   ```sh
-   # Run from cortx-hare directory
-   make
-   sudo make devinstall
-   ```
-
-2. Add current user to `hare` group.
+* Add current user to `hare` group.
    ```sh
    sudo usermod --append --groups hare $USER
    ```
