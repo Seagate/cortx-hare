@@ -201,14 +201,16 @@ hctl bootstrap --mkfs /tmp/trinodes.yaml
 hctl status
 ```
 
-### 3.8. Configure S3 client
+### Configure S3 client
 
-* We deploy manually, so there is no Cluster IP.  The workaround:
+1. Deployment happens manually, so there is no Cluster IP. Hence, run the following command.
+
   ```sh
   sudo tee -a /etc/hosts <<< '<IP address of node-1> s3.seagate.com'
   ```
 
-* Configure S3 client: <!-- XXX Which file should this data be put in? -->
+2. Configure S3 client: <!-- XXX Which file should this data be put in? -->
+
   ```
   Access Key: anything
   Secret Key: anything
@@ -224,7 +226,8 @@ hctl status
   `HTTP Proxy server name` field should be set to the IP address of
   the primary node.
 
-  Now execute
+3. Run the following command.
+
   ```sh
   s3cmd --configure
   ```
