@@ -4,7 +4,7 @@ This document provides detailed information on the installation of Hare componen
 
 ## Prerequisites
 
-* Repository must be cloned along with all submodules using the below mentioned commands. Refer [Link to readme.](README.md#get-source-code)
+* Repository must be cloned along with all submodules using the below mentioned commands. Refer [Readme](README.md#get-source-code)
 
     `git clone --recursive https://github.com/Seagate/cortx-hare.git`
     
@@ -18,7 +18,7 @@ This document provides detailed information on the installation of Hare componen
 
 * The `cortx-motr` and `cortx-motr-devel` RPMs must be installed.
 
-* Alternatively, Motr can be compiled and installed from sources:
+* Alternatively, Motr can be compiled and installed from the source.
   ```sh
   git clone --recursive https://github.com/Seagate/cortx-motr.git motr
   cd motr
