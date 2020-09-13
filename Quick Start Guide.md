@@ -42,51 +42,13 @@ This document provides detailed information on the installation of Hare componen
    
    `sudo usermod --append --groups hare $USER`
    
-   
-
-3. Edit `cfgen/examples/singlenode.yaml` file.
-
-   * Ensure that the disks enumerated in the `io_disks` list exist.
-     Create loop devices, if necessary:
-     ```bash
-     sudo mkdir -p /var/motr
-     for i in {0..9}; do
-         sudo dd if=/dev/zero of=/var/motr/disk$i.img bs=1M seek=9999 count=1
-         sudo losetup /dev/loop$i /var/motr/disk$i.img
-     done
-     ```
-
-   * Make sure that `data_iface` value refers to existing network
-     interface (it should be present in the output of `ip a` command).
-
-4. Configure LNet
-
-* Execute these commands (assuming Motr uses `eth0` network interface):
-  ```bash
-  sudo tee /etc/modprobe.d/lnet.conf <<< \
-      'options lnet networks=tcp(eth0) config_on_load=1'
-  ```
-
-5. Start the cluster.
-   ```sh
-   hctl bootstrap --mkfs cfgen/examples/singlenode.yaml
-   ```
-
-## 2. Test I/O
-
-```sh
-utils/m0crate-io-conf >/tmp/m0crate-io.yaml
-dd if=/dev/urandom of=/tmp/128M bs=1M count=128
-sudo $M0_SRC_DIR/clovis/m0crate/m0crate -S /tmp/m0crate-io.yaml
-```
-
-## 3. 3-node SSC VM setup
+## 3-node SSC VM setup
 
 <!-- XXX Why do we need this section at all?
   -- Is section '4. Multi-node setup' not enough?
   -->
 
-### 3.1. Create VMs
+### Create VMs
 
 * Login to [Red Hat CloudForms](https://ssc-cloud.colo.seagate.com)
   (aka SSC) using your Seagate GID and password.
