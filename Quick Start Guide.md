@@ -2,10 +2,11 @@
 
 This document provides detailed information on the installation of Hare component.
 
-## 0. Prerequisites
+## Prerequisites
 
-* Repository is cloned along with all submodules. [Link to readme.](README.md#get-source-code)
-  Quick clone from Seagate repo: `git clone --recursive https://github.com/Seagate/cortx-hare.git`
+* Repository must be cloned along with all submodules using the below mentioned command. Refer [Link to readme.](README.md#get-source-code)
+
+  *  `git clone --recursive https://github.com/Seagate/cortx-hare.git`
 
 * Python &geq; 3.6 and the corresponding header files.
 
