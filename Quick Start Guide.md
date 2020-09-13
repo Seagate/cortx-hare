@@ -229,7 +229,9 @@ hctl status
   s3cmd --configure
   ```
 
-### 3.8. Test S3 I/O
+### Test S3 I/O
+
+The testing of S3 I/O is mentioned below.
 
 ```sh
 (set -eu
@@ -241,17 +243,6 @@ s3cmd get s3://testbkt/$fn /tmp/$fn
 cmp /root/$fn /tmp/$fn || echo '**ERROR** S3 I/O test failed' >&2
 )
 ```
-
-## 4. Multi-node setup
-
-For multi-node cluster the steps are similar to
-[those of single-node](#1-single-node-setup).
-Steps 1–2 should be performed on each of the nodes.  The bootstrap
-command may be executed on any server node (i.e., on any of the nodes
-configured to run confd).
-
-Use `cfgen/examples/ees-cluster.yaml`, which describes a dual-node cluster,
-as an example.
 
 ## Observe
 
