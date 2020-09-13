@@ -125,14 +125,15 @@ Execute `m0setup` on all nodes.
   ```
   The output should not be empty.
 
-### 3.5. Prepare SSH keys
+### Prepare SSH keys
 
-Execute these commands on the primary node (node-1):
-```sh
-ssh-keygen
-ssh-copy-id <hostname of node-2>
-ssh-copy-id <hostname of node-3>
-```
+Run the below mentioned commands on the primary node (node-1).
+
+* `ssh-keygen`
+
+* `ssh-copy-id <hostname of node-2>`
+
+* `ssh-copy-id <hostname of node-3>`
 
 ### Prepare the CDF
 
