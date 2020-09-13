@@ -1,6 +1,4 @@
-# Hare User Guide
-
-## Welcome
+# Hare
 
 Hare is an experiment in
 [Social Architecture](https://www.youtube.com/watch?v=uj-li0LO_2g),
