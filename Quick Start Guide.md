@@ -188,18 +188,20 @@ EOF
 )
 ```
 
-### 3.7. Disable S3 authentication
+### Disable S3 Authentication
 
-```sh
-/opt/seagate/eos/hare/libexec/s3auth-disable
-```
+Run the below mentioned command to disable S3 authentication.
 
-### 3.8. Bootstrap the cluster
+* `/opt/seagate/eos/hare/libexec/s3auth-disable`
 
-```sh
-hctl bootstrap --mkfs /tmp/trinodes.yaml
-hctl status
-```
+
+### Bootstrap the cluster
+
+Run the below mentioned commands to bootstrap the cluster.
+
+* `hctl bootstrap --mkfs /tmp/trinodes.yaml`
+
+* `hctl status`
 
 ### Configure S3 client
 
