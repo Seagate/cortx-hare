@@ -127,7 +127,7 @@ Execute `m0setup` on all nodes.
 
 ### Prepare SSH keys
 
-Run the below mentioned commands on the primary node (node-1).
+Run the below mentioned commands on the primary node (node-1) to generate SSH Keys.
 
 * `ssh-keygen`
 
