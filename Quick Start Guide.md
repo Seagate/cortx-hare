@@ -1,25 +1,24 @@
-# Hare Developer Guide
+# Quick Start Guide
 
-**Note:** Some of the steps below require access to Seagate infrastructure.
+This document provides detailed information on the installation of Hare component.
 
-<!------------------------------------------------------------------->
-## Installation
+## Prerequisites
 
-* Download Hare with submodules.
-  ```sh
-  git clone --recursive https://github.com/Seagate/cortx-hare.git hare
-  cd hare
-  ```
+* Repository must be cloned along with all submodules using the below mentioned commands. Refer [Readme](README.md#get-source-code).
 
-* Install the dependencies: Python (≥ 3.6), libraries and header files
-  needed to compile Python extensions.
-  ```sh
-  sudo yum install python3 python3-devel
-  ```
+    `git clone --recursive https://github.com/Seagate/cortx-hare.git`
+    
+    `cd hare`
+  
+* Python &geq; 3.6 and the corresponding header files. Run the below mentioned command to install the same.
 
-* Install `cortx-motr` and `cortx-motr-devel` RPMs.
+   `sudo yum install python3 python3-devel`
 
-* Alternatively, you can build and install Motr from sources:
+* CentOS 7 must be available.
+
+* The `cortx-motr` and `cortx-motr-devel` RPMs must be installed.
+
+* Alternatively, Motr can be compiled and installed from the source.
   ```sh
   git clone --recursive https://github.com/Seagate/cortx-motr.git motr
   cd motr
@@ -31,20 +30,18 @@
   cd -
   ```
   See [Motr Quick Start Guide](https://github.com/Seagate/cortx-motr/blob/dev/doc/Quick-Start-Guide.rst#building-the-source-code) for more details.
+      
+* Build and install Hare by running the below mentioned commands from the cortx-hare directory. 
+   ```sh
+   
+   make
+   
+   sudo make devinstall
 
-* Build and install Hare.
-  ```sh
-  make
-  sudo make devinstall
-  ```
-
-* Add current user to `hare` group.
-  ```sh
-  sudo usermod --append --groups hare $USER
-  ```
-  Log out and log back in.
-
-<!------------------------------------------------------------------->
+* Run the below mentioned command to add current user to `hare` group. Then, log out and log in.
+   
+   `sudo usermod --append --groups hare $USER`
+   
 ## 3-node SSC VM setup
 
 <!-- XXX Why do we need this section at all?
@@ -68,8 +65,8 @@
 
 ### Install RPMs
 
-  Run the following code snippet on every node (VM):
-  ```bash
+Run the following code snippet on every node (VM).
+ ```bash
   (set -eu
 
   if ! rpm -q cortx-hare cortx-s3server; then
@@ -88,41 +85,44 @@
   )
   ```
 
-### Set up loop devices
+### Loop Devices
 
-Run `m0setup` on all nodes.
+Execute `m0setup` on all nodes to setup loop devices.
 
 ### Configure LNet
 
-* Execute these commands on every node (assuming Motr uses `eth0`
-  network interface):
+Perform the procedure mentioned below to configure LNet.
+
+1. Run the below mentioned commands on each node (assuming Motr uses `eth0`
+  network interface).
   ```bash
   sudo tee /etc/modprobe.d/lnet.conf <<< \
       'options lnet networks=tcp(eth0) config_on_load=1'
   sudo systemctl start lnet
   ```
 
-* Check that LNet works:
-  ```sh
-  sudo lctl list_nids
-  ```
-  The output should not be empty.
+2. Run the below mentioned command to ensure that LNet works.
+  
+     `sudo lctl list_nids`
+  
+      The output should not be empty.
 
 ### Prepare SSH keys
 
-Execute these commands on the primary node (node-1):
-```sh
-ssh-keygen
-ssh-copy-id <hostname of node-2>
-ssh-copy-id <hostname of node-3>
-```
+Run the below mentioned commands on the primary node (node-1) to generate SSH Keys.
+
+* `ssh-keygen`
+
+* `ssh-copy-id <hostname of node-2>`
+
+* `ssh-copy-id <hostname of node-3>`
 
 ### Prepare the CDF
 
 The code snippet below will create the cluster description file (CDF).
 You may want to update `OUT`, `NODES`, and `IFACE` values prior to
 running the code.  The value of `IFACE` should correspond to the one
-from [Configure LNet](#configure-lnet) step.
+from [Configure LNet](#configure-lnet) section.
 
 ```bash
 (set -eu
@@ -171,27 +171,31 @@ EOF
 )
 ```
 
-### Disable S3 authentication
+### Disable S3 Authentication
 
-```sh
-/opt/seagate/eos/hare/libexec/s3auth-disable
-```
+Run the below mentioned command to disable S3 authentication.
+
+* `/opt/seagate/eos/hare/libexec/s3auth-disable`
+
 
 ### Bootstrap the cluster
 
-```sh
-hctl bootstrap --mkfs /tmp/trinodes.yaml
-hctl status
-```
+Run the below mentioned commands to bootstrap the cluster.
+
+* `hctl bootstrap --mkfs /tmp/trinodes.yaml`
+
+* `hctl status`
 
 ### Configure S3 client
 
-* We deploy manually, so there is no Cluster IP.  The workaround:
-  ```sh
-  sudo tee -a /etc/hosts <<< '<IP address of node-1> s3.seagate.com'
-  ```
+1. Deployment happens manually, so there is no Cluster IP. Hence, run the following command.
 
-* Configure S3 client: <!-- XXX Which file should this data be put in? -->
+  
+   `sudo tee -a /etc/hosts <<< '<IP address of node-1> s3.seagate.com'`
+ 
+
+2. Configure the S3 client based on the data below.<!-- XXX Which file should this data be put in? -->
+
   ```
   Access Key: anything
   Secret Key: anything
@@ -204,15 +208,16 @@ hctl status
   HTTP Proxy server name: <IP address of node-1>
   HTTP Proxy server port: 28081
   ```
-  `HTTP Proxy server name` field should be set to the IP address of
-  the primary node.
-
-  Now execute
-  ```sh
-  s3cmd --configure
-  ```
+  The `HTTP Proxy server name` field should be set to the IP address of the primary node.
+  
+3. Run the following command.
+ 
+    `s3cmd --configure`
+ 
 
 ### Test S3 I/O
+
+The testing of S3 I/O is mentioned below.
 
 ```sh
 (set -eu
@@ -225,15 +230,18 @@ cmp /root/$fn /tmp/$fn || echo '**ERROR** S3 I/O test failed' >&2
 )
 ```
 
-<!------------------------------------------------------------------->
 ## Observe
 
 ### Consul web UI
 
 To view the [Consul UI](https://learn.hashicorp.com/consul/getting-started/ui#set-up-access-to-the-ui),
-open `http://<vm-ip-address>:8500/ui` URL in your browser.
+open the below mentioned URL in your browser.
+
+* `http://<vm-ip-address>:8500/ui`
 
 ### The RC leader
+
+The RC leader election related information can be viewed below.
 
 ```
 $ consul kv get -detailed leader
@@ -246,30 +254,26 @@ Session          d5f3f364-6f79-48cd-b452-913321b2c743
 Value            sage75
 ```
 
-**Note:** The presence of the `Session` line indicates that the leader
-has been elected.
+***Note:*** The presence of the `Session` line indicates that the leader has been elected.
+
 
 ### Logs
 
-* RC leader election log:
-  ```sh
-  tail -f /var/log/hare/consul-elect-rc-leader.log
-  ```
+* Run the below mentioned command to generate the RC leader election log.
 
-* RC log:
-  ```sh
-  tail -f /var/log/hare/consul-proto-rc.log
-  ```
+    `tail -f /var/log/hare/consul-elect-rc-leader.log`
 
-* System log:
-  ```sh
-  journalctl --since <HH:MM> # bootstrap time
-  ```
+* Run the below mentioned command to generate the RC log.
 
-<!------------------------------------------------------------------->
-## Miscellanea
+    `tail -f /var/log/hare/consul-proto-rc.log`
 
-* Get an entry point:
+* Run the below mentioned command to generate the system log.
+
+    `journalctl --since <HH:MM> # bootstrap time`
+
+## Miscellaneous
+
+* The code block below showcases the command and output with regards to getting an entry point.
 
   ```sh
   $ ./get-entrypoint
@@ -280,7 +284,7 @@ has been elected.
       address: 192.168.180.162@tcp:12345:44:101
   ```
 
-* Add a timeout and monitor it via the log:
+* The code block below showcases the command and output with regards to adding a timeout and monitoring it. 
 
   ```
   $ tail -f /var/log/hare/consul-proto-rc.log &
@@ -304,14 +308,12 @@ has been elected.
   The timeout resets automatically (for demo purposes), so you will
   see it in the log file every other minute.
 
-<!------------------------------------------------------------------->
 ## Troubleshooting
 
 ### Unknown tag: package package is not installed
 
+An example of the error with `make rpm` command is displayed below.
 ```
-$ make rpm
-[...]
 --> Preparing rpmbuild environment
 ‘cortx-hare-1.0.0.tar.gz’ -> ‘/home/vagrant/rpmbuild/SOURCES/cortx-hare-1.0.0.tar.gz’
 ‘hare.spec’ -> ‘/home/vagrant/rpmbuild/SPECS/hare.spec’
@@ -323,8 +325,14 @@ make[1]: *** [__rpm] Error 1
 make[1]: Leaving directory `/tmp/cortx-hare'
 make: *** [rpm] Error 2
 ```
+This is caused by missing submodules. It happens when repository is cloned without `--recursive` flag.
 
-The likely cause is missing submodule.  Perhaps you've cloned
-cortx-hare repository without `--recursive` flag.
 
-Solution: `git submodule update --init --recursive`.
+Solution: Clone using the `git submodule update --init --recursive` command.
+
+## References
+
+- [Halon replacement: a simpler, better HA subsystem for EOS](https://docs.google.com/presentation/d/17Pn61WBbTHpeR4NxGtaDfmmHxgoLW9BnQHRW7WJO0gM/view) (slides)
+- [Halon replacement: Consul, design highlights](https://docs.google.com/document/d/1cR-BbxtMjGuZPj8NOc95RyFjqmeFsYf4JJ5Hw_tL1zA/view)
+- Bootstrap guide: [README.md](README.md): _how to get source code and run hare + motr instance_.
+- Contributing guide: [CONTRIBUTING.md](CONTRIBUTING.md).
