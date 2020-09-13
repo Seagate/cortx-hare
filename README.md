@@ -4,14 +4,15 @@ Hare is an experiment in
 [Social Architecture](https://www.youtube.com/watch?v=uj-li0LO_2g),
 disguised as a software project. The scripts in this repository constitute a middleware layer between [Consul](https://www.consul.io/) and [Motr](https://github.com/Seagate/cortx-motr) services.
 
-Their responsibilities:
-1. Configures components of the distributed Motr object store.
-2. Makes arrangements to ensure that Motr system remains available even
-   if some of its components fail.
-3. Provides CLI for starting/stopping Motr system.
+Actions of Hare
 
-Hare implementation uses [Consul](https://www.consul.io) key-value store
-and health-checking mechanisms.
+*  Configures components of the distributed Motr object storage.
+
+*  Ensures that Motr system remains available even if some of its components fail.
+   
+*  Provides CLI for starting or stopping of Motr services.
+
+Hare implementation uses [Consul](https://www.consul.io) key-value store and other health-checking mechanisms.
 
 <!------------------------------------------------------------------->
 
