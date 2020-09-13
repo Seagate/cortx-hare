@@ -209,7 +209,7 @@ hctl status
    `sudo tee -a /etc/hosts <<< '<IP address of node-1> s3.seagate.com'`
  
 
-2. Configure the S3 client based on the data below.: <!-- XXX Which file should this data be put in? -->
+2. Configure the S3 client based on the data below.<!-- XXX Which file should this data be put in? -->
 
   ```
   Access Key: anything
@@ -276,21 +276,15 @@ Value            sage75
 
 * Run the below mentioned command to generate the RC leader election log.
 
-  ```sh
-  tail -f /var/log/hare/consul-elect-rc-leader.log
-  ```
+    `tail -f /var/log/hare/consul-elect-rc-leader.log`
 
 * Run the below mentioned command to generate the RC log.
 
-  ```sh
-  tail -f /var/log/hare/consul-proto-rc.log
-  ```
+    `tail -f /var/log/hare/consul-proto-rc.log`
 
 * Run the below mentioned command to generate the system log.
 
-  ```sh
-  journalctl --since <HH:MM> # bootstrap time
-  ```
+    `journalctl --since <HH:MM> # bootstrap time`
 
 ## Miscellaneous
 
