@@ -15,9 +15,8 @@ This document provides detailed information on the installation of Hare componen
    `sudo yum install python3 python3-devel`
 
 * CentOS 7 must be available.
-  ```sh
-  sudo yum install python3 python3-devel
-  ```
+
+* The `cortx-motr` and `cortx-motr-devel` RPMs must be installed.
 
 * Ensure that [Motr](https://github.com/seagate/cortx-motr) is built and its systemd services are installed.
   _Note: check [cortx-motr](https://github.com/Seagate/cortx-motr/blob/dev/README.md) repo for more details_
