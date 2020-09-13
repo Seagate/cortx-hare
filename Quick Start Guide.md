@@ -134,12 +134,12 @@ ssh-copy-id <hostname of node-2>
 ssh-copy-id <hostname of node-3>
 ```
 
-### 3.6. Prepare the CDF
+### Prepare the CDF
 
 The code snippet below will create the cluster description file (CDF).
 You may want to update `OUT`, `NODES`, and `IFACE` values prior to
-running the code.  The value of `IFACE` should correspond to the value
-used in [step 3.4](#34-configure-lnet).
+running the code.  The value of `IFACE` should correspond to the one
+from [Configure LNet](#configure-lnet) step.
 
 ```bash
 (set -eu
