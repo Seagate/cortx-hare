@@ -123,9 +123,9 @@ Perform the procedure mentioned below to configure LNet.
 
 2. Run the below mentioned command to ensure that LNet works.
   
-  `sudo lctl list_nids`
+     `sudo lctl list_nids`
   
-   The output should not be empty.
+      The output should not be empty.
 
 ### Prepare SSH keys
 
