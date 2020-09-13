@@ -1,8 +1,6 @@
-# Hare Developer Guide
+# Quick Start Guide
 
-Current document covers building from sources and detailed configuration of Hare service.
-
-Topics described here may require access to Seagate infrastructure.
+This document provides detailed information on the installation of Hare component.
 
 ## 0. Prerequisites
 
