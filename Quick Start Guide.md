@@ -19,12 +19,17 @@ This document provides detailed information on the installation of Hare componen
 * The `cortx-motr` and `cortx-motr-devel` RPMs must be installed.
 
 * Alternatively, Motr can be compiled and installed from sources:
-    ```sh
-    git clone --recursive https://github.com/Seagate/cortx-motr.git motr
-    M0_SRC_DIR=$PWD/motr
+  ```sh
+  git clone --recursive https://github.com/Seagate/cortx-motr.git motr
+  cd motr
 
-    $M0_SRC_DIR/scripts/m0 make
-    sudo $M0_SRC_DIR/scripts/install-motr-service --link
+  scripts/m0 make
+  sudo scripts/install-motr-service --link
+
+  M0_SRC_DIR=$PWD
+  cd -
+  ```
+  See [Motr Quick Start Guide](https://github.com/Seagate/cortx-motr/blob/dev/doc/Quick-Start-Guide.rst#building-the-source-code) for more details.
     ```
 
 ## 1. Single-node setup
