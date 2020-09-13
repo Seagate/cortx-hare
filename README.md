@@ -2,11 +2,7 @@
 
 Hare is an experiment in
 [Social Architecture](https://www.youtube.com/watch?v=uj-li0LO_2g),
-disguised as a software project.
-
-## What Hare does?
-
-The scripts in this repository constitute a middleware layer between [Consul](https://www.consul.io/) and [Motr](https://github.com/Seagate/cortx-motr) services.
+disguised as a software project. The scripts in this repository constitute a middleware layer between [Consul](https://www.consul.io/) and [Motr](https://github.com/Seagate/cortx-motr) services.
 
 Their responsibilities:
 1. Configures components of the distributed Motr object store.
