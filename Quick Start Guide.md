@@ -4,7 +4,7 @@ This document provides detailed information on the installation of Hare componen
 
 ## Prerequisites
 
-* Repository must be cloned along with all submodules using the below mentioned commands. Refer [Readme](README.md#get-source-code)
+* Repository must be cloned along with all submodules using the below mentioned commands. Refer [Readme](README.md#get-source-code).
 
     `git clone --recursive https://github.com/Seagate/cortx-hare.git`
     
@@ -101,13 +101,31 @@ sudo $M0_SRC_DIR/clovis/m0crate/m0crate -S /tmp/m0crate-io.yaml
   [Active Services](https://ssc-cloud.colo.seagate.com/service/explorer#/)
   page.
 
-### 3.2. Install RPMs
+### Install RPMs
 
-Execute following step on all nodes: [README.md#install-rpm-packages]
+Run the following code snippet on every node (VM).
+ ```bash
+  (set -eu
 
-### 3.3. Create loop devices
+  if ! rpm -q cortx-hare cortx-s3server; then
+      if ! sudo yum install -y cortx-hare cortx-s3server; then
+          for x in integration/centos-7.7.1908/last_successful s3server_uploads
+          do
+              repo="cortx-storage.colo.seagate.com/releases/eos/$x"
+              sudo yum-config-manager --add-repo="http://$repo"
+              sudo tee -a /etc/yum.repos.d/${repo//\//_}.repo <<< gpgcheck=0
+          done
+          unset repo x
 
-Execute `m0setup` on all nodes.
+          sudo yum install -y cortx-hare cortx-s3server
+      fi
+  fi
+  )
+  ```
+
+### Loop Devices
+
+Execute `m0setup` on all nodes to setup loop devices.
 
 ### Configure LNet
 
