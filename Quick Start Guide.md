@@ -334,7 +334,7 @@ has been elected.
 
 ### Unknown tag: package package is not installed
 
-Example with `make rpm` command:
+An example of the error with `make rpm` command is displayed below.
 ```
 --> Preparing rpmbuild environment
 ‘cortx-hare-1.0.0.tar.gz’ -> ‘/home/vagrant/rpmbuild/SOURCES/cortx-hare-1.0.0.tar.gz’
@@ -349,10 +349,8 @@ make: *** [rpm] Error 2
 ```
 This caused by missing submodules. It happens when repository is cloned without
 `--recursive` flag.
-Solution: initialize following submodules
-* cortx-hare/vendor/consul-bin/
-* cortx-hare/vendor/dhall-bin/
-* cortx-hare/vendor/dhall-prelude/
+
+Solution: Clone using the `git submodule update --init --recursive` command.
 
 ## 8. Links
 
