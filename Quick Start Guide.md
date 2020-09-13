@@ -253,14 +253,18 @@ configured to run confd).
 Use `cfgen/examples/ees-cluster.yaml`, which describes a dual-node cluster,
 as an example.
 
-## 5. Observe
+## Observe
 
-### 5.1. Consul web UI
+### Consul web UI
 
 To view the [Consul UI](https://learn.hashicorp.com/consul/getting-started/ui#set-up-access-to-the-ui),
-open `http://<vm-ip-address>:8500/ui` URL in your browser.
+open the below mentioned URL in your browser.
 
-### 5.2. The RC leader
+* `http://<vm-ip-address>:8500/ui`
+
+### The RC leader
+
+The RC leader election related information can be viewed below.
 
 ```
 $ consul kv get -detailed leader
@@ -273,8 +277,8 @@ Session          d5f3f364-6f79-48cd-b452-913321b2c743
 Value            sage75
 ```
 
-***Note:*** The presence of the `Session` line indicates that the leader
-has been elected.
+***Note:*** The presence of the `Session` line indicates that the leader has been elected.
+
 
 ### Logs
 
