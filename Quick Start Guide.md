@@ -205,9 +205,9 @@ hctl status
 
 1. Deployment happens manually, so there is no Cluster IP. Hence, run the following command.
 
-  ```sh
-  sudo tee -a /etc/hosts <<< '<IP address of node-1> s3.seagate.com'
-  ```
+  
+   `sudo tee -a /etc/hosts <<< '<IP address of node-1> s3.seagate.com'`
+ 
 
 2. Configure the S3 client based on the data below.: <!-- XXX Which file should this data be put in? -->
 
@@ -226,10 +226,9 @@ hctl status
   The `HTTP Proxy server name` field should be set to the IP address of the primary node.
   
 3. Run the following command.
-
-  ```sh
-  s3cmd --configure
-  ```
+ 
+    `s3cmd --configure`
+ 
 
 ### Test S3 I/O
 
