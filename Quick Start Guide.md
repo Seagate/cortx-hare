@@ -293,9 +293,9 @@ has been elected.
   journalctl --since <HH:MM> # bootstrap time
   ```
 
-## 6. Miscellaneous
+## Miscellaneous
 
-* Get an entry point:
+* The code block below showcases the command and output with regards to getting an entry point.
 
   ```sh
   $ ./get-entrypoint
@@ -306,7 +306,7 @@ has been elected.
       address: 192.168.180.162@tcp:12345:44:101
   ```
 
-* Add a timeout and monitor it via the log:
+* The code block below showcases the command and output with regards to adding a timeout and monitoring it. 
 
   ```
   $ tail -f /var/log/hare/consul-proto-rc.log &
@@ -330,7 +330,7 @@ has been elected.
   The timeout resets automatically (for demo purposes), so you will
   see it in the log file every other minute.
 
-## 7. Troubleshooting
+## Troubleshooting
 
 ### Unknown tag: package package is not installed
 
@@ -352,7 +352,7 @@ This caused by missing submodules. It happens when repository is cloned without
 
 Solution: Clone using the `git submodule update --init --recursive` command.
 
-## 8. Links
+## References
 
 - [Halon replacement: a simpler, better HA subsystem for EOS](https://docs.google.com/presentation/d/17Pn61WBbTHpeR4NxGtaDfmmHxgoLW9BnQHRW7WJO0gM/view) (slides)
 - [Halon replacement: Consul, design highlights](https://docs.google.com/document/d/1cR-BbxtMjGuZPj8NOc95RyFjqmeFsYf4JJ5Hw_tL1zA/view)
