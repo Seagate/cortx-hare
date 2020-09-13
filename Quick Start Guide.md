@@ -30,11 +30,12 @@ This document provides detailed information on the installation of Hare componen
   cd -
   ```
   See [Motr Quick Start Guide](https://github.com/Seagate/cortx-motr/blob/dev/doc/Quick-Start-Guide.rst#building-the-source-code) for more details.
-    ```
-    
+      
 * Build and install Hare by running the below mentioned commands from the cortx-hare directory. 
    ```sh
+   
    make
+   
    sudo make devinstall
 
 ## 1. Single-node setup
