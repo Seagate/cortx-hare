@@ -4,13 +4,17 @@ This document provides detailed information on the installation of Hare componen
 
 ## Prerequisites
 
-* Repository must be cloned along with all submodules using the below mentioned command. Refer [Link to readme.](README.md#get-source-code)
+* Repository must be cloned along with all submodules using the below mentioned commands. Refer [Link to readme.](README.md#get-source-code)
 
-  *  `git clone --recursive https://github.com/Seagate/cortx-hare.git`
+    `git clone --recursive https://github.com/Seagate/cortx-hare.git`
+    
+    `cd hare`
+  
+* Python &geq; 3.6 and the corresponding header files. Run the below mentioned command to install the same.
 
-* Python &geq; 3.6 and the corresponding header files.
+   `sudo yum install python3 python3-devel`
 
-  To install on CentOS 7, run
+* CentOS 7 must be available.
   ```sh
   sudo yum install python3 python3-devel
   ```
