@@ -276,19 +276,22 @@ Value            sage75
 ***Note:*** The presence of the `Session` line indicates that the leader
 has been elected.
 
-### 5.3. Logs
+### Logs
 
-* RC leader election log:
+* Run the below mentioned command to generate the RC leader election log.
+
   ```sh
   tail -f /var/log/hare/consul-elect-rc-leader.log
   ```
 
-* RC log:
+* Run the below mentioned command to generate the RC log.
+
   ```sh
   tail -f /var/log/hare/consul-proto-rc.log
   ```
 
-* System log:
+* Run the below mentioned command to generate the system log.
+
   ```sh
   journalctl --since <HH:MM> # bootstrap time
   ```
