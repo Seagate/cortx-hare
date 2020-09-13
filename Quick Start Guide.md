@@ -38,11 +38,11 @@ This document provides detailed information on the installation of Hare componen
    
    sudo make devinstall
 
-* Add current user to `hare` group.
-   ```sh
-   sudo usermod --append --groups hare $USER
-   ```
-   Log out and log back in.
+* Run the below mentioned command to add current user to `hare` group. Then, log out and log in.
+   
+   `sudo usermod --append --groups hare $USER`
+   
+   
 
 3. Edit `cfgen/examples/singlenode.yaml` file.
 
@@ -109,21 +109,23 @@ Execute following step on all nodes: [README.md#install-rpm-packages]
 
 Execute `m0setup` on all nodes.
 
-### 3.4. Configure LNet
+### Configure LNet
 
-* Execute these commands on each node (assuming Motr uses `eth0`
-  network interface):
+Perform the procedure mentioned below to configure LNet.
+
+1. Run the below mentioned commands on each node (assuming Motr uses `eth0`
+  network interface).
   ```bash
   sudo tee /etc/modprobe.d/lnet.conf <<< \
       'options lnet networks=tcp(eth0) config_on_load=1'
   sudo systemctl start lnet
   ```
 
-* Check that LNet works:
-  ```sh
-  sudo lctl list_nids
-  ```
-  The output should not be empty.
+2. Run the below mentioned command to ensure that LNet works.
+  
+  `sudo lctl list_nids`
+  
+   The output should not be empty.
 
 ### Prepare SSH keys
 
@@ -140,7 +142,7 @@ Run the below mentioned commands on the primary node (node-1) to generate SSH Ke
 The code snippet below will create the cluster description file (CDF).
 You may want to update `OUT`, `NODES`, and `IFACE` values prior to
 running the code.  The value of `IFACE` should correspond to the one
-from [Configure LNet](#configure-lnet) step.
+from [Configure LNet](#configure-lnet) section.
 
 ```bash
 (set -eu
