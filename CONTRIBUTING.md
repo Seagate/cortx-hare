@@ -7,7 +7,7 @@
 - [1.4 Run Jenkins and System Tests](#14-Run-Jenkins-and-System-Tests)
 - [FAQs](FAQs)
 
-# Contributing
+# Contributing to CORTX-HARE
 
 This project uses [PC3 (Pedantic Code Construction Contract)](rfc/9/README.md) process for contributions. Contributing to the cortx-hare repository is a three-step process where you'll need to:
 
@@ -178,12 +178,12 @@ Creating a pull request automatically triggers Jenkins jobs and System tests. To
 
 ```shell
 
-$ git pull origin master
+$ git pull origin main
 $ git submodule update --init --recursive
 $ git checkout 'your-local-branch'
 $ git pull origin 'your-remote-branch-name'
 $ git submodule update --init --recursive
-$ git rebase origin/master
+$ git rebase origin/main
 ```
 
 **Q** How do I address reviewer comments?
