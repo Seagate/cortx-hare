@@ -4,7 +4,7 @@ This document provides detailed information on the installation of Hare componen
 
 ## Prerequisites
 
-* Repository must be cloned along with all submodules using the below mentioned commands. Refer [Readme](README.md#get-source-code).
+* Repository must be cloned along with all submodules using the below mentioned commands. 
 
     `git clone --recursive https://github.com/Seagate/cortx-hare.git`
     
