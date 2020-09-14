@@ -16,7 +16,7 @@ This document provides detailed information on the installation of Hare componen
 
 * CentOS 7 must be available.
 
-* The `cortx-motr` and `cortx-motr-devel` RPMs must be installed.
+* The `cortx-motr` and `cortx-motr-devel` RPMs must be installed. Refer [Motr Quick Start Guide](https://github.com/Seagate/cortx-motr/blob/dev/doc/Quick-Start-Guide.rst).
 
 * Alternatively, Motr can be compiled and installed from the source.
   ```sh
