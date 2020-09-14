@@ -1,10 +1,10 @@
 - [1.0 Prerequisites](#10-Prerequisites)
-- [1.2 Set up Git on your Development Box](#12-Set-Up-Git-on-your-Development-Box)
-- [1.3 Submit your changes](#13-Submit-your-Changes)
-   * [1.3.1 Clone the cortx-hare repository](#131-Clone-the-cortx-hare-repository)
-   * [1.3.2 Code Commits](#132-Code-commits)
-   * [1.3.3 Create a Pull Request](#133-Create-a-Pull-Request)
-- [1.4 Run Jenkins and System Tests](#14-Run-Jenkins-and-System-Tests)
+- [1.1 Set up Git on your Development Box](#11-Set-Up-Git-on-your-Development-Box)
+- [1.2 Submit your changes](#12-Submit-your-Changes)
+   * [1.2.1 Clone the cortx-hare repository](#121-Clone-the-cortx-hare-repository)
+   * [1.2.2 Code Commits](#122-Code-commits)
+   * [1.2.3 Create a Pull Request](#123-Create-a-Pull-Request)
+- [1.3 Run Jenkins and System Tests](#13-Run-Jenkins-and-System-Tests)
 - [FAQs](FAQs)
 
 # Contributing to CORTX-HARE
@@ -43,32 +43,11 @@ Before you set up your GitHub, you'll need to
    </p>
     </details>
 
-## 1.2 Set Up Git on your Development Box
+## 1.1 Set Up Git on your Development Box
 
-<details>
-  <summary>Before you begin</summary>
-    <p>
+Once you've installed the prerequisites, follow these steps to set up Git on your Virtual Machine:
 
-1. Update Git to the latest version. If you're on an older version, you'll see errors in your commit hooks that look like this:
-
-     `$ git commit`
-
-    ```shell
-
-    git: 'interpret-trailers' is not a git command.
-    See 'git --help'
-    cannot insert change-id line in .git/COMMIT_EDITMSG
-    ```
-    </p>
-    </details>
-
-Once you've installed the prerequisites, follow these steps to set up Git on your Development Box:
-
-1. Install git-clang-format using: 
-
-    `$ yum install git-clang-format`
-
-2. Set up git config options using:
+Set up git config options using:
 
    ```shell
 
@@ -77,11 +56,11 @@ Once you've installed the prerequisites, follow these steps to set up Git on you
    $ git config --global color.ui auto
    $ git config --global credential.helper cache
    ```
-## 1.3. Submit your Changes
+## 1.2 Submit your Changes
 
 Before you can work on a GitHub feature, you'll need to clone the cortx-hare repository.
 
-### 1.3.1 Clone the cortx-hare repository
+### 1.2.1 Clone the cortx-hare repository
 
 You'll need to **Fork** the cortx-hare repository to clone it into your private GitHub repository. Follow these steps to clone the repository to your gitHub account:
 1. Navigate to the 'cortx-hare' repository homepage on GitHub.
@@ -96,7 +75,7 @@ You'll need to **Fork** the cortx-hare repository to clone it into your private 
 
    `$ git checkout -b "your-local-branch-name"`
    
-### 1.3.2 Code Commits
+### 1.2.2 Code Commits
 
 You can make changes to the code and save them in your files.
 
@@ -110,26 +89,15 @@ You can make changes to the code and save them in your files.
 
    `origin/main`
    
-   1. Then, check them at least with:
+1. To commit your code changes use:
 
-      `$ ./scripts/m0 run-ut`
+   `$ git commit -s` 
+   
+   Refer to point 9. from the [PC3 document](https://github.com/Seagate/cortx-hare/blob/dev/rfc/9/README.md#22-patch-requirements) to know more about the commit message requirements.
 
-   2. Ideally, run the complete tests with:
-
-      `$ ./scripts/m0 check-everything`
-
-   - It is better, for the review process, that your contribution contains no more than 3 commits.
-
-2. To commit your code changes use:
-
-   `$ git commit -s -m 'comment'` - enter your GitHub Account ID and an appropriate Feature or Change description in comment.
-
-
-3. Check out your git log to view the details of your commit and verify the author name using: `$ git log`
+2. Check out your git log to view the details of your commit and verify the author name using: `$ git log`
 
     :page_with_curl: **Note:** If you need to change the author name for your commit, refer to the GitHub article on [Changing author info](https://docs.github.com/en/github/using-git/changing-author-info).
-
-4. To Push your changes to GitHub, use: `$ git push origin 'your-local-branch-name'`
 
 :page_with_curl: **Note on development branch:**
 
@@ -155,7 +123,7 @@ Your output will look like the **Sample Output** below:
    * [new branch] <your-local-branch-name> -> <your-local-branch-name>
    ```
 
-### 1.3.3 Create a Pull Request
+### 1.2.3 Create a Pull Request
 
 
 1. Once you Push changes to GitHub, the output will display a URL for creating a Pull Request, as shown in the sample code above.
@@ -166,7 +134,7 @@ Your output will look like the **Sample Output** below:
 4. Click **Create pull request** to create the pull request.
 5. Add reviewers to your pull request to review and provide feedback on your changes.
 
-## 1.4 Run Jenkins and System Tests
+## 1.3 Run Jenkins and System Tests
 
 Creating a pull request automatically triggers Jenkins jobs and System tests. To familiarize yourself with jenkins, please visit the [Jenkins wiki page](https://en.wikipedia.org/wiki/Jenkins_(software)).
 
