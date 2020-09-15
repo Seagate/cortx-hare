@@ -18,10 +18,5 @@
 #
 
 # Broadcast disk failure event to motr processes.
-# Sample payload: {"obj_type": "drive", "obj_name": "vdb", "obj_state": "failed"}
 
-HARE_BIN=/opt/seagate/cortx/hare/bin
-
-payload=$1
-
-$HARE_BIN/h0q bq M0_HA_MSG_NVEC $payload
+h0q bq M0_HA_MSG_NVEC "$HARE_RC_EVENT_PAYLOAD"
