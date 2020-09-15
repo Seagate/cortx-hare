@@ -8,10 +8,9 @@ disguised as a software project.
 
 ## What Hare does?
 
-1. Configures components of the distributed Motr object store.
-2. Provides CLI for starting/stopping Motr system.
-3. Makes arrangements to ensure that Motr system remains available even
-   if some of its components fail.
+1. Configures [Motr](https://github.com/seagate/cortx-motr) object store.
+2. Starts/stops Motr services.
+3. Notifies Motr of service and device faults.
 
 Hare implementation uses [Consul](https://www.consul.io) key-value store
 and health-checking mechanisms.
@@ -19,13 +18,75 @@ and health-checking mechanisms.
 <!------------------------------------------------------------------->
 ## Installation
 
-<!-- XXX-TODO
-You can download `cortx-hare` RPM from XXX.
+<!-- XXX-RESTOREME
+### RPM package
+
+* Install `yum-config-manager` to manage your repositories.
+  ```sh
+  sudo yum -y install yum-utils
+  ```
+
+* Add the official Seagate repository.
+  ```sh
+  sudo yum-config-manager --add-repo XXX-TBD
+  ```
+
+* Install `cortx-hare`.
+  ```sh
+  sudo yum -y install cortx-hare
+  ```
 -->
 
-To build and install Hare from sources, follow the instructions of [Hare Developer Guide](README_developers.md#installation).
+### Building from source
 
-## :ballot_box_with_check: Checklist
+* Download Hare with submodules.
+  ```sh
+  git clone --recursive https://github.com/Seagate/cortx-hare.git hare
+  cd hare
+  ```
+
+* Install Python (&ge; 3.6), libraries and header files needed to
+  compile Python extensions.
+  ```sh
+  sudo yum -y install python3 python3-devel
+  ```
+
+* Install Motr
+
+  * .. from RPMs
+    ```sh
+    sudo yum -y install cortx-motr cortx-motr-devel
+    ```
+
+  * .. or from sources
+    ```sh
+    git clone --recursive https://github.com/Seagate/cortx-motr.git motr
+    cd motr
+
+    scripts/m0 make
+    sudo scripts/install-motr-service --link
+
+    M0_SRC_DIR=$PWD
+    cd -
+    ```
+
+* Build and install Hare.
+  ```sh
+  make
+  sudo make devinstall
+  ```
+
+* Add current user to `hare` group.
+  ```sh
+  sudo usermod --append --groups hare $USER
+  ```
+  Log out and log back in.
+
+
+<!------------------------------------------------------------------->
+## Quick start
+
+:ballot_box_with_check: **Checklist**
 
 Before starting the cluster as \<user\> at \<origin\> machine,
 ensure that
@@ -41,32 +102,34 @@ ensure that
 
 ### Prepare the CDF
 
-To start the cluster for the first time you will need a cluster
-description file (CDF).
+If you are starting the cluster for the first time, you will need a
+_cluster description file_ (CDF).
 
-Make a copy of `/opt/seagate/cortx/hare/share/cfgen/examples/singlenode.yaml` (single-node setup) or `/opt/seagate/cortx/hare/share/cfgen/examples/ees-cluster.yaml` (dual-node setup).
+See `cfgen --help-schema` for the description of CDF format.
+
+You can make a copy of
+`/opt/seagate/cortx/hare/share/cfgen/examples/singlenode.yaml`
+(single-node setup) or
+`/opt/seagate/cortx/hare/share/cfgen/examples/ees-cluster.yaml`
+(dual-node setup) and edit it as necessary.
 
 ```sh
 cp /opt/seagate/cortx/hare/share/cfgen/examples/singlenode.yaml ~/CDF.yaml
 vi ~/CDF.yaml
 ```
 
-Edit the copy to match the setup of your cluster.  `host`,
-`data_iface`, and `io_disks` fields may need to be modified.
-
-See `cfgen --help-schema` for the description of CDF format.
+You will probably need to modify `host`, `data_iface`, and `io_disks` values.
 
 #### data_iface
 
 * Make sure that `data_iface` value refers to existing network
   interface (it should be present in the output of `ip a` command).
 
-* The network interface specified in `data_iface` must be configured
-  for LNet.  If you can see its IP address in the output of
-  `sudo lctl list_nids` command, you are all set.  Otherwise,
-  configure LNet by executing this code snippet on each node:
-
-  ```sh
+* This network interface must be configured for LNet.  If you can see
+  its IP address in the output of `sudo lctl list_nids` command, you
+  are all set.  Otherwise, configure LNet by executing this code
+  snippet on each node:
+  ```bash
   IFACE=eth1  # XXX `data_iface` value from the CDF
   sudo tee /etc/modprobe.d/lnet.conf <<< \
       "options lnet networks=tcp($IFACE) config_on_load=1"
@@ -74,7 +137,7 @@ See `cfgen --help-schema` for the description of CDF format.
 
 #### io_disks
 
-* Devices mentioned in `io_disks` section must exist.
+* Devices specified in `io_disks` section must exist.
 
 * Sometimes it is convenient to use loop devices instead of actual disks:
   ```bash
@@ -85,15 +148,7 @@ See `cfgen --help-schema` for the description of CDF format.
   done
   ```
 
-### Disable s3auth server
-
-<!-- XXX REVISEME: Provisioner should take care of this. -->
-```sh
-/opt/seagate/cortx/hare/libexec/s3auth-disable
-```
-
-<!------------------------------------------------------------------->
-## Hare we go
+### Hare we go
 
 * Start the cluster.
   ```sh
@@ -129,14 +184,16 @@ See `cfgen --help-schema` for the description of CDF format.
 <!------------------------------------------------------------------->
 ## Reporting problems
 
-To request changes or report a bug, please [log an issue](https://github.com/Seagate/cortx-hare/issues/new) and describe the problem you observe.
+To request changes or report a bug, please
+[log an issue](https://github.com/Seagate/cortx-hare/issues/new)
+and describe the problem you are facing.
 
 When reporting a bug, consider running
 ```sh
 hctl reportbug
 ```
 to collect forensic data.  Run this command on every node of the
-cluster and attach generated archive files to the GitHub issue.
+cluster and attach generated files to the GitHub issue.
 
 <!------------------------------------------------------------------->
 ## Troubleshooting
@@ -184,8 +241,29 @@ sudo systemctl reset-failed hare-hax
 ```
 and bootstrap again.
 
+### Unknown tag: package package is not installed
+
+```
+$ make rpm
+[...]
+--> Preparing rpmbuild environment
+‘cortx-hare-1.0.0.tar.gz’ -> ‘/home/vagrant/rpmbuild/SOURCES/cortx-hare-1.0.0.tar.gz’
+‘hare.spec’ -> ‘/home/vagrant/rpmbuild/SPECS/hare.spec’
+make[1]: Leaving directory `/tmp/cortx-hare'
+make[1]: Entering directory `/tmp/cortx-hare'
+--> Building rpm packages
+error: line 33: Unknown tag: package package is not installed
+make[1]: *** [__rpm] Error 1
+make[1]: Leaving directory `/tmp/cortx-hare'
+make: *** [rpm] Error 2
+```
+
+The likely cause is missing git submodule.  Perhaps you've cloned
+cortx-hare repository without `--recursive` flag.
+
+Solution: `git submodule update --init --recursive`.
+
 <!------------------------------------------------------------------->
 ## See also
 
-* [Hare Developer Guide](README_developers.md)
 * [Hare RFCs](rfc/README.md)
