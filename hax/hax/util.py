@@ -34,7 +34,8 @@ from urllib3.exceptions import HTTPError
 from hax.exception import HAConsistencyException
 from hax.types import ConfHaProcess, Fid, FsStatsWithTime, ObjT
 
-__all__ = ['ConsulUtil', 'create_process_fid', 'create_drive_fid']
+__all__ = ['ConsulUtil', 'create_process_fid', 'create_service_fid',
+           'create_sdev_fid', 'create_drive_fid']
 
 # XXX What is the difference between `ip_addr` and `address`?
 # The names are hard to discern.
@@ -61,6 +62,14 @@ def mk_fid(obj_t: ObjT, key: int) -> Fid:
 
 def create_process_fid(key: int) -> Fid:
     return mk_fid(ObjT.PROCESS, key)
+
+
+def create_service_fid(key: int) -> Fid:
+    return mk_fid(ObjT.SERVICE, key)
+
+
+def create_sdev_fid(key: int) -> Fid:
+    return mk_fid(ObjT.SDEV, key)
 
 
 def create_drive_fid(key: int) -> Fid:
@@ -425,14 +434,66 @@ class ConsulUtil:
         logging.debug('Setting process status in KV: %s:%s', key, data)
         self.kv.kv_put(key, data)
 
-    def drive_name_to_id(self, uid: str) -> str:
-        drive_id = ''
-        # 'm0conf/nodes/<node_name>/processes/<process_fidk>/disks/<disk_uuid>'
-        node_items = self.kv.kv_get('m0conf/nodes', recurse=True)
-        for x in node_items:
-            if '/disks/' in x['Key'] and uid in x['Key']:
-                drive_id = x['Value']
-        return drive_id
+    @repeat_if_fails()
+    def sdev_to_drive_fid(self, sdev_fid: Fid):
+        # We extract the drive fid as follows,
+        # e.g. sdev_fid=0x6400000000000001:0x2c
+        # 1. m0conf/sites/0x5300000000000001:0x1/racks/0x6100000000000001:0x2/
+        #    encls/0x6500000000000001:0x21/ctrls/0x6300000000000001:0x22/
+        #    drives/0x6b00000000000001:0x2d:{"sdev": "0x6400000000000001:0x2c",
+        #    "state": "M0_NC_UNKNOWN"}
+        # 2. Fetch Consul kv for drive fid
+        # 3. Extract drive fid key from the drive fid.
+        # 4. Create drive fid from fid key.
+        drive_fid: Fid = Fid(0, 0)
+        drive_items = self.kv.kv_get('m0conf/sites', recurse=True)
+        for x in drive_items:
+            if '/drives/' in x['Key']:
+                if json.loads(x['Value'])['sdev'] == f'{sdev_fid}':
+                    # Using constant index 10 for the drive fid.
+                    # Fix this by changing the Consul schema to have
+                    # mapping of sdev fid to drive fid direct mapping.
+                    drive_fid_item = x['Key'].split('/')[10]
+                    drive_fidk = Fid.parse(drive_fid_item).key
+                    drive_fid = create_drive_fid(drive_fidk)
+                    break
+        return drive_fid
+
+    @repeat_if_fails()
+    def node_to_drive_fid(self, node_name: str, drive: str):
+        sdev_fid: Fid = Fid(0, 0)
+        # We extract the sdev fid as follows,
+        # e.g. node_name=ssc-vm-c-0553.colo.seagate.com
+        #      drive=/dev/vdf
+        # 1. m0conf/nodes/ssc-vm-c-0553.colo.seagate.com/processes/41/
+        #     services/ios:43
+        # 2. Create ioservice motr fid
+        # 3. fetch consul kv for ios fid,
+        #    m0conf/nodes/0x6e00000000000001:0x20/processes/
+        #    0x7200000000000001:0x29/services/0x7300000000000001:0x2b/
+        #    sdevs/0x6400000000000001:0x2c:
+        #    {"path": "/dev/vdf", "state": "M0_NC_UNKNOWN"}
+        # 4. find drive name in the json value and extract sdev fid from the
+        #    key 0x6400000000000001:0x2c
+        # 5. Create sdev fid from sdev fid key.
+        process_items = self.kv.kv_get(f'm0conf/nodes/{node_name}/processes',
+                                       recurse=True)
+        for x in process_items:
+            if '/ios' in x['Key']:
+                fidk_ios = x['Value']
+        ios_fid = create_service_fid(int(fidk_ios))
+        sdev_items = self.kv.kv_get('m0conf/nodes', recurse=True)
+        for x in sdev_items:
+            if f'/{ios_fid}/' in x['Key']:
+                if json.loads(x['Value'])['path'] == drive:
+                    # Using constant index 8 for the sdev fid.
+                    # Fix this by changing the Consul schema to have
+                    # mapping of drive path to sdev direct mapping.
+                    sdev_fid_item = x['Key'].split('/')[8]
+                    sdev_fidk = Fid.parse(sdev_fid_item).key
+                    sdev_fid = create_sdev_fid(sdev_fidk)
+                    break
+        return self.sdev_to_drive_fid(sdev_fid)
 
     def set_m0_disk_state(self, fid: str, objstate: int) -> None:
         assert 0 <= objstate < len(ha_conf_obj_states), \

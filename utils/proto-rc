@@ -129,9 +129,6 @@ sed '/^null$/d' | jq --compact-output '.[]' | {
           debug_RC)
             exec_with_timeout $RULES_DIR/_debug
             ;;
-          device-state-set)
-            exec_with_timeout $RULES_DIR/device-state-set $HARE_RC_EVENT_PAYLOAD
-            ;;
           # Run rule script with the name equal to incoming event type.
           # Recommended option for new rule scripts and event types.
           *)

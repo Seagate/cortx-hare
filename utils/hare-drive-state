@@ -31,40 +31,41 @@ Usage: $PROG [<option>]
 
 Post drive events to Motr
 
-Positional arguments:
-  <drive name> Universal drive name
-
 Options:
-  -s, --state <drive state> Drive state to notify Motr
-  -h, --help   Show this help and exit.
+  --json <json-payload> Payload to set device state.
+                        payload format:
+                        {
+                          "node" : "ssc-vm-c-0553.colo.seagate.com",
+                          "source_type" : "drive",
+                          "device" : "/dev/vdb"
+                          "state" : "FAILED",
+                        }
+  -h, --help            Show this help and exit.
 EOF
 }
 
-TEMP=$(getopt --options hs: \
-              --longoptions help,state: \
+TEMP=$(getopt --options h: \
+              --longoptions help,json: \
               --name "$PROG" -- "$@" || true)
+
+echo $?
 
 (($? == 0)) || { usage >&2; exit 1; }
 
 eval set -- "$TEMP"
 
-state=
+payload=
 
 while true; do
     case "$1" in
         -h|--help)           usage; exit ;;
-        -s|--state)          state=$2; shift 2 ;;
+        --json)              payload=$2; shift 2 ;;
         --)                  shift; break ;;
         *)                   break ;;
     esac
 done
 
-drive=${1:-}
-
-[[ $drive ]] || {
-    usage >&2
-    exit 1
-}
+[[ $payload ]] || { usage >&2; exit 1; }
 
 die() {
     echo "$PROG: $*" >&2
@@ -72,12 +73,7 @@ die() {
 }
 
 state_set() {
-    payload=$(jq --null-input --compact-output \
-            --arg obj_type "drive" \
-            --arg obj_name "$drive" \
-            --arg obj_state "$state" \
-            '{ obj_type: $obj_type, obj_name: $obj_name, obj_state: $obj_state }')
-    h0q eq 'device-state-set' $payload
+    h0q eq 'device-state-set' "$payload"
 }
 
 state_get() {
@@ -85,7 +81,7 @@ state_get() {
     :
 }
 
-if [[ $state ]]; then
+if [[ $payload ]]; then
     state_set
 else
     state_get
