@@ -4,7 +4,7 @@
 
 Hare is an experiment in
 [Social Architecture](https://www.youtube.com/watch?v=uj-li0LO_2g),
-disguised as a software project.
+disguised as a software project.  Additional information about Hare can be found in our [wiki](https://github.com/Seagate/cortx-hare/wiki).
 
 ## What Hare does?
 
