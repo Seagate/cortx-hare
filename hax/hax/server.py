@@ -187,10 +187,10 @@ def run_server(
 ):
     node_address = ConsulUtil().get_hax_ip_address()
 
-    # Bind to ANY interface so scripts can use localhost to send requests
-    # FIXME: This introduces security related concerns since hax becomes
-    # available from network.
-    web_address = '0.0.0.0'
+    # We can't use broad 0.0.0.0 IP address to make it possible to run
+    # multiple hax instances at the same machine (i.e. in failover situation).
+    # Instead, every hax will use a private IP only.
+    web_address = node_address
 
     # Note that bq-delivered mechanism must use a unique node name rather than
     # broad '0.0.0.0' that doesn't identify the node from outside.
