@@ -31,6 +31,11 @@ and health-checking mechanisms.
   sudo yum-config-manager --add-repo XXX-TBD
   ```
 
+* Add the official Hashicorp Consul repository.
+  ```sh
+  sudo yum-config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo
+  ```
+
 * Install `cortx-hare`.
   ```sh
   sudo yum -y install cortx-hare
@@ -39,9 +44,9 @@ and health-checking mechanisms.
 
 ### Building from source
 
-* Download Hare with submodules.
+* Download Hare.
   ```sh
-  git clone --recursive https://github.com/Seagate/cortx-hare.git hare
+  git clone https://github.com/Seagate/cortx-hare.git hare
   cd hare
   ```
 
@@ -51,7 +56,14 @@ and health-checking mechanisms.
   sudo yum -y install python3 python3-devel
   ```
 
-* Install Motr
+* Install Consul.
+  ```sh
+  sudo yum -y install yum-utils
+  sudo yum-config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo
+  sudo yum -y install consul-1.7.2
+  ```
+
+* Install Motr.
 
   * .. from RPMs
     ```sh
@@ -240,28 +252,6 @@ hctl shutdown
 sudo systemctl reset-failed hare-hax
 ```
 and bootstrap again.
-
-### Unknown tag: package package is not installed
-
-```
-$ make rpm
-[...]
---> Preparing rpmbuild environment
-‘cortx-hare-1.0.0.tar.gz’ -> ‘/home/vagrant/rpmbuild/SOURCES/cortx-hare-1.0.0.tar.gz’
-‘hare.spec’ -> ‘/home/vagrant/rpmbuild/SPECS/hare.spec’
-make[1]: Leaving directory `/tmp/cortx-hare'
-make[1]: Entering directory `/tmp/cortx-hare'
---> Building rpm packages
-error: line 33: Unknown tag: package package is not installed
-make[1]: *** [__rpm] Error 1
-make[1]: Leaving directory `/tmp/cortx-hare'
-make: *** [rpm] Error 2
-```
-
-The likely cause is missing git submodule.  Perhaps you've cloned
-cortx-hare repository without `--recursive` flag.
-
-Solution: `git submodule update --init --recursive`.
 
 <!------------------------------------------------------------------->
 ## See also
