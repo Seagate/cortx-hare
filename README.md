@@ -267,3 +267,4 @@ Solution: `git submodule update --init --recursive`.
 ## See also
 
 * [Hare RFCs](rfc/README.md)
+* [Hare wiki](https://github.com/Seagate/cortx-hare/wiki)
