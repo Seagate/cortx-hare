@@ -11,6 +11,7 @@ cfgen/dhall/dhall-lang-[0-9]*
 dist/
 systemd/hax-environment
 tags
+vendor/
 
 # C extensions
 *.so
