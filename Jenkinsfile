@@ -61,7 +61,7 @@ pipeline {
                             def remote = getTestMachine(VM_FQDN)
                             def commandResult = sshCommand remote: remote, command: """
                             rm -rf $REPO_NAME
-                            git clone --recursive https://$GITHUB_TOKEN@github.com/Seagate/'$REPO_NAME'.git
+                            git clone https://$GITHUB_TOKEN@github.com/Seagate/'$REPO_NAME'.git
                             cd $REPO_NAME
                             git checkout $BRANCH_NAME
                             git log -1
@@ -84,7 +84,6 @@ pipeline {
                             git remote add origin https://$GITHUB_TOKEN@github.com/Seagate/'$REPO_NAME'.git
                             git fetch --depth 1 origin refs/pull/$CHANGE_ID/head
                             git checkout FETCH_HEAD
-                            git submodule update --init
                             git log -1
                             ls -la
                             """

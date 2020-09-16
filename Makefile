@@ -58,6 +58,12 @@ PIP         := $(PY_VENV); pip3
 SETUP_PY    := $(PY_VENV); $(PYTHON) setup.py
 PY3_VERSION := 36
 PY3_VERSION_MINOR := $(shell grep -o . <<<$(PY3_VERSION) | tail -n1)
+DHALL_VERSION := 1.26.1
+DHALL_URL     := https://github.com/dhall-lang/dhall-haskell/releases/download/$(DHALL_VERSION)/dhall-$(DHALL_VERSION)-x86_64-linux.tar.bz2
+DHALL_JSON_VERSION := 1.4.1
+DHALL_JSON_URL     := https://github.com/dhall-lang/dhall-haskell/releases/download/$(DHALL_VERSION)/dhall-json-$(DHALL_JSON_VERSION)-x86_64-linux.tar.bz2
+DHALL_PRELUDE_VERSION := 11.1.0
+DHALL_PRELUDE_URL     := https://github.com/dhall-lang/dhall-lang/archive/v$(DHALL_PRELUDE_VERSION).tar.gz
 
 # Build ----------------------------------------------- {{{1
 #
@@ -94,6 +100,11 @@ distclean: clean
 	@if [[ -e $(PY_VENV_DIR) ]]; then \
 	     $(call _log,removing $(PY_VENV_DIR)); \
 	     rm -rf $(PY_VENV_DIR); \
+	 fi
+	@$(call _info,Cleaning cached vendor files)
+	@if [[ -d vendor ]]; then \
+	     $(call _log,removing vendor/ dir); \
+	     rm -rf vendor/; \
 	 fi
 
 .PHONY: clean
@@ -137,6 +148,59 @@ HAX_EXE            = $(DESTDIR)/$(PREFIX)/bin/hax
 HAX_EGG_LINK       = $(DESTDIR)/$(PREFIX)/lib/python3.$(PY3_VERSION_MINOR)/site-packages/hax.egg-link
 SYSTEMD_CONFIG_DIR = $(DESTDIR)/usr/lib/systemd/system
 
+# dhall-bin {{{2
+vendor/dhall-bin/$(DHALL_VERSION)/dhall-$(DHALL_VERSION)-x86_64-linux.tar.bz2:
+	@$(call _log,fetching dhall $(DHALL_VERSION) archive)
+	@mkdir -p vendor/dhall-bin/$(DHALL_VERSION)
+	@cd vendor/dhall-bin/$(DHALL_VERSION) && \
+	 curl --location --remote-name $(DHALL_URL)
+
+vendor/dhall-bin/$(DHALL_VERSION)/dhall-json-$(DHALL_JSON_VERSION)-x86_64-linux.tar.bz2:
+	@$(call _log,fetching dhall-json $(DHALL_VERSION) archive)
+	@mkdir -p vendor/dhall-bin/$(DHALL_VERSION)
+	@cd vendor/dhall-bin/$(DHALL_VERSION) && \
+	 curl --location --remote-name $(DHALL_JSON_URL)
+
+vendor/dhall-bin/$(DHALL_VERSION)/bin/dhall: \
+		vendor/dhall-bin/$(DHALL_VERSION)/dhall-$(DHALL_VERSION)-x86_64-linux.tar.bz2
+	@$(call _log,unpacking dhall $(DHALL_VERSION) archive)
+	@cd vendor/dhall-bin/$(DHALL_VERSION) && \
+	 tar --no-same-owner -xmf dhall-$(DHALL_VERSION)-x86_64-linux.tar.bz2
+
+vendor/dhall-bin/$(DHALL_VERSION)/bin/dhall-to-json: \
+		vendor/dhall-bin/$(DHALL_VERSION)/dhall-json-$(DHALL_JSON_VERSION)-x86_64-linux.tar.bz2
+	@$(call _log,unpacking dhall-json $(DHALL_VERSION) archive)
+	@cd vendor/dhall-bin/$(DHALL_VERSION) && \
+	 tar --no-same-owner -xmf dhall-json-$(DHALL_JSON_VERSION)-x86_64-linux.tar.bz2
+
+.PHONY: unpack-dhall-bin
+unpack-dhall-bin: \
+		vendor/dhall-bin/$(DHALL_VERSION)/bin/dhall \
+		vendor/dhall-bin/$(DHALL_VERSION)/bin/dhall-to-json
+	@cd vendor/dhall-bin && ln -sfn $(DHALL_VERSION)/bin current
+
+# dhall-prelude {{{2
+vendor/dhall-prelude/$(DHALL_PRELUDE_VERSION):
+	@mkdir -p vendor/dhall-prelude/$(DHALL_PRELUDE_VERSION)
+
+vendor/dhall-prelude/current: vendor/dhall-prelude/$(DHALL_PRELUDE_VERSION)
+	@cd vendor/dhall-prelude && ln -sfn $(DHALL_PRELUDE_VERSION) current
+
+vendor/dhall-prelude/$(DHALL_PRELUDE_VERSION)/v$(DHALL_PRELUDE_VERSION).tar.gz: vendor/dhall-prelude/$(DHALL_PRELUDE_VERSION)
+	@$(call _log,fetching dhall-prelude $(DHALL_PRELUDE_VERSION) archive)
+	@cd vendor/dhall-prelude/$(DHALL_PRELUDE_VERSION) && \
+	 curl --location --output v$(DHALL_PRELUDE_VERSION).tar.gz \
+	      $(DHALL_PRELUDE_URL)
+
+.PHONY: fetch-dhall-prelude
+fetch-dhall-prelude: \
+	vendor/dhall-prelude/$(DHALL_PRELUDE_VERSION)/v$(DHALL_PRELUDE_VERSION).tar.gz \
+	vendor/dhall-prelude/current
+
+.PHONY: unpack-dhall-prelude
+unpack-dhall-prelude: fetch-dhall-prelude
+	@$(MAKE) --quiet -C cfgen unpack-dhall-prelude
+
 # install {{{2
 .PHONY: install
 install: install-dirs install-cfgen install-hax install-systemd install-vendor
@@ -178,13 +242,9 @@ install-dirs:
 	 done
 	@install --verbose --directory --mode=0775 $(DESTDIR)/var/lib/hare
 
-.PHONY: unpack-dhall-prelude
-unpack-dhall-prelude:
-	$(MAKE) --quiet -C cfgen unpack-dhall-prelude
-
 .PHONY: install-cfgen
 install-cfgen: CFGEN_INSTALL_CMD = install
-install-cfgen: $(CFGEN_EXE) install-cfgen-deps unpack-dhall-prelude
+install-cfgen: $(CFGEN_EXE) install-cfgen-deps unpack-dhall-bin unpack-dhall-prelude
 	@$(call _info,Installing cfgen/dhall configs)
 	@install --verbose --directory $(CFGEN_SHARE)
 	@for d in cfgen/dhall cfgen/examples; do \
@@ -227,11 +287,10 @@ $(HAX_EGG_LINK) $(HAX_EXE): $(HAX_WHL)
 	@cd hax && $(HAX_INSTALL_CMD)
 
 .PHONY: install-vendor
-install-vendor: vendor/consul-bin/current/consul \
-                $(wildcard vendor/dhall-bin/current/*)
-	@$(call _info,Installing Consul and Dhall)
+install-vendor:
+	@$(call _info,Installing Dhall)
 	@install --verbose --directory $(DESTDIR)/$(PREFIX)/bin
-	@install --verbose $^ $(DESTDIR)/$(PREFIX)/bin
+	@install --verbose $(wildcard vendor/dhall-bin/current/*) $(DESTDIR)/$(PREFIX)/bin
 
 # devinstall {{{2
 .PHONY: devinstall
@@ -261,7 +320,7 @@ devinstall: install-dirs devinstall-cfgen devinstall-hax devinstall-systemd devi
 
 .PHONY: devinstall-cfgen
 devinstall-cfgen: CFGEN_INSTALL_CMD = ln -sf
-devinstall-cfgen: $(CFGEN_EXE) install-cfgen-deps unpack-dhall-prelude
+devinstall-cfgen: $(CFGEN_EXE) install-cfgen-deps unpack-dhall-bin unpack-dhall-prelude
 	@$(call _info,Installing cfgen/dhall configs)
 	@install --verbose --directory $(CFGEN_SHARE)
 	@for d in cfgen/dhall cfgen/examples; do \
@@ -297,11 +356,10 @@ devinstall-hax: hax/requirements.txt $(HAX_EGG_LINK)
 					--requirement <(sed -ne '/^#:runtime-requirements:/,$$p' $<)
 
 .PHONY: devinstall-vendor
-devinstall-vendor: vendor/consul-bin/current/consul \
-                   $(wildcard vendor/dhall-bin/current/*)
-	@$(call _info,Installing Consul and Dhall)
+devinstall-vendor:
+	@$(call _info,Installing Dhall)
 	@install --verbose --directory $(DESTDIR)/$(PREFIX)/bin
-	@ln -v -sf $(addprefix $(TOP_SRC_DIR), $^) $(DESTDIR)/$(PREFIX)/bin
+	@ln -v -sf $(addprefix $(TOP_SRC_DIR), $(wildcard vendor/dhall-bin/current/*)) $(DESTDIR)/$(PREFIX)/bin
 
 # Uninstall ------------------------------------------- {{{1
 #
@@ -388,14 +446,12 @@ RPMSOURCES_DIR  := $(RPMBUILD_DIR)/SOURCES
 RPMSPECS_DIR    := $(RPMBUILD_DIR)/SPECS
 
 .PHONY: dist
-dist:
+dist: unpack-dhall-bin unpack-dhall-prelude
 	@$(call _info,Generating dist archive)
 	@rm -f $(DIST_FILE)
 	@git archive -v --prefix=cortx-hare/ HEAD -o $(DIST_FILE:.gz=)
-	git submodule foreach --recursive \
-	     "git archive --prefix=cortx-hare/\$$path/ --output=\$$sha1.tar HEAD \
-	      && tar --concatenate --file=$$(pwd)/$(DIST_FILE:.gz=) \$$sha1.tar \
-	      && rm \$$sha1.tar"
+	@tar --append --verbose --transform 's#^vendor#cortx-hare/vendor#' \
+	     --file=$(DIST_FILE:.gz=) vendor
 	@gzip $(DIST_FILE:.gz=)
 
 .PHONY: __rpm_pre

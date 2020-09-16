@@ -35,8 +35,12 @@ EOF
 
 cat <<EOF > /etc/yum.repos.d/lustre_release.repo
 [lustre]
-baseurl=$STORAGE/releases/eos/lustre/lustre-2.12.3/
+baseurl=$STORAGE/releases/cortx/uploads/rhel/rhel-7.7.1908/lustre/lustre-2.12.3/
 gpgcheck=0
 name=lustre
 enabled=1
 EOF
+
+# Hashicorp Consul repo
+yum -y install yum-utils
+yum-config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo
