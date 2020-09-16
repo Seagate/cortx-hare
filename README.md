@@ -257,3 +257,4 @@ and bootstrap again.
 ## See also
 
 * [Hare RFCs](rfc/README.md)
+* [Hare wiki](https://github.com/Seagate/cortx-hare/wiki)
