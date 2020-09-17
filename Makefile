@@ -136,6 +136,7 @@ HARE_RULES         = $(DESTDIR)/$(PREFIX)/rules
 HAX_EXE            = $(DESTDIR)/$(PREFIX)/bin/hax
 HAX_EGG_LINK       = $(DESTDIR)/$(PREFIX)/lib/python3.$(PY3_VERSION_MINOR)/site-packages/hax.egg-link
 SYSTEMD_CONFIG_DIR = $(DESTDIR)/usr/lib/systemd/system
+LOGROTATE_CONF_DIR = $(DESTDIR)/etc/logrotate.d
 
 # install {{{2
 .PHONY: install
@@ -146,10 +147,10 @@ install: install-dirs install-cfgen install-hax install-systemd install-vendor
 	     install $$f $(HARE_LIBEXEC); \
 	 done
 	@$(call _info,Installing hare provisioning)
-	@for f in provisioning/*; do \
-	     $(call _log,copying $$f -> $(HARE_CONF)); \
-	     install $$f $(HARE_CONF); \
-	 done
+	@$(call _log,copying setup.yaml -> $(HARE_CONF))
+	@install provisioning/setup.yaml $(HARE_CONF)
+	@$(call _log,copying hare-logrotate -> $(LOGROTATE_CONF_DIR))
+	@install --mode=0644 provisioning/hare-logrotate $(LOGROTATE_CONF_DIR)
 	@$(call _info,Installing RC rules)
 	@for f in rules/*; do \
 	     $(call _log,copying $$f -> $(HARE_RULES)); \
@@ -172,6 +173,7 @@ install-dirs:
 		  $(HARE_RULES) \
 		  $(DESTDIR)/run/cortx \
 		  $(DESTDIR)/var/log/hare \
+		  $(DESTDIR)/etc/logrotate.d \
 		  $(DESTDIR)/var/motr/hax; \
 	 do \
 	     install --verbose --directory $$d; \
