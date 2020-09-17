@@ -25,9 +25,6 @@ M0CONFGEN := $(if\
 dhall-lang-version := $(shell readlink ../vendor/dhall-prelude/current)
 dhall-lang-dir := dhall/dhall-lang-$(dhall-lang-version)
 
-opt_mock := $(shell if ! which facter &>/dev/null ||\
- grep -q ':/docker/' /proc/1/cgroup 2>/dev/null; then echo '--mock'; fi)
-
 .PHONY: check
 check: flake8 typecheck test-cfgen check-dhall
 
@@ -43,8 +40,8 @@ typecheck: $(PYTHON_SCRIPTS)
 test-cfgen: unpack-dhall-prelude
 	set -eu -o pipefail;\
  out=$$(mktemp -d);\
- ./cfgen -D ./dhall $(opt_mock) --debug examples/singlenode.yaml >/dev/null;\
- ./cfgen -D ./dhall $(opt_mock) -o $$out examples/singlenode.yaml;\
+ ./cfgen -D ./dhall --mock --debug examples/singlenode.yaml >/dev/null;\
+ ./cfgen -D ./dhall --mock -o $$out examples/singlenode.yaml;\
  dhall text <$$out/confd.dhall | $(M0CONFGEN) >/dev/null;\
  jq . <$$out/consul-kv.json >/dev/null;\
  rm -r $$out
