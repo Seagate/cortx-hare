@@ -429,9 +429,10 @@ mypy: $(PYTHON_SCRIPTS)
 test: test-cfgen
 
 .PHONY: test-cfgen
-test-cfgen: $(PY_VENV_DIR)
+test-cfgen: $(PY_VENV_DIR) unpack-dhall-bin unpack-dhall-prelude
 	@$(call _info,Testing cfgen)
-	@$(PY_VENV); $(MAKE) --quiet -C cfgen test-cfgen check-dhall
+	@$(PY_VENV); PATH=$$PWD/vendor/dhall-bin/current:$$PATH \
+		$(MAKE) --quiet -C cfgen test-cfgen check-dhall
 
 # RPM ------------------------------------------------- {{{1
 #
