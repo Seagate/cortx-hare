@@ -77,6 +77,7 @@ rm -rf %{buildroot}
 %{_sharedstatedir}/hare/
 %{_localstatedir}/motr/hax/
 /opt/seagate/cortx/hare/*
+/etc/logrotate.d/hare-logrotate
 
 %post
 systemctl daemon-reload
