@@ -3,9 +3,9 @@ domain: github.com
 shortname: 11/HCTL
 name: Hare Controller CLI
 status: stable
-editor: Konstantin Nekrasov <konstantin.nekrasov@seagate.com>
+editor: Mandar Sawant <mandar.sawant@seagate.com>
 contributors:
-  - Mandar Sawant <mandar.sawant@seagate.com>
+  - Konstantin Nekrasov <konstantin.nekrasov@seagate.com>
 ---
 
 `hctl` is a command-line interface for managing Hare cluster.
@@ -269,3 +269,109 @@ Options:
 ```
 
 **Note:** Similarly to `hctl node standby`, this command exits early, i.e. it doesn't wait until the resources are started at the nodes that used to be in standby state.
+
+#### hctl node-join
+
+Use this command to start Hare and Motr services on a node that was rebooted.
+
+```
+[root@ssc-vm-c-0552 cortx-hare]# hctl node-join --help
+Usage: hare-node-join [<option>]... <CDF>
+       hare-node-join [<option>]... --conf-dir <dir>
+
+Start and join a node with the cluster.
+
+Positional arguments:
+  <CDF>                        Path to the cluster description file.
+  -c, --conf-dir <dir>         Don't generate configuration files, use existing
+                               ones from the specified directory.
+  --conf-create                Re-create configuration on this node.
+  --consul-addr  <consul-addr> Active Consul server address.
+  --consul-port  <consul-port> Active Consul server port.
+Options:
+  -h, --help    Show this help and exit.
+```
+
+##### Stopped services on a node
+
+```
+[root@ssc-vm-c-0553 cortx-hare]# hctl status
+Profile: 0x7000000000000001:0x3d
+Data pools:
+    0x6f00000000000001:0x3e
+Services:
+    ssc-vm-c-0553.colo.seagate.com  (RC)
+    [started]  hax        0x7200000000000001:0x23  192.168.9.107@tcp:12345:1:1
+    [started]  confd      0x7200000000000001:0x26  192.168.9.107@tcp:12345:2:1
+    [started]  ioservice  0x7200000000000001:0x29  192.168.9.107@tcp:12345:2:2
+    [unknown]  m0_client  0x7200000000000001:0x37  192.168.9.107@tcp:12345:4:1
+    [unknown]  m0_client  0x7200000000000001:0x3a  192.168.9.107@tcp:12345:4:2
+    ssc-vm-c-0552.colo.seagate.com
+    [unknown]  hax        0x7200000000000001:0x6   192.168.9.108@tcp:12345:1:1
+    [unknown]  confd      0x7200000000000001:0x9   192.168.9.108@tcp:12345:2:1
+    [unknown]  ioservice  0x7200000000000001:0xc   192.168.9.108@tcp:12345:2:2
+    [unknown]  m0_client  0x7200000000000001:0x1a  192.168.9.108@tcp:12345:4:1
+    [unknown]  m0_client  0x7200000000000001:0x1d  192.168.9.108@tcp:12345:4:2
+```
+
+##### Restarting services on a node without regenerating configuration for the node
+
+```
+[root@ssc-vm-c-0552 cortx-hare]# hctl node-join --conf-dir /var/lib/hare --consul-addr 192.168.9.107 --consul-port 8500
+2020-09-18 10:10:52: Starting Consul server agent on this node.... OK
+2020-09-18 10:10:54: Updating Consul agents configs from the KV store... OK
+2020-09-18 10:10:54: Waiting for the RC Leader to get elected... OK
+2020-09-18 10:10:55: Starting Motr (phase1, m0d)... OK
+2020-09-18 10:10:59: Starting Motr (phase2, m0d)... OK
+2020-09-18 10:11:02: Checking health of services... OK
+[root@ssc-vm-c-0552 cortx-hare]# hctl status
+Profile: 0x7000000000000001:0x3d
+Data pools:
+    0x6f00000000000001:0x3e
+Services:
+    ssc-vm-c-0553.colo.seagate.com  (RC)
+    [started]  hax        0x7200000000000001:0x23  192.168.9.107@tcp:12345:1:1
+    [started]  confd      0x7200000000000001:0x26  192.168.9.107@tcp:12345:2:1
+    [started]  ioservice  0x7200000000000001:0x29  192.168.9.107@tcp:12345:2:2
+    [unknown]  m0_client  0x7200000000000001:0x37  192.168.9.107@tcp:12345:4:1
+    [unknown]  m0_client  0x7200000000000001:0x3a  192.168.9.107@tcp:12345:4:2
+    ssc-vm-c-0552.colo.seagate.com
+    [started]  hax        0x7200000000000001:0x6   192.168.9.108@tcp:12345:1:1
+    [started]  confd      0x7200000000000001:0x9   192.168.9.108@tcp:12345:2:1
+    [started]  ioservice  0x7200000000000001:0xc   192.168.9.108@tcp:12345:2:2
+    [unknown]  m0_client  0x7200000000000001:0x1a  192.168.9.108@tcp:12345:4:1
+    [unknown]  m0_client  0x7200000000000001:0x1d  192.168.9.108@tcp:12345:4:2
+```
+
+##### hctl node-join with configuration recreate
+
+If a failed node is replaced with a fresh and there's a need to re-generate the configuration files.
+
+```
+[root@ssc-vm-c-0552 cortx-hare]# hctl node-join /tmp/ees-cluster.yaml --consul-addr 192.168.9.107 --consul-port 8500 --conf-create
+2020-09-18 10:16:52: Generating node configuration... OK
+2020-09-18 10:16:52: Starting Consul server agent on this node.... OK
+2020-09-18 10:16:53: Updating Consul agents configs from the KV store... OK
+2020-09-18 10:16:53: Waiting for the RC Leader to get elected... OK
+2020-09-18 10:16:53: Starting Motr (phase1, m0d)... OK
+2020-09-18 10:16:58: Starting Motr (phase2, m0d)... OK
+2020-09-18 10:17:01: Checking health of services... OK
+```
+
+##### hctl node-join with regenerating Hare configuration and Motr mkfs
+
+It is possible that a fresh node needs to run motr mkfs in case the storage was wiped of.
+Executing hctl node-join command with `--mkfs` options will re-intialise Motr storage for the given node.
+
+```
+[root@ssc-vm-c-0552 cortx-hare]# hctl node-join /tmp/ees-cluster.yaml --consul-addr 192.168.9.107 --consul-port 8500 --mkfs --conf-create
+2020-09-18 11:02:32: Generating node configuration... OK
+2020-09-18 11:02:33: Starting Consul server agent on this node.... OK
+2020-09-18 11:02:35: Updating Consul agents configs from the KV store... OK
+2020-09-18 11:02:35: Waiting for the RC Leader to get elected... OK
+2020-09-18 11:02:35: Starting Motr (phase1, mkfs)... OK
+2020-09-18 11:02:42: Starting Motr (phase1, m0d)... OK
+2020-09-18 11:02:45: Starting Motr (phase2, mkfs)... OK
+2020-09-18 11:02:52: Starting Motr (phase2, m0d)... OK
+2020-09-18 11:02:55: Checking health of services... OK
+```
