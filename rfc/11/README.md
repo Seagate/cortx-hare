@@ -22,6 +22,7 @@ Commands:
     node        manage the cluster nodes
     reportbug   gather Hare forensic data
     shutdown    stop the cluster
+    start       start the cluster
     status      show cluster status
 
     help        Show this help and exit.
@@ -85,6 +86,21 @@ Stopping hare-consul-agent at ssc-vm-c-0553.colo.seagate.com...
 Stopped hare-consul-agent at ssc-vm-c-0552.colo.seagate.com
 Stopped hare-consul-agent at ssc-vm-c-0553.colo.seagate.com
 Killing RC Leader at ssc-vm-c-0552.colo.seagate.com... **ERROR**
+```
+
+## Cluster start
+
+```
+$ hctl start
+2020-09-18 06:59:59: Starting Consul server agent on this node............ OK
+2020-09-18 07:00:09: Importing configuration into the KV store... OK
+2020-09-18 07:00:09: Starting Consul agents on other cluster nodes... OK
+2020-09-18 07:00:09: Updating Consul agents configs from the KV store... OK
+2020-09-18 07:00:10: Installing Motr configuration files... OK
+2020-09-18 07:00:10: Waiting for the RC Leader to get elected..... OK
+2020-09-18 07:00:12: Starting Motr (phase1, m0d)... OK
+2020-09-18 07:00:15: Starting Motr (phase2, m0d)... OK
+2020-09-18 07:00:18: Checking health of services... OK
 ```
 
 ## Cluster status
