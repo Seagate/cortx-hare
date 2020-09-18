@@ -231,7 +231,7 @@ make_consul_env() {
 
 say 'Starting Consul server agent on this node...'
 # Create Consul env only for this node.
-if [[ $conf_create ]]; then
+if $conf_create; then
     make_consul_env
 fi
 
@@ -274,7 +274,7 @@ while (( $(get_ready_agents | wc -l) != $agents_nr )); do
     (( count++ ))
 done
 
-if [[ $conf_create ]]; then
+if $conf_create; then
     say 'Updating Consul agents configs from the KV store...'
     update-consul-conf &
     pids=($!)
