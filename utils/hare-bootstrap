@@ -254,7 +254,6 @@ fi
 
 abort_if_RC_leader_election_is_impossible
 
-# Get my IP address (the one that the other agents will join to).
 read _ join_ip <<< $(get_server_nodes | grep -w $(node-name))
 read _ join_peers <<< $(get_server_nodes | grep -vw $(node-name))
 
@@ -269,8 +268,12 @@ EOF
 fi
 
 say 'Starting Consul server agent on this node...'
+join_peers_option="--join $join_peers"
+if [[ ! $join_peers ]]; then
+    join_peers_option=""
+fi
 # $join_ip is our bind_ip address
-mk-consul-env --mode server --bind $join_ip --join $join_peers \
+mk-consul-env --mode server --bind $join_ip $join_peers_option\
               --extra-options '-ui -bootstrap-expect 1'
 
 sudo systemctl start hare-consul-agent
