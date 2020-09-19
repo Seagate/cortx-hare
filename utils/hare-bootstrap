@@ -268,12 +268,9 @@ EOF
 fi
 
 say 'Starting Consul server agent on this node...'
-join_peers_option="--join $join_peers"
-if [[ ! $join_peers ]]; then
-    join_peers_option=""
-fi
+join_peers_opt="${join_peers:+--join $join_peers}"
 # $join_ip is our bind_ip address
-mk-consul-env --mode server --bind $join_ip $join_peers_option\
+mk-consul-env --mode server --bind $join_ip $join_peers_opt \
               --extra-options '-ui -bootstrap-expect 1'
 
 sudo systemctl start hare-consul-agent
