@@ -101,7 +101,8 @@ get_session_checks_nr() {
 }
 
 get_leader() {
-    curl -sX GET http://$CONSUL_ADDR:$CONSUL_PORT/v1/leader
+    curl -sX GET http://$CONSUL_ADDR:$CONSUL_PORT/v1/kv/leader |
+        jq -r '.[].Value' | base64 -d
 }
 
 wait4() {
@@ -158,8 +159,8 @@ while true; do
     case "$1" in
         -h|--help)      usage; exit ;;
         -c|--conf-dir)  conf_dir=$2; shift 2 ;;
-        --consul-addr)  CONSUL_ADDR=$2 shift 2 ;;
-        --consul-port)  CONSUL_PORT=$2 shift 2 ;;
+        --consul-addr)  CONSUL_ADDR=$2; shift 2 ;;
+        --consul-port)  CONSUL_PORT=$2; shift 2 ;;
         --mkfs)         opt_mkfs=--mkfs; shift ;;
         --conf-create)  conf_create=true; shift ;;
         --)             shift; break ;;
@@ -242,7 +243,7 @@ sudo systemctl start hare-consul-agent
 # Here we are checking if any of the peer nodes is already elected as the
 # leader. This is required in case of node reboots and starting services
 # only on a given node.
-while ! $(get_leader); do
+while [[ ! $(get_leader) ]]; do
     sleep 1
     echo -n '.'
 done
