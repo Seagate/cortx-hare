@@ -255,9 +255,14 @@ pids=()
 # number of Consul agents. So we explicitly fetch the pids for all the
 # agents and check if the number of started agents matches the expected
 # number of total Consul agents in the cluster.
-while read node; do
-    pids+=$(ssh $node 'pidof consul')
-done < <(get_server_nodes | grep -vw $(node-name) || true)
+srvnodes=($(get_server_nodes | grep -vw $(node-name)))
+for node in ${srvnodes[@]}; do
+    if ssh -n $node "systemctl --quiet is-active hare-consul-agent"; then
+        pids+=($(ssh -n $node \
+                 "systemctl --quiet show --property MainPID hare-consul-agent" |
+                      cut -d '=' -f2))
+    fi
+done
 agents_nr=$(( ${#pids[@]} + 1 ))
 
 # Waiting for the agents to get ready...
