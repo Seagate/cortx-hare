@@ -75,7 +75,7 @@ and health-checking mechanisms.
     git clone --recursive https://github.com/Seagate/cortx-motr.git motr
     cd motr
 
-    scripts/m0 make
+    sudo scripts/m0 make
     sudo scripts/install-motr-service --link
 
     M0_SRC_DIR=$PWD
@@ -84,7 +84,7 @@ and health-checking mechanisms.
 
 * Build and install Hare.
   ```sh
-  make
+  sudo make
   sudo make devinstall
   ```
 
