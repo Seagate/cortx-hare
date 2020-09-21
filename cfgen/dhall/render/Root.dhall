@@ -35,7 +35,7 @@ in
       , named.Oid "mdpool" x.mdpool
       , named.TextUnquoted "imeta_pver"
             (Optional/fold types.Oid x.imeta_pver Text renderOid "(0,0)")
-      , named.Natural "mdredundancy" 1  -- XXX Is this value OK for EES?
+      , named.Natural "mdredundancy" 1  -- XXX Is this value OK for LDR1?
                                         --     Check with @madhav.
       , "params=[]"
       , named.Oids "nodes" x.nodes

@@ -15,9 +15,9 @@ processes.
 
 * Raw
   * [10/GLOSS](10/README.md) — Hare User's Glossary
-  * [12/CHECK](12/README.md) - EES HA Health Checks
-  * [13/HALC](13/README.md) — EES HA, Loosely Coupled
-  * [14/HW](14/README.md) — EES Hardware
+  * [12/CHECK](12/README.md) - LDR1 HA Health Checks
+  * [13/HALC](13/README.md) — LDR1 HA, Loosely Coupled
+  * [14/HW](14/README.md) — LDR1 Hardware
   * [15/BQ](15/README.md) — Broadcast Queue
   * [16/RCE](16/README.md) — Recovery Coordination Engine
   * [17/CICD](17/README.md) — Continuous Integration and Continuous Deployment
