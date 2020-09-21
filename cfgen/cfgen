@@ -645,7 +645,7 @@ class SvcT(Enum):
     M0_CST_FDMI = auto()
     M0_CST_BE = auto()
     M0_CST_M0T1FS = auto()
-    M0_CST_CLOVIS = auto()
+    M0_CST_CLIENT = auto()
     M0_CST_ISCS = auto()
 
     def to_dhall(self) -> str:
@@ -1368,7 +1368,7 @@ def generate_consul_kv(cluster: Cluster, dhall_dir: str) -> str:
                                         svc_id=svc_id,
                                         stype=stype,
                                         meta_data=proc.meta_data)
-                # Add clovis clients to consul kv
+                # Add Motr clients to consul kv
                 if proc_id in cluster.m0_clients:
                     proc_ep = m0conf[proc_id].endpoint
                     yield ConsulService(node_name=node.name,

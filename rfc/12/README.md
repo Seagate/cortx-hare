@@ -1,20 +1,20 @@
 ---
 domain: github.com
 shortname: 12/CHECK
-name: EES HA Health Checks
+name: LDR1 HA Health Checks
 status: raw
 editor: Maxim Medved <max.medved@seagate.com>
 ---
 
 Some of the issues on the cluster could be detected by looking at systemd unit
-states. Some of the issues can't. This is why we have EES HA Health Checks.
+states. Some of the issues can't. This is why we have LDR1 HA Health Checks.
 
-# EES HA Health Checks
+# LDR1 HA Health Checks
 
 ## Overview
 
-The primary goal of EES HA is to make EES data stack and EES management stack
-highly available. To do this EES HA monitors system state and changes location
+The primary goal of LDR1 HA is to make LDR1 data stack and LDR1 management stack
+highly available. To do this LDR1 HA monitors system state and changes location
 and/or configuration of services in case of hardware/software failures to run
 them on the part of the system that hasn't failed. Basic error detection in
 Pacemaker uses resource agent monitor operation. For systemd units it's just
@@ -26,7 +26,7 @@ service itself is not functioning properly: it may be hung, deadlocked etc. If
 a custom resource agent for our components does similar health check - like
 "the process is running" - then it has the same issues as the systemd unit.
 
-There is another issue with system monitoring: if EES HA starts watching for
+There is another issue with system monitoring: if LDR1 HA starts watching for
 all hardware and software components, it also needs to know exactly how are
 they communicating and what are they depend on. Such dependencies are not
 exactly the same as the startup/shutdown dependencies which Pacemaker uses to
@@ -35,17 +35,17 @@ Pacemaker couldn't know when components are failing because of communication
 issues. Adding communication dependencies into our current implementation is
 not even close to an easy task.
 
-To make EES HA to be able detect if components or entire data/management stack
+To make LDR1 HA to be able detect if components or entire data/management stack
 are functioning a set of health checks was introduced. The purpose of health
 checks is to be able to detect when a component or a set of components stop
-functioning and then provide this information to EES HA, so EES HA can make a
+functioning and then provide this information to LDR1 HA, so LDR1 HA can make a
 decision about how to recover from this situation.
 
 Health checks are implemented as checks of functionality. For one check this is
 functionality of a single hardware component or network link, for another check
 this is functionality of entire data stack.
 
-## List of EES HA health checks
+## List of LDR1 HA health checks
 
 | implementation | integration | check-id | what it checks | how it checks | action if the check fails | components involved |
 | -------------- | ----------- | -------- | -------------- | --------------| ------------------------- | ----------------------------------- |
@@ -81,4 +81,4 @@ There are 2 options for health checks integration into Pacemaker:
 
 ## See also
 
-* [Original list of EES HA health checks. The spreadsheet has a lot of useful information](https://docs.google.com/spreadsheets/d/1xASlPnlFx1OmhKttbgOweHbmfbXMI6n3Pmp2TSO8ou8/edit#gid=1305517710)
+* [Original list of LDR1 HA health checks. The spreadsheet has a lot of useful information](https://docs.google.com/spreadsheets/d/1xASlPnlFx1OmhKttbgOweHbmfbXMI6n3Pmp2TSO8ou8/edit#gid=1305517710)

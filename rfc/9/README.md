@@ -126,7 +126,8 @@ specific goals:
   -- | whether a feature, bug, change or idea is actually worth solving as it
   -- | is really easy to see if there is a need. Further it forces developers
   -- | to consciously fragment their work into a stream of small fixes rather
-  -- | than one big with a rubbish commit message or even a listing.
+  -- | than one big with a <censored>nonsensical</censored> commit message or
+  -- | even a listing.
   -- |
   -- | From a maintainers perspective it allows us to quickly examine a pull
   -- | request and merge it in a manner of seconds or decline it if the
