@@ -42,7 +42,7 @@ in
     , M0_CST_FDMI    = "M0_CST_FDMI"
     , M0_CST_BE      = "M0_CST_BE"
     , M0_CST_M0T1FS  = "M0_CST_M0T1FS"
-    , M0_CST_CLOVIS  = "M0_CST_CLOVIS"
+    , M0_CST_CLIENT  = "M0_CST_CLIENT"
     , M0_CST_ISCS    = "M0_CST_ISCS"
     }
     x

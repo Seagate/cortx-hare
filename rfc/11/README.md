@@ -50,7 +50,7 @@ Options:
 
 Initial bootstrap requires `--mkfs`.  Subsequent `hctl bootstrap` calls SHOULD NOT use `--mkfs`, otherwise any data stored in Motr will be lost.
 ```
-$ hctl bootstrap --mkfs /tmp/ees-cluster.yaml
+$ hctl bootstrap --mkfs /tmp/ldr1-cluster.yaml
 2020-09-03 09:54:39: Generating cluster configuration... OK
 2020-09-03 09:54:40: Starting Consul server agent on this node........... OK
 2020-09-03 09:54:49: Importing configuration into the KV store... OK

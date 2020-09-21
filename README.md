@@ -122,7 +122,7 @@ See `cfgen --help-schema` for the description of CDF format.
 You can make a copy of
 `/opt/seagate/cortx/hare/share/cfgen/examples/singlenode.yaml`
 (single-node setup) or
-`/opt/seagate/cortx/hare/share/cfgen/examples/ees-cluster.yaml`
+`/opt/seagate/cortx/hare/share/cfgen/examples/ldr1-cluster.yaml`
 (dual-node setup) and edit it as necessary.
 
 ```sh
