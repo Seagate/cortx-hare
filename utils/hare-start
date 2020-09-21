@@ -21,23 +21,249 @@ set -eu -o pipefail
 # set -x
 export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
 
-# :help: start cluster
+# :help: Start the cluster
 
 PROG=${0##*/}
+
+usage() {
+    cat <<EOF
+       $PROG [<option>]... --conf-dir <dir>
+
+Start the cluster.
+
+Optional arguments:
+  -c, --conf-dir <dir>   Don't generate configuration files, use existing
+                         ones from the specified directory.
+  -h, --help   Show this help and exit.
+EOF
+}
+
+TEMP=$(getopt --options hc: \
+              --longoptions help,conf-dir: \
+              --name "$PROG" -- "$@" || true)
+
+(($? == 0)) || { usage >&2; exit 1; }
+
+eval set -- "$TEMP"
+
+get_server_nodes() {
+    jq -r '.servers[] | "\(.node_name) \(.ipaddr)"' \
+       $conf_dir/consul-agents.json
+}
+
+get_client_nodes() {
+    jq -r '.clients[] | "\(.node_name) \(.ipaddr)"' \
+       $conf_dir/consul-agents.json
+}
+
+get_all_nodes() {
+    jq -r '(.servers + .clients)[] | "\(.node_name) \(.ipaddr)"' \
+        $conf_dir/consul-agents.json
+}
+
+get_session() {
+    consul kv get -detailed leader | awk '/Session/ {print $2}'
+}
+
+get_session_checks_nr() {
+    local sid=$1
+    curl -sX GET http://localhost:8500/v1/session/info/$sid |
+        jq -r '.[].Checks|length'
+}
+
+wait_rc_leader() {
+    local count=1
+    while [[ $(get_session) == '-' ]]; do
+        if (( $count > 5 )); then
+            consul kv put leader elect$RANDOM > /dev/null
+            count=1
+        fi
+        sleep 1
+        echo -n '.'
+        (( count++ ))
+    done
+}
+
+wait4() {
+    for pid in $*; do
+        wait $pid
+    done
+}
+
+get_ready_agents() {
+    consul members | sed 1d | awk '{print $1}'
+}
+
+get_ready_agents_nr() {
+    consul members | sed 1d | wc -l
+}
 
 die() {
     echo "$PROG: $*" >&2
     exit 1
 }
 
-conf_dir=/var/lib/hare
+say() {
+    echo -n "$(date '+%F %T'): $*"
+}
 
-if ! [[ -d $conf_dir ]]; then
-    die 'Cluster is not configured on this node.'
-fi
+conf_dir=
+
+while true; do
+    case "$1" in
+        -h|--help)           usage; exit ;;
+        -c|--conf-dir)       conf_dir=$2; shift 2 ;;
+        --)                  shift; break ;;
+        *)                   break ;;
+    esac
+done
 
 if  hctl status > /dev/null 2>&1; then
     die 'Cluster is up and running.'
 fi
 
-hctl bootstrap -c $conf_dir
+if [[ -z $conf_dir ]]; then
+    conf_dir=/var/lib/hare
+
+    if ! [[ -d $conf_dir ]]; then
+        cat <<EOF >&2
+$conf_dir directory does not exist.
+Try reinstalling Hare.
+EOF
+        exit 1
+    fi
+fi
+
+say 'Starting Consul server agent on this node...'
+sudo systemctl start hare-consul-agent
+
+# Wait for Consul's internal leader to be ready.
+# (Until then the KV store won't be accessible.)
+while ! consul info 2>/dev/null | grep -q 'leader.*true'; do
+    sleep 1
+    echo -n '.'
+done
+echo ' OK'
+
+say 'Starting Consul agents on other cluster nodes...'
+pids=()
+while read node bind_ip; do
+    ssh $node "sudo systemctl start hare-consul-agent" &
+    pids+=($!)
+done < <(get_server_nodes | grep -vw $(node-name) || true)
+
+while read node bind_ip; do
+    ssh $node "sudo systemctl start hare-consul-agent" &
+    pids+=($!)
+done < <(get_client_nodes)
+wait4 ${pids[@]-}
+agents_nr=$(( ${#pids[@]} + 1 ))
+
+# Waiting for the agents to get ready...
+count=1
+while (( $(get_ready_agents_nr) != $agents_nr )); do
+    if (( $count > 5 )); then
+        echo 'Some agent(s) failed to start in due time:' >&2
+        diff <(get_ready_agents | sort) \
+             <(get_all_nodes | awk '{print $1}' | sort) | sed 1d >&2
+        echo 'Check connectivity and firewall (Consul ports must be opened)' >&2
+        exit 1
+    fi
+    echo -n '.'
+    sleep 1
+    (( count++ ))
+done
+echo ' OK'
+
+consul reload > /dev/null
+say 'Waiting for the RC Leader to get elected...'
+wait_rc_leader
+sid=$(get_session)
+# There is always the serfHealth check in the session. But
+# if it is the only one - we should destroy the current session
+# (and wait for re-election to happen) to make sure that the new
+# session will be bound to the Motr services checks also.
+while (( $(get_session_checks_nr $sid) == 1 )); do
+    curl -sX PUT http://localhost:8500/v1/session/destroy/$sid &>/dev/null
+    wait_rc_leader
+    sid=$(get_session)
+done
+echo ' OK'
+
+get_nodes() {
+    local phase=$1
+
+    if [[ $phase == phase1 ]]; then
+        # Note: confd-s are running on server nodes only.
+        get_server_nodes
+    else
+        get_all_nodes
+    fi
+}
+
+start_motr() {
+    local op=$1
+    local phase=$2
+
+    say "Starting Motr ($phase, $op)..."
+    bootstrap-node $op --phase $phase &
+    pids=($!)
+
+    while read node _; do
+        ssh $node "PATH=$PATH $(which bootstrap-node) $op --phase $phase" &
+        pids+=($!)
+    done < <(get_nodes $phase | grep -vw $(node-name) || true)
+    wait4 ${pids[@]}
+    echo ' OK'
+}
+
+bootstrap_nodes() {
+    local phase=$1
+
+    start_motr 'm0d' $phase
+}
+
+# Start confds first
+bootstrap_nodes phase1
+
+# Start ioservices
+bootstrap_nodes phase2
+
+. update-consul-conf --dry-run  # import S3_IDs
+if [[ -n $S3_IDs ]]; then
+    # Now the 3rd phase (s3servers).
+    say 'Starting S3 servers (phase3)...'
+    bootstrap-node --phase phase3 &
+    pids=($!)
+
+    while read node _; do
+        ssh $node "PATH=$PATH $(which bootstrap-node) --phase phase3" &
+        pids+=($!)
+    done < <(get_all_nodes | grep -vw $(node-name) || true)
+    wait4 ${pids[@]}
+    echo ' OK'
+fi
+
+say 'Checking health of services...'
+check_service() {
+    local svc=$1
+    curl -s http://127.0.0.1:8500/v1/health/service/$svc |
+        jq -r '.[] | "\(.Node.Node) \([.Checks[].Status]|unique)"' |
+        fgrep -v '["passing"]' || true
+}
+
+count=1
+for svc in confd ios s3service; do
+    svc_not_ready=$(check_service $svc)
+    while [[ $svc_not_ready ]]; do
+        if (( $count > 30 )); then
+            echo $svc_not_ready >&2
+            echo "Check '$svc' service on the node(s) listed above." >&2
+            exit 1
+        fi
+        (( count++ ))
+        sleep 1
+        svc_not_ready=$(check_service $svc)
+    done
+done
+echo ' OK'
