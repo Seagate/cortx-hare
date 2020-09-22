@@ -18,10 +18,10 @@
 
 import datetime
 import logging
-import time
+from threading import Event
 from typing import List
 
-from hax.exception import HAConsistencyException
+from hax.exception import HAConsistencyException, InterruptedException
 from hax.motr import Motr, log_exception
 from hax.types import FsStatsWithTime, StoppableThread
 from hax.util import ConsulUtil
@@ -35,10 +35,17 @@ class FsStatsUpdater(StoppableThread):
         self.stopped = False
         self.consul = ConsulUtil()
         self.interval_sec = interval_sec
+        self.event = Event()
 
     def stop(self) -> None:
         logging.debug('Stop signal received')
         self.stopped = True
+        self.event.set()
+
+    def _sleep(self, interval_sec) -> None:
+        interrupted = self.event.wait(timeout=interval_sec)
+        if interrupted:
+            raise InterruptedException()
 
     @log_exception
     def _execute(self, motr: Motr):
@@ -50,7 +57,7 @@ class FsStatsUpdater(StoppableThread):
             while not self.stopped:
                 started = self._ioservices_running()
                 if not all(started):
-                    time.sleep(self.interval_sec)
+                    self._sleep(self.interval_sec)
                     continue
                 result: int = motr.start_rconfc()
                 if result == 0:
@@ -70,7 +77,12 @@ class FsStatsUpdater(StoppableThread):
                                       'due to an intermittent error. The '
                                       'error is swallowed since new attempts '
                                       'will be made timely')
-                time.sleep(self.interval_sec)
+                self._sleep(self.interval_sec)
+        except InterruptedException:
+            # No op. _sleep() has interrupted before the timeout exceeded:
+            # the application is shutting down.
+            # There are no resources that we need to dispose specially.
+            pass
         except Exception:
             logging.exception('Aborting due to an error')
         finally:
@@ -86,11 +98,9 @@ class FsStatsUpdater(StoppableThread):
 
     def _ensure_motr_all_started(self):
         while True:
-            if self.stopped:
-                return
             started = self._ioservices_running()
             if all(started):
                 logging.debug(
                     'According to Consul all confds have been started')
                 return
-            time.sleep(5)
+            self._sleep(5)
