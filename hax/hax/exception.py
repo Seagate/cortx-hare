@@ -39,3 +39,10 @@ class NotDelivered(RuntimeError):
     def __init__(self, message: str):
         super().__init__()
         self.message = message
+
+
+class InterruptedException(RuntimeError):
+    """
+    Marker exception that is used in HaX to control thread lifecycle.
+    """
+    pass
