@@ -45,3 +45,7 @@ and describe the problem you are facing.
    ```
 
 4. [Create a pull request](https://docs.github.com/en/github/collaborating-with-issues-and-pull-requests/creating-a-pull-request-from-a-fork).
+
+## See also
+
+* [CORTX Contributing Guide](https://github.com/Seagate/cortx/blob/main/CONTRIBUTING.md)
