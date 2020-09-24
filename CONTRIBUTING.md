@@ -7,14 +7,6 @@ Thank you for your interest in contributing to Hare!
 This project uses [PC3 (Pedantic Code Construction Contract)](rfc/9/README.md)
 process for contributions.
 
-## Authenticating with SSO
-
-<!-- XXX-DELETEME Remove this section as soon as Seagate ditches SSO. -->
-
-'Seagate' organization at GitHub uses SAML single sign-on (SSO).
-To authenticate with the API or Git on the command line, you must
-[authorize your SSH key or personal access token](https://docs.github.com/en/github/authenticating-to-github/authenticating-with-saml-single-sign-on).
-
 ## Requesting changes
 
 To request changes,
