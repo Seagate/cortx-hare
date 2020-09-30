@@ -6,7 +6,8 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 from hax.message import BroadcastHAStates
 from hax.motr.delivery import DeliveryHerald
 from hax.queue.confobjutil import ConfObjUtil
-from hax.types import Fid, HaLinkMessagePromise, HAState, MessageId
+from hax.types import (Fid, HaLinkMessagePromise, HAState, MessageId,
+                       ServiceHealth)
 from hax.util import create_drive_fid
 
 
@@ -75,17 +76,19 @@ class BQProcessor:
 
         q: Queue = Queue(1)
         self.queue.put(
-            BroadcastHAStates(states=[HAState(fid, status='offline')],
-                              reply_to=q))
+            BroadcastHAStates(
+                states=[HAState(fid,
+                                status=ServiceHealth.FAILED)], reply_to=q))
         ids: List[MessageId] = q.get()
         self.herald.wait_for_any(HaLinkMessagePromise(ids))
 
-    def to_ha_state(self, objinfo: dict) -> Optional[HAState]:
+    def to_ha_state(self, objinfo: Dict[str, str]) -> Optional[HAState]:
         try:
             drive_id = self.confobjutil.obj_name_to_id(objinfo['obj_type'],
                                                        objinfo['obj_name'])
+            state = ServiceHealth.OK if objinfo[
+                'obj_state'] == 'online' else ServiceHealth.FAILED
         except KeyError as error:
             logging.error('Invalid json payload, no key (%s) present', error)
             return None
-        return HAState(fid=create_drive_fid(int(drive_id)),
-                       status=objinfo['obj_state'])
+        return HAState(fid=create_drive_fid(int(drive_id)), status=state)

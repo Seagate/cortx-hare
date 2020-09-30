@@ -28,7 +28,8 @@ from hax.motr import Motr
 from hax.motr.delivery import DeliveryHerald
 from hax.motr.ffi import HaxFFI
 from hax.server import run_server
-from hax.types import Fid
+from hax.servicemon import ServiceMonitor
+from hax.types import Fid, StoppableThread
 from hax.util import ConsulUtil, repeat_if_fails
 
 __all__ = ['main']
@@ -41,16 +42,10 @@ def _setup_logging():
     logging.basicConfig(
         level=logging.DEBUG,
         format='%(asctime)s [%(levelname)s] {%(threadName)s} %(message)s')
+    # TODO set consul logging to WARN
 
 
-def _run_qconsumer_thread(queue: Queue, motr: Motr) -> ConsumerThread:
-    thread = ConsumerThread(queue, motr)
-    thread.start()
-    return thread
-
-
-def _run_stats_updater_thread(motr: Motr) -> FsStatsUpdater:
-    thread = FsStatsUpdater(motr, interval_sec=30)
+def _run_thread(thread: StoppableThread):
     thread.start()
     return thread
 
@@ -74,7 +69,7 @@ def main():
     #    thread which must be free ASAP)
     # 2. A new HA notification has come form Consul via HTTP
     # [KN] The messages are consumed by Python thread created by
-    # _run_qconsumer_thread function.
+    # _run_thread(ConsumerThread(..)) function.
     #
     # [KN] Note: The server is launched in the main thread.
     q = Queue(maxsize=8)
@@ -90,18 +85,25 @@ def main():
     ffi = HaxFFI()
     herald = DeliveryHerald()
     motr = Motr(queue=q, rm_fid=cfg.rm_fid, ffi=ffi, herald=herald)
-    consumer = _run_qconsumer_thread(q, motr)
 
+    # Note that consumer thread must be started before we invoke motr.start(..)
+    # Reason: hax process will send entrypoint request and somebody needs
+    # to reply it.
+    consumer = _run_thread(ConsumerThread(q, motr))
     try:
         motr.start(cfg.hax_ep,
                    process=cfg.hax_fid,
                    ha_service=cfg.ha_fid,
                    rm_service=cfg.rm_fid)
         logging.info('Motr API has been started')
-        stats_updater = _run_stats_updater_thread(motr)
+        service_monitor = _run_thread(ServiceMonitor(q))
+        stats_updater = _run_thread(FsStatsUpdater(motr, interval_sec=30))
+
         # [KN] This is a blocking call. It will work until the program is
         # terminated by signal
-        run_server(q, herald, threads_to_wait=[consumer, stats_updater])
+        run_server(q,
+                   herald,
+                   threads_to_wait=[consumer, stats_updater, service_monitor])
     except Exception:
         logging.exception('Exiting due to an exception')
     finally:
