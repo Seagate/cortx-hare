@@ -20,19 +20,20 @@ import json
 import logging
 import os
 import re
+from base64 import b64encode
 from functools import wraps
 from time import sleep
 from typing import Any, Dict, List, NamedTuple, Optional, Tuple
 
 import simplejson
-from base64 import b64encode
 from consul import Consul, ConsulException
 from consul.base import ClientError
 from requests.exceptions import RequestException
 from urllib3.exceptions import HTTPError
 
 from hax.exception import HAConsistencyException
-from hax.types import ConfHaProcess, Fid, FsStatsWithTime, ObjT
+from hax.types import (ConfHaProcess, Fid, FsStatsWithTime, HAState, ObjT,
+                       ServiceHealth)
 
 __all__ = ['ConsulUtil', 'create_process_fid', 'create_drive_fid']
 
@@ -194,7 +195,7 @@ class ConsulUtil:
         self.cns: Consul = Consul()
         self.kv = ConsulKVBasic(cns=self.cns)
 
-    def _catalog_service_names(self) -> List[str]:
+    def catalog_service_names(self) -> List[str]:
         """
         Return full list of service names currently registered in Consul
         server.
@@ -220,17 +221,21 @@ class ConsulUtil:
         raise HAConsistencyException(
             f'No {svc_name!r} Consul service found at node {hostname!r}')
 
+    def get_local_nodename(self) -> str:
+        try:
+            local_nodename = os.environ.get('HARE_HAX_NODE_NAME') or \
+                self.cns.agent.self()['Config']['NodeName']
+            return local_nodename
+        except (ConsulException, HTTPError, RequestException) as e:
+            raise HAConsistencyException('Failed to communicate '
+                                         'to Consul Agent') from e
+
     def _local_service_by_name(self, name: str) -> Dict[str, Any]:
         """
         Returns the service data by its name assuming that it runs at the same
         node to the current hax process.
         """
-        try:
-            local_nodename = os.environ.get('HARE_HAX_NODE_NAME') or \
-                self.cns.agent.self()['Config']['NodeName']
-        except (ConsulException, HTTPError, RequestException) as e:
-            raise HAConsistencyException('Failed to communicate '
-                                         'to Consul Agent') from e
+        local_nodename = self.get_local_nodename()
         return self._service_by_name(local_nodename, name)
 
     def _service_data(self) -> ServiceData:
@@ -314,7 +319,7 @@ class ConsulUtil:
 
         m0d_services = set(['ios', 'confd'])
         result = []
-        for service_name in self._catalog_service_names():
+        for service_name in self.catalog_service_names():
             if service_name not in m0d_services:
                 continue
             data = self.get_service_data_by_name(service_name)
@@ -442,6 +447,23 @@ class ConsulUtil:
         key = f'process/{fid}'
         logging.debug('Setting disk state in KV: %s:%s', key, data)
         self.kv.kv_put(key, data)
+
+    def get_local_service_health(self, service_name: str) -> HAState:
+        local_nodename = self.get_local_nodename()
+        srv_data: List[Dict[str,
+                            Any]] = self.cns.health.service(service_name)[1]
+        local_services = [
+            srv for srv in srv_data if srv['Node']['Node'] == local_nodename
+        ]
+        if not local_services:
+            raise RuntimeError(
+                f'Node {local_nodename} has no service {service_name}')
+        service = local_services[0]
+
+        ok = all(x.get('Status') == 'passing' for x in service['Checks'])
+        status = ServiceHealth.OK if ok else ServiceHealth.FAILED
+        fid = create_process_fid(int(service['Service']['ID']))
+        return HAState(fid=fid, status=status)
 
 
 def dump_json(obj) -> str:

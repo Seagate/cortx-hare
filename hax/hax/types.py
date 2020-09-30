@@ -117,7 +117,7 @@ class Fid:
         return self.container == 0 and self.key == 0
 
     def __repr__(self):
-        return f'{self.container:#x}:{self.key:#x}'
+        return f'0x{self.container:x}:0x{self.key:x}'
 
     def __eq__(self, other):
         return type(other) is Fid and \
@@ -166,8 +166,6 @@ ReprebStatus = NamedTuple('ReprebStatus', [('fid', Fid),
 
 HaNote = NamedTuple('HaNote', [('obj_t', str), ('note', HaNoteStruct)])
 
-HAState = NamedTuple('HAState', [('fid', Fid), ('status', str)])
-
 # struct m0_stob_id
 StobId = NamedTuple('StobId', [('domain_fid', Fid), ('fid', Fid)])
 
@@ -205,3 +203,15 @@ class HaLinkMessagePromise:
 
     def __repr__(self):
         return 'HaLinkMessagePromise' + str(self._ids)
+
+
+class ServiceHealth(Enum):
+    FAILED = 0
+    OK = 1
+    UNKNOWN = 2
+
+    def __str__(self):
+        return self.name
+
+
+HAState = NamedTuple('HAState', [('fid', Fid), ('status', ServiceHealth)])
