@@ -1,7 +1,9 @@
 /var/log/hare/*.log
 {
     rotate 10
-    size 10M
+    maxsize 50M
     weekly
     compress
+    missingok
+    copytruncate
 }
