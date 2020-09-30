@@ -6,7 +6,8 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 from hax.message import BroadcastHAStates
 from hax.motr.delivery import DeliveryHerald
 from hax.queue.confobjutil import ConfObjUtil
-from hax.types import Fid, HaLinkMessagePromise, HAState, MessageId
+from hax.types import (Fid, HaLinkMessagePromise, HAState, MessageId,
+                       ServiceHealth)
 
 
 class BQProcessor:
@@ -76,17 +77,17 @@ class BQProcessor:
 
         q: Queue = Queue(1)
         self.queue.put(
-            BroadcastHAStates(states=[HAState(fid, status='offline')],
-                              reply_to=q))
+            BroadcastHAStates(
+                states=[HAState(fid,
+                                status=ServiceHealth.FAILED)], reply_to=q))
         ids: List[MessageId] = q.get()
         self.herald.wait_for_any(HaLinkMessagePromise(ids))
 
     def to_ha_state(self, objinfo: dict) -> Optional[HAState]:
         try:
-            sdev_fid = self.confobjutil.drive_to_sdev_fid(objinfo['node'],
-                                                          objinfo['device'])
+            sdev_fid = self.confobjutil.drive_to_sdev_fid(
+                objinfo['node'], objinfo['device'])
         except KeyError as error:
             logging.error('Invalid json payload, no key (%s) present', error)
             return None
-        return HAState(sdev_fid,
-                       status=objinfo['state'])
+        return HAState(sdev_fid, status=objinfo['state'])
