@@ -10,12 +10,16 @@ from hax.types import (Fid, HaLinkMessagePromise, HAState, MessageId,
                        ServiceHealth)
 from hax.util import create_drive_fid
 
+LOG = logging.getLogger('hax')
+
 
 class BQProcessor:
     """
+    Broadcast Queue Processor.
+
     This is the place where a real processing logic should be located.
-    Currently it is effectively a no-op.
     """
+
     def __init__(self, queue: Queue, delivery_herald: DeliveryHerald):
         self.queue = queue
         self.confobjutil = ConfObjUtil()
@@ -23,22 +27,22 @@ class BQProcessor:
 
     def process(self, message: Tuple[int, Any]) -> None:
         (i, msg) = message
-        logging.debug('Message #%d received: %s (type: %s)', i, msg,
-                      type(msg).__name__)
+        LOG.debug('Message #%d received: %s (type: %s)', i, msg,
+                  type(msg).__name__)
         try:
             self.payload_process(msg)
         except Exception:
-            logging.exception(
+            LOG.exception(
                 'Failed to process a message #%d.'
                 ' The message is skipped.', i)
-        logging.debug('Message #%d processed', i)
+        LOG.debug('Message #%d processed', i)
 
     def payload_process(self, msg: str) -> None:
         data = None
         try:
             data = json.loads(msg)
         except json.JSONDecodeError:
-            logging.error('Cannot parse payload, invalid json')
+            LOG.error('Cannot parse payload, invalid json')
             return
 
         payload = data['payload']
@@ -49,9 +53,8 @@ class BQProcessor:
             'STOB_IOQ_ERROR': self.handle_ioq_stob_error,
         }
         if msg_type not in handlers:
-            logging.warn(
-                'Unsupported message type given: %s. Message skipped.',
-                msg_type)
+            LOG.warn('Unsupported message type given: %s. Message skipped.',
+                     msg_type)
             return
         handlers[msg_type](payload)
 
@@ -60,10 +63,12 @@ class BQProcessor:
         # for objinfo in payload:
         hastate: Optional[HAState] = self.to_ha_state(payload)
         if not hastate:
-            logging.debug('No ha states to broadcast.')
+            LOG.debug('No ha states to broadcast.')
             return
 
         q: Queue = Queue(1)
+        LOG.debug('HA broadcast, node: %s device: %s state: %s',
+                  payload['node'], payload['device'], payload['state'])
         self.queue.put(BroadcastHAStates(states=[hastate], reply_to=q))
         ids: List[MessageId] = q.get()
         self.herald.wait_for_any(HaLinkMessagePromise(ids))
@@ -71,7 +76,7 @@ class BQProcessor:
     def handle_ioq_stob_error(self, payload: Dict[str, Any]) -> None:
         fid = Fid.parse(payload['conf_sdev'])
         if fid.is_null():
-            logging.debug('Fid is 0:0. Skipping the message.')
+            LOG.debug('Fid is 0:0. Skipping the message.')
             return
 
         q: Queue = Queue(1)
@@ -89,6 +94,6 @@ class BQProcessor:
             state = ServiceHealth.OK if objinfo[
                 'obj_state'] == 'online' else ServiceHealth.FAILED
         except KeyError as error:
-            logging.error('Invalid json payload, no key (%s) present', error)
+            LOG.error('Invalid json payload, no key (%s) present', error)
             return None
         return HAState(fid=create_drive_fid(int(drive_id)), status=state)

@@ -26,6 +26,8 @@ from hax.motr import Motr, log_exception
 from hax.types import FsStatsWithTime, StoppableThread
 from hax.util import ConsulUtil
 
+LOG = logging.getLogger('hax')
+
 
 class FsStatsUpdater(StoppableThread):
     def __init__(self, motr: Motr, interval_sec=5):
@@ -38,7 +40,7 @@ class FsStatsUpdater(StoppableThread):
         self.event = Event()
 
     def stop(self) -> None:
-        logging.debug('Stop signal received')
+        LOG.debug('Stop signal received')
         self.stopped = True
         self.event.set()
 
@@ -51,7 +53,7 @@ class FsStatsUpdater(StoppableThread):
     def _execute(self, motr: Motr):
         try:
             ffi = motr._ffi
-            logging.info('filesystem stats updater thread has started')
+            LOG.info('filesystem stats updater thread has started')
             ffi.adopt_motr_thread()
             self._ensure_motr_all_started()
             while not self.stopped:
@@ -65,7 +67,7 @@ class FsStatsUpdater(StoppableThread):
                     motr.stop_rconfc()
                     if not stats:
                         continue
-                    logging.debug('FS stats are as follows: %s', stats)
+                    LOG.debug('FS stats are as follows: %s', stats)
                     now_time = datetime.datetime.now()
                     data = FsStatsWithTime(stats=stats,
                                            timestamp=now_time.timestamp(),
@@ -73,10 +75,10 @@ class FsStatsUpdater(StoppableThread):
                     try:
                         self.consul.update_fs_stats(data)
                     except HAConsistencyException:
-                        logging.debug('Failed to update Consul KV '
-                                      'due to an intermittent error. The '
-                                      'error is swallowed since new attempts '
-                                      'will be made timely')
+                        LOG.debug('Failed to update Consul KV '
+                                  'due to an intermittent error. The '
+                                  'error is swallowed since new attempts '
+                                  'will be made timely')
                 self._sleep(self.interval_sec)
         except InterruptedException:
             # No op. _sleep() has interrupted before the timeout exceeded:
@@ -84,15 +86,15 @@ class FsStatsUpdater(StoppableThread):
             # There are no resources that we need to dispose specially.
             pass
         except Exception:
-            logging.exception('Aborting due to an error')
+            LOG.exception('Aborting due to an error')
         finally:
-            logging.debug('Releasing motr-related resources for this thread')
+            LOG.debug('Releasing motr-related resources for this thread')
             ffi.shun_motr_thread()
-            logging.debug('filesystem stats updater thread exited')
+            LOG.debug('filesystem stats updater thread exited')
 
     def _ioservices_running(self) -> List[bool]:
         statuses = self.consul.get_m0d_statuses()
-        logging.debug('The following statuses received: %s', statuses)
+        LOG.debug('The following statuses received: %s', statuses)
         started = ['M0_CONF_HA_PROCESS_STARTED' == v[1] for v in statuses]
         return started
 
@@ -100,7 +102,6 @@ class FsStatsUpdater(StoppableThread):
         while True:
             started = self._ioservices_running()
             if all(started):
-                logging.debug(
-                    'According to Consul all confds have been started')
+                LOG.debug('According to Consul all confds have been started')
                 return
             self._sleep(5)
