@@ -15,6 +15,7 @@
 # For any questions about this software or licensing,
 # please email opensource@seagate.com or cortx-questions@seagate.com.
 #
+"""Service monitoring."""
 
 import logging
 from queue import Queue
@@ -26,9 +27,28 @@ from hax.message import BroadcastHAStates
 from hax.types import HAState, ServiceHealth, StoppableThread
 from hax.util import ConsulUtil
 
+LOG = logging.getLogger('hax')
+
 
 class ServiceMonitor(StoppableThread):
+
+    """
+    The service monitoring thread.
+
+    This thread polls the service health status
+    from Consul via Health API and broadcasts the states to Motr land.
+    """
+
     def __init__(self, queue: Queue, interval_sec=1):
+        """
+        Constructor.
+
+        queue - the multithreaded blocking queue to send BroadcastHAStates.
+        messages (assuming that the queue is being read out by ConsumerThread).
+
+        interval_sec - float value, represents the delay between the
+        polling iterations.
+        """
         super().__init__(target=self._execute, name='service-monitor')
         self.stopped = False
         self.consul = ConsulUtil()
@@ -37,7 +57,8 @@ class ServiceMonitor(StoppableThread):
         self.q = queue
 
     def stop(self) -> None:
-        logging.debug('Stop signal received')
+        """Stop the thread."""
+        LOG.debug('Stop signal received')
         self.stopped = True
         self.event.set()
 
@@ -53,13 +74,12 @@ class ServiceMonitor(StoppableThread):
     def _broadcast(self, state_list: List[HAState]) -> None:
         if not state_list:
             return
-        logging.debug('Changes in statuses: %s', state_list)
+        LOG.debug('Changes in statuses: %s', state_list)
         self.q.put(BroadcastHAStates(states=state_list, reply_to=None))
 
     def _execute(self):
         service_names: List[str] = self._get_services()
-        logging.debug('The following services will be monitored %s',
-                      service_names)
+        LOG.debug('The following services will be monitored %s', service_names)
         known_statuses: Dict[str, ServiceHealth] = {
             service: ServiceHealth.UNKNOWN
             for service in service_names
@@ -75,13 +95,13 @@ class ServiceMonitor(StoppableThread):
                         if (health.status != known_statuses[name]):
                             delta.append(health)
                             known_statuses[name] = health.status
-                            logging.debug('%s is now %s', name, health.status)
+                            LOG.debug('%s is now %s', name, health.status)
                     self._broadcast(delta)
                 except HAConsistencyException:
                     # No action - we'll just try again at next iteration
                     pass
                 self._sleep(self.interval_sec)
         except Exception:
-            logging.exception('Aborting due to an error')
+            LOG.exception('Aborting due to an error')
         finally:
-            logging.debug('Thread exited')
+            LOG.debug('Thread exited')

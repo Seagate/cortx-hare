@@ -37,6 +37,8 @@ from hax.queue.offset import InboxFilter, OffsetStorage
 from hax.types import Fid, StoppableThread
 from hax.util import ConsulUtil, dump_json
 
+LOG = logging.getLogger('hax')
+
 
 async def hello_reply(request):
     return json_response(text="I'm alive! Sincerely, HaX")
@@ -68,7 +70,7 @@ def process_sns_operation(queue: Queue):
             'disk-detach': create_handler(SnsDiskDetach),
         }
 
-        logging.debug(f'process_sns_operation: {op_name}')
+        LOG.debug(f'process_sns_operation: {op_name}')
         if op_name not in msg_factory:
             raise HTTPNotFound()
         data = await request.json()
@@ -92,7 +94,7 @@ def get_sns_status(motr_queue: Queue,
         return queue.get(timeout=10)
 
     async def _process(request):
-        logging.debug('%s with params: %s', request, request.query)
+        LOG.debug('%s with params: %s', request, request.query)
         loop = asyncio.get_event_loop()
         payload = await loop.run_in_executor(None, fn, request)
         return json_response(data=payload, dumps=dump_json)
@@ -175,15 +177,15 @@ def run_server(
         web.get('/api/v1/sns/rebalance-status',
                 get_sns_status(queue, SnsRebalanceStatus)),
     ])
-    logging.info(f'Starting HTTP server at {web_address}:{port} ...')
+    LOG.info(f'Starting HTTP server at {web_address}:{port} ...')
     try:
         web.run_app(app, host=web_address, port=port)
-        logging.debug('Server stopped normally')
+        LOG.debug('Server stopped normally')
     finally:
-        logging.debug('Stopping the threads')
+        LOG.debug('Stopping the threads')
         for thread in threads_to_wait:
             thread.stop()
         for thread in threads_to_wait:
             thread.join()
 
-        logging.info('The http server has stopped')
+        LOG.info('The http server has stopped')
