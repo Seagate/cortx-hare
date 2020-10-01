@@ -76,7 +76,7 @@ cd "$dest_dir/hare/$HOSTNAME"
 exec 5>&2
 exec 2> >(tee _reportbug.stderr >&2)
 
-sudo journalctl --no-pager --full --utc --boot --output short-precise \
+sudo journalctl --no-pager --full --utc --output short-precise \
      > syslog.txt || true
 
 sudo systemctl --all --full --no-pager status {hare,m0,motr,s3}\* \
