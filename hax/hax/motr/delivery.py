@@ -23,6 +23,8 @@ from typing import Dict
 from hax.exception import NotDelivered
 from hax.types import HaLinkMessagePromise, MessageId
 
+LOG = logging.getLogger('hax')
+
 
 class DeliveryHerald:
     """
@@ -55,7 +57,7 @@ class DeliveryHerald:
             self.waiting_clients[promise] = condition
 
         with condition:
-            logging.debug('Blocking until %s is confirmed', promise)
+            LOG.debug('Blocking until %s is confirmed', promise)
             condition.wait(timeout=timeout_sec)
         with self.lock:
             del self.waiting_clients[promise]
@@ -63,8 +65,8 @@ class DeliveryHerald:
                 raise NotDelivered('None of message tags =' + str(promise) +
                                    '  were delivered to Motr within ' +
                                    str(timeout_sec) + ' seconds timeout')
-            logging.debug('Thread unblocked - %s has just been received',
-                          self.recently_delivered[promise])
+            LOG.debug('Thread unblocked - %s has just been received',
+                      self.recently_delivered[promise])
             del self.recently_delivered[promise]
 
     def notify_delivered(self, message_id: MessageId):
@@ -72,8 +74,8 @@ class DeliveryHerald:
         with self.lock:
             for promise, client in self.waiting_clients.items():
                 if message_id in promise:
-                    logging.debug('Found a waiting client for %s: %s',
-                                  message_id, promise)
+                    LOG.debug('Found a waiting client for %s: %s', message_id,
+                              promise)
                     with client:
                         client.notify()
                     self.recently_delivered[promise] = message_id

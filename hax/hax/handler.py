@@ -31,6 +31,8 @@ from hax.queue.publish import EQPublisher
 from hax.types import MessageId, StobIoqError, StoppableThread
 from hax.util import ConsulUtil, dump_json, repeat_if_fails
 
+LOG = logging.getLogger('hax')
+
 
 class ConsumerThread(StoppableThread):
     """
@@ -54,7 +56,7 @@ class ConsumerThread(StoppableThread):
 
     def _do_work(self, q: Queue, motr: Motr):
         ffi = motr._ffi
-        logging.info('Handler thread has started')
+        LOG.info('Handler thread has started')
         ffi.adopt_motr_thread()
 
         def pull_msg():
@@ -66,7 +68,7 @@ class ConsumerThread(StoppableThread):
         try:
             while True:
                 try:
-                    logging.debug('Waiting for the next message')
+                    LOG.debug('Waiting for the next message')
 
                     item = pull_msg()
                     while item is None:
@@ -75,7 +77,7 @@ class ConsumerThread(StoppableThread):
                             raise StopIteration()
                         item = pull_msg()
 
-                    logging.debug('Got %s message from queue', item)
+                    LOG.debug('Got %s message from queue', item)
                     if isinstance(item, EntrypointRequest):
                         # While replying any Exception is catched. In such a
                         # case, the motr process will receive EAGAIN and
@@ -100,63 +102,62 @@ class ConsumerThread(StoppableThread):
                         decorated = (repeat_if_fails(wait_seconds=5))(fn)
                         decorated(item)
                     elif isinstance(item, BroadcastHAStates):
-                        logging.info('HA states: %s', item.states)
+                        LOG.info('HA states: %s', item.states)
                         result: List[MessageId] = motr.broadcast_ha_states(
                             item.states)
                         if item.reply_to:
                             item.reply_to.put(result)
                     elif isinstance(item, StobIoqError):
-                        logging.info('Stob IOQ: %s', item.fid)
+                        LOG.info('Stob IOQ: %s', item.fid)
                         payload = dump_json(item)
-                        logging.debug('Stob IOQ JSON: %s', payload)
+                        LOG.debug('Stob IOQ JSON: %s', payload)
                         offset = self.eq_publisher.publish('stob-ioq', payload)
-                        logging.debug('Written to epoch: %s', offset)
+                        LOG.debug('Written to epoch: %s', offset)
                     elif isinstance(item, SnsRepairStatus):
-                        logging.info('Requesting SNS repair status')
+                        LOG.info('Requesting SNS repair status')
                         status = motr.get_repair_status(item.fid)
-                        logging.info('SNS repair status is received: %s',
-                                     status)
+                        LOG.info('SNS repair status is received: %s', status)
                         item.reply_to.put(status)
                     elif isinstance(item, SnsRebalanceStatus):
-                        logging.info('Requesting SNS rebalance status')
+                        LOG.info('Requesting SNS rebalance status')
                         status = motr.get_rebalance_status(item.fid)
-                        logging.info('SNS rebalance status is received: %s',
-                                     status)
+                        LOG.info('SNS rebalance status is received: %s',
+                                 status)
                         item.reply_to.put(status)
                     elif isinstance(item, SnsRebalanceStart):
-                        logging.info('Requesting SNS rebalance start')
+                        LOG.info('Requesting SNS rebalance start')
                         motr.start_rebalance(item.fid)
                     elif isinstance(item, SnsRebalanceStop):
-                        logging.info('Requesting SNS rebalance stop')
+                        LOG.info('Requesting SNS rebalance stop')
                         motr.stop_rebalance(item.fid)
                     elif isinstance(item, SnsRebalancePause):
-                        logging.info('Requesting SNS rebalance pause')
+                        LOG.info('Requesting SNS rebalance pause')
                         motr.pause_rebalance(item.fid)
                     elif isinstance(item, SnsRebalanceResume):
-                        logging.info('Requesting SNS rebalance resume')
+                        LOG.info('Requesting SNS rebalance resume')
                         motr.resume_rebalance(item.fid)
                     elif isinstance(item, SnsRepairStart):
-                        logging.info('Requesting SNS repair start')
+                        LOG.info('Requesting SNS repair start')
                         motr.start_repair(item.fid)
                     elif isinstance(item, SnsRepairStop):
-                        logging.info('Requesting SNS repair stop')
+                        LOG.info('Requesting SNS repair stop')
                         motr.stop_repair(item.fid)
                     elif isinstance(item, SnsRepairPause):
-                        logging.info('Requesting SNS repair pause')
+                        LOG.info('Requesting SNS repair pause')
                         motr.pause_repair(item.fid)
                     elif isinstance(item, SnsRepairResume):
-                        logging.info('Requesting SNS repair resume')
+                        LOG.info('Requesting SNS repair resume')
                         motr.resume_repair(item.fid)
 
                     else:
-                        logging.warning('Unsupported event type received: %s',
-                                        item)
+                        LOG.warning('Unsupported event type received: %s',
+                                    item)
                 except StopIteration:
                     raise
                 except Exception:
                     # no op, swallow the exception
-                    logging.exception('**ERROR**')
+                    LOG.exception('**ERROR**')
         except StopIteration:
             ffi.shun_motr_thread()
         finally:
-            logging.info('Handler thread has exited')
+            LOG.info('Handler thread has exited')

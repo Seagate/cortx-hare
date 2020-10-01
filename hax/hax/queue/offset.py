@@ -5,6 +5,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from hax.util import ConsulKVBasic, repeat_if_fails
 
+LOG = logging.getLogger('hax')
+
 
 def get_key_by_node(prefix: str, node_name: str):
     return f'{prefix}/{node_name}'
@@ -26,7 +28,7 @@ class OffsetStorage:
     @repeat_if_fails()
     def mark_last_read(self, message_epoch: int) -> None:
         key = get_key_by_node(self.key_prefix, self.node_name)
-        logging.debug('Marking epoch %s as read', str(message_epoch))
+        LOG.debug('Marking epoch %s as read', str(message_epoch))
         self.kv.kv_put(key, str(message_epoch))
 
     @repeat_if_fails()
@@ -67,7 +69,7 @@ class InboxFilter:
             return (key, b_value.decode())
 
         offset = self.offset_mgr.get_last_read_epoch()
-        logging.debug('Last read epoch: %s', offset)
+        LOG.debug('Last read epoch: %s', offset)
         messages = [to_tuple(item) for item in raw_input]
         messages.sort(key=lambda x: x[0])
         return [x for x in messages if x[0] > offset]

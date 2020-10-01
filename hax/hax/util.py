@@ -38,6 +38,8 @@ from hax.types import (ConfHaProcess, Fid, FsStatsWithTime, HAState, ObjT,
 __all__ = ['ConsulUtil', 'create_process_fid', 'create_service_fid',
            'create_sdev_fid', 'create_drive_fid']
 
+LOG = logging.getLogger('hax')
+
 # XXX What is the difference between `ip_addr` and `address`?
 # The names are hard to discern.
 ServiceData = NamedTuple('ServiceData', [('node', str), ('fid', Fid),
@@ -111,21 +113,19 @@ def repeat_if_fails(wait_seconds=5, max_retries=-1):
             attempt_count = 0
             while (True):
                 try:
-                    logging.debug(
-                        'Attempting to invoke the repeatable call: %s',
-                        f.__name__)
+                    LOG.debug('Attempting to invoke the repeatable call: %s',
+                              f.__name__)
                     result = f(*args, **kwds)
-                    logging.debug('The repeatable call succeeded: %s',
-                                  f.__name__)
+                    LOG.debug('The repeatable call succeeded: %s', f.__name__)
                     return result
                 except HAConsistencyException as e:
                     attempt_count += 1
                     if max_retries >= 0 and attempt_count > max_retries:
-                        logging.warn(
+                        LOG.warn(
                             'Too many errors happened in a row '
                             '(max_retries = %d)', max_retries)
                         raise e
-                    logging.warn(
+                    LOG.warn(
                         f'Got HAConsistencyException: {e.message} '
                         f'(attempt {attempt_count}). The'
                         f' attempt will be repeated in {wait_seconds} seconds')
@@ -319,7 +319,7 @@ class ConsulUtil:
             try:
                 key = f'processes/{srv.fid}'
                 raw_data = self.kv.kv_get(key)
-                logging.debug('Raw value from KV: %s', raw_data)
+                LOG.debug('Raw value from KV: %s', raw_data)
                 data = raw_data['Value']
                 value: str = json.loads(data)['state']
                 return value
@@ -337,7 +337,7 @@ class ConsulUtil:
 
     def get_service_data_by_name(self, name: str) -> List[ServiceData]:
         services = self._catalog_service_get(name)
-        logging.debug('Services "%s" received: %s', name, services)
+        LOG.debug('Services "%s" received: %s', name, services)
         return list(map(mkServiceData, services))
 
     def get_confd_list(self) -> List[ServiceData]:
@@ -436,7 +436,7 @@ class ConsulUtil:
 
         data = json.dumps({'state': ha_process_events[event.chp_event]})
         key = f'processes/{event.fid}'
-        logging.debug('Setting process status in KV: %s:%s', key, data)
+        LOG.debug('Setting process status in KV: %s:%s', key, data)
         self.kv.kv_put(key, data)
 
     @repeat_if_fails()
@@ -506,7 +506,7 @@ class ConsulUtil:
 
         data = json.dumps({'state': ha_conf_obj_states[objstate]})
         key = f'process/{fid}'
-        logging.debug('Setting disk state in KV: %s:%s', key, data)
+        LOG.debug('Setting disk state in KV: %s:%s', key, data)
         self.kv.kv_put(key, data)
 
     def get_local_service_health(self, service_name: str) -> HAState:

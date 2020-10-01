@@ -19,6 +19,7 @@
 #
 
 import logging
+import sys
 from queue import Queue
 from typing import NamedTuple
 
@@ -37,12 +38,20 @@ __all__ = ['main']
 HL_Fids = NamedTuple('HL_Fids', [('hax_ep', str), ('hax_fid', Fid),
                                  ('ha_fid', Fid), ('rm_fid', Fid)])
 
+LOG = logging.getLogger('hax')
+
 
 def _setup_logging():
-    logging.basicConfig(
-        level=logging.DEBUG,
-        format='%(asctime)s [%(levelname)s] {%(threadName)s} %(message)s')
-    # TODO set consul logging to WARN
+    hax_logger = LOG
+    hax_logger.setLevel(logging.DEBUG)
+
+    formatter = logging.Formatter(
+        '%(asctime)s [%(levelname)s] {%(threadName)s} %(message)s')
+    console = logging.StreamHandler(sys.stdout)
+    console.setFormatter(formatter)
+
+    logging.getLogger('').addHandler(console)
+    logging.getLogger('consul').setLevel(logging.WARN)
 
 
 def _run_thread(thread: StoppableThread):
@@ -77,10 +86,10 @@ def main():
     util: ConsulUtil = ConsulUtil()
     cfg = _get_motr_fids(util)
 
-    logging.info('Welcome to HaX')
-    logging.info(f'Setting up ha_link interface with the options as follows: '
-                 f'hax fid = {cfg.hax_fid}, hax endpoint = {cfg.hax_ep}, '
-                 f'HA fid = {cfg.ha_fid}, RM fid = {cfg.rm_fid}')
+    LOG.info('Welcome to HaX')
+    LOG.info(f'Setting up ha_link interface with the options as follows: '
+             f'hax fid = {cfg.hax_fid}, hax endpoint = {cfg.hax_ep}, '
+             f'HA fid = {cfg.ha_fid}, RM fid = {cfg.rm_fid}')
 
     ffi = HaxFFI()
     herald = DeliveryHerald()
@@ -95,7 +104,7 @@ def main():
                    process=cfg.hax_fid,
                    ha_service=cfg.ha_fid,
                    rm_service=cfg.rm_fid)
-        logging.info('Motr API has been started')
+        LOG.info('Motr API has been started')
         service_monitor = _run_thread(ServiceMonitor(q))
         stats_updater = _run_thread(FsStatsUpdater(motr, interval_sec=30))
 
@@ -105,7 +114,7 @@ def main():
                    herald,
                    threads_to_wait=[consumer, stats_updater, service_monitor])
     except Exception:
-        logging.exception('Exiting due to an exception')
+        LOG.exception('Exiting due to an exception')
     finally:
         motr.close()
 
