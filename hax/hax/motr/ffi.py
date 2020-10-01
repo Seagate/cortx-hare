@@ -22,6 +22,8 @@ import os
 
 from hax.types import FidStruct, HaNoteStruct, Uint128Struct
 
+LOG = logging.getLogger('hax')
+
 py_func_proto = c.PYFUNCTYPE(None, c.c_void_p)
 
 
@@ -43,7 +45,7 @@ class HaxFFI:
     def __init__(self):
         dirname = os.path.dirname(os.path.abspath(__file__))
         lib_path = f'{dirname}/../../libhax.cpython-36m-x86_64-linux-gnu.so'
-        logging.debug('Loading library from path: %s', lib_path)
+        LOG.debug('Loading library from path: %s', lib_path)
         lib = c.cdll.LoadLibrary(lib_path)
         lib.init_motr_api.argtypes = [c.py_object, c.c_char_p]
         lib.init_motr_api.restype = c.c_void_p

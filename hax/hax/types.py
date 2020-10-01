@@ -210,7 +210,8 @@ class ServiceHealth(Enum):
     OK = 1
     UNKNOWN = 2
 
-    def __str__(self):
+    def __repr__(self):
+        """Return human-readable constant name (useful in log output)."""
         return self.name
 
 
