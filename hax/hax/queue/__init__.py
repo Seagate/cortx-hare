@@ -86,11 +86,13 @@ class BQProcessor:
         ids: List[MessageId] = q.get()
         self.herald.wait_for_any(HaLinkMessagePromise(ids))
 
-    def to_ha_state(self, objinfo: dict) -> Optional[HAState]:
+    def to_ha_state(self, objinfo: Dict[str, str]) -> Optional[HAState]:
         try:
             sdev_fid = self.confobjutil.drive_to_sdev_fid(
                 objinfo['node'], objinfo['device'])
+            state = ServiceHealth.OK if objinfo[
+                'state'] == 'online' else ServiceHealth.FAILED
         except KeyError as error:
             LOG.error('Invalid json payload, no key (%s) present', error)
             return None
-        return HAState(sdev_fid, status=objinfo['state'])
+        return HAState(sdev_fid, status=state)
