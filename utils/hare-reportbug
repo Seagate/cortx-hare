@@ -79,6 +79,9 @@ exec 2> >(tee _reportbug.stderr >&2)
 sudo journalctl --no-pager --full --utc --output short-precise \
      > syslog.txt || true
 
+sudo journalctl --no-pager --full --utc --output=json --unit=pacemaker.service \
+     > syslog-pacemaker.json || true
+
 sudo systemctl --all --full --no-pager status {hare,m0,motr,s3}\* \
      > systemctl-status.txt || true
 
