@@ -131,24 +131,21 @@ CFGEN_SHARE        = $(DESTDIR)/$(PREFIX)/share/cfgen
 CONSUL_LIBEXEC     = $(DESTDIR)/$(PREFIX)/libexec/consul
 CONSUL_SHARE       = $(DESTDIR)/$(PREFIX)/share/consul
 HARE_CONF          = $(DESTDIR)/$(PREFIX)/conf
+HARE_CONF_LOG      = $(DESTDIR)/$(PREFIX)/conf/logrotate
 HARE_LIBEXEC       = $(DESTDIR)/$(PREFIX)/libexec
 HARE_RULES         = $(DESTDIR)/$(PREFIX)/rules
 HAX_EXE            = $(DESTDIR)/$(PREFIX)/bin/hax
 HAX_EGG_LINK       = $(DESTDIR)/$(PREFIX)/lib/python3.$(PY3_VERSION_MINOR)/site-packages/hax.egg-link
 SYSTEMD_CONFIG_DIR = $(DESTDIR)/usr/lib/systemd/system
+ETC_CRON_DIR       = /etc/cron.hourly
 
 # install {{{2
 .PHONY: install
-install: install-dirs install-cfgen install-hax install-systemd install-vendor
+install: install-dirs install-cfgen install-hax install-systemd install-vendor install-provisioning
 	@$(call _info,Installing hare utils)
 	@for f in utils/*; do \
 	     $(call _log,copying $$f -> $(HARE_LIBEXEC)); \
 	     install $$f $(HARE_LIBEXEC); \
-	 done
-	@$(call _info,Installing hare provisioning)
-	@for f in provisioning/*; do \
-	     $(call _log,copying $$f -> $(HARE_CONF)); \
-	     install $$f $(HARE_CONF); \
 	 done
 	@$(call _info,Installing RC rules)
 	@for f in rules/*; do \
@@ -164,10 +161,13 @@ install: install-dirs install-cfgen install-hax install-systemd install-vendor
 	@install utils/h0q $(DESTDIR)/$(PREFIX)/bin
 	@$(call _log,linking h0q -> $(DESTDIR)/usr/bin)
 	@ln -sf /$(PREFIX)/bin/h0q $(DESTDIR)/usr/bin
+	@$(call _log,copying m0trace-prune -> $(ETC_CRON_DIR))
+	@install utils/m0trace-prune $(ETC_CRON_DIR)
 
 .PHONY: install-dirs
 install-dirs:
 	@for d in $(HARE_CONF) \
+		  $(HARE_CONF_LOG) \
 		  $(HARE_LIBEXEC) \
 		  $(HARE_RULES) \
 		  $(DESTDIR)/run/cortx \
@@ -233,9 +233,22 @@ install-vendor: vendor/consul-bin/current/consul \
 	@install --verbose --directory $(DESTDIR)/$(PREFIX)/bin
 	@install --verbose $^ $(DESTDIR)/$(PREFIX)/bin
 
+.PHONY: install-provisioning
+install-provisioning:
+	@$(call _info,Installing hare provisioning)
+	@for f in provisioning/*; do \
+	     $(call _log,copying $$f -> $(HARE_CONF)); \
+	     install $$f $(HARE_CONF); \
+	 done
+	@$(call _info,Installing hare provisioning/logrotate)
+	@for f in provisioning/logrotate/*; do \
+	     $(call _log,copying $$f -> $(HARE_CONF_LOG)); \
+	     install $$f $(HARE_CONF_LOG); \
+	 done
+
 # devinstall {{{2
 .PHONY: devinstall
-devinstall: install-dirs devinstall-cfgen devinstall-hax devinstall-systemd devinstall-vendor
+devinstall: install-dirs devinstall-cfgen devinstall-hax devinstall-systemd devinstall-vendor devinstall-provisioning
 	@$(call _info,linking hare utils)
 	@for f in utils/*; do \
 	     $(call _log,linking $$f -> $(HARE_LIBEXEC)); \
@@ -258,6 +271,8 @@ devinstall: install-dirs devinstall-cfgen devinstall-hax devinstall-systemd devi
 	@$(call _log,changing permission of $(DESTDIR)/var/lib/hare)
 	@chgrp hare $(DESTDIR)/var/lib/hare
 	@chmod --changes g+w $(DESTDIR)/var/lib/hare
+	@$(call _log,copying m0trace-prune -> $(ETC_CRON_DIR))
+	@install utils/m0trace-prune $(ETC_CRON_DIR)
 
 .PHONY: devinstall-cfgen
 devinstall-cfgen: CFGEN_INSTALL_CMD = ln -sf
@@ -302,6 +317,19 @@ devinstall-vendor: vendor/consul-bin/current/consul \
 	@$(call _info,Installing Consul and Dhall)
 	@install --verbose --directory $(DESTDIR)/$(PREFIX)/bin
 	@ln -v -sf $(addprefix $(TOP_SRC_DIR), $^) $(DESTDIR)/$(PREFIX)/bin
+
+.PHONY: devinstall-provisioning
+devinstall-provisioning:
+	@$(call _info,Installing hare provisioning)
+	@for f in provisioning/*; do \
+	     $(call _log,copying $$f -> $(HARE_CONF)); \
+	     install $$f $(HARE_CONF); \
+	 done
+	@$(call _info,Installing hare provisioning/logrotate)
+	@for f in provisioning/logrotate/*; do \
+	     $(call _log,copying $$f -> $(HARE_CONF_LOG)); \
+	     install $$f $(HARE_CONF_LOG); \
+	 done
 
 # Uninstall ------------------------------------------- {{{1
 #
