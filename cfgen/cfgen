@@ -19,7 +19,7 @@ from typing import Any, Callable, Dict, Iterator, List, NamedTuple, Optional, \
 import yaml
 
 
-__version__ = '0.12.1'
+__version__ = '0.12.2'
 
 
 def parse_opts(argv):
@@ -316,13 +316,14 @@ def get_facts(hostname: str, mock_p: bool, *args: str) -> Dict[str, Any]:
 
 def fabricate_facts(hostname: str, *args: str) -> Dict[str, Any]:
     rng = random.randrange
+    ipaddress = '.'.join(str(n) for n in [
+        random.choice([10, 172, 192]), rng(256), rng(256), rng(256)])
     fabricated = {
         'processorcount': rng(1, 21),
-        'memorysize_mb': '{:.2f}'.format(random.uniform(512, 16000)),
-        'ipaddress_eth1': '.'.join(str(n) for n in [
-            random.choice([10, 172, 192]), rng(256), rng(256), rng(256)]),
+        'memorysize_mb': '{:.2f}'.format(random.uniform(512, 16000))
     }
-    return dict((k, fabricated[k]) for k in args)
+    return dict((k, ipaddress if k.startswith('ipaddress_') else fabricated[k])
+                for k in args)
 
 
 Disk = NamedTuple('Disk', [('path', str), ('size', int), ('blksize', int)])
