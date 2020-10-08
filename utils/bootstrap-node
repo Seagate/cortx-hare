@@ -187,19 +187,33 @@ case $phase in
        ;;
 esac
 
+# It's critical to check for the service state in Consul catalogue.
+# Otherwise, if synchronisation of service status between Consul
+# servers delays (for some reason), hax may get 'offline' state from
+# Consul for already started m0d process (spoiling its ha_link).
+wait_m0mkfs_done()
+{
+    local id=$1
+    local fid=$(id2fid $id)
+
+    touch /tmp/motr-mkfs-pass-$fid
+    # Give time for service check to reset m0mkfs' HA state
+    # (see utils/check-service also).
+    while [[ -f /tmp/motr-mkfs-pass-$fid ||
+             -f /tmp/motr-mkfs-fail-$fid ||
+             $(get-service-health $id) != 'warning' ]]; do
+        sleep 1
+    done
+    # Give hax a chance to get the warning/offline state from Consul
+    # and finish ha_link before m0d process is started.
+    sleep 2
+}
+
 for id in $IDs; do
     fid=$(id2fid $id)
     if [[ $do_mkfs ]]; then
         sudo systemctl start motr-mkfs@$fid
-        touch /tmp/motr-mkfs-pass-$fid
-        # Give time for service check to reset m0mkfs' HA state
-        # (see utils/check-service also).
-        while [[ -f /tmp/motr-mkfs-pass-$fid ||
-                 -f /tmp/motr-mkfs-fail-$fid ]] ||
-              [[ $(get-process-state $fid) != M0_CONF_HA_PROCESS_STOPPED ]]; do
-            sleep 1
-        done
-        sleep 1
+        wait_m0mkfs_done $id
     fi
 
     if [[ $do_mkfs != 'mkfs-only' ]]; then
