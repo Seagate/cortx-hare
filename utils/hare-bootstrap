@@ -335,7 +335,6 @@ say 'Installing Motr configuration files...'
 while read node _; do
     scp -q $conf_dir/confd.xc $node:$conf_dir
 done < <(get_server_nodes | grep -vw $(node-name) || true)
-echo ' OK'
 
 say 'Waiting for the RC Leader to get elected...'
 wait_rc_leader

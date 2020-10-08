@@ -200,7 +200,7 @@ wait_m0mkfs_done() {
     # (see utils/check-service also).
     while [[ -f /tmp/motr-mkfs-pass-$fid ||
              -f /tmp/motr-mkfs-fail-$fid ||
-             $(get-service-health $id) != 'warning' ]]; do
+             $(get-service-health $id) == 'passing' ]]; do
         sleep 1
     done
     # Give hax a chance to get the warning/offline state from Consul
