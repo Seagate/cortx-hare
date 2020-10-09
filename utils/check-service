@@ -75,8 +75,13 @@ declare -A status=(
     [failing]=2
 )
 
+# Convert fid to decimal service id (used in Consul):
+# $ fid=0x7200000000000001:0xa
+# $ echo $((16#${fid/*:0x/}))
+# 10
 fid2id() {
-    echo $((16#${1/*:0x/}))
+    local fid=$1
+    echo $((16#${fid/*:0x/}))
 }
 
 # During bootstrap with m0mkfs we need to report passing and
