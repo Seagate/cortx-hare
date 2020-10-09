@@ -239,6 +239,13 @@ class ConsulUtil:
             raise HAConsistencyException('Failed to communicate '
                                          'to Consul Agent') from e
 
+    def _get_service_health(self, service_name: str) -> List[Dict[str, Any]]:
+        try:
+            return self.cns.health.service(service_name)[1]
+        except (ConsulException, HTTPError, RequestException) as e:
+            raise HAConsistencyException('Failed to communicate '
+                                         'to Consul Agent') from e
+
     def _local_service_by_name(self, name: str) -> Dict[str, Any]:
         """
         Returns the service data by its name assuming that it runs at the same
@@ -512,7 +519,7 @@ class ConsulUtil:
     def get_local_service_health(self, service_name: str) -> HAState:
         local_nodename = self.get_local_nodename()
         srv_data: List[Dict[str,
-                            Any]] = self.cns.health.service(service_name)[1]
+                            Any]] = self._get_service_health(service_name)
         local_services = [
             srv for srv in srv_data if srv['Node']['Node'] == local_nodename
         ]
