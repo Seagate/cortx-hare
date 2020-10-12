@@ -267,7 +267,7 @@ EOF
     exit 1
 fi
 
-say 'Starting Consul server agent on this node...'
+say 'Starting Consul server on this node...'
 join_peers_opt="${join_peers:+--join $join_peers}"
 # $join_ip is our bind_ip address
 mk-consul-env --mode server --bind $join_ip $join_peers_opt \
@@ -288,7 +288,7 @@ jq '[.[] | {key, value: (.value | @base64)}]' < $conf_dir/consul-kv.json |
     consul kv import - > /dev/null
 echo ' OK'
 
-say 'Starting Consul agents on other cluster nodes...'
+say 'Starting Consul on other nodes...'
 pids=()
 while read node bind_ip; do
     ssh $node "PATH=$PATH $(which mk-consul-env) \
@@ -306,7 +306,7 @@ done < <(get_client_nodes)
 wait4 ${pids[@]-}
 agents_nr=$(( ${#pids[@]} + 1 ))
 
-# Waiting for the agents to get ready...
+# Waiting for the Consul agents to get ready...
 count=1
 while (( $(get_ready_agents_nr) != $agents_nr )); do
     if (( $count > 5 )); then
@@ -322,7 +322,7 @@ while (( $(get_ready_agents_nr) != $agents_nr )); do
 done
 echo ' OK'
 
-say 'Updating Consul agents configs from the KV store...'
+say 'Updating Consul configuraton from the KV store...'
 update-consul-conf &
 pids=($!)
 while read node _; do
@@ -332,11 +332,10 @@ done < <(get_all_nodes | grep -vw $(node-name) || true)
 wait4 ${pids[@]}
 echo ' OK'
 
-say 'Installing Motr configuration files...'
+# Installing Motr confd.xc files...
 while read node _; do
     scp -q $conf_dir/confd.xc $node:$conf_dir
 done < <(get_server_nodes | grep -vw $(node-name) || true)
-echo ' OK'
 
 say 'Waiting for the RC Leader to get elected...'
 wait_rc_leader

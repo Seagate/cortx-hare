@@ -75,6 +75,18 @@ declare -A status=(
     [failing]=2
 )
 
+# Convert fid to decimal service id (used in Consul):
+# $ fid=0x7200000000000001:0xa
+# $ echo $((16#${fid/*:0x/}))
+# 10
+fid2id() {
+    local fid=$1
+    echo $((16#${fid/*:0x/}))
+}
+
+# During bootstrap with m0mkfs we need to report passing and
+# warning (offline) status for m0mkfs process to make sure
+# its ha_link is destroyed before m0d process is started.
 if [[ $service =~ m0d ]]; then
     pass=/tmp/motr-mkfs-pass-$fid
     fail=/tmp/motr-mkfs-fail-$fid
@@ -84,6 +96,12 @@ if [[ $service =~ m0d ]]; then
         touch $fail
         exit ${status[passing]}
     elif [[ -f $fail ]]; then
+        id=$(fid2id $fid)
+        if [[ $(get-service-health $id) != 'passing' ]]; then
+            # The passing/online state is still not synchronized among
+            # Consul servers, don't change it just yet...
+            exit ${status[passing]}
+        fi
         rm $fail
         exit ${status[warning]}
     fi
