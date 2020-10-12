@@ -80,7 +80,7 @@ and health-checking mechanisms.
     scripts/m0 make
     sudo scripts/install-motr-service --link
 
-    M0_SRC_DIR=$PWD
+    export M0_SRC_DIR=$PWD
     cd -
     ```
 
