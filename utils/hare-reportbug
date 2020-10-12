@@ -85,6 +85,10 @@ sudo journalctl --no-pager --full --utc --output=json --unit=pacemaker.service \
 sudo systemctl --all --full --no-pager status {hare,m0,motr,s3}\* \
      > systemctl-status.txt || true
 
+# cluster status
+sudo timeout --kill-after 30 15 hctl status \
+     > hctl-status.txt || true
+
 extra_files=(
     /etc/sysconfig/motr
     /opt/seagate/cortx-prvsnr/pillar/components/cluster.sls
