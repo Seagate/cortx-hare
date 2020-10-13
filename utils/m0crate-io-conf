@@ -23,14 +23,14 @@ export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
 
 PATH=$PATH:/opt/seagate/cortx/hare/bin
 
-## Return profile fid.
+## Fid of the first profile.
 ##
 ## Sample output:
 ## ```
 ## 0x7000000000000001:0x2e
 ## ```
-profile_fid() {
-    consul kv get m0conf/profiles
+first_profile_fid() {
+    consul kv get -keys 'm0conf/profiles/' | head -1 | cut -d/ -f3
 }
 
 ## Return process fid and endpoint of every motr client.
@@ -65,7 +65,7 @@ CrateConfig_Sections: [MOTR_CONFIG, WORKLOAD_SPEC]
 MOTR_CONFIG:
    MOTR_LOCAL_ADDR: $local_ep
    MOTR_HA_ADDR:    $hax_ep
-   PROF: <$(profile_fid)>  # Profile fid
+   PROF: <$(first_profile_fid)>  # Profile fid
    LAYOUT_ID: 9                      # Defines the UNIT_SIZE (9: 1MB)
    IS_OOSTORE: 1                     # Is oostore-mode?
    IS_READ_VERIFY: 0                 # Enable read-verify?
