@@ -205,7 +205,7 @@ def setup_logging():
 
 
 @repeat_if_fails(max_retries=24)
-def show_text_status(cns: Consul):
+def show_text_status(cns: Consul) -> None:
     # In-memory buffer required because an intermittent Consul exception can
     # happen right in the middle of printing something. It is good to postpone
     # the printing to stdout until the moment when those exceptions can't
@@ -238,13 +238,13 @@ def main(argv=None):
     opts = parse_opts(argv)
     cns = Consul()
     if not cluster_online():
-        print('Cluster is not running.', file=sys.stderr)
-        return 1
+        print('Cluster is not running', file=sys.stderr)
+        return
 
     if opts.json:
         status = get_cluster_status(cns)
         print(j.dumps(status, indent=2, cls=FidEncoder))
-        return 0
+        return
     show_text_status(cns)
 
 
