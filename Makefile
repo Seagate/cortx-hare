@@ -137,6 +137,7 @@ HARE_RULES         = $(DESTDIR)/$(PREFIX)/rules
 HAX_EXE            = $(DESTDIR)/$(PREFIX)/bin/hax
 HAX_EGG_LINK       = $(DESTDIR)/$(PREFIX)/lib/python3.$(PY3_VERSION_MINOR)/site-packages/hax.egg-link
 SYSTEMD_CONFIG_DIR = $(DESTDIR)/usr/lib/systemd/system
+LOGROTATE_CONF_DIR = $(DESTDIR)/etc/logrotate.d
 ETC_CRON_DIR       = /etc/cron.hourly
 
 # install {{{2
@@ -171,6 +172,7 @@ install-dirs:
 		  $(HARE_LIBEXEC) \
 		  $(HARE_RULES) \
 		  $(DESTDIR)/run/cortx \
+		  $(DESTDIR)/etc/logrotate.d \
 		  $(DESTDIR)/var/log/hare \
 		  $(DESTDIR)/var/motr/hax; \
 	 do \
@@ -245,6 +247,8 @@ install-provisioning:
 	     $(call _log,copying $$f -> $(HARE_CONF_LOG)); \
 	     install $$f $(HARE_CONF_LOG); \
 	 done
+	@$(call _log,copying provisioning/logrotate/hare -> $(LOGROTATE_CONF_DIR))
+	@install --mode=0644 provisioning/logrotate/hare $(LOGROTATE_CONF_DIR)
 
 # devinstall {{{2
 .PHONY: devinstall
