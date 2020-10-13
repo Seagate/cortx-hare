@@ -118,22 +118,112 @@ optional arguments:
 
 ```
 $ hctl status
-Profile: 0x7000000000000001:0x3d
 Data pools:
-    0x6f00000000000001:0x3e
+    # fid name
+    0x6f00000000000001:0x2e 'tier1-ssd'
+    0x6f00000000000001:0x39 'tier2-hdd'
+Profiles:
+    # fid name: pool(s)
+    0x7000000000000001:0x54 'fast': 'tier1-ssd'
+    0x7000000000000001:0x55 'slow': 'tier2-hdd'
+    0x7000000000000001:0x56 'both': 'tier1-ssd' 'tier2-hdd'
 Services:
-    ssc-vm-c-0553.colo.seagate.com
-    [started]  hax        0x7200000000000001:0x23  192.168.9.107@tcp:12345:1:1
-    [started]  confd      0x7200000000000001:0x26  192.168.9.107@tcp:12345:2:1
-    [started]  ioservice  0x7200000000000001:0x29  192.168.9.107@tcp:12345:2:2
-    [unknown]  m0_client  0x7200000000000001:0x37  192.168.9.107@tcp:12345:4:1
-    [unknown]  m0_client  0x7200000000000001:0x3a  192.168.9.107@tcp:12345:4:2
-    ssc-vm-c-0552.colo.seagate.com  (RC)
-    [started]  hax        0x7200000000000001:0x6   192.168.9.108@tcp:12345:1:1
-    [started]  confd      0x7200000000000001:0x9   192.168.9.108@tcp:12345:2:1
-    [started]  ioservice  0x7200000000000001:0xc   192.168.9.108@tcp:12345:2:2
-    [unknown]  m0_client  0x7200000000000001:0x1a  192.168.9.108@tcp:12345:4:1
-    [unknown]  m0_client  0x7200000000000001:0x1d  192.168.9.108@tcp:12345:4:2
+    localhost  (RC)
+    [started]  hax        0x7200000000000001:0x6   172.28.128.45@tcp:12345:1:1
+    [started]  confd      0x7200000000000001:0x9   172.28.128.45@tcp:12345:2:1
+    [started]  ioservice  0x7200000000000001:0xc   172.28.128.45@tcp:12345:2:2
+    [unknown]  m0_client  0x7200000000000001:0x28  172.28.128.45@tcp:12345:4:1
+    [unknown]  m0_client  0x7200000000000001:0x2b  172.28.128.45@tcp:12345:4:2
+```
+
+```
+$ hctl status --json
+{
+  "pools": [
+    {
+      "fid": "0x6f00000000000001:0x2e",
+      "name": "tier1-ssd"
+    },
+    {
+      "fid": "0x6f00000000000001:0x39",
+      "name": "tier2-hdd"
+    }
+  ],
+  "profiles": [
+    {
+      "fid": "0x7000000000000001:0x54",
+      "name": "fast",
+      "pools": [
+        "tier1-ssd"
+      ]
+    },
+    {
+      "fid": "0x7000000000000001:0x55",
+      "name": "slow",
+      "pools": [
+        "tier2-hdd"
+      ]
+    },
+    {
+      "fid": "0x7000000000000001:0x56",
+      "name": "both",
+      "pools": [
+        "tier1-ssd",
+        "tier2-hdd"
+      ]
+    }
+  ],
+  "filesystem": {
+    "stats": {
+      "fs_free_seg": 8590389096,
+      "fs_total_seg": 8590951472,
+      "fs_free_disk": 104689827840,
+      "fs_avail_disk": 104689827840,
+      "fs_total_disk": 104689827840,
+      "fs_svc_total": 2,
+      "fs_svc_replied": 2
+    },
+    "timestamp": 1602613220.761281,
+    "date": "2020-10-13T18:20:20.761281"
+  },
+  "nodes": [
+    {
+      "name": "localhost",
+      "svcs": [
+        {
+          "name": "hax",
+          "fid": "0x7200000000000001:0x6",
+          "ep": "172.28.128.45@tcp:12345:1:1",
+          "status": "started"
+        },
+        {
+          "name": "confd",
+          "fid": "0x7200000000000001:0x9",
+          "ep": "172.28.128.45@tcp:12345:2:1",
+          "status": "started"
+        },
+        {
+          "name": "ioservice",
+          "fid": "0x7200000000000001:0xc",
+          "ep": "172.28.128.45@tcp:12345:2:2",
+          "status": "started"
+        },
+        {
+          "name": "m0_client",
+          "fid": "0x7200000000000001:0x28",
+          "ep": "172.28.128.45@tcp:12345:4:1",
+          "status": "unknown"
+        },
+        {
+          "name": "m0_client",
+          "fid": "0x7200000000000001:0x2b",
+          "ep": "172.28.128.45@tcp:12345:4:2",
+          "status": "unknown"
+        }
+      ]
+    }
+  ]
+}
 ```
 
 ## Node management

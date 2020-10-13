@@ -203,8 +203,11 @@ append_s3_svc() {
           }
         ]
     }"
+    local first_profile_fid=$(
+        consul kv get -keys 'm0conf/profiles/' | head -1 | cut -d/ -f3)
+    [[ -n $first_profile_fid ]]  # assert
     cat <<EOF | sudo tee /etc/sysconfig/s3server-$fid > /dev/null
-MOTR_PROFILE_FID=`consul kv get m0conf/profiles`
+MOTR_PROFILE_FID=$first_profile_fid
 MOTR_S3SERVER_EP='$ep'
 MOTR_HA_EP='$HAX_EP'
 MOTR_PROCESS_FID='$fid'

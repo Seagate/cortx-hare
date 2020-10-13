@@ -1,0 +1,79 @@
+nodes:
+  - hostname: srvnode-1
+    data_iface: enp175s0f1_c1
+    data_iface_type: o2ib
+    m0_servers:
+      - runs_confd: true
+        io_disks:
+          data: []
+      - io_disks:
+          meta_data: /dev/vg_metadata_srvnode-1/lv_raw_metadata
+          data:
+            - /dev/foo
+            - /dev/disk/by-id/dm-name-mpatha
+            - /dev/disk/by-id/dm-name-mpathb
+            - /dev/disk/by-id/dm-name-mpathc
+            - /dev/disk/by-id/dm-name-mpathd
+            - /dev/disk/by-id/dm-name-mpathe
+            - /dev/disk/by-id/dm-name-mpathf
+    m0_clients:
+      s3: 11
+      other: 3
+  - hostname: srvnode-2
+    data_iface: enp175s0f1_c2
+    data_iface_type: o2ib
+    m0_servers:
+      - runs_confd: true
+        io_disks:
+          data: []
+      - io_disks:
+          meta_data: /dev/vg_metadata_srvnode-2/lv_raw_metadata
+          data:
+            - /dev/foo
+            - /dev/disk/by-id/dm-name-mpathg
+            - /dev/disk/by-id/dm-name-mpathh
+            - /dev/disk/by-id/dm-name-mpathi
+            - /dev/disk/by-id/dm-name-mpathj
+            - /dev/disk/by-id/dm-name-mpathk
+            - /dev/disk/by-id/dm-name-mpathl
+    m0_clients:
+      s3: 11
+      other: 3
+pools:
+  - name: tier1-nvme
+    disk_refs:
+      - path: /dev/foo
+        node: srvnode-1
+      - path: /dev/foo
+        node: srvnode-2
+    data_units: 1
+    parity_units: 0
+  - name: tier2-ssd
+    disk_refs:
+      - path: /dev/disk/by-id/dm-name-mpatha
+      - path: /dev/disk/by-id/dm-name-mpathb
+      - path: /dev/disk/by-id/dm-name-mpathg
+      - path: /dev/disk/by-id/dm-name-mpathh
+    data_units: 2
+    parity_units: 1
+    allowed_failures: { site: 0, rack: 0, encl: 0, ctrl: 0, disk: 1 }
+  - name: tier3-hdd
+    disk_refs:
+      - path: /dev/disk/by-id/dm-name-mpathc
+      - path: /dev/disk/by-id/dm-name-mpathd
+      - path: /dev/disk/by-id/dm-name-mpathe
+      - path: /dev/disk/by-id/dm-name-mpathf
+      - path: /dev/disk/by-id/dm-name-mpathi
+      - path: /dev/disk/by-id/dm-name-mpathj
+      - path: /dev/disk/by-id/dm-name-mpathk
+      - path: /dev/disk/by-id/dm-name-mpathl
+    data_units: 2
+    parity_units: 1
+    allowed_failures: { site: 0, rack: 0, encl: 0, ctrl: 0, disk: 1 }
+profiles:
+  - name: fast
+    pools: [ tier1-nvme, tier2-ssd ]
+  - name: archive
+    pools: [ tier3-hdd ]
+  - name: all
+    pools: [ tier1-nvme, tier2-ssd, tier3-hdd ]
