@@ -18,31 +18,6 @@
 
 -}
 
--- m0d process
-let M0Server =
-  { runs_confd : Optional Bool
-  , io_disks : { meta_data: Optional Text, data : List Text }
-  }
-
-let Node =
-  { hostname : Text
-  , data_iface : Text
-  , data_iface_type: Optional ./Protocol.dhall
-  , m0_servers : List M0Server
-  , m0_clients : { s3 : Natural, other : Natural }
-  }
-
-let Pool =
-  { name : Text
-  , type : Optional ./PoolType.dhall
-  , disk_refs : Optional (List ./DiskRef.dhall)
-  , data_units : Natural    -- N
-  , parity_units : Natural  -- K
-  , allowed_failures : Optional ./FailVec.dhall
-  }
-
-in
-{ nodes : List Node
-, pools : List Pool
-, profiles : Optional (List ./PoolsRef.dhall)
+{ path : Text
+, node : Optional Text
 }

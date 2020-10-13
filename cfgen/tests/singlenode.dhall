@@ -51,9 +51,11 @@ in
 , pools =
     [ { name = "the pool"
       , type = None types.PoolType
+      , disk_refs = None (List types.DiskRef)
       , data_units = 1
       , parity_units = 0
       , allowed_failures = None types.FailVec
       }
     ]
+, profiles = None (List types.PoolsRef)
 } : types.ClusterDesc

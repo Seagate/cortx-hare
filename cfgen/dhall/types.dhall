@@ -39,8 +39,10 @@
 , Protocol    = ./types/Protocol.dhall
 
 , ClusterDesc = ./types/ClusterDesc.dhall
+, DiskRef     = ./types/DiskRef.dhall
 , FailVec     = ./types/FailVec.dhall
 , PoolType    = ./types/PoolType.dhall
+, PoolsRef    = ./types/PoolsRef.dhall
 
 , Obj         = ./types/Obj.dhall
 , ObjT        = ./types/ObjT.dhall
