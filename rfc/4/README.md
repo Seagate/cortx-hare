@@ -26,15 +26,14 @@ Key | Value | Description
 `m0conf/nodes/<node_fid>/processes/<process_fid>` | `{ "name": "<process name>", "state": "<HA state>" }` |
 `m0conf/nodes/<node_fid>/processes/<process_fid>/services/<svc_fid>` | `{ "name": "<service name>", "state": "<HA state>" }` |
 `m0conf/nodes/<node_fid>/processes/<process_fid>/services/<svc_fid>/sdevs/<sdev_fid>` | `{ "path": "<sdev path>", "state": "<HA state>" }` |
+`m0conf/pools/<pool_fid>` | pool name | Name of the pool as specified in the CDF.  Example: `tier1-nvme`.
+`m0conf/profiles/<profile_fid>` | `{ "name": "<profile_name>", "pools": [ "<pool_name>" ] }` | "pools" - names of the _SNS_ pools associated with this profile.  `<profile_name>` and `<pool_name>`s are specified in the CDF.
 `m0conf/sites/<site_fid>` | `{ "state": "<HA state>" }` | [HA state](#ha-state) of this site.
 `m0conf/sites/<site_fid>/racks/<rack_fid>` | `{ "state": "<HA state>" }` | [HA state](#ha-state) of this rack.
 `m0conf/sites/<site_fid>/racks/<rack_fid>/encls/<encl_fid>` | `{ "state": "<HA state>" }` | [HA state](#ha-state) of this enclosure.
 `m0conf/sites/<site_fid>/racks/<rack_fid>/encls/<encl_fid>/ctrls/<ctrl_fid>` | `{ "node": "<node_fid>", "state": "<HA state>" }` | Fid of the corresponding node and [HA state](#ha-state) of this controller.
 `m0conf/sites/<site_fid>/racks/<rack_fid>/encls/<encl_fid>/ctrls/<ctrl_fid>/drives/<drive_fid>` | `{ "dev": "<sdev_fid>", "state": "<HA state>" }` | Fid of the corresponding storage device and [HA state](#ha-state) of this drive.
-`m0conf/profiles/<profile_fidk>` | `[ <pool_fidk> ]` | Array of fid keys of the SNS pools associated with this profile.
 `processes/<fid>` | `{ "state": "<HA state>" }` | The items are created and updated by `hax` processes.  Supported values of \<HA state\>: `M0_CONF_HA_PROCESS_STARTING`, `M0_CONF_HA_PROCESS_STARTED`, `M0_CONF_HA_PROCESS_STOPPING`, `M0_CONF_HA_PROCESS_STOPPED`.
-`profile` | fid | Profile fid in string format.  Example: `"0x7000000000000001:0x4"`.
-`profile/pools` | fids | Space-separated list of fids of SNS pools.
 `sspl.SYSTEM_INFORMATION.log_level` | | This key is used by SSPL.
 `stats/filesystem` | JSON object | See ['stats/filesystem' value](#statsfilesystem-value) below.
 `timeout` | YYYYmmddHHMM.SS | This value is used by the RC timeout mechanism.
@@ -59,13 +58,6 @@ Key | Value | Description
   Right now we don't know for sure if this will actually be a problem.
   The [specification of `bootstrap` script](rfc/6/README.md) should
   cover this topic.
--->
-<!--
-  XXX Human-readable pool names (e.g., "tier1-nvme", "tier2-ssd", "tier3-hdd")
-  proved to be quite useful in multi-pool setups.  If pool information is
-  ever needed, consider the following format of pool entries:
-
-  `m0conf/pools/<pool_fidk>` | `{ "name": <pool name>, ...N K failvec... }`
 -->
 <!--
   XXX 'sspl.SYSTEM_INFORMATION.log_level' does not conform to the naming

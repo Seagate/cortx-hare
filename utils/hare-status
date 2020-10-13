@@ -27,7 +27,6 @@ import sys
 from subprocess import PIPE, Popen
 from typing import Any, Dict, List, NamedTuple, Optional
 
-import simplejson as j
 from consul import Consul, ConsulException
 from hax.exception import HAConsistencyException
 from hax.util import repeat_if_fails
@@ -47,67 +46,93 @@ class Fid:
         return f'{self.__class__.__name__}({self.container:#x}, {self.key:#x})'
 
 
-class FidEncoder(j.JSONEncoder):
+class FidEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, Fid):
             return str(obj)
         return super().default(obj)
 
 
+Profile = NamedTuple('Profile', [
+    ('fid', str), ('name', str), ('pools', List[str])])
+
+Pool = NamedTuple('Pool', [('fid', str), ('name', str)])
+
 Process = NamedTuple('Process', [('name', str), ('fid', Fid), ('ep', str),
                                  ('status', str)])
 
-Host = NamedTuple('Host', [('name', str), ('svcs', List[Process])])
+Node = NamedTuple('Node', [('name', str), ('svcs', List[Process])])
 
 
 def processfid2str(fidk: int) -> str:
     return '{:#x}:{:#x}'.format(ord('r') << 56 | 1, fidk)
 
 
-def get_kv(cns: Consul, key: str, recurse: bool = False) -> Any:
-    """
-    Returns the given value from Consul KV. May throw HAConsistencyException in
-    case of an intermittent connection error or while Consul is re-electing
-    internal Raft leader.
+def kv_item(cns: Consul, key: str, recurse: bool = False) -> Any:
+    """Gets Consul KV item.
+
+    May throw HAConsistencyException in case of an intermittent connection
+    error or while Consul is re-electing internal Raft leader.
+
+    The _value_ returned is for the specified key, or if `recurse` is True
+    a list of _values_ for all keys with the given prefix is returned.
+
+    Each _value_ looks like this:
+    ```
+    {
+      "CreateIndex": 100,
+      "ModifyIndex": 200,
+      "LockIndex": 200,
+      "Key": "foo",
+      "Flags": 0,
+      "Value": "bar",
+      "Session": "adf4238a-882b-9ddc-4a9d-5b6758e4159e"
+    }
+    ```
+    Returns None if the requested `key` does not exists.
     """
     try:
-        kv: Dict[str, Any] = cns.kv.get(key, recurse=recurse)[1]
-        if kv is None:
-            return None
-        if isinstance(kv, list):
-            return kv
-        val = kv['Value']
-        return val.decode() if val else None
+        # See https://python-consul.readthedocs.io/en/latest/#consul-kv
+        val = cns.kv.get(key, recurse=recurse)[1]
+        assert val is None or recurse == (type(val) is list)
+        return val
     except (ConsulException, HTTPError, RequestException) as e:
         raise HAConsistencyException('Could not access Consul KV') from e
 
 
-def get_kv_safe(cns: Consul, key: str, **kwargs) -> str:
-    return get_kv(cns, key, **kwargs) or ''
+def kv_value_as_str(cns: Consul, key: str) -> Optional[str]:
+    item = kv_item(cns, key)
+    return None if item is None else item['Value'].decode()
 
 
 def leader_tag(cns: Consul, host: str) -> str:
-    return ' (RC)' if get_kv_safe(cns, 'leader') == host else ''
+    return ' (RC)' if kv_value_as_str(cns, 'leader') == host else ''
 
 
-def profile(cns: Consul) -> str:
-    return get_kv_safe(cns, 'm0conf/profiles')
+def profiles(cns: Consul) -> List[Profile]:
+    profs = []
+    for x in kv_item(cns, 'm0conf/profiles/', recurse=True):
+        fidstr = x['Key'].split('/')[-1]
+        payload = json.loads(x['Value'])
+        profs.append(Profile(
+            fid=fidstr, name=payload['name'], pools=payload['pools']))
+    return profs
 
 
-def sns_pools(cns: Consul) -> List[str]:
-    return get_kv_safe(cns, 'm0conf/profiles/pools').split(' ')
+def sns_pools(cns: Consul) -> List[Pool]:
+    return [Pool(fid=x['Key'].split('/')[-1], name=x['Value'].decode())
+            for x in kv_item(cns, 'm0conf/pools/', recurse=True)]
 
 
-def hosts(cns: Consul) -> List[str]:
-    data = get_kv(cns, 'm0conf/nodes', recurse=True)
-    host_names = [json.loads(x['Value'])['name'] for x in data
-                  if len(x['Key'].split('/')) == 3]
-    return host_names
+def node_names(cns: Consul) -> List[str]:
+    data = kv_item(cns, 'm0conf/nodes/', recurse=True)
+    return [json.loads(x['Value'])['name'] for x in data
+            if len(x['Key'].split('/')) == 3]  # XXX Yuck!
 
 
-def get_fs_stats(cns: Consul) -> Optional[Any]:
-    data = get_kv(cns, 'stats/filesystem') or '{"stats": {}}'
-    return j.loads(data)
+def get_fs_stats(cns: Consul) -> Any:
+    stats = kv_value_as_str(cns, 'stats/filesystem')
+    return {'stats': {}} if stats is None else json.loads(stats)
 
 
 def proc_id2name(cns: Consul, node: str, proc_id: int) -> str:
@@ -117,16 +142,16 @@ def proc_id2name(cns: Consul, node: str, proc_id: int) -> str:
         'ios': 'ioservice',
         'm0_client_s3': 's3server'
     }
-    services = get_kv(cns,
-                      f'm0conf/nodes/{node}/processes/{proc_id}/services',
-                      recurse=True)
+    services = kv_item(cns,
+                       f'm0conf/nodes/{node}/processes/{proc_id}/services/',
+                       recurse=True)
     assert services
     for svc in services:
         # key looks like
-        # 'm0conf/nodes/{node}/processes/{proc_id}/services/<svc_name>'
-        svc_name = svc['Key'].split('/')[-1]
-        if svc_name in names:
-            return names[svc_name]
+        # 'm0conf/nodes/<name>/processes/<process_fidk>/services/<svc_type>'
+        svc_type = svc['Key'].split('/')[-1]
+        if svc_type in names:
+            return names[svc_type]
     return 'm0_client'
 
 
@@ -135,32 +160,34 @@ def fid_key(fid: str) -> int:
     return int(key, 16)
 
 
-def node_name2id(cns: Consul, node_name: str) -> Any:
-    data = get_kv(cns, 'm0conf/nodes/', recurse=True)
-    for x in data:
-        if len(x['Key'].split('/')) == 3 and \
-           json.loads(x['Value'])['name'] == node_name:
-            return x['Key'].split('/')[-1]
-
-    assert False
-    return ''
+def node_name2fid(cns: Consul, node_name: str) -> Any:
+    for x in kv_item(cns, 'm0conf/nodes/', recurse=True):
+        parts = x['Key'].split('/', 3)
+        if len(parts) == 3 and json.loads(x['Value'])['name'] == node_name:
+            return parts[-1]
+    raise RuntimeError(f'Cannot find Consul KV entry for node {node_name!r}')
 
 
 def processes(cns: Consul, node_name: str) -> List[Process]:
     # Get 'm0conf/nodes/<node_id>/processes/<process_fidk>/...' entries
     # from the KV.  See 'Consul KV Schema' in [4/KV](rfc/4/README.md).
-    node_id = node_name2id(cns, node_name)
-    data = get_kv(cns, f'm0conf/nodes/{node_id}/processes', recurse=True)
-    proc_ids = [x['Key'].split('/')[-1] for x in data
-                if len(x['Key'].split('/')) == 5]
-    fidk_list = list(map(fid_key, proc_ids))
-    fidk_list.sort()
+    node_fid = node_name2fid(cns, node_name)
+    proc_fidks = []
+    for x in kv_item(cns, f'm0conf/nodes/{node_fid}/processes/', recurse=True):
+        parts = x['Key'].split('/', 5)
+        if len(parts) == 5:
+            proc_fidks.append(fid_key(parts[-1]))
     return [
-        Process(name=proc_id2name(cns, node_name, k),
-                fid=Fid(0x7200000000000001, k),
-                ep=get_kv_safe(
-                    cns, f'm0conf/nodes/{node_name}/processes/{k}/endpoint'),
-                status=process_status(cns, node_name, k)) for k in fidk_list
+        Process(
+            name=proc_id2name(cns, node_name, k),
+            fid=Fid(0x7200000000000001, k),
+            ep=(
+                kv_value_as_str(
+                    cns,
+                    f'm0conf/nodes/{node_name}/processes/{k}/endpoint'
+                ) or '**ERROR**'),
+            status=process_status(cns, node_name, k))
+        for k in sorted(proc_fidks)
     ]
 
 
@@ -181,13 +208,13 @@ def cluster_online() -> bool:
 
 @repeat_if_fails(max_retries=24)
 def get_cluster_status(cns: Consul) -> Dict[str, Any]:
-    nodes = [(Host(name=h, svcs=processes(cns, h)))._asdict()
-             for h in hosts(cns)]
     return {
-        'profile': profile(cns),
         'pools': [x for x in sns_pools(cns)],
+        'profiles': [{'fid': x.fid, 'name': x.name, 'pools': x.pools}
+                     for x in profiles(cns)],
         'filesystem': get_fs_stats(cns),
-        'nodes': nodes
+        'nodes': [Node(name=h, svcs=processes(cns, h))
+                  for h in node_names(cns)]
     }
 
 
@@ -205,32 +232,40 @@ def setup_logging():
 
 
 @repeat_if_fails(max_retries=24)
-def show_text_status(cns: Consul):
+def show_text_status(cns: Consul) -> None:
     # In-memory buffer required because an intermittent Consul exception can
     # happen right in the middle of printing something. It is good to postpone
     # the printing to stdout until the moment when those exceptions can't
     # appear anymore.
     with io.StringIO() as stream:
-        # Raised exception will cross  the 'with' border so that the stream
+        # Raised exception will cross the 'with' border so that the stream
         # will be closed and its memory will be released.
-        #
         def echo(text):
             print(text, file=stream)
 
-        def flush():
-            print(stream.getvalue())
+        pools = sns_pools(cns)
+        assert pools
+        echo('Data pool{}:'.format('s' if len(pools) > 1 else ''))
+        echo('    # fid name')
+        for pool in pools:
+            echo(f'    {pool.fid} {pool.name!r}')
 
-        echo('Profile: ' + profile(cns))
-        echo('Data pools:')
-        for x in sns_pools(cns):
-            echo(f'    {x}')
+        profs = profiles(cns)
+        assert profs
+        echo('Profile{}:'.format('s' if len(profs) > 1 else ''))
+        echo('    # fid name: pool(s)')
+        for prof in profs:
+            assert prof.pools
+            pools_repr = ' '.join(repr(x) for x in prof.pools)
+            echo(f'    {prof.fid} {prof.name!r}: {pools_repr}')
+
         echo('Services:')
-        for h in hosts(cns):
+        for h in node_names(cns):
             echo(f'    {h} {leader_tag(cns, h)}')
             for p in processes(cns, h):
                 fid: str = f'{p.fid}'
                 echo(f'    [{p.status}]  {p.name:<9}  {fid:<23}  {p.ep}')
-        flush()
+        print(stream.getvalue(), end='')  # flush
 
 
 def main(argv=None):
@@ -238,14 +273,15 @@ def main(argv=None):
     opts = parse_opts(argv)
     cns = Consul()
     if not cluster_online():
-        print('Cluster is not running.', file=sys.stderr)
+        print('Cluster is not running', file=sys.stderr)
         return 1
 
     if opts.json:
         status = get_cluster_status(cns)
-        print(j.dumps(status, indent=2, cls=FidEncoder))
-        return 0
-    show_text_status(cns)
+        print(json.dumps(status, indent=2, cls=FidEncoder))
+    else:
+        show_text_status(cns)
+    return 0
 
 
 if __name__ == '__main__':
