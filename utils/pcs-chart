@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+set -o pipefail
+
+if ! command -v docker &>/dev/null ; then
+    echo "${0##*/}: Docker is missing, please install it first:"
+    echo '  https://docs.docker.com/engine/install/ubuntu/'
+    echo '  https://docs.docker.com/engine/install/centos/'
+    exit 1
+fi >&2
+
+image='docker.pkg.github.com/seagate/cortx-hare/pcs-chart'
+docker_cmd="docker run --rm --interactive --volume $PWD:/outdir $image"
+journal_cmd='journalctl --output json --unit pacemaker'
+
+case "$*" in
+    *--pull*)    docker pull --quiet $image > /dev/null ;;&
+    *--follow*)  $journal_cmd --follow | $docker_cmd "$@" ;;
+    *--journal*) $journal_cmd | $docker_cmd "$@" ;;
+    *)           $docker_cmd "$@" ;;
+esac
+rc=$?
+
+case "$*" in
+    *--usage*)
+        cat <<-END_USAGE
+		    pcs-chart --journal [options]
+		    pcs-chart --follow  [options]
+		END_USAGE
+        ;;
+    *--help*|*--man*)
+        cat <<-END_HELP
+		    --journal
+		            Read pacemaker logs from 'journalctl' instead of STDIN.
+		
+		    --follow
+		            Monitor 'journalctl' pacemaker logs in realtime and generate
+		            failover/failback chart as soon as information is available
+		            in the log. Implies '--journal'
+		
+		    --pull
+		            Update pcs-chart docker image before running the command.
+		END_HELP
+        ;;
+esac
+
+exit $rc
