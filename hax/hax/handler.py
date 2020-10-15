@@ -19,7 +19,7 @@
 import logging
 import time
 from queue import Empty, Queue
-from typing import List
+from typing import List, Union
 
 from hax.message import (BroadcastHAStates, EntrypointRequest, HaNvecGetEvent,
                          ProcessEvent, SnsRebalancePause, SnsRebalanceResume,
@@ -27,11 +27,45 @@ from hax.message import (BroadcastHAStates, EntrypointRequest, HaNvecGetEvent,
                          SnsRebalanceStop, SnsRepairPause, SnsRepairResume,
                          SnsRepairStart, SnsRepairStatus, SnsRepairStop)
 from hax.motr import Motr
-from hax.queue.publish import EQPublisher
-from hax.types import MessageId, StobIoqError, StoppableThread
+from hax.queue.publish import EQPublisher, BQPublisher
+from hax.types import (ConfHaProcess, HAState, m0HaProcessEvent,
+                       m0HaProcessType, MessageId, ServiceHealth,
+                       StobIoqError, StoppableThread)
 from hax.util import ConsulUtil, dump_json, repeat_if_fails
 
 LOG = logging.getLogger('hax')
+
+
+def broadcast_process_event(q: Queue, event: ConfHaProcess):
+    ha_event = m0HaProcessEvent(event.chp_event)
+    proc_type = m0HaProcessType(event.chp_type)
+    if proc_type == m0HaProcessType.M0_CONF_HA_PROCESS_M0D:
+        status_map = {m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED:
+                      ServiceHealth.FAILED,
+                      m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED:
+                      ServiceHealth.OK}
+        svc_status = status_map.get(ha_event, ServiceHealth.UNKNOWN)
+        if svc_status != ServiceHealth.UNKNOWN:
+            q.put(BroadcastHAStates(states=[HAState(fid=event.fid,
+                                                    status=svc_status)],
+                                    is_broadcast_local=False,
+                                    reply_to=None))
+
+
+def broadcast_local(ha_states: BroadcastHAStates, motr: Motr):
+    result: List[MessageId] = motr.broadcast_ha_states(ha_states.states)
+    if ha_states.reply_to:
+        ha_states.reply_to.put(result)
+
+
+def broadcast_cluster(publisher_q: Union[EQPublisher, BQPublisher],
+                      ha_states: BroadcastHAStates):
+    states_json = [{'fid': f'{state.fid}', 'status': repr(state.status)}
+                   for state in ha_states.states]
+    payload = dump_json(states_json)
+    LOG.debug('Broadcast HA states JSON: %s', payload)
+    offset = publisher_q.publish('ha-notify', payload)
+    LOG.debug('Written to epoch: %s', offset)
 
 
 class ConsumerThread(StoppableThread):
@@ -50,6 +84,7 @@ class ConsumerThread(StoppableThread):
         self.is_stopped = False
         self.consul = ConsulUtil()
         self.eq_publisher = EQPublisher()
+        self.bq_publisher = BQPublisher()
 
     def stop(self) -> None:
         self.is_stopped = True
@@ -92,6 +127,8 @@ class ConsumerThread(StoppableThread):
                         # intermittent error gets resolved.
                         decorated = (repeat_if_fails(wait_seconds=5))(fn)
                         decorated(item.evt)
+                        event: ConfHaProcess = item.evt
+                        broadcast_process_event(q, event)
                     elif isinstance(item, HaNvecGetEvent):
                         fn = motr.ha_nvec_get_reply
                         # If a consul-related exception appears, it will
@@ -103,10 +140,10 @@ class ConsumerThread(StoppableThread):
                         decorated(item)
                     elif isinstance(item, BroadcastHAStates):
                         LOG.info('HA states: %s', item.states)
-                        result: List[MessageId] = motr.broadcast_ha_states(
-                            item.states)
-                        if item.reply_to:
-                            item.reply_to.put(result)
+                        if item.is_broadcast_local:
+                            broadcast_local(item, motr)
+                        else:
+                            broadcast_cluster(self.eq_publisher, item)
                     elif isinstance(item, StobIoqError):
                         LOG.info('Stob IOQ: %s', item.fid)
                         payload = dump_json(item)

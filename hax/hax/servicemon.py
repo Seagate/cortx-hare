@@ -75,7 +75,9 @@ class ServiceMonitor(StoppableThread):
         if not state_list:
             return
         LOG.debug('Changes in statuses: %s', state_list)
-        self.q.put(BroadcastHAStates(states=state_list, reply_to=None))
+        self.q.put(BroadcastHAStates(states=state_list,
+                                     is_broadcast_local=False,
+                                     reply_to=None))
 
     def _execute(self):
         service_names: List[str] = self._get_services()
@@ -91,7 +93,7 @@ class ServiceMonitor(StoppableThread):
 
                     for name in service_names:
                         health: HAState = self.consul.get_local_service_health(
-                            name)
+                                              name)
                         if (health.status != known_statuses[name]):
                             delta.append(health)
                             known_statuses[name] = health.status

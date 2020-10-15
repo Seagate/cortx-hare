@@ -47,6 +47,9 @@ class ProcessEvent(BaseMessage):
 @dataclass
 class BroadcastHAStates(BaseMessage):
     states: List[HAState]
+    # Differentiates between local and cluster broadcast.
+    # See hax/hax/handler.py
+    is_broadcast_local: bool
     reply_to: Optional[Queue]
 
 

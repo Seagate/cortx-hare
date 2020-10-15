@@ -22,7 +22,7 @@ from errno import EAGAIN
 from typing import Any, List
 
 from hax.exception import ConfdQuorumException, RepairRebalanceException
-from hax.message import (BroadcastHAStates, EntrypointRequest, HaNvecGetEvent,
+from hax.message import (EntrypointRequest, HaNvecGetEvent,
                          ProcessEvent)
 from hax.motr.delivery import DeliveryHerald
 from hax.motr.ffi import HaxFFI, make_array, make_c_str
@@ -188,18 +188,13 @@ class Motr:
         return message_ids
 
     def _process_event_cb(self, fid, chp_event, chp_type, chp_pid):
-        LOG.info('fid=%s, chp_event=%s', fid, chp_event)
+        LOG.info('fid=%s, chp_event=%s chp_type=%s', fid, chp_event, chp_type)
         self.queue.put(
             ProcessEvent(
                 ConfHaProcess(chp_event=chp_event,
                               chp_type=chp_type,
                               chp_pid=chp_pid,
                               fid=fid)))
-        if chp_event == 3:
-            self.queue.put(
-                BroadcastHAStates(
-                    states=[HAState(fid=fid, status=ServiceHealth.FAILED)],
-                    reply_to=None))
 
     def _stob_ioq_event_cb(self, fid, sie_conf_sdev, sie_stob_id, sie_fd,
                            sie_opcode, sie_rc, sie_offset, sie_size,

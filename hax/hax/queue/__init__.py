@@ -51,11 +51,14 @@ class BQProcessor:
             'M0_HA_MSG_NVEC': self.handle_device_state_set,
             'STOB_IOQ_ERROR': self.handle_ioq_stob_error,
         }
-        if msg_type not in handlers:
+        if msg_type in handlers:
+            handlers[msg_type](payload)
+        elif msg_type == 'HA_NOTIFY':
+            self.handle_ha_notify(payload)
+        else:
             LOG.warn('Unsupported message type given: %s. Message skipped.',
                      msg_type)
             return
-        handlers[msg_type](payload)
 
     def handle_device_state_set(self, payload: Dict[str, Any]) -> None:
         # To add check for multiple object entries in a payload.
@@ -68,7 +71,9 @@ class BQProcessor:
         q: Queue = Queue(1)
         LOG.debug('HA broadcast, node: %s device: %s state: %s',
                   payload['node'], payload['device'], payload['state'])
-        self.queue.put(BroadcastHAStates(states=[hastate], reply_to=q))
+        self.queue.put(BroadcastHAStates(states=[hastate],
+                                         is_broadcast_local=True,
+                                         reply_to=q))
         ids: List[MessageId] = q.get()
         self.herald.wait_for_any(HaLinkMessagePromise(ids))
 
@@ -82,7 +87,8 @@ class BQProcessor:
         self.queue.put(
             BroadcastHAStates(
                 states=[HAState(fid,
-                                status=ServiceHealth.FAILED)], reply_to=q))
+                                status=ServiceHealth.FAILED)],
+                is_broadcast_local=True, reply_to=q))
         ids: List[MessageId] = q.get()
         self.herald.wait_for_any(HaLinkMessagePromise(ids))
 
@@ -96,3 +102,21 @@ class BQProcessor:
             LOG.error('Invalid json payload, no key (%s) present', error)
             return None
         return HAState(sdev_fid, status=state)
+
+    def handle_ha_notify(self, payload: List[Dict[str, Any]]) -> None:
+        hastates: List[HAState] = []
+        for state in payload:
+            hastatus = ServiceHealth.UNKNOWN
+            if state['status'] == 'FAILED':
+                hastatus = ServiceHealth.FAILED
+            elif state['status'] == 'OK':
+                hastatus = ServiceHealth.OK
+            hastates.append(HAState(Fid.parse(state['fid']), hastatus))
+
+        if hastates:
+            q: Queue = Queue(1)
+            self.queue.put(BroadcastHAStates(states=hastates,
+                                             is_broadcast_local=True,
+                                             reply_to=q))
+            ids: List[MessageId] = q.get()
+            self.herald.wait_for_any(HaLinkMessagePromise(ids))

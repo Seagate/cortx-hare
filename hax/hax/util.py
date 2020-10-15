@@ -85,6 +85,11 @@ ha_process_events = ('M0_CONF_HA_PROCESS_STARTING',
                      'M0_CONF_HA_PROCESS_STOPPING',
                      'M0_CONF_HA_PROCESS_STOPPED')
 
+ha_process_types = ('M0_CONF_HA_PROCESS_OTHER',
+                    'M0_CONF_HA_PROCESS_KERNEL',
+                    'M0_CONF_HA_PROCESS_M0MKFS',
+                    'M0_CONF_HA_PROCESS_M0D')
+
 ha_conf_obj_states = ('M0_NC_UNKNOWN',
                       'M0_NC_ONLINE',
                       'M0_NC_FAILED',
@@ -317,29 +322,32 @@ class ConsulUtil:
             raise HAConsistencyException('Failed to communicate to'
                                          ' Consul Agent') from e
 
+    def get_m0d_status(self, srv: ServiceData) -> Tuple[str, str]:
+        try:
+            key = f'processes/{srv.fid}'
+            raw_data = self.kv.kv_get(key)
+            LOG.debug('Raw value from KV: %s', raw_data)
+            data = raw_data['Value']
+            data_json = json.loads(data)
+            value: str = data_json['state']
+            stype: str = data_json['type']
+            LOG.info('key (%s) state (%s) type (%s)', key, value, stype)
+            return value, stype
+        except Exception:
+            return 'Unknown', 'Unknown'
+
     def get_m0d_statuses(self) -> List[Tuple[ServiceData, str]]:
         """
         Return the list of all Motr service statuses according to Consul
         watchers. The following services are considered: ios, confd.
         """
-        def get_status(srv: ServiceData) -> str:
-            try:
-                key = f'processes/{srv.fid}'
-                raw_data = self.kv.kv_get(key)
-                LOG.debug('Raw value from KV: %s', raw_data)
-                data = raw_data['Value']
-                value: str = json.loads(data)['state']
-                return value
-            except Exception:
-                return 'Unknown'
-
         m0d_services = set(['ios', 'confd'])
         result = []
         for service_name in self.catalog_service_names():
             if service_name not in m0d_services:
                 continue
             data = self.get_service_data_by_name(service_name)
-            result += [(item, get_status(item)) for item in data]
+            result += [(item, self.get_m0d_status(item)[0]) for item in data]
         return result
 
     def get_service_data_by_name(self, name: str) -> List[ServiceData]:
@@ -441,7 +449,11 @@ class ConsulUtil:
         assert 0 <= event.chp_event < len(ha_process_events), \
             f'Invalid event type: {event.chp_event}'
 
-        data = json.dumps({'state': ha_process_events[event.chp_event]})
+        LOG.info('Updating process status type=%s event=%s',
+                 ha_process_types[event.chp_type],
+                 ha_process_events[event.chp_event])
+        data = dump_json({'type': ha_process_types[event.chp_type],
+                          'state': ha_process_events[event.chp_event]})
         key = f'processes/{event.fid}'
         LOG.debug('Setting process status in KV: %s:%s', key, data)
         self.kv.kv_put(key, data)
@@ -527,11 +539,43 @@ class ConsulUtil:
             raise RuntimeError(
                 f'Node {local_nodename} has no service {service_name}')
         service = local_services[0]
+        svc_data = mkServiceData(self._service_by_name(local_nodename,
+                                                       service_name))
+        status, stype = self.get_m0d_status(svc_data)
+        # Motr processes are of 2 types, mkfs and m0d.
+        # The type of motr process also needs to be considered to determine
+        # the correct health of the process.
+        # Motr mkfs and m0d processes for confd and ioservices share the same
+        # motr fids. Motr mkfs processes are short lived, thus it is possible
+        # that when the status check is done the status is reported as
+        # 'warning' which is acceptable for motr mkfs process. This should not
+        # be confused with motr m0d status, thus type needs to be checked as
+        # well.
+        if stype != 'M0_CONF_HA_PROCESS_M0D':
+            ok = all(x.get('Status') == 'passing' or
+                     (x.get('Status') == 'warning' and
+                      status in ['M0_CONF_HA_PROCESS_STARTING',
+                                 'M0_CONF_HA_PROCESS_STOPPING',
+                                 'M0_CONF_HA_PROCESS_STOPPED',
+                                 'M0_CONF_HA_PROCESS_STARTED'])
+                     for x in service['Checks'])
+        else:
+            ok = all(x.get('Status') == 'passing' or
+                     (x.get('Status') == 'warning' and
+                     status in ['M0_CONF_HA_PROCESS_STARTING',
+                                'M0_CONF_HA_PROCESS_STARTED'])
+                     for x in service['Checks'])
 
-        ok = all(x.get('Status') == 'passing' for x in service['Checks'])
-        status = ServiceHealth.OK if ok else ServiceHealth.FAILED
+        LOG.debug('Service=%s status=%s type=%s',
+                  service_name, status, stype)
+        if ok:
+            svc_status = ServiceHealth.OK
+        elif status == 'Unknown':
+            svc_status = ServiceHealth.UNKNOWN
+        else:
+            svc_status = ServiceHealth.FAILED
         fid = create_process_fid(int(service['Service']['ID']))
-        return HAState(fid=fid, status=status)
+        return HAState(fid=fid, status=svc_status)
 
 
 def dump_json(obj) -> str:
