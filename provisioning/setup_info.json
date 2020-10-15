@@ -1,19 +1,22 @@
 {
     "setup_types": [
         {
-            "name":"virtual",
+            "server_type":"virtual",
             "unsupported_features": ["hctl_node"]
         },
         {
-            "name":"5u84",
+            "server_type":"physical",
+            "storage_type":"5u84",
             "unsupported_features": []
         },
         {
-            "name":"PODS",
+            "server_type":"physical",
+            "storage_type":"PODS",
             "unsupported_features": []
         },
         {
-            "name":"JBOD",
+            "server_type":"physical",
+            "storage_type":"JBOD",
             "unsupported_features": ["hctl_node"]
         }
     ]
