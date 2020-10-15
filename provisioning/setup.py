@@ -28,8 +28,7 @@ import logging
 import shutil
 import subprocess
 
-from eos.utils.product_features import unsupported_features
-
+from cortx.utils.product_features import unsupported_features
 
 def get_data_from_provisioner_cli(method, output_format='json') -> str:
     try:
@@ -76,7 +75,7 @@ class UnsupportedFeatures(argparse.Action):
                 setup_info = get_data_from_provisioner_cli('get_setup_info')
                 if setup_info != 'unknown':
                     for setup in hare_unavailable_features['setup_types']:
-                        if setup['name'] == setup_info['server_type']:
+                        if setup['server_type'] == setup_info['server_type']:
                             features_unavailable.extend(
                                 setup['unsupported_features'])
                             _report_unsupported_features(features_unavailable)
