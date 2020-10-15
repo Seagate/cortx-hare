@@ -1,7 +1,7 @@
 hare:
   post_install:
-    script: /opt/seagate/cortx/hare/conf/setup.py
-    args: --report-unavailable-features
+    script: null
+    args: null
   init:
     script: null
     args: null
