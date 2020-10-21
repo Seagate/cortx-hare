@@ -65,11 +65,20 @@ reset_all() {
     $hare_exec/prov-ha-reset
 }
 
+motr_update() {
+    ssh $lnode /usr/sbin/m0provision config
+    ssh $rnode /usr/sbin/m0provision config
+}
+
 echo 'Exporting Consul KV...'
 $consul_bin/consul kv export > $hare_dir/consul-conf-exported.json
 
 reset_all
 sudo pcs cluster cib $cib_file
+
+# post_update from motr setup.yaml is not called currently, until then it
+# needs to be called from HA after update is done.
+motr_update
 
 echo 'Updating ha resources for IO path, SSPL, CSM and UDS...'
 $hare_exec/build-ees-ha $cdf $ioargsfile --cib-file $cib_file --update
