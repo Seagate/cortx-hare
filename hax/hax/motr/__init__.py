@@ -28,7 +28,7 @@ from hax.motr.delivery import DeliveryHerald
 from hax.motr.ffi import HaxFFI, make_array, make_c_str
 from hax.types import (ConfHaProcess, Fid, FidStruct, FsStats, HaNote,
                        HaNoteStruct, HAState, MessageId, ObjT, ReprebStatus,
-                       ServiceHealth, StobIoqError)
+                       StobIoqError)
 from hax.util import ConsulUtil
 
 LOG = logging.getLogger('hax')
@@ -171,7 +171,7 @@ class Motr:
         cns = ConsulUtil()
 
         def ha_obj_state(st):
-            return HaNoteStruct.M0_NC_ONLINE if st.status == ServiceHealth.OK \
+            return HaNoteStruct.M0_NC_ONLINE if st.status == 'online' \
                 else HaNoteStruct.M0_NC_FAILED
 
         notes = []
@@ -197,9 +197,8 @@ class Motr:
                               fid=fid)))
         if chp_event == 3:
             self.queue.put(
-                BroadcastHAStates(
-                    states=[HAState(fid=fid, status=ServiceHealth.FAILED)],
-                    reply_to=None))
+                BroadcastHAStates(states=[HAState(fid=fid, status='offline')],
+                                  reply_to=None))
 
     def _stob_ioq_event_cb(self, fid, sie_conf_sdev, sie_stob_id, sie_fd,
                            sie_opcode, sie_rc, sie_offset, sie_size,
