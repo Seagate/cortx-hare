@@ -15,7 +15,7 @@
 # For any questions about this software or licensing,
 # please email opensource@seagate.com or cortx-questions@seagate.com.
 
-from typing import Any, Tuple, Dict, List, Optional
+from typing import Any, Tuple, Dict, List
 
 # This is a stub file for `python-consul` module so that mypy will be able
 # to validate the code leveraging the library.
@@ -35,53 +35,43 @@ class Health:
     def node(
         self,
         node: str,
-        index: Optional[int] = None,
-        wait: Optional[str] = None,
-        dc: Optional[str] = None,
-        token: Optional[str] = None,
-    ) -> Tuple[int, List[Dict[str, Any]]]: ...
-    def service(
-        self,
-        service: str,
-        index: Optional[int] = None,
-        wait: Optional[str] = None,
-        dc: Optional[str] = None,
-        near: Optional[str] = None,
-        token: Optional[str] = None,
-        node_meta: Optional[Dict[str, Any]] = None,
+        index: int = None,
+        wait: str = None,
+        dc: str = None,
+        token: str = None,
     ) -> Tuple[int, List[Dict[str, Any]]]: ...
 
 class Catalog:
     def nodes(
         self,
-        index: Optional[int] = None,
-        wait: Optional[str] = None,
-        consistency: Optional[str] = None,
-        dc: Optional[str] = None,
-        near: Optional[str] = None,
-        token: Optional[str] = None,
+        index: int = None,
+        wait: str = None,
+        consistency: str = None,
+        dc: str = None,
+        near: str = None,
+        token: str = None,
         node_meta: Dict[str, str] = None,
     ) -> Tuple[int, List[Dict[str, Any]]]: ...
     def service(
         self,
         service: str,
-        index: Optional[int] = None,
-        wait: Optional[str] = None,
-        tag: Optional[str] = None,
-        consistency: Optional[str] = None,
-        dc: Optional[str] = None,
-        near: Optional[str] = None,
-        token: Optional[str] = None,
+        index: int = None,
+        wait: str = None,
+        tag: str = None,
+        consistency: str = None,
+        dc: str = None,
+        near: str = None,
+        token: str = None,
     ) -> Tuple[int, List[Dict[str, Any]]]: ...
     def services(
         self,
-        index: Optional[int] = None,
-        wait: Optional[str] = None,
-        tag: Optional[str] = None,
-        consistency: Optional[str] = None,
-        dc: Optional[str] = None,
-        near: Optional[str] = None,
-        token: Optional[str] = None,
+        index: int = None,
+        wait: str = None,
+        tag: str = None,
+        consistency: str = None,
+        dc: str = None,
+        near: str = None,
+        token: str = None,
     ) -> Tuple[int, Dict[str, List[Any]]]: ...
 
 class Agent:
@@ -91,34 +81,34 @@ class KV:
     def get(
         self,
         key: str,
-        index: Optional[int] = None,
-        recurse: Optional[bool] = False,
-        wait: Optional[str] = None,
-        token: Optional[str] = None,
-        keys: Optional[bool] = False,
-        separator: Optional[str] = None,
-        dc: Optional[str] = None,
+        index: int = None,
+        recurse: bool = False,
+        wait: str = None,
+        token: str = None,
+        keys: bool = False,
+        separator: str = None,
+        dc: str = None,
     ) -> Tuple[int, Any]: ...
     def put(
         self,
         key: str,
         value: str,
-        cas: Optional[int] = None,
-        flags: Optional[int] = None,
-        acquire: Optional[str] = None,
-        release: Optional[str] = None,
-        token: Optional[str] = None,
-        dc: Optional[str] = None,
+        cas: int = None,
+        flags: int = None,
+        acquire: str = None,
+        release: str = None,
+        token: str = None,
+        dc: str = None,
     ) -> bool: ...
 
 class Session:
     def info(
         self,
         session_id: str,
-        index: Optional[int] = None,
-        wait: Optional[str] = None,
-        consistency: Optional[str] = None,
-        dc: Optional[str] = None,
+        index: int = None,
+        wait: str = None,
+        consistency: str = None,
+        dc: str = None,
     ) -> Tuple[int, Any]: ...
 
 class ConsulException(Exception): ...
