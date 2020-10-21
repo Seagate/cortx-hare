@@ -26,22 +26,56 @@ from aiohttp import web
 from aiohttp.web import HTTPError, HTTPNotFound
 from aiohttp.web_response import json_response
 
-from hax.message import (BaseMessage, SnsDiskAttach, SnsDiskDetach,
-                         SnsRebalancePause, SnsRebalanceResume,
+from hax.message import (BaseMessage, BroadcastHAStates, SnsDiskAttach,
+                         SnsDiskDetach, SnsRebalancePause, SnsRebalanceResume,
                          SnsRebalanceStart, SnsRebalanceStatus,
                          SnsRebalanceStop, SnsRepairPause, SnsRepairResume,
                          SnsRepairStart, SnsRepairStatus, SnsRepairStop)
 from hax.motr.delivery import DeliveryHerald
 from hax.queue import BQProcessor
 from hax.queue.offset import InboxFilter, OffsetStorage
-from hax.types import Fid, StoppableThread
-from hax.util import ConsulUtil, dump_json
+from hax.types import Fid, HAState, ServiceHealth, StoppableThread
+from hax.util import ConsulUtil, create_process_fid, dump_json
 
 LOG = logging.getLogger('hax')
 
 
 async def hello_reply(request):
     return json_response(text="I'm alive! Sincerely, HaX")
+
+
+def to_ha_states(data: Any) -> List[HAState]:
+    """Converts a dictionary, obtained from JSON data, into a list of
+    HA states.
+
+    Format of an HA state: HAState(fid= <service fid>, status= <state>),
+    where <state> is either 'online' or 'offline'.
+    """
+    if not data:
+        return []
+
+    def get_status(checks: List[Dict[str, Any]]) -> ServiceHealth:
+        ok = all(x.get('Status') == 'passing' for x in checks)
+        return ServiceHealth.OK if ok else ServiceHealth.FAILED
+
+    return [
+        HAState(fid=create_process_fid(int(t['Service']['ID'])),
+                status=get_status(t['Checks'])) for t in data
+    ]
+
+
+def process_ha_states(queue: Queue):
+    async def _process(request):
+        data = await request.json()
+
+        loop = asyncio.get_event_loop()
+        # Note that queue.put is potentially a blocking call
+        await loop.run_in_executor(
+            None, lambda: queue.put(
+                BroadcastHAStates(states=to_ha_states(data), reply_to=None)))
+        return web.Response()
+
+    return _process
 
 
 def process_sns_operation(queue: Queue):
@@ -169,6 +203,7 @@ def run_server(
     app = web.Application(middlewares=[encode_exception])
     app.add_routes([
         web.get('/', hello_reply),
+        web.post('/', process_ha_states(queue)),
         web.post('/watcher/bq',
                  process_bq_update(inbox_filter, BQProcessor(queue, herald))),
         web.post('/api/v1/sns/{operation}', process_sns_operation(queue)),

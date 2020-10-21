@@ -20,12 +20,42 @@
     {
       "type": "service",
       "service": "confd",
+      "handler_type": "http",
+      "http_handler_config": {
+        "path": "http://localhost:8008",
+        "method": "POST",
+        "timeout": "10s"
+      }
+    },
+    {
+      "type": "service",
+      "service": "confd",
       "args": [ "/opt/seagate/cortx/hare/libexec/consul-watch-handler" ]
     },
     {
       "type": "service",
       "service": "ios",
+      "handler_type": "http",
+      "http_handler_config": {
+        "path": "http://localhost:8008",
+        "method": "POST",
+        "timeout": "10s"
+      }
+    },
+    {
+      "type": "service",
+      "service": "ios",
       "args": [ "/opt/seagate/cortx/hare/libexec/consul-watch-handler" ]
+    },
+    {
+      "type": "service",
+      "service": "s3service",
+      "handler_type": "http",
+      "http_handler_config": {
+        "path": "http://localhost:8008",
+        "method": "POST",
+        "timeout": "10s"
+      }
     },
     {
       "type": "service",
