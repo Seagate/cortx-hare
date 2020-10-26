@@ -49,6 +49,17 @@ die() {
     exit 1
 }
 
+systemd_journal() {
+    local nr_boots_max=10
+    local nr_boots=$(sudo journalctl --list-boot | wc -l)
+    if ((nr_boots > nr_boots_max)); then
+        nr_boots=$nr_boots_max
+    fi
+    for ((i = 0; i < nr_boots; ++i)); do
+        sudo journalctl -b -$i --utc --no-pager > systemd-journal_$i || true
+    done
+}
+
 case "${1:-}" in
     -h|--help) usage; exit;;
 esac
@@ -76,8 +87,7 @@ cd "$dest_dir/hare/$HOSTNAME"
 exec 5>&2
 exec 2> >(tee _reportbug.stderr >&2)
 
-sudo journalctl --no-pager --full --utc --output short-precise \
-     > syslog.txt || true
+systemd_journal
 
 sudo journalctl --no-pager --full --utc --output=json --unit=pacemaker.service \
      > syslog-pacemaker.json || true
