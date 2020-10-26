@@ -103,9 +103,6 @@ extra_files=(
     /etc/sysconfig/motr
     /opt/seagate/cortx-prvsnr/pillar/components/cluster.sls
     /opt/seagate/cortx/s3/conf/s3config.yaml
-    $(if [[ -r /etc/corosync/corosync.conf ]]; then
-          awk '$1 == "logfile:" { print $2 }' /etc/corosync/corosync.conf
-      fi)
 )
 for f in ${extra_files[@]}; do
     if [[ -f $f ]]; then
@@ -116,6 +113,7 @@ done
 cp --parents /var/lib/hare/* . 2>/dev/null || true
 cp -r --parents /var/lib/hare/consul-{env,server,client}-* . 2>/dev/null || true
 cp -r --parents /var/log/hare/ . 2>/dev/null || true
+cp -r --parents /var/log/cluster/ . 2>/dev/null || true
 
 cd ..
 
