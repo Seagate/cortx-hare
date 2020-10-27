@@ -49,6 +49,17 @@ die() {
     exit 1
 }
 
+systemd_journal() {
+    local nr_boots_max=10
+    local nr_boots=$(sudo journalctl --list-boot | wc -l)
+    if ((nr_boots > nr_boots_max)); then
+        nr_boots=$nr_boots_max
+    fi
+    for ((i = 0; i < nr_boots; ++i)); do
+        sudo journalctl -b -$i --utc --no-pager > systemd-journal_$i || true
+    done
+}
+
 case "${1:-}" in
     -h|--help) usage; exit;;
 esac
@@ -76,8 +87,7 @@ cd "$dest_dir/hare/$HOSTNAME"
 exec 5>&2
 exec 2> >(tee _reportbug.stderr >&2)
 
-sudo journalctl --no-pager --full --utc --output short-precise \
-     > syslog.txt || true
+systemd_journal
 
 sudo journalctl --no-pager --full --utc --output=json --unit=pacemaker.service \
      > syslog-pacemaker.json || true
@@ -93,9 +103,6 @@ extra_files=(
     /etc/sysconfig/motr
     /opt/seagate/cortx-prvsnr/pillar/components/cluster.sls
     /opt/seagate/cortx/s3/conf/s3config.yaml
-    $(if [[ -r /etc/corosync/corosync.conf ]]; then
-          awk '$1 == "logfile:" { print $2 }' /etc/corosync/corosync.conf
-      fi)
 )
 for f in ${extra_files[@]}; do
     if [[ -f $f ]]; then
@@ -106,6 +113,7 @@ done
 cp --parents /var/lib/hare/* . 2>/dev/null || true
 cp -r --parents /var/lib/hare/consul-{env,server,client}-* . 2>/dev/null || true
 cp -r --parents /var/log/hare/ . 2>/dev/null || true
+cp -r --parents /var/log/cluster/ . 2>/dev/null || true
 
 cd ..
 
