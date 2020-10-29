@@ -96,11 +96,11 @@ fi
 %postun
 systemctl daemon-reload
 
-# Don't fail if /usr/lib/rpm/brp-python-bytecompile reports syntax errors --
-# that script doesn't work with python3.
-# FIXME: https://github.com/scylladb/scylla/issues/2235 suggests that proper
-# fix is to rename all *.py files to *.py3.
-%define _python_bytecompile_errors_terminate_build 0
+# Instruct rpm's built-in python syntax linter /usr/lib/rpm/brp-python-bytecompile
+# to target python3 syntax instead of the default python2 syntax, which yeilds
+# linter errors, like
+#   SyntaxError: invalid syntax
+%global __python %{__python3}
 
 # Consul binaries are stripped and don't contain build id, so rpmbuild fails
 # with:
