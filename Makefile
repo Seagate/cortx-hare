@@ -149,7 +149,7 @@ HAX_EXE            = $(DESTDIR)/$(PREFIX)/bin/hax
 HAX_EGG_LINK       = $(DESTDIR)/$(PREFIX)/lib/python3.$(PY3_VERSION_MINOR)/site-packages/hax.egg-link
 SYSTEMD_CONFIG_DIR = $(DESTDIR)/usr/lib/systemd/system
 LOGROTATE_CONF_DIR = $(DESTDIR)/etc/logrotate.d
-ETC_CRON_DIR       = /etc/cron.hourly
+ETC_CRON_DIR       = $(DESTDIR)/etc/cron.hourly
 
 # dhall-bin {{{2
 vendor/dhall-bin/$(DHALL_VERSION)/dhall-$(DHALL_VERSION)-x86_64-linux.tar.bz2:
@@ -235,6 +235,7 @@ install-dirs:
 		  $(HARE_CONF_LOG) \
 		  $(HARE_LIBEXEC) \
 		  $(HARE_RULES) \
+		  $(ETC_CRON_DIR) \
 		  $(DESTDIR)/run/cortx \
 		  $(DESTDIR)/var/log/hare \
 		  $(DESTDIR)/etc/logrotate.d \

@@ -76,8 +76,9 @@ rm -rf %{buildroot}
 %{_exec_prefix}/lib/systemd/system/*
 %{_sharedstatedir}/hare/
 %{_localstatedir}/motr/hax/
+%{_sysconfdir}/cron.hourly/*
+%{_sysconfdir}/logrotate.d/*
 /opt/seagate/cortx/hare/*
-/etc/logrotate.d/hare
 
 %post
 systemctl daemon-reload
