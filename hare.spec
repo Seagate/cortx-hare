@@ -49,6 +49,7 @@ Requires: consul = 1.7.8
 Requires: facter
 Requires: jq
 Requires: cortx-motr = %{h_motr_version}
+Requires: cortx-py-utils
 Requires: python36
 
 Conflicts: halon
@@ -76,6 +77,8 @@ rm -rf %{buildroot}
 %{_exec_prefix}/lib/systemd/system/*
 %{_sharedstatedir}/hare/
 %{_localstatedir}/motr/hax/
+%{_sysconfdir}/logrotate.d/hare
+%{_sysconfdir}/cron.hourly/m0trace-prune
 /opt/seagate/cortx/hare/*
 
 %post
