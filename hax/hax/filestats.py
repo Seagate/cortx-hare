@@ -24,7 +24,7 @@ from typing import List
 from hax.exception import HAConsistencyException, InterruptedException
 from hax.motr import Motr, log_exception
 from hax.types import FsStatsWithTime, StoppableThread
-from hax.util import ConsulUtil
+from hax.util import ConsulUtil, repeat_if_fails
 
 LOG = logging.getLogger('hax')
 
@@ -92,12 +92,14 @@ class FsStatsUpdater(StoppableThread):
             ffi.shun_motr_thread()
             LOG.debug('filesystem stats updater thread exited')
 
+    @repeat_if_fails()
     def _ioservices_running(self) -> List[bool]:
         statuses = self.consul.get_m0d_statuses()
         LOG.debug('The following statuses received: %s', statuses)
         started = ['M0_CONF_HA_PROCESS_STARTED' == v[1] for v in statuses]
         return started
 
+    @repeat_if_fails()
     def _ensure_motr_all_started(self):
         while True:
             started = self._ioservices_running()
