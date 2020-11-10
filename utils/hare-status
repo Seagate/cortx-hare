@@ -23,6 +23,7 @@ import json
 import argparse
 import io
 import logging
+import simplejson
 import sys
 from subprocess import PIPE, Popen
 from typing import Any, Dict, List, NamedTuple, Optional
@@ -45,12 +46,8 @@ class Fid:
     def __repr__(self):
         return f'{self.__class__.__name__}({self.container:#x}, {self.key:#x})'
 
-
-class FidEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, Fid):
-            return str(obj)
-        return super().default(obj)
+    def for_json(self):
+        return self.__str__()
 
 
 Profile = NamedTuple('Profile', [
@@ -306,7 +303,7 @@ def main(argv=None):
 
     if opts.json:
         status = get_cluster_status(cns)
-        print(json.dumps(status, indent=2, cls=FidEncoder))
+        print(simplejson.dumps(status, indent=2, for_json=True))
     else:
         show_text_status(cns)
     return 0
