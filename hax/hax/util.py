@@ -372,6 +372,7 @@ class ConsulUtil:
                             service_type=srv_type))
         return services
 
+    @repeat_if_fails()
     def get_conf_obj_status(self, obj_t: ObjT, fidk: int) -> str:
         # 'node/<node_name>/process/<process_fidk>/service/type'
         node_items = self.kv.kv_get('m0conf/nodes', recurse=True)
