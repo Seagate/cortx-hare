@@ -541,7 +541,21 @@ static void msg_is_delivered_cb(struct m0_halon_interface *hi,
 static void msg_is_not_delivered_cb(struct m0_halon_interface *hi,
 				    struct m0_ha_link *hl, uint64_t tag)
 {
-	M0_LOG(M0_DEBUG, "noop");
+	struct m0_fid *proc_fid = &hl->hln_conn_cfg.hlcc_rpc_service_fid;
+
+	PyGILState_STATE gstate;
+	gstate = PyGILState_Ensure();
+
+	/* Notify hax about delivery failure. */
+	M0_LOG(M0_DEBUG, "msg not delivered, tag=%"PRIu64,
+		hl->hln_tag_broadcast_delivery);
+
+	PyObject *py_fid = toFid(proc_fid);
+	PyObject_CallMethod(hc0->hc_handler, "_msg_delivered_cb", "(OsKK)",
+			    py_fid, hl->hln_conn_cfg.hlcc_rpc_endpoint,
+			    hl->hln_tag_broadcast_delivery, hl);
+	Py_DECREF(py_fid);
+	PyGILState_Release(gstate);
 }
 
 static void link_connected_cb(struct m0_halon_interface *hi,
