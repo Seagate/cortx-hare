@@ -20,15 +20,17 @@ import ctypes as c
 import logging
 from errno import EAGAIN
 from typing import Any, List
+from queue import Queue
 
 from hax.exception import ConfdQuorumException, RepairRebalanceException
-from hax.message import (EntrypointRequest, HaNvecGetEvent,
+from hax.message import (BroadcastHAStates, EntrypointRequest, HaNvecGetEvent,
                          ProcessEvent)
 from hax.motr.delivery import DeliveryHerald
 from hax.motr.ffi import HaxFFI, make_array, make_c_str
 from hax.types import (ConfHaProcess, Fid, FidStruct, FsStats, HaNote,
                        HaNoteStruct, HAState, MessageId, ObjT, ReprebStatus,
-                       StobIoqError, ServiceHealth)
+                       StobIoqError, ServiceHealth, m0HaProcessEvent,
+                       m0HaProcessType, HaLinkMessagePromise)
 from hax.util import ConsulUtil
 
 LOG = logging.getLogger('hax')
@@ -108,6 +110,36 @@ class Motr:
                   " '{}', process fid = {}".format(remote_rpc_endpoint,
                                                    str(process_fid)) +
                   ' The request will be processed in another thread.')
+        try:
+            cns = ConsulUtil()
+            if is_first_request and (not cns.is_proc_client(process_fid)):
+                # This is the first start of this process or the process has
+                # restarted.
+                # Let everyone know that the process has restarted so that
+                # they can re-establish their connections with the process.
+                # Disconnect all the halinks this process is any.
+                # Motr clients are filtered out as they are the initiators of
+                # the rpc connections to motr ioservices. Presently there's no
+                # need identified to report motr client restarts, Consul will
+                # anyway detect the failure and report the same so we exclude
+                # reporting the same during their first entrypoint request.
+                # But we need to do it for motr server processes.
+                q: Queue = Queue(1)
+                LOG.debug('first entrypoint request, broadcasting FAILED')
+                self.queue.put(
+                    BroadcastHAStates(
+                        states=[HAState(fid=process_fid,
+                                        status=ServiceHealth.FAILED)],
+                        reply_to=q))
+                ids: List[MessageId] = q.get()
+                LOG.debug('waiting for broadcast of %s ep: %s',
+                          ids, remote_rpc_endpoint)
+                self.herald.wait_for_all(HaLinkMessagePromise(ids))
+        except Exception:
+            pass
+
+        LOG.debug('enqueue entrypoint request for %s',
+                  remote_rpc_endpoint)
         self.queue.put(
             EntrypointRequest(
                 reply_context=reply_context,
@@ -195,6 +227,13 @@ class Motr:
                               chp_type=chp_type,
                               chp_pid=chp_pid,
                               fid=fid)))
+
+        if chp_type == m0HaProcessType.M0_CONF_HA_PROCESS_M0D:
+            if chp_event == m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED:
+                self.queue.put(
+                    BroadcastHAStates(
+                        states=[HAState(fid=fid, status=ServiceHealth.OK)],
+                        reply_to=None))
 
     def _stob_ioq_event_cb(self, fid, sie_conf_sdev, sie_stob_id, sie_fd,
                            sie_opcode, sie_rc, sie_offset, sie_size,
