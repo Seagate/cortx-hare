@@ -69,14 +69,45 @@ class DeliveryHerald:
                       self.recently_delivered[promise])
             del self.recently_delivered[promise]
 
+    def wait_for_all(self,
+                     promise: HaLinkMessagePromise,
+                     timeout_sec: float = 30.0):
+        """
+        Blocks the current thread until all of the messages in
+        promise._ids are reported by Motr as delivered.
+
+        Raises NotDelivered exception when timeout_sec exceeds.
+        """
+        for msg in promise._ids:
+            condition = Condition()
+            with self.lock:
+                self.waiting_clients[promise] = condition
+
+            with condition:
+                LOG.debug('Blocking until %s is confirmed', promise)
+                condition.wait(timeout=timeout_sec)
+            with self.lock:
+                if promise not in self.recently_delivered:
+                    raise NotDelivered('None of message tags =' +
+                                       str(promise) +
+                                       '  were delivered to Motr')
+                msgid = self.recently_delivered[promise]
+                if msgid in promise:
+                    promise._ids.remove(msgid)
+                LOG.debug('Thread unblocked - %s just received',
+                          self.recently_delivered[promise])
+                del self.recently_delivered[promise]
+
     def notify_delivered(self, message_id: MessageId):
         # [KN] This function is expected to be called from Motr.
         with self.lock:
+            LOG.debug('notify waiting clients %s',
+                      self.waiting_clients.items())
             for promise, client in self.waiting_clients.items():
                 if message_id in promise:
                     LOG.debug('Found a waiting client for %s: %s', message_id,
                               promise)
+                    self.recently_delivered[promise] = message_id
                     with client:
                         client.notify()
-                    self.recently_delivered[promise] = message_id
                     return
