@@ -216,3 +216,41 @@ class ServiceHealth(Enum):
 
 
 HAState = NamedTuple('HAState', [('fid', Fid), ('status', ServiceHealth)])
+
+
+class m0HaProcessEvent(Enum):
+    M0_CONF_HA_PROCESS_STARTING = 0
+    M0_CONF_HA_PROCESS_STARTED = 1
+    M0_CONF_HA_PROCESS_STOPPING = 2
+    M0_CONF_HA_PROCESS_STOPPED = 3
+
+    def str_to_Enum(self, evt):
+        events = {'M0_CONF_HA_PROCESS_STARTING':
+                  self.M0_CONF_HA_PROCESS_STARTING,
+                  'M0_CONF_HA_PROCESS_STARTED':
+                  self.M0_CONF_HA_PROCESS_STARTED,
+                  'M0_CONF_HA_PROCESS_STOPPING':
+                  self.M0_CONF_HA_PROCESS_STOPPING,
+                  'M0_CONF_HA_PROCESS_STOPPED':
+                  self.M0_CONF_HA_PROCESS_STOPPED}
+        return events[evt]
+
+    def __repr__(self):
+        return self.name
+
+
+class m0HaProcessType(Enum):
+    M0_CONF_HA_PROCESS_OTHER = 0
+    M0_CONF_HA_PROCESS_KERNEL = 1
+    M0_CONF_HA_PROCESS_M0MKFS = 2
+    M0_CONF_HA_PROCESS_M0D = 3
+
+    def str_to_Enum(self):
+        types = {'M0_CONF_HA_PROCESS_OTHER': self.M0_CONF_HA_PROCESS_OTHER,
+                 'M0_CONF_HA_PROCESS_KERNEL': self.M0_CONF_HA_PROCESS_KERNEL,
+                 'M0_CONF_HA_PROCESS_M0MKFS': self.M0_CONF_HA_PROCESS_M0MKFS,
+                 'M0_CONF_HA_PROCESS_M0D': self.M0_CONF_HA_PROCESS_M0D}
+        return types[self.name]
+
+    def __repr__(self):
+        return self.name
