@@ -217,10 +217,14 @@ def enrich_cluster_desc(desc: Dict[str, Any], mock_p: bool) -> None:
         node['facts']['_memsize_MB'] = int(float(
             node['facts']['memorysize_mb']))
 
+        if 'm0_servers' not in node:
+            continue
+
         for m0d in node['m0_servers']:
             m0d.setdefault('runs_confd', False)
             m0d['_io_disks'] = get_disks(node['hostname'], mock_p,
                                          m0d['io_disks']['data'])
+
     if 'profiles' not in desc:
         sns_pools = [pool['name'] for pool in desc['pools']
                      if pool_type(pool) is PoolT.sns]
@@ -256,6 +260,12 @@ def validate_nodes_desc(nodes_desc: List[Dict[str, Any]]) -> None:
         assert node['facts'][ipaddr_key(iface)], \
             f"""{name}: {iface!r} interface has no IP address
 Make sure the value of data_iface in the CDF is correct."""
+
+        if 'm0_servers' not in node:
+            assert (node['m0_clients']['s3']
+                    + node['m0_clients']['other'] > 0), \
+                f'{name}: At least one client should be configured'
+            continue
 
         nr_confds = sum(1 for m0d in node['m0_servers'] if m0d['runs_confd'])
         assert nr_confds < 2, f'{name}: Too many confd services'
@@ -1688,7 +1698,10 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
     for node in cluster_desc['nodes']:
         node_id = ConfNode.build(conf, root_id, node)
         ctrl_id = None
-        if any(m0d['_io_disks'] for m0d in node['m0_servers']):
+        m0ds = []
+        if 'm0_servers' in node:
+            m0ds = node['m0_servers']
+        if any(m0d['_io_disks'] for m0d in m0ds):
             ctrl_id = ConfController.build(conf,
                                            ConfEnclosure.build(conf, rack_id),
                                            node_id)
@@ -1696,7 +1709,7 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
         ConfProcess.build(conf, node_id, node, ProcT.hax)
 
         confd_p = False
-        for m0d in node['m0_servers']:
+        for m0d in m0ds:
             ConfProcess.build(conf, node_id, node, ProcT.m0_server, m0d,
                               ctrl_id)
             if m0d['runs_confd']:
