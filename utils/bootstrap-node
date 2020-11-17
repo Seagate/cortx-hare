@@ -156,11 +156,10 @@ wait_m0d_started() {
     done
 }
 
-if [[ -n $CONFD_IDs || -n $IOS_IDs ]]; then
-    sudo mkdir -p /var/motr/hax
-    sudo systemctl start hare-hax
-    wait_active hare-hax 5
-fi
+# Make sure hax is always started.
+sudo mkdir -p /var/motr/hax
+sudo systemctl start hare-hax
+wait_active hare-hax 5
 
 if [[ -n $CONFD_IDs && $phase == phase1 ]]; then
     [[ -f /var/lib/hare/confd.xc ]] ||
