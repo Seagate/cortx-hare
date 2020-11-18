@@ -1698,9 +1698,7 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
     for node in cluster_desc['nodes']:
         node_id = ConfNode.build(conf, root_id, node)
         ctrl_id = None
-        m0ds = []
-        if 'm0_servers' in node:
-            m0ds = node['m0_servers']
+        m0ds = node.get('m0_servers', [])
         if any(m0d['_io_disks'] for m0d in m0ds):
             ctrl_id = ConfController.build(conf,
                                            ConfEnclosure.build(conf, rack_id),
