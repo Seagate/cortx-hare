@@ -30,7 +30,7 @@ nodes:
     data_iface: <str>  # name of network interface; e.g., eth1, eth1:c1
     data_iface_type: tcp|o2ib  # type of network interface;
                                # optional, defaults to "tcp"
-    m0_servers:
+    m0_servers:        # optional for client-only nodes
       - runs_confd: <bool>  # optional, defaults to false
         io_disks:
           meta_data: <str>  # device path for meta-data;
