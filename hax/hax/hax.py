@@ -40,9 +40,9 @@ HL_Fids = NamedTuple('HL_Fids', [('hax_ep', str), ('hax_fid', Fid),
 LOG = logging.getLogger('hax')
 
 
-def _run_qconsumer_thread(queue: Queue, motr: Motr,
-                          herald: DeliveryHerald) -> ConsumerThread:
-    thread = ConsumerThread(queue, motr, herald)
+def _run_qconsumer_thread(queue: Queue, motr: Motr, herald: DeliveryHerald,
+                          consul: ConsulUtil) -> ConsumerThread:
+    thread = ConsumerThread(queue, motr, herald, consul)
     thread.start()
     return thread
 
@@ -97,7 +97,7 @@ def main():
     # Note that consumer thread must be started before we invoke motr.start(..)
     # Reason: hax process will send entrypoint request and somebody needs
     # to reply it.
-    consumer = _run_qconsumer_thread(q, motr, herald)
+    consumer = _run_qconsumer_thread(q, motr, herald, util)
 
     try:
         motr.start(cfg.hax_ep,
