@@ -18,10 +18,10 @@ class BQProcessor:
 
     This is the place where a real processing logic should be located.
     """
-
-    def __init__(self, queue: Queue, delivery_herald: DeliveryHerald):
+    def __init__(self, queue: Queue, delivery_herald: DeliveryHerald,
+                 conf_obj_util: ConfObjUtil):
         self.queue = queue
-        self.confobjutil = ConfObjUtil()
+        self.confobjutil = conf_obj_util
         self.herald = delivery_herald
 
     def process(self, message: Tuple[int, Any]) -> None:
