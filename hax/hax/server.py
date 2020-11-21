@@ -44,7 +44,7 @@ async def hello_reply(request):
     return json_response(text="I'm alive! Sincerely, HaX")
 
 
-def to_ha_states(data: Any) -> List[HAState]:
+def to_ha_states(data: Any, consul_util: ConsulUtil) -> List[HAState]:
     """Converts a dictionary, obtained from JSON data, into a list of
     HA states.
 
@@ -64,7 +64,7 @@ def to_ha_states(data: Any) -> List[HAState]:
         node = get_svc_node(item['Checks'], item['Service']['ID'])
         LOG.debug('Checking current state of the process %s',
                   item['Service']['ID'])
-        status: ServiceHealth = ConsulUtil().get_service_health(
+        status: ServiceHealth = consul_util.get_service_health(
                                                item['Service']['Service'],
                                                node,
                                                int(item['Service']['ID']))
@@ -76,7 +76,7 @@ def to_ha_states(data: Any) -> List[HAState]:
     ]
 
 
-def process_ha_states(queue: Queue):
+def process_ha_states(queue: Queue, consul_util: ConsulUtil):
     async def _process(request):
         data = await request.json()
 
@@ -84,7 +84,8 @@ def process_ha_states(queue: Queue):
         # Note that queue.put is potentially a blocking call
         await loop.run_in_executor(
             None, lambda: queue.put(
-                BroadcastHAStates(states=to_ha_states(data), reply_to=None)))
+                BroadcastHAStates(states=to_ha_states(data, consul_util),
+                                  reply_to=None)))
         return web.Response()
 
     return _process
@@ -197,10 +198,11 @@ async def encode_exception(request, handler):
 def run_server(
     queue: Queue,
     herald: DeliveryHerald,
+    consul_util: ConsulUtil,
     threads_to_wait: List[StoppableThread] = [],
     port=8008,
 ):
-    node_address = ConsulUtil().get_hax_ip_address()
+    node_address = consul_util.get_hax_ip_address()
 
     # We can't use broad 0.0.0.0 IP address to make it possible to run
     # multiple hax instances at the same machine (i.e. in failover situation).
@@ -215,7 +217,7 @@ def run_server(
     app = web.Application(middlewares=[encode_exception])
     app.add_routes([
         web.get('/', hello_reply),
-        web.post('/', process_ha_states(queue)),
+        web.post('/', process_ha_states(queue, consul_util)),
         web.post('/watcher/bq',
                  process_bq_update(inbox_filter, BQProcessor(queue, herald))),
         web.post('/api/v1/sns/{operation}', process_sns_operation(queue)),
