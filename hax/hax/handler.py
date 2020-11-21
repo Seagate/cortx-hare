@@ -47,12 +47,13 @@ class ConsumerThread(StoppableThread):
     The thread exits gracefully when it receives message of type Die (i.e.
     it is a 'poison pill').
     """
-    def __init__(self, q: Queue, motr: Motr, herald: DeliveryHerald):
+    def __init__(self, q: Queue, motr: Motr, herald: DeliveryHerald,
+                 consul: ConsulUtil):
         super().__init__(target=self._do_work,
                          name='qconsumer',
                          args=(q, motr))
         self.is_stopped = False
-        self.consul = ConsulUtil()
+        self.consul = consul
         self.eq_publisher = EQPublisher()
         self.herald = herald
 
