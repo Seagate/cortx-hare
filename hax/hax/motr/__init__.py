@@ -50,6 +50,7 @@ class Motr:
                  queue,
                  rm_fid: Fid,
                  herald: DeliveryHerald,
+                 consul_util: ConsulUtil,
                  node_uuid: str = ''):
         self._ffi = ffi or HaxFFI()
         # [KN] Note that node_uuid is currently ignored by the corresponding
@@ -58,6 +59,7 @@ class Motr:
         self.queue = queue
         self.rm_fid = rm_fid
         self.herald = herald
+        self.consul_util = consul_util
 
         if not self._ha_ctx:
             LOG.error('Cannot initialize Motr API. m0_halon_interface_init'
@@ -130,7 +132,7 @@ class Motr:
                                                  str(process_fid)))
         sess = principal_rm = confds = None
         try:
-            prov = ConsulUtil()
+            prov = self.consul_util
             sess = prov.get_leader_session_no_wait()
             principal_rm = prov.get_session_node(sess)
             confds = prov.get_confd_list()
@@ -168,7 +170,6 @@ class Motr:
 
     def broadcast_ha_states(self, ha_states: List[HAState]) -> List[MessageId]:
         LOG.debug('Broadcasting HA states %s over ha_link', ha_states)
-        cns = ConsulUtil()
 
         def ha_obj_state(st):
             return HaNoteStruct.M0_NC_ONLINE if st.status == ServiceHealth.OK \
@@ -178,7 +179,7 @@ class Motr:
         for st in ha_states:
             note = HaNoteStruct(st.fid.to_c(), ha_obj_state(st))
             notes.append(note)
-            notes += self._generate_sub_services(note, cns)
+            notes += self._generate_sub_services(note, self.consul_util)
 
         message_ids: List[MessageId] = self._ffi.ha_broadcast(
             self._ha_ctx, make_array(HaNoteStruct, notes), len(notes))
@@ -221,13 +222,13 @@ class Motr:
     def ha_nvec_get_reply(self, event: HaNvecGetEvent) -> None:
         LOG.debug('Preparing the reply for HaNvecGetEvent (nvec size = %s)',
                   len(event.nvec))
-        cutil = ConsulUtil()
         notes: List[HaNoteStruct] = []
         for n in event.nvec:
             n.note.no_state = HaNoteStruct.M0_NC_ONLINE
-            if n.obj_t in (ObjT.PROCESS.name, ObjT.SERVICE.name) and \
-               cutil.get_conf_obj_status(ObjT[n.obj_t],
-                                         n.note.no_id.f_key) != 'passing':
+            if (n.obj_t in (ObjT.PROCESS.name, ObjT.SERVICE.name) and
+                self.consul_util.get_conf_obj_status(ObjT[n.obj_t],
+                                                     n.note.no_id.f_key) !=
+                    'passing'):
                 n.note.no_state = HaNoteStruct.M0_NC_FAILED
             notes.append(n.note)
 

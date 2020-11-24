@@ -30,12 +30,12 @@ LOG = logging.getLogger('hax')
 
 
 class FsStatsUpdater(StoppableThread):
-    def __init__(self, motr: Motr, interval_sec=5):
+    def __init__(self, motr: Motr, consul_util: ConsulUtil, interval_sec=5):
         super().__init__(target=self._execute,
                          name='fs-stats-updater',
                          args=(motr, ))
         self.stopped = False
-        self.consul = ConsulUtil()
+        self.consul = consul_util
         self.interval_sec = interval_sec
         self.event = Event()
 
