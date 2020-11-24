@@ -185,10 +185,11 @@ async def encode_exception(request, handler):
 def run_server(
     queue: Queue,
     herald: DeliveryHerald,
+    consul_util: ConsulUtil,
     threads_to_wait: List[StoppableThread] = [],
     port=8008,
 ):
-    node_address = ConsulUtil().get_hax_ip_address()
+    node_address = consul_util.get_hax_ip_address()
 
     # We can't use broad 0.0.0.0 IP address to make it possible to run
     # multiple hax instances at the same machine (i.e. in failover situation).
