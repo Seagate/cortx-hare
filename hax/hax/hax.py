@@ -59,8 +59,9 @@ def _run_qconsumer_thread(queue: Queue, motr: Motr) -> ConsumerThread:
     return thread
 
 
-def _run_stats_updater_thread(motr: Motr) -> FsStatsUpdater:
-    thread = FsStatsUpdater(motr, interval_sec=30)
+def _run_stats_updater_thread(motr: Motr,
+                              consul_util: ConsulUtil) -> FsStatsUpdater:
+    thread = FsStatsUpdater(motr, consul_util, interval_sec=30)
     thread.start()
     return thread
 
@@ -99,7 +100,8 @@ def main():
 
     ffi = HaxFFI()
     herald = DeliveryHerald()
-    motr = Motr(queue=q, rm_fid=cfg.rm_fid, ffi=ffi, herald=herald)
+    motr = Motr(queue=q, rm_fid=cfg.rm_fid, ffi=ffi, herald=herald,
+                consul_util=util)
 
     # Note that consumer thread must be started before we invoke motr.start(..)
     # Reason: hax process will send entrypoint request and somebody needs
@@ -112,10 +114,11 @@ def main():
                    ha_service=cfg.ha_fid,
                    rm_service=cfg.rm_fid)
         LOG.info('Motr API has been started')
-        stats_updater = _run_stats_updater_thread(motr)
+        stats_updater = _run_stats_updater_thread(motr, consul_util=util)
         # [KN] This is a blocking call. It will work until the program is
         # terminated by signal
-        run_server(q, herald, threads_to_wait=[consumer, stats_updater])
+        run_server(q, herald, consul_util=util,
+                   threads_to_wait=[consumer, stats_updater])
     except Exception:
         LOG.exception('Exiting due to an exception')
     finally:
