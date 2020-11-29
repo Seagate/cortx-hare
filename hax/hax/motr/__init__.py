@@ -20,7 +20,7 @@ import ctypes as c
 import logging
 from errno import EAGAIN
 from typing import Any, List
-from queue import Queue
+# from queue import Queue
 
 from hax.exception import ConfdQuorumException, RepairRebalanceException
 from hax.message import (BroadcastHAStates, EntrypointRequest, HaNvecGetEvent,
@@ -126,14 +126,12 @@ class Motr:
                 # anyway detect the failure and report the same so we exclude
                 # reporting the same during their first entrypoint request.
                 # But we need to do it for motr server processes.
-                q: Queue = Queue(1)
+                # q: Queue = Queue(1)
                 LOG.debug('first entrypoint request, broadcasting FAILED')
-                self.queue.put(
-                    BroadcastHAStates(
-                        states=[HAState(fid=process_fid,
-                                        status=ServiceHealth.FAILED)],
-                        reply_to=q))
-                ids: List[MessageId] = q.get()
+                states = [HAState(fid=process_fid,
+                                  status=ServiceHealth.FAILED)]
+                LOG.info('HA states: %s', states)
+                ids: List[MessageId] = self.broadcast_ha_states(states)
                 LOG.debug('waiting for broadcast of %s ep: %s',
                           ids, remote_rpc_endpoint)
                 self.herald.wait_for_all(HaLinkMessagePromise(ids))
