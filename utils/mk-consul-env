@@ -90,7 +90,7 @@ if [[ -n $extra_opts ]]; then
 fi
 
 # Prepare for consul-agent startup:
-sudo rm -rf /var/lib/hare/consul-$bind_addr
+sudo rm -rf /var/lib/hare/consul-data-$bind_addr
 
 conf_dir=consul-$mode-conf
 sudo mkdir -p /var/lib/hare/$conf_dir
