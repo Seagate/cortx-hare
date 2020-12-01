@@ -139,10 +139,10 @@ def main(argv=None):
     cluster = build_cluster(cluster_desc)
 
     outs: List[Tuple[str, Callable[..., str], List[Any]]] = [
-        ('consul-agents.json', generate_consul_agents, cluster),
-        ('consul-kv.json', generate_consul_kv, cluster, opts.dhall_dir),
-        ('confd.dhall', generate_confd, cluster.m0conf, opts.dhall_dir)]
-    for path, generate, *args in outs:
+        ('consul-agents.json', generate_consul_agents, [cluster]),
+        ('consul-kv.json', generate_consul_kv, [cluster, opts.dhall_dir]),
+        ('confd.dhall', generate_confd, [cluster.m0conf, opts.dhall_dir])]
+    for path, generate, args in outs:
         with open(os.path.join(opts.output_dir, path), 'w') as f:
             f.write(generate(*args))
 

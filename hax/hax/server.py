@@ -121,7 +121,7 @@ def get_sns_status(motr_queue: Queue,
                    status_type: Union[Type[SnsRepairStatus],
                                       Type[SnsRebalanceStatus]]):
     def fn(request):
-        queue = Queue(1)
+        queue: Queue = Queue(1)
         motr_queue.put(
             status_type(reply_to=queue,
                         fid=Fid.parse(request.query['pool_fid'])))
