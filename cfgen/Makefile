@@ -33,8 +33,9 @@ flake8: $(PYTHON_SCRIPTS)
 	flake8 $(FLAKE8_OPTS) $^
 
 .PHONY: typecheck
+override MYPY_OPTS := --config-file ../hax/mypy.ini $(MYPY_OPTS)
 typecheck: $(PYTHON_SCRIPTS)
-	set -eu -o pipefail; for f in $^; do MYPYPATH=../stubs mypy $$f; done
+	set -eu -o pipefail; for f in $^; do MYPYPATH=../stubs mypy $(MYPY_OPTS) $$f; done
 
 .PHONY: test-cfgen
 test-cfgen: unpack-dhall-prelude
