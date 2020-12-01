@@ -409,7 +409,9 @@ def run_command(hostname: str, *args: str) -> str:
 def get_facts(hostname: str, mock_p: bool, *args: str) -> Dict[str, Any]:
     if mock_p:
         return fabricate_facts(hostname, *args)
-    return json.loads(run_command(hostname, 'facter', '--json', *args))
+    result: Dict[str, Any] = json.loads(
+        run_command(hostname, 'facter', '--json', *args))
+    return result
 
 
 def fabricate_facts(hostname: str, *args: str) -> Dict[str, Any]:
