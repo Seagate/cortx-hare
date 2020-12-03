@@ -113,22 +113,18 @@ def repeat_if_fails(wait_seconds=5, max_retries=-1):
             attempt_count = 0
             while (True):
                 try:
-                    LOG.debug('Attempting to invoke the repeatable call: %s',
-                              f.__name__)
-                    result = f(*args, **kwds)
-                    LOG.debug('The repeatable call succeeded: %s', f.__name__)
-                    return result
+                    return f(*args, **kwds)
                 except HAConsistencyException as e:
                     attempt_count += 1
                     if max_retries >= 0 and attempt_count > max_retries:
                         LOG.warn(
-                            'Too many errors happened in a row '
-                            '(max_retries = %d)', max_retries)
+                            'Function %s: Too many errors happened in a row '
+                            '(max_retries = %d)', f.__name__, max_retries)
                         raise e
-                    LOG.warn(
-                        f'Got HAConsistencyException: {e.message} '
-                        f'(attempt {attempt_count}). The'
-                        f' attempt will be repeated in {wait_seconds} seconds')
+                    LOG.warn(f'Got HAConsistencyException: {e.message} while '
+                             f'invoking function {f.__name__} '
+                             f'(attempt {attempt_count}). The attempt will be '
+                             f'repeated in {wait_seconds} seconds')
                     sleep(wait_seconds)
 
         return wrapper
