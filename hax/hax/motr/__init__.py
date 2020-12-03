@@ -134,7 +134,7 @@ class Motr:
                                         status=ServiceHealth.FAILED)],
                         reply_to=q))
                 ids: List[MessageId] = q.get()
-                LOG.debug('waiting for broadcast of %s ep: %s',
+                LOG.debug('waiting for broadcast of %s for ep: %s',
                           ids, remote_rpc_endpoint)
                 self.herald.wait_for_all(HaLinkMessagePromise(ids))
         except Exception:
