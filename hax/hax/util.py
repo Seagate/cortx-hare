@@ -24,6 +24,7 @@ from base64 import b64encode
 from functools import wraps
 from time import sleep
 from typing import Any, Dict, List, NamedTuple, Optional, Tuple
+from hax.log import TRACE
 
 import simplejson
 from consul import Consul, ConsulException
@@ -310,7 +311,7 @@ class ConsulUtil:
         try:
             key = f'processes/{srv_fid}'
             raw_data = self.kv.kv_get(key)
-            LOG.debug('Raw value from KV: %s', raw_data)
+            LOG.log(TRACE, 'Raw value from KV: %s', raw_data)
             data = raw_data['Value']
             value: str = json.loads(data)['state']
             return value
@@ -333,7 +334,7 @@ class ConsulUtil:
 
     def get_service_data_by_name(self, name: str) -> List[ServiceData]:
         services = self._catalog_service_get(name)
-        LOG.debug('Services "%s" received: %s', name, services)
+        LOG.log(TRACE, 'Services "%s" received: %s', name, services)
         return list(map(mkServiceData, services))
 
     def get_confd_list(self) -> List[ServiceData]:

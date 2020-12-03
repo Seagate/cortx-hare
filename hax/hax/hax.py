@@ -19,12 +19,12 @@
 #
 
 import logging
-import sys
 from queue import Queue
 from typing import NamedTuple
 
 from hax.filestats import FsStatsUpdater
 from hax.handler import ConsumerThread
+from hax.log import setup_logging
 from hax.motr import Motr
 from hax.motr.delivery import DeliveryHerald
 from hax.motr.ffi import HaxFFI
@@ -38,19 +38,6 @@ HL_Fids = NamedTuple('HL_Fids', [('hax_ep', str), ('hax_fid', Fid),
                                  ('ha_fid', Fid), ('rm_fid', Fid)])
 
 LOG = logging.getLogger('hax')
-
-
-def _setup_logging():
-    hax_logger = LOG
-    hax_logger.setLevel(logging.DEBUG)
-
-    formatter = logging.Formatter(
-        '%(asctime)s [%(levelname)s] {%(threadName)s} %(message)s')
-    console = logging.StreamHandler(sys.stdout)
-    console.setFormatter(formatter)
-
-    logging.getLogger('').addHandler(console)
-    logging.getLogger('consul').setLevel(logging.WARN)
 
 
 def _run_qconsumer_thread(queue: Queue, motr: Motr,
@@ -79,7 +66,7 @@ def _get_motr_fids(util: ConsulUtil) -> HL_Fids:
 def main():
     # Note: no logging must happen before this call.
     # Otherwise the log configuration will not apply.
-    _setup_logging()
+    setup_logging()
 
     # [KN] The elements in the queue will appear if
     # 1. A callback is invoked from ha_link (this will happen in a motr
@@ -101,7 +88,10 @@ def main():
 
     ffi = HaxFFI()
     herald = DeliveryHerald()
-    motr = Motr(queue=q, rm_fid=cfg.rm_fid, ffi=ffi, herald=herald,
+    motr = Motr(queue=q,
+                rm_fid=cfg.rm_fid,
+                ffi=ffi,
+                herald=herald,
                 consul_util=util)
 
     # Note that consumer thread must be started before we invoke motr.start(..)
@@ -118,7 +108,9 @@ def main():
         stats_updater = _run_stats_updater_thread(motr, consul_util=util)
         # [KN] This is a blocking call. It will work until the program is
         # terminated by signal
-        run_server(q, herald, consul_util=util,
+        run_server(q,
+                   herald,
+                   consul_util=util,
                    threads_to_wait=[consumer, stats_updater])
     except Exception:
         LOG.exception('Exiting due to an exception')
