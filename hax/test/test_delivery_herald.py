@@ -24,7 +24,7 @@ from threading import Thread
 from time import sleep
 
 from hax.exception import NotDelivered
-from hax.motr import log_exception
+from hax.log import TRACE
 from hax.motr.delivery import DeliveryHerald
 from hax.types import HaLinkMessagePromise, MessageId
 
@@ -35,10 +35,11 @@ class TestDeliveryHeraldAny(unittest.TestCase):
     """
     @classmethod
     def setUpClass(cls):
-        logging.basicConfig(
-            level=logging.DEBUG,
-            stream=sys.stdout,
-            format='%(asctime)s {%(threadName)s} [%(levelname)s] %(message)s')
+        # It seems like when unittest is invoked from setup.py,
+        # some default logging configuration is already applied;
+        # invoking setup_logging() will make the log messages to appear twice.
+        logging.addLevelName(TRACE, 'TRACE')
+        logging.getLogger('hax').setLevel(TRACE)
 
     def test_it_works(self):
         herald = DeliveryHerald()
