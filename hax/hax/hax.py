@@ -53,8 +53,9 @@ def _setup_logging():
     logging.getLogger('consul').setLevel(logging.WARN)
 
 
-def _run_qconsumer_thread(queue: Queue, motr: Motr) -> ConsumerThread:
-    thread = ConsumerThread(queue, motr)
+def _run_qconsumer_thread(queue: Queue, motr: Motr,
+                          herald: DeliveryHerald) -> ConsumerThread:
+    thread = ConsumerThread(queue, motr, herald)
     thread.start()
     return thread
 
@@ -106,7 +107,7 @@ def main():
     # Note that consumer thread must be started before we invoke motr.start(..)
     # Reason: hax process will send entrypoint request and somebody needs
     # to reply it.
-    consumer = _run_qconsumer_thread(q, motr)
+    consumer = _run_qconsumer_thread(q, motr, herald)
 
     try:
         motr.start(cfg.hax_ep,
