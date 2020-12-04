@@ -20,17 +20,17 @@ import ctypes as c
 import logging
 from errno import EAGAIN
 from typing import Any, List
-from queue import Queue
 
 from hax.exception import ConfdQuorumException, RepairRebalanceException
-from hax.message import (BroadcastHAStates, EntrypointRequest, HaNvecGetEvent,
+from hax.message import (BroadcastHAStates, FirstEntrypointRequest,
+                         EntrypointRequest, HaNvecGetEvent,
                          ProcessEvent)
 from hax.motr.delivery import DeliveryHerald
 from hax.motr.ffi import HaxFFI, make_array, make_c_str
 from hax.types import (ConfHaProcess, Fid, FidStruct, FsStats, HaNote,
                        HaNoteStruct, HAState, MessageId, ObjT, ReprebStatus,
                        StobIoqError, ServiceHealth, m0HaProcessEvent,
-                       m0HaProcessType, HaLinkMessagePromise)
+                       m0HaProcessType)
 from hax.util import ConsulUtil
 
 LOG = logging.getLogger('hax')
@@ -126,19 +126,20 @@ class Motr:
                 # anyway detect the failure and report the same so we exclude
                 # reporting the same during their first entrypoint request.
                 # But we need to do it for motr server processes.
-                q: Queue = Queue(1)
-                LOG.debug('first entrypoint request, broadcasting FAILED')
                 self.queue.put(
-                    BroadcastHAStates(
-                        states=[HAState(fid=process_fid,
-                                        status=ServiceHealth.FAILED)],
-                        reply_to=q))
-                ids: List[MessageId] = q.get()
-                LOG.debug('waiting for broadcast of %s ep: %s',
-                          ids, remote_rpc_endpoint)
-                self.herald.wait_for_all(HaLinkMessagePromise(ids))
+                    FirstEntrypointRequest(
+                        reply_context=reply_context,
+                        req_id=req_id,
+                        remote_rpc_endpoint=remote_rpc_endpoint,
+                        process_fid=process_fid,
+                        git_rev=git_rev,
+                        pid=pid,
+                        is_first_request=is_first_request
+                    ))
+                return
         except Exception:
-            pass
+            LOG.exception('Failed to notify failure for %s',
+                          process_fid)
 
         LOG.debug('enqueue entrypoint request for %s',
                   remote_rpc_endpoint)
@@ -150,7 +151,7 @@ class Motr:
                 process_fid=process_fid,
                 git_rev=git_rev,
                 pid=pid,
-                is_first_request=is_first_request,
+                is_first_request=is_first_request
             ))
 
     def send_entrypoint_request_reply(self, message: EntrypointRequest):
@@ -248,6 +249,14 @@ class Motr:
                           halink_ctx: int):
         LOG.info(
             'Delivered to endpoint'
+            "'{}', process fid = {}".format(proc_endpoint, str(proc_fid)) +
+            'tag= %d', tag)
+        self.herald.notify_delivered(MessageId(halink_ctx=halink_ctx, tag=tag))
+
+    def _msg_not_delivered_cb(self, proc_fid, proc_endpoint: str, tag: int,
+                              halink_ctx: int):
+        LOG.info(
+            'Message delivery failed, endpoint'
             "'{}', process fid = {}".format(proc_endpoint, str(proc_fid)) +
             'tag= %d', tag)
         self.herald.notify_delivered(MessageId(halink_ctx=halink_ctx, tag=tag))

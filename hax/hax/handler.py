@@ -21,14 +21,18 @@ import time
 from queue import Empty, Queue
 from typing import List
 
-from hax.message import (BroadcastHAStates, EntrypointRequest, HaNvecGetEvent,
+from hax.message import (BroadcastHAStates, FirstEntrypointRequest,
+                         EntrypointRequest, HaNvecGetEvent,
                          ProcessEvent, SnsRebalancePause, SnsRebalanceResume,
                          SnsRebalanceStart, SnsRebalanceStatus,
                          SnsRebalanceStop, SnsRepairPause, SnsRepairResume,
                          SnsRepairStart, SnsRepairStatus, SnsRepairStop)
 from hax.motr import Motr
+from hax.motr.delivery import DeliveryHerald
 from hax.queue.publish import EQPublisher
-from hax.types import MessageId, StobIoqError, StoppableThread
+from hax.types import (ConfHaProcess, HAState, MessageId, StobIoqError,
+                       m0HaProcessEvent, ServiceHealth, StoppableThread,
+                       HaLinkMessagePromise)
 from hax.util import ConsulUtil, dump_json, repeat_if_fails
 
 LOG = logging.getLogger('hax')
@@ -43,16 +47,36 @@ class ConsumerThread(StoppableThread):
     The thread exits gracefully when it receives message of type Die (i.e.
     it is a 'poison pill').
     """
-    def __init__(self, q: Queue, motr: Motr):
+    def __init__(self, q: Queue, motr: Motr, herald: DeliveryHerald):
         super().__init__(target=self._do_work,
                          name='qconsumer',
                          args=(q, motr))
         self.is_stopped = False
         self.consul = ConsulUtil()
         self.eq_publisher = EQPublisher()
+        self.herald = herald
 
     def stop(self) -> None:
         self.is_stopped = True
+
+    @repeat_if_fails(wait_seconds=1)
+    def _update_process_status(self, event: ConfHaProcess) -> None:
+        # If a consul-related exception appears, it will
+        # be processed by repeat_if_fails.
+        #
+        # This thread will become blocked until that
+        # intermittent error gets resolved.
+        self.consul.update_process_status(event)
+
+    def update_process_failure(self, ha_states: List[HAState]) -> None:
+        for state in ha_states:
+            if state.status == ServiceHealth.FAILED:
+                m0status = m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED
+                pevent = ConfHaProcess(chp_event=m0status,
+                                       chp_type=3,
+                                       chp_pid=0,
+                                       fid=state.fid)
+                self._update_process_status(pevent)
 
     def _do_work(self, q: Queue, motr: Motr):
         ffi = motr._ffi
@@ -76,21 +100,31 @@ class ConsumerThread(StoppableThread):
                         if self.is_stopped:
                             raise StopIteration()
                         item = pull_msg()
-
-                    if isinstance(item, EntrypointRequest):
+                    LOG.debug('Got %s message from queue', item)
+                    if isinstance(item, FirstEntrypointRequest):
+                        LOG.debug('first entrypoint request, broadcast FAILED')
+                        ids: List[MessageId] = motr.broadcast_ha_states(
+                            [HAState(fid=item.process_fid,
+                                     status=ServiceHealth.FAILED)])
+                        LOG.debug('waiting for broadcast of %s for ep: %s',
+                                  ids, item.remote_rpc_endpoint)
+                        self.herald.wait_for_all(HaLinkMessagePromise(ids))
+                        motr.send_entrypoint_request_reply(
+                            EntrypointRequest(
+                                reply_context=item.reply_context,
+                                req_id=item.req_id,
+                                remote_rpc_endpoint=item.remote_rpc_endpoint,
+                                process_fid=item.process_fid,
+                                git_rev=item.git_rev,
+                                pid=item.pid,
+                                is_first_request=item.is_first_request))
+                    elif isinstance(item, EntrypointRequest):
                         # While replying any Exception is catched. In such a
                         # case, the motr process will receive EAGAIN and
                         # hence will need to make new attempt by itself
                         motr.send_entrypoint_request_reply(item)
                     elif isinstance(item, ProcessEvent):
-                        fn = self.consul.update_process_status
-                        # If a consul-related exception appears, it will
-                        # be processed by repeat_if_fails.
-                        #
-                        # This thread will become blocked until that
-                        # intermittent error gets resolved.
-                        decorated = (repeat_if_fails(wait_seconds=5))(fn)
-                        decorated(item.evt)
+                        self._update_process_status(item.evt)
                     elif isinstance(item, HaNvecGetEvent):
                         fn = motr.ha_nvec_get_reply
                         # If a consul-related exception appears, it will
@@ -104,6 +138,7 @@ class ConsumerThread(StoppableThread):
                         LOG.info('HA states: %s', item.states)
                         result: List[MessageId] = motr.broadcast_ha_states(
                             item.states)
+                        self.update_process_failure(item.states)
                         if item.reply_to:
                             item.reply_to.put(result)
                     elif isinstance(item, StobIoqError):
