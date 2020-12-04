@@ -82,6 +82,7 @@ class DeliveryHerald:
             condition = Condition()
             with self.lock:
                 self.waiting_clients[promise] = condition
+                LOG.debug('waiting clients %s', self.waiting_clients)
 
             with condition:
                 LOG.debug('Blocking until %s is confirmed', promise)
@@ -91,12 +92,8 @@ class DeliveryHerald:
                     raise NotDelivered('None of message tags =' +
                                        str(promise) +
                                        '  were delivered to Motr')
-                msgid = self.recently_delivered[promise]
-                if msgid in promise:
-                    promise._ids.remove(msgid)
                 LOG.debug('Thread unblocked - %s just received',
                           self.recently_delivered[promise])
-                del self.recently_delivered[promise]
 
     def notify_delivered(self, message_id: MessageId):
         # [KN] This function is expected to be called from Motr.
@@ -104,6 +101,8 @@ class DeliveryHerald:
             LOG.debug('notify waiting clients %s',
                       self.waiting_clients.items())
             for promise, client in self.waiting_clients.items():
+                LOG.debug('received msg id %s, waiting promise %s',
+                          message_id, promise)
                 if message_id in promise:
                     LOG.debug('Found a waiting client for %s: %s', message_id,
                               promise)
