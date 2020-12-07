@@ -198,6 +198,13 @@ class HaLinkMessagePromise:
     def __init__(self, message_ids: List[MessageId]):
         self._ids: Set[MessageId] = set(message_ids)
 
+    def exclude_ids(self, ids: List[MessageId]) -> None:
+        for message_id in ids:
+            self._ids.discard(message_id)
+
+    def is_empty(self) -> bool:
+        return not self._ids
+
     def __contains__(self, message_id: MessageId) -> bool:
         return message_id in self._ids
 
