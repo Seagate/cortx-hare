@@ -534,7 +534,6 @@ static void msg_is_delivered_cb(struct m0_halon_interface *hi,
 	PyObject_CallMethod(hc0->hc_handler, "_msg_delivered_cb", "(OsKK)",
 			    py_fid, hl->hln_conn_cfg.hlcc_rpc_endpoint,
 			    tag, hl);
-			    /* hl->hln_tag_broadcast_delivery, hl);*/
 	Py_DECREF(py_fid);
 	PyGILState_Release(gstate);
 }
@@ -554,7 +553,7 @@ static void msg_is_not_delivered_cb(struct m0_halon_interface *hi,
 	PyObject *py_fid = toFid(proc_fid);
 	PyObject_CallMethod(hc0->hc_handler, "_msg_not_delivered_cb", "(OsKK)",
 			    py_fid, hl->hln_conn_cfg.hlcc_rpc_endpoint,
-			    hl->hln_tag_broadcast_delivery, hl);
+			    tag, hl);
 	Py_DECREF(py_fid);
 	PyGILState_Release(gstate);
 }
