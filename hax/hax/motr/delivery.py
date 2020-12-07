@@ -78,6 +78,8 @@ class DeliveryHerald:
 
         Raises NotDelivered exception when timeout_sec exceeds.
         """
+        i = len(promise._ids)
+
         for msg in promise._ids:
             condition = Condition()
             with self.lock:
@@ -94,6 +96,10 @@ class DeliveryHerald:
                                        '  were delivered to Motr')
                 LOG.debug('Thread unblocked - %s just received',
                           self.recently_delivered[promise])
+                i -= 1
+                if i == 0:
+                    del self.waiting_clients[promise]
+                    del self.recently_delivered[promise]
 
     def notify_delivered(self, message_id: MessageId):
         # [KN] This function is expected to be called from Motr.
