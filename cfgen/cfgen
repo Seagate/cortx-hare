@@ -789,7 +789,8 @@ def service_types(proc_t: ProcT,
                        SvcT.M0_CST_SNS_REB,
                        SvcT.M0_CST_ADDB2,
                        SvcT.M0_CST_CAS,
-                       SvcT.M0_CST_ISCS])
+                       SvcT.M0_CST_ISCS,
+                       SvcT.M0_CST_FDMI])
     return ts
 
 
