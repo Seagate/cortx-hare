@@ -91,6 +91,35 @@ and health-checking mechanisms.
   Log out and log back in.
 
 
+### Build and install `hare` rpm from source.
+
+* Install Motr.
+
+  * .. from RPMS
+    ```sh
+    sudo yum -y install cortx-motr cortx-motr-devel
+    ```
+
+  * .. or from sources
+    ```sh
+    git clone --recursive https://github.com/Seagate/cortx-motr.git motr
+    cd motr
+
+    scripts/m0 make rpms
+    sudo rpm -ivh ~/rpmbuild/RPMS/x86_64/cortx-motr-*.rpm
+    ```
+
+* Build `hare` rpm.
+
+  Download hare source as mentioned above.
+  ```sh
+  cd hare
+
+  make rpm
+  sudo rpm -ivh ~/rpmbuild/RPMS/x86_64/cortx-hare-*.rpm
+  ```
+
+
 <!------------------------------------------------------------------->
 ## Quick start
 
