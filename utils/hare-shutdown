@@ -127,7 +127,7 @@ def exec_silent(cmd: str) -> bool:
 
 def exec(cmd: str) -> None:
     assert cmd
-    print('done' if exec_silent(cmd) else '**ERROR**')
+    print('OK' if exec_silent(cmd) else '**ERROR**')
 
 
 def process_stop(proc: Process) -> None:
@@ -214,8 +214,9 @@ def main() -> None:
             _stop_parallel([proc for proc in processes[svc]])
 
     if leader_node and not is_fake_leader_name(leader_node):
-        print(f'Killing RC Leader at {leader_node}... ', end='', flush=True)
-        exec(ssh_prefix(leader_node) + 'sudo pkill --exact -KILL consul')
+        print(f'Shutting down RC Leader at {leader_node}... ', end='', flush=True)
+        exec(ssh_prefix(leader_node) +
+                'sudo pkill --exact -KILL consul &> /dev/null')
 
 
 if __name__ == '__main__':
