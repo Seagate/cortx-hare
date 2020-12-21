@@ -214,9 +214,10 @@ def main() -> None:
             _stop_parallel([proc for proc in processes[svc]])
 
     if leader_node and not is_fake_leader_name(leader_node):
-        print(f'Shutting down RC Leader at {leader_node}... ', end='', flush=True)
-        exec(ssh_prefix(leader_node) +
-                'sudo pkill --exact -KILL consul &> /dev/null')
+        print(f'Shutting down RC Leader at {leader_node}... ',
+              end='', flush=True)
+        pkill: str = 'sudo pkill --exact -KILL consul &> /dev/null'
+        exec(ssh_prefix(leader_node) + pkill)
 
 
 if __name__ == '__main__':
