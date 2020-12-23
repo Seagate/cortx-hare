@@ -57,6 +57,10 @@ class FsStatsUpdater(StoppableThread):
             ffi.adopt_motr_thread()
             self._ensure_motr_all_started()
             while not self.stopped:
+                if not self._am_i_rc():
+                    self._sleep(self.interval_sec)
+                    continue
+
                 started = self._ioservices_running()
                 if not all(started):
                     self._sleep(self.interval_sec)
@@ -107,3 +111,10 @@ class FsStatsUpdater(StoppableThread):
                 LOG.debug('According to Consul all confds have been started')
                 return
             self._sleep(5)
+
+    def _am_i_rc(self):
+        # The call is already marked with @repeat_if_fails
+        leader = self.consul.get_leader_node()
+        # The call doesn't communicate via Consul REST API
+        this_node = self.consul.get_local_nodename()
+        return leader == this_node

@@ -228,6 +228,11 @@ class ConsulUtil:
             f'No {svc_name!r} Consul service found at node {hostname!r}')
 
     def get_local_nodename(self) -> str:
+        """
+        Returns the logical name of the current node. This is the name that
+        Consul is aware of. In other words, whenever Consul references a node,
+        it will use the names that this function can return.
+        """
         try:
             local_nodename = os.environ.get('HARE_HAX_NODE_NAME') or \
                 self.cns.agent.self()['Config']['NodeName']
@@ -279,6 +284,18 @@ class ConsulUtil:
         return self._service_data().ip_addr
 
     @repeat_if_fails()
+    def get_leader_node(self) -> str:
+        """
+        Returns the node name of RC leader.
+        Note: in case when RC leader is not elected yet, the node name may be
+        just a randomly generated string (see hare-node-join script for
+        more details).
+        """
+        leader = self.kv.kv_get('leader')
+        node: bytes = leader['Value']
+        return node.decode('utf-8')
+
+    @repeat_if_fails()
     def get_leader_session(self) -> str:
         """
         Blocking version of `get_leader_session_no_wait()`.
@@ -303,7 +320,7 @@ class ConsulUtil:
         try:
             session = self.cns.session.info(session_id)[1]
             return str(session['Node'])  # principal RM
-        except ConsulException as e:
+        except (ConsulException, HTTPError, RequestException) as e:
             raise HAConsistencyException('Failed to communicate to'
                                          ' Consul Agent') from e
 
