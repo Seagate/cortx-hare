@@ -114,7 +114,8 @@ clean: clean-hax clean-mypy clean-dhall-prelude
 clean-hax:
 	@$(call _info,Cleaning hax)
 	@for d in hax/build hax/dist hax/hax.egg-info hax/*.so \
-	          hax/hax/__pycache__; do \
+		  hax/hax/__pycache__ hax/hax/motr/__pycache__ \
+		  hax/hax/queue/__pycache__ hax/test/__pycache__; do \
 	     if [[ -e $$d ]]; then \
 	         $(call _log,removing $$d); \
 	         rm -rf $$d; \
