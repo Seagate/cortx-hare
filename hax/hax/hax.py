@@ -28,6 +28,7 @@ from hax.log import setup_logging
 from hax.motr import Motr
 from hax.motr.delivery import DeliveryHerald
 from hax.motr.ffi import HaxFFI
+from hax.motr.rconfc import RconfcStarter
 from hax.server import run_server
 from hax.types import Fid, Profile
 from hax.util import ConsulUtil, repeat_if_fails
@@ -66,6 +67,13 @@ def _get_motr_fids(util: ConsulUtil) -> HL_Fids:
         raise RuntimeError('Configuration error: no profile '
                            'is found in Consul KV')
     return HL_Fids(hax_ep, hax_fid, ha_fid, rm_fid, profiles)
+
+
+def _run_rconfc_starter_thread(motr: Motr,
+                               consul_util: ConsulUtil) -> RconfcStarter:
+    rconfc_starter = RconfcStarter(motr, consul_util)
+    rconfc_starter.start()
+    return rconfc_starter
 
 
 def main():
@@ -112,13 +120,15 @@ def main():
                    rm_service=cfg.rm_fid,
                    profile=cfg.profiles[0])
         LOG.info('Motr API has been started')
+        rconfc_starter = _run_rconfc_starter_thread(motr, consul_util=util)
+
         stats_updater = _run_stats_updater_thread(motr, consul_util=util)
         # [KN] This is a blocking call. It will work until the program is
         # terminated by signal
         run_server(q,
                    herald,
                    consul_util=util,
-                   threads_to_wait=[consumer, stats_updater])
+                   threads_to_wait=[consumer, stats_updater, rconfc_starter])
     except Exception:
         LOG.exception('Exiting due to an exception')
     finally:
