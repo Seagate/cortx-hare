@@ -61,6 +61,7 @@ class Motr:
         self.rm_fid = rm_fid
         self.herald = herald
         self.consul_util = consul_util
+        self.spiel_ready = False
 
         if not self._ha_ctx:
             LOG.error('Cannot initialize Motr API. m0_halon_interface_init'
@@ -103,6 +104,9 @@ class Motr:
                                'Please check Motr logs for more details.')
         LOG.debug('confc has been stopped successfuly')
         return result
+
+    def is_spiel_ready(self):
+        return self.spiel_ready
 
     @log_exception
     def _entrypoint_request_cb(self, reply_context: Any, req_id: Any,
@@ -291,6 +295,8 @@ class Motr:
         ]
 
     def close(self):
+        LOG.debug('Stopping rconfc')
+        self.stop_rconfc()
         LOG.debug('Shutting down Motr API')
         self._ffi.destroy(self._ha_ctx)
         self._ha_ctx = 0
