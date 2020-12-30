@@ -20,7 +20,7 @@
 
 import logging
 from queue import Queue
-from typing import NamedTuple
+from typing import List, NamedTuple
 
 from hax.filestats import FsStatsUpdater
 from hax.handler import ConsumerThread
@@ -29,13 +29,14 @@ from hax.motr import Motr
 from hax.motr.delivery import DeliveryHerald
 from hax.motr.ffi import HaxFFI
 from hax.server import run_server
-from hax.types import Fid
+from hax.types import Fid, Profile
 from hax.util import ConsulUtil, repeat_if_fails
 
 __all__ = ['main']
 
 HL_Fids = NamedTuple('HL_Fids', [('hax_ep', str), ('hax_fid', Fid),
-                                 ('ha_fid', Fid), ('rm_fid', Fid)])
+                                 ('ha_fid', Fid), ('rm_fid', Fid),
+                                 ('profiles', List[Profile])])
 
 LOG = logging.getLogger('hax')
 
@@ -60,7 +61,11 @@ def _get_motr_fids(util: ConsulUtil) -> HL_Fids:
     hax_fid: Fid = util.get_hax_fid()
     ha_fid: Fid = util.get_ha_fid()
     rm_fid: Fid = util.get_rm_fid()
-    return HL_Fids(hax_ep, hax_fid, ha_fid, rm_fid)
+    profiles = util.get_profiles()
+    if not profiles:
+        raise RuntimeError('Configuration error: no profile '
+                           'is found in Consul KV')
+    return HL_Fids(hax_ep, hax_fid, ha_fid, rm_fid, profiles)
 
 
 def main():
@@ -79,7 +84,7 @@ def main():
     q: Queue = Queue(maxsize=8)
 
     util: ConsulUtil = ConsulUtil()
-    cfg = _get_motr_fids(util)
+    cfg: HL_Fids = _get_motr_fids(util)
 
     LOG.info('Welcome to HaX')
     LOG.info(f'Setting up ha_link interface with the options as follows: '
@@ -100,10 +105,12 @@ def main():
     consumer = _run_qconsumer_thread(q, motr, herald, util)
 
     try:
+        # [KN] We use just the first profile for Spiel API for now.
         motr.start(cfg.hax_ep,
                    process=cfg.hax_fid,
                    ha_service=cfg.ha_fid,
-                   rm_service=cfg.rm_fid)
+                   rm_service=cfg.rm_fid,
+                   profile=cfg.profiles[0])
         LOG.info('Motr API has been started')
         stats_updater = _run_stats_updater_thread(motr, consul_util=util)
         # [KN] This is a blocking call. It will work until the program is

@@ -262,3 +262,9 @@ class m0HaProcessType(Enum):
 
     def __repr__(self):
         return self.name
+
+
+class Profile(NamedTuple):
+    fid: Fid
+    name: str
+    pool_names: List[str]

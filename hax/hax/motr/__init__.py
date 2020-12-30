@@ -22,15 +22,14 @@ from errno import EAGAIN
 from typing import Any, List
 
 from hax.exception import ConfdQuorumException, RepairRebalanceException
-from hax.message import (BroadcastHAStates, FirstEntrypointRequest,
-                         EntrypointRequest, HaNvecGetEvent,
-                         ProcessEvent)
+from hax.message import (BroadcastHAStates, EntrypointRequest,
+                         FirstEntrypointRequest, HaNvecGetEvent, ProcessEvent)
 from hax.motr.delivery import DeliveryHerald
 from hax.motr.ffi import HaxFFI, make_array, make_c_str
 from hax.types import (ConfHaProcess, Fid, FidStruct, FsStats, HaNote,
-                       HaNoteStruct, HAState, MessageId, ObjT, ReprebStatus,
-                       StobIoqError, ServiceHealth, m0HaProcessEvent,
-                       m0HaProcessType)
+                       HaNoteStruct, HAState, MessageId, ObjT, Profile,
+                       ReprebStatus, ServiceHealth, StobIoqError,
+                       m0HaProcessEvent, m0HaProcessType)
 from hax.util import ConsulUtil
 
 LOG = logging.getLogger('hax')
@@ -69,9 +68,10 @@ class Motr:
             raise RuntimeError('Cannot initialize Motr API')
 
     def start(self, rpc_endpoint: str, process: Fid, ha_service: Fid,
-              rm_service: Fid):
+              rm_service: Fid, profile: Profile):
         LOG.debug('Starting m0_halon_interface')
         self._process_fid = process
+        self._profile = profile
         result = self._ffi.start(self._ha_ctx, make_c_str(rpc_endpoint),
                                  process.to_c(), ha_service.to_c(),
                                  rm_service.to_c())
@@ -84,8 +84,8 @@ class Motr:
 
     def start_rconfc(self) -> int:
         LOG.debug('Starting rconfc')
-        result: int = self._ffi.start_rconfc(self._ha_ctx,
-                                             self._process_fid.to_c())
+        profile_fid: Fid = self._profile.fid
+        result: int = self._ffi.start_rconfc(self._ha_ctx, profile_fid.to_c())
         if result:
             raise RuntimeError('Cannot start rconfc.'
                                ' Please check Motr logs for more details.')
@@ -113,8 +113,8 @@ class Motr:
                                                    str(process_fid)) +
                   ' The request will be processed in another thread.')
         try:
-            if (is_first_request and
-                    (not self.consul_util.is_proc_client(process_fid))):
+            if (is_first_request
+                    and (not self.consul_util.is_proc_client(process_fid))):
                 # This is the first start of this process or the process has
                 # restarted.
                 # Let everyone know that the process has restarted so that
@@ -134,25 +134,20 @@ class Motr:
                         process_fid=process_fid,
                         git_rev=git_rev,
                         pid=pid,
-                        is_first_request=is_first_request
-                    ))
+                        is_first_request=is_first_request))
                 return
         except Exception:
-            LOG.exception('Failed to notify failure for %s',
-                          process_fid)
+            LOG.exception('Failed to notify failure for %s', process_fid)
 
-        LOG.debug('enqueue entrypoint request for %s',
-                  remote_rpc_endpoint)
+        LOG.debug('enqueue entrypoint request for %s', remote_rpc_endpoint)
         self.queue.put(
-            EntrypointRequest(
-                reply_context=reply_context,
-                req_id=req_id,
-                remote_rpc_endpoint=remote_rpc_endpoint,
-                process_fid=process_fid,
-                git_rev=git_rev,
-                pid=pid,
-                is_first_request=is_first_request
-            ))
+            EntrypointRequest(reply_context=reply_context,
+                              req_id=req_id,
+                              remote_rpc_endpoint=remote_rpc_endpoint,
+                              process_fid=process_fid,
+                              git_rev=git_rev,
+                              pid=pid,
+                              is_first_request=is_first_request))
 
     def send_entrypoint_request_reply(self, message: EntrypointRequest):
         reply_context = message.reply_context
@@ -273,10 +268,9 @@ class Motr:
         notes: List[HaNoteStruct] = []
         for n in event.nvec:
             n.note.no_state = HaNoteStruct.M0_NC_ONLINE
-            if (n.obj_t in (ObjT.PROCESS.name, ObjT.SERVICE.name) and
-                self.consul_util.get_conf_obj_status(ObjT[n.obj_t],
-                                                     n.note.no_id.f_key) !=
-                    'passing'):
+            if (n.obj_t in (ObjT.PROCESS.name, ObjT.SERVICE.name)
+                    and self.consul_util.get_conf_obj_status(
+                        ObjT[n.obj_t], n.note.no_id.f_key) != 'passing'):
                 n.note.no_state = HaNoteStruct.M0_NC_FAILED
             notes.append(n.note)
 
