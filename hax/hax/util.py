@@ -34,7 +34,7 @@ from urllib3.exceptions import HTTPError
 
 from hax.exception import HAConsistencyException
 from hax.types import (ConfHaProcess, Fid, FsStatsWithTime,
-                       ObjT, ServiceHealth)
+                       ObjT, ServiceHealth, Profile)
 
 __all__ = ['ConsulUtil', 'create_process_fid', 'create_service_fid',
            'create_sdev_fid', 'create_drive_fid']
@@ -594,6 +594,19 @@ class ConsulUtil:
             raise HAConsistencyException('Failed to communicate '
                                          'to Consul Agent') from e
         return status
+
+    def get_profiles(self) -> List[Profile]:
+        def to_profile(k: str, v: Dict[str, Any]) -> Profile:
+            return Profile(fid=Fid.parse(k),
+                           name=v['name'],
+                           pool_names=v['pools'])
+
+        result: List[Profile] = []
+        for x in self.kv.kv_get('m0conf/profiles/', recurse=True):
+            fidstr = x['Key'].split('/')[-1]
+            payload = simplejson.loads(x['Value'])
+            result.append(to_profile(fidstr, payload))
+        return result
 
 
 def dump_json(obj) -> str:
