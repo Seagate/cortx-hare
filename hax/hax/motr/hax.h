@@ -70,7 +70,7 @@ int start(unsigned long long ctx, const char *local_rpc_endpoint,
 	  const struct m0_fid *rm_service_fid);
 
 int start_rconfc(unsigned long long   ctx,
-		 const struct m0_fid *process_fid);
+		 const struct m0_fid *profile_fid);
 
 int stop_rconfc(unsigned long long ctx);
 

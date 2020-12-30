@@ -693,17 +693,17 @@ int start(unsigned long long ctx, const char *local_rpc_endpoint,
 	return rc;
 }
 
-int start_rconfc(unsigned long long ctx, const struct m0_fid *process_fid)
+int start_rconfc(unsigned long long ctx, const struct m0_fid *profile_fid)
 {
 	struct hax_context *hc = (struct hax_context *)ctx;
 
 	struct m0_spiel *spiel = m0_halon_interface_spiel(hc->hc_hi);
 	char fid_str[M0_FID_STR_LEN];
 
-	struct m0_fid *process_fid_copy =
-	    &M0_FID_TINIT('r', process_fid->f_container, process_fid->f_key);
+	struct m0_fid *profile_fid_copy =
+	    &M0_FID_TINIT('r', profile_fid->f_container, profile_fid->f_key);
 
-	m0_fid_print(fid_str, M0_FID_STR_LEN, process_fid_copy);
+	m0_fid_print(fid_str, M0_FID_STR_LEN, profile_fid_copy);
 	int rc = m0_spiel_cmd_profile_set(spiel, fid_str);
 	if (rc != 0) {
 		M0_LOG(M0_ERROR, "Failed to set spiel profile");
