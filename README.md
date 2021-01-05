@@ -187,7 +187,7 @@ You will probably need to modify `host`, `data_iface`, and `io_disks` values.
   ```sh
   /opt/seagate/cortx/hare/libexec/m0crate-io-conf >/tmp/m0crate-io.yaml
   dd if=/dev/urandom of=/tmp/128M bs=1M count=128
-  sudo m0crate -S /tmp/m0crate-io.yaml
+  sudo ./motr/motr/m0crate/m0crate -S /tmp/m0crate-io.yaml
   ```
 
 * Stop the cluster.
