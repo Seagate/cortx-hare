@@ -24,7 +24,7 @@
  */
 
 pipeline {
-    agent { label 'docker-nightly-node' }
+    agent { label 'docker-cp-centos-7.8.2003-node' }
 
     options {
         timeout(50)  // abort the build after that many minutes
@@ -37,8 +37,8 @@ pipeline {
     environment {
         REPO_NAME = 'cortx-hare'
         VM_FQDN = 'ssc-vm-0581.colo.seagate.com'
-        VM_CRED = credentials('bb694996-b19f-4f1a-8686-46cc9ba7d120')
-        GITHUB_TOKEN = credentials('shailesh-github-token')
+        VM_CRED = credentials('node-user')
+        GITHUB_TOKEN = credentials('cortx-admin-github')
     }
 
     stages {
