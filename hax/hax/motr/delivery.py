@@ -46,6 +46,24 @@ class DeliveryHerald:
         self.waiting_clients: Dict[HaLinkMessagePromise, Condition] = {}
         self.lock = Lock()
 
+    def _verify_delivered(self,
+                          promise: HaLinkMessagePromise,
+                          timeout_sec: float):
+        """
+        Verify if any message in promise._ids are reported by Motr
+        as delivered. Calling function should hold the self.lock.
+        """
+
+        del self.waiting_clients[promise]
+        if promise not in self.recently_delivered:
+            raise NotDelivered('None of message tags =' + str(promise) +
+                               '  were delivered to Motr within ' +
+                               str(timeout_sec) + ' seconds timeout')
+        confirmed_msgs = self.recently_delivered.pop(promise)
+        LOG.log(TRACE, 'Thread unblocked - %s just received',
+                confirmed_msgs)
+        promise.exclude_ids(confirmed_msgs)
+
     def wait_for_any(self,
                      promise: HaLinkMessagePromise,
                      timeout_sec: float = 30.0):
@@ -63,14 +81,7 @@ class DeliveryHerald:
             LOG.log(TRACE, 'Blocking until %s is confirmed', promise)
             condition.wait(timeout=timeout_sec)
         with self.lock:
-            del self.waiting_clients[promise]
-            if promise not in self.recently_delivered:
-                raise NotDelivered('None of message tags =' + str(promise) +
-                                   '  were delivered to Motr within ' +
-                                   str(timeout_sec) + ' seconds timeout')
-            LOG.log(TRACE, 'Thread unblocked - %s has just been received',
-                    self.recently_delivered[promise])
-            del self.recently_delivered[promise]
+            self._verify_delivered(promise, timeout_sec)
 
     def wait_for_all(self,
                      promise: HaLinkMessagePromise,
@@ -92,15 +103,7 @@ class DeliveryHerald:
                 LOG.log(TRACE, 'Blocking until %s is confirmed', promise)
                 condition.wait(timeout=timeout_sec)
             with self.lock:
-                if promise not in self.recently_delivered:
-                    raise NotDelivered('None of message tags =' +
-                                       str(promise) +
-                                       '  were delivered to Motr')
-                confirmed_msgs = self.recently_delivered.pop(promise)
-                LOG.log(TRACE, 'Thread unblocked - %s just received',
-                        confirmed_msgs)
-                del self.waiting_clients[promise]
-                promise.exclude_ids(confirmed_msgs)
+                self._verify_delivered(promise, timeout_sec)
                 if not promise.is_empty():
                     self.waiting_clients[promise] = condition
 
