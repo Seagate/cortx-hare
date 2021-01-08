@@ -36,15 +36,15 @@ pipeline {
 
     environment {
         REPO_NAME = 'cortx-hare'
-        VM_FQDN = 'ssc-vm-0581.colo.seagate.com'
-        VM_CRED = credentials('node-user')
-        GITHUB_TOKEN = credentials('cortx-admin-github')
+        VM_FQDN = 'ssc-vm-1889.colo.seagate.com' // SSC VM used for Hare CI
+        VM_CRED = credentials('node-user') // To connect SSC VM over SSH
+        GITHUB_TOKEN = credentials('cortx-admin-github') // To clone cortx-hare repo
     }
 
     stages {
         stage('Prepare VM') {
             environment {
-                SSC_AUTH = credentials('shailesh-cloudform-cred')
+                SSC_AUTH = credentials('RE-CF-CRED') // To connect SSC CloudForm
             }
             steps {
                 sh 'VERBOSE=true jenkins/vm-reset'
