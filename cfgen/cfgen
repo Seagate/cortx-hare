@@ -1102,14 +1102,18 @@ def pool_drives(m0conf: Dict[Oid, Any],
     for drive_id, node_id in drives:
         if m0conf[drive_id].pvers:  # already assigned to some pool
             over_referenced.setdefault(node_id, []).append(drive_id)
-    if over_referenced:
-        err = '{} referred to by several pools:'.format(
-            'This disk is' if len(over_referenced) == 1 else 'These disks are')
-        for node_id in sorted(over_referenced):
-            err += '\n  ' + m0conf[node_id].name
-            for drive_id in sorted(over_referenced[node_id]):
-                err += '\n   \\_ ' + m0conf[m0conf[drive_id].sdev].filename
-        raise AssertionError(err)
+
+    # TODO: coordinate with Motr component, to make sure that it supports the
+    #       same storage device to be part of more than one pool
+    # if over_referenced:
+    #     err = '{} referred to by several pools:'.format(
+    #         'This disk is' if len(over_referenced) == 1 \
+    #                        else 'These disks are')
+    #     for node_id in sorted(over_referenced):
+    #         err += '\n  ' + m0conf[node_id].name
+    #         for drive_id in sorted(over_referenced[node_id]):
+    #             err += '\n   \\_ ' + m0conf[m0conf[drive_id].sdev].filename
+    #     raise AssertionError(err)
 
     return [drive_id for drive_id, _ in drives]
 
@@ -1728,7 +1732,29 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
                 proc_id = ConfProcess.build(conf, node_id, node, proc_t)
                 cluster.m0_clients[proc_id] = new_oid(ObjT.service)
 
+    aux_pools = {}
     for pool in cluster_desc['pools']:
+        parity_group_size = pool['data_units'] + 2 * pool['parity_units']
+        if len(pool.get('disk_refs', [])) == parity_group_size:
+            # more strict requirement, where each node must have only one disk
+            # ref and total number of nodes should be equal to
+            # parity_group_size
+            # len(set([x.get('node')
+            #         for x in pool['disk_refs']])) == parity_group_size):
+            disk_ref_combinations = [
+                list(x) for x in itertools.combinations(
+                                     pool['disk_refs'],
+                                     parity_group_size - pool['parity_units'])
+            ]
+            aux_pools[pool['name']] = [
+                    {'name':         pool['name'] + f'-aux{i:02}',
+                     'data_units':   pool['data_units'] - pool['parity_units'],
+                     'parity_units': pool['parity_units'],
+                     'disk_refs':    comb}
+                    for i, comb in enumerate(disk_ref_combinations, start=1)
+            ]
+
+    for pool in itertools.chain(cluster_desc['pools'], *aux_pools.values()):
         ConfPool.build(conf, root_id, pool)
 
     if conf[root_id].imeta_pver is None:  # no DIX pool defined in the CDF
@@ -1738,6 +1764,9 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
         ConfPool.build(conf, root_id, {'type': 'md'})
 
     for prof in cluster_desc['profiles']:
+        prof['pools'] += [aux_pool['name']
+                          for pool_name in prof['pools']
+                          for aux_pool in aux_pools.get(pool_name, [])]
         ConfProfile.build(conf, root_id, prof)
 
     validate_m0conf(conf)
