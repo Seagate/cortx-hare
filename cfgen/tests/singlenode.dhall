@@ -27,6 +27,7 @@ in
       , data_iface = "eth1"
       , data_iface_type = None types.Protocol
       , m0_servers =
+          Some
           [ { runs_confd = Some True
             , io_disks =
                 { meta_data = None Text
