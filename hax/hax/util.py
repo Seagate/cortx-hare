@@ -489,10 +489,53 @@ class ConsulUtil:
             if f'{fid}' == x['Key'].split('/')[-1]
         ]
 
+    def is_node_alive(self, node: str) -> bool:
+        """
+        Checks via Consul Members API whether the given node is alive.
+        """
+        try:
+            # Returns data of the following kind:
+            # [{
+            #     'Name': 'localhost',
+            #     'Addr': '192.168.6.214',
+            #     'Port': 8301,
+            #     'Tags': {
+            #         'acls': '0',
+            #         'bootstrap': '1',
+            #         'build': '1.7.8:9a5a1218',
+            #         'dc': 'dc1',
+            #         'id': 'dd8a91f6-ca32-30e0-983c-8f309d653045',
+            #         'port': '8300',
+            #         'raft_vsn': '3',
+            #         'role': 'consul',
+            #         'segment': '',
+            #         'vsn': '2',
+            #         'vsn_max': '3',
+            #         'vsn_min': '2',
+            #         'wan_join_port': '8302'
+            #     },
+            #     'Status': 1,
+            #     'ProtocolMin': 1,
+            #     'ProtocolMax': 5,
+            #     'ProtocolCur': 2,
+            #     'DelegateMin': 2,
+            #     'DelegateMax': 5,
+            #     'DelegateCur': 4
+            # }]
+            members_data = self.cns.agent.members()
+            LOG.log(TRACE, "members: %s", members_data)
+            for member in members_data:
+                if member['Name'] == node:
+                    return int(member['Status']) == 1
+            return True
+        except (ConsulException, HTTPError, RequestException) as e:
+            raise HAConsistencyException(
+                'Failed to members data from Consul') from e
+
     def get_node_health(self, node: str) -> str:
         try:
             node_data = self.cns.health.node(node)[1]
-            if not node_data:
+            if not node_data or (not self.is_node_alive(node)):
                 return 'failed'
             return str(node_data[0]['Status'])
         except (ConsulException, HTTPError, RequestException) as e:
