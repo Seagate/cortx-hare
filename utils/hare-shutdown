@@ -23,6 +23,7 @@ import logging
 import os
 import re
 import threading
+import argparse
 from queue import Queue
 from socket import gethostname
 from typing import Dict, List, NamedTuple
@@ -40,7 +41,14 @@ shutdown_sequence = ('s3service', 'ios', 'confd', 'hax', 'consul')
 
 
 def _setup_logging():
-    logging.basicConfig(level=logging.INFO, format='%(message)s')
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-v", "--verbose", help="Increase output verbosity",
+                        action="store_true")
+    args = parser.parse_args()
+    if args.verbose:
+        logging.basicConfig(level=logging.DEBUG, format='%(message)s')
+    else:
+        logging.basicConfig(level=logging.INFO, format='%(message)s')
 
 
 def processfid2str(fidk: int) -> str:
@@ -127,7 +135,10 @@ def exec_silent(cmd: str) -> bool:
 
 def exec(cmd: str) -> None:
     assert cmd
-    print('OK' if exec_silent(cmd) else '**ERROR**')
+    if exec_silent(cmd):
+        logging.info('OK')
+    else:
+        logging.error('**ERROR**')
 
 
 def process_stop(proc: Process) -> None:
@@ -214,8 +225,7 @@ def main() -> None:
             _stop_parallel([proc for proc in processes[svc]])
 
     if leader_node and not is_fake_leader_name(leader_node):
-        print(f'Shutting down RC Leader at {leader_node}... ',
-              end='', flush=True)
+        logging.info(f'Shutting down RC Leader at {leader_node}... ')
         pkill: str = 'sudo pkill --exact -KILL consul &> /dev/null'
         exec(ssh_prefix(leader_node) + pkill)
 
