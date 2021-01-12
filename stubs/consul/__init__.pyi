@@ -76,6 +76,7 @@ class Catalog:
 
 class Agent:
     def self(self) -> Dict[str, Any]: ...
+    def members(self, wan: bool = False) -> List[Dict[str, Any]]: ...
 
 class KV:
     def get(
