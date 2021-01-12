@@ -187,8 +187,13 @@ You will probably need to modify `host`, `data_iface`, and `io_disks` values.
   ```sh
   /opt/seagate/cortx/hare/libexec/m0crate-io-conf >/tmp/m0crate-io.yaml
   dd if=/dev/urandom of=/tmp/128M bs=1M count=128
-  sudo ./motr/motr/m0crate/m0crate -S /tmp/m0crate-io.yaml
+  sudo m0crate -S /tmp/m0crate-io.yaml
   ```
+  Please note that m0crate will run as shown above when it will be
+  available in default system PATH which will be the case when when
+  setup is created using RPM's. If its created by building Motr
+  source code, then m0crate utility can be run using full path from
+  the motr source directory (./motr/motr/m0crate/m0crate).
 
 * Stop the cluster.
   ```sh
