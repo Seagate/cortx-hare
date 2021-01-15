@@ -26,6 +26,7 @@ processes.
   * [4/KV](4/README.md) — Consul KV Schema
   * [5/HAX](5/README.md) — HAlink eXchange
   * [18/CFGEN](18/README.md) — Configuration Generation
+  * [20/MINIPROV](20/README.md) — Mini-Provisioning API Support
 * Stable
   * [6/BOOT](6/README.md) — Motr Cluster Bootstrap
   * [8/STYLE](8/README.md) — Coding Style Guidelines
