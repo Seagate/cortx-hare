@@ -2,12 +2,6 @@
 
 # Hare User Guide
 
-## Welcome
-
-Hare is an experiment in
-[Social Architecture](https://www.youtube.com/watch?v=uj-li0LO_2g),
-disguised as a software project.
-
 ## What Hare does?
 
 1. Configures [Motr](https://github.com/seagate/cortx-motr) object store.
