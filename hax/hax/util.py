@@ -22,9 +22,10 @@ import os
 import re
 from base64 import b64encode
 from functools import wraps
-from time import sleep
 from typing import Any, Dict, List, NamedTuple, Optional, Tuple
 from hax.log import TRACE
+from threading import Event
+from time import sleep
 
 import simplejson
 from consul import Consul, ConsulException
@@ -32,7 +33,7 @@ from consul.base import ClientError
 from requests.exceptions import RequestException
 from urllib3.exceptions import HTTPError
 
-from hax.exception import HAConsistencyException
+from hax.exception import HAConsistencyException, InterruptedException
 from hax.types import (ConfHaProcess, Fid, FsStatsWithTime,
                        ObjT, ServiceHealth, Profile)
 
@@ -135,6 +136,16 @@ def repeat_if_fails(wait_seconds=5, max_retries=-1):
 
 TxPutKV = NamedTuple('TxPutKV', [('key', str), ('value', str),
                                  ('cas', Optional[Any])])
+
+
+def wait_for_event(event: Event, interval_sec) -> None:
+    """
+    Caller sleeps until the @event happens or the wait timesout after
+    @interval_sec.
+    """
+    interrupted = event.wait(timeout=interval_sec)
+    if interrupted:
+        raise InterruptedException()
 
 
 class ConsulKVBasic:
@@ -607,6 +618,22 @@ class ConsulUtil:
             payload = simplejson.loads(x['Value'])
             result.append(to_profile(fidstr, payload))
         return result
+
+    @repeat_if_fails()
+    def ensure_ioservices_running(self) -> List[bool]:
+        statuses = self.get_m0d_statuses()
+        LOG.debug('The following statuses received: %s', statuses)
+        started = ['M0_CONF_HA_PROCESS_STARTED' == v[1] for v in statuses]
+        return started
+
+    @repeat_if_fails()
+    def ensure_motr_all_started(self, event: Event):
+        while True:
+            started = self.ensure_ioservices_running()
+            if all(started):
+                LOG.debug('According to Consul all confds have been started')
+                return
+            wait_for_event(event, 5)
 
 
 def dump_json(obj) -> str:
