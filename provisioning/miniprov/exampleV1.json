@@ -1,0 +1,346 @@
+{
+  "mine_functions": {
+    "primary_host_keys": {
+      "mine_function": "ssh.recv_known_host_entries",
+      "hostname": "127.0.0.1"
+    },
+    "node_ip_addrs": [
+      {
+        "mine_function": "grains.get"
+      },
+      "ip4_interfaces"
+    ]
+  },
+  "commons": {
+    "health-map": {
+      "path": "/opt/seagate/cortx_configs/healthmap/",
+      "file": "healthmap-schema.json"
+    },
+    "version": {
+      "consul": "1.7.8-1",
+      "elasticsearch-oss": "6.8.8-1",
+      "erlang": "latest",
+      "kibana-oss": "6.8.8-1",
+      "nodejs": "v12.13.0",
+      "rabbitmq": "latest",
+      "rsyslog": "8.40.0-1.el7",
+      "rsyslog-elasticsearch": "8.40.0-1.el7",
+      "rsyslog-mmjsonparse": "8.40.0-1.el7",
+      "kafka": "2.13-2.7.0"
+    }
+  },
+  "corosync-pacemaker": {
+    "cluster_name": "cortx_cluster",
+    "user": "hacluster",
+    "secret": "gAAAAABgDsD7pV2BxPXu6NeIIrVCwptUHbZaODtAAgo9Ik778Qz2lgu3xZzJUk7qNlU5ZMHZYq5HKoD500Df359jJ4JZ9z1KcQ=="
+  },
+  "elasticsearch": {
+    "cluster_name": "elasticsearch_cluster",
+    "network_host": "0.0.0.0",
+    "http_port": 9200
+  },
+  "firewall": {
+    "data_public": {
+      "services": [
+        "ssh",
+        "high-availability"
+      ],
+      "ports": {
+        "consul": [
+          "8600/tcp",
+          "8600/udp",
+          "8500/tcp",
+          "8301/tcp",
+          "8301/udp",
+          "8302/tcp",
+          "8302/udp",
+          "8300/tcp"
+        ],
+        "dhclient": [
+          "68/udp"
+        ],
+        "dhserver": [
+          "67/udp"
+        ],
+        "hare": [
+          "8008/tcp"
+        ],
+        "nfs": [
+          "2049/tcp",
+          "2049/udp",
+          "32803/tcp",
+          "892/tcp",
+          "875/tcp"
+        ],
+        "uds": [
+          "5000/tcp",
+          "5125/udp"
+        ],
+        "www": [
+          "443/tcp"
+        ],
+        "s3": [
+          "7081/tcp",
+          "8081/tcp",
+          "8082/tcp",
+          "8083/tcp",
+          "8084/tcp",
+          "8085/tcp",
+          "8086/tcp",
+          "8087/tcp",
+          "8088/tcp",
+          "8089/tcp",
+          "8090/tcp",
+          "8091/tcp",
+          "8092/tcp",
+          "8093/tcp",
+          "8094/tcp",
+          "8095/tcp",
+          "8096/tcp",
+          "8097/tcp",
+          "8098/tcp",
+          "514/tcp",
+          "514/udp",
+          "8125/tcp",
+          "6379/tcp",
+          "9443/tcp",
+          "9086/tcp"
+        ]
+      }
+    },
+    "mgmt_public": {
+      "services": [
+        "ssh",
+        "high-availability",
+        "ftp"
+      ],
+      "ports": {
+        "consul": [
+          "8600/tcp",
+          "8600/udp",
+          "8500/tcp",
+          "8301/tcp",
+          "8301/udp",
+          "8302/tcp",
+          "8302/udp",
+          "8300/tcp"
+        ],
+        "csm": [
+          "28100/tcp",
+          "28101/tcp",
+          "28102/tcp",
+          "28103/tcp"
+        ],
+        "dhclient": [
+          "68/udp"
+        ],
+        "elasticsearch": [
+          "9200/tcp",
+          "9300/tcp"
+        ],
+        "ntpd": [
+          "123/udp"
+        ],
+        "openldap": [
+          "389/tcp"
+        ],
+        "smtp": [
+          "25/tcp"
+        ],
+        "saltmaster": [
+          "4505/tcp",
+          "4506/tcp"
+        ],
+        "uds": [
+          "5000/tcp",
+          "5125/udp"
+        ],
+        "www": [
+          "443/tcp"
+        ]
+      }
+    }
+  },
+  "glusterfs": {
+    "in_docker": false,
+    "network_type": "mgmt",
+    "volumes": [
+      {
+        "name": "volume_prvsnr_data",
+        "export_dir": "/srv/glusterfs/volume_prvsnr_data",
+        "mount_dir": "/var/lib/seagate/cortx/provisioner/shared"
+      },
+      {
+        "name": "volume_salt_cache_jobs",
+        "export_dir": "/srv/glusterfs/volume_salt_cache_jobs",
+        "mount_dir": "/var/cache/salt/master/jobs"
+      }
+    ]
+  },
+  "haproxy": {
+    "backend": {
+      "s3authserver": {
+        "ssl_enabled": false
+      },
+      "s3server": {
+        "ssl_enabled": false
+      }
+    },
+    "frontend": {
+      "s3authserver": {
+        "ssl_enabled": true
+      },
+      "s3server": {
+        "ssl_enabled": true
+      }
+    },
+    "nbproc": 12
+  },
+  "openldap": {
+    "backend_db": "mdb",
+    "root": {
+      "user": "admin",
+      "secret": "gAAAAABgDsD9AL9sc3GTifl67KHhXPvN8qDeL2qXg2fDl_ZzWDcamNUErrtN7NBextFXdyxrTW7s0o2e3MvfGVOZ4JA2rLkdVw=="
+    },
+    "sgiam": {
+      "user": "admin",
+      "secret": "gAAAAABgDsD9Mn4dQH0lHiwfjxOaEc5JyFomf-0bjl4H0-5d2cuQ-3VWiZ2H5ZZg_k-oqk8crnzPFNa-Nnpz9oVD-97jXY3Eew=="
+    }
+  },
+  "provisioner": {
+    "common_config": {
+      "confstore_url": "json:///opt/seagate/cortx_configs/provisioner_cluster.json"
+    },
+    "cluster_info": {
+      "pillar_dir": "/opt/seagate/cortx/provisioner/pillar/groups/all/",
+      "num_of_nodes": 1
+    },
+    "cluster": {
+      "num_of_nodes": "1"
+    }
+  },
+  "rabbitmq": {
+    "cluster_nodes": "localhost",
+    "erlang_cookie": "QLDZYPYEYGHECTHYQXFJ"
+  },
+  "release": {
+    "product": "LR2",
+    "setup": "cortx",
+    "type": "bundle",
+    "target_build": "http://cortx-storage.colo.seagate.com/releases/cortx/github/integration-custom-ci/release/centos-7.8.2003/custom-build-500/",
+    "update": {
+      "base_dir": "/opt/seagate/cortx/updates",
+      "repos": {}
+    }
+  },
+  "rsyslog": {
+    "host": "localhost",
+    "port": 514
+  },
+  "storage": {
+    "enclosure-1": {
+      "type": "RBOD",
+      "controller": {
+        "type": null,
+        "primary": {
+          "ip": "10.0.0.2",
+          "port": 80
+        },
+        "secondary": {
+          "ip": "10.0.0.3",
+          "port": 80
+        },
+        "user": "manage",
+        "secret": "gAAAAABgDsD-n8U52K1glqwVeEpqPzghG0eH53dMyceq62RMpmMr4-WFpQFUvPHF7yZZlwwy3TNevwUtB_3kHH_7ZoYf6l0mNQ=="
+      }
+    }
+  },
+  "system": {
+    "ntp": {
+      "time_server": "time.seagate.com",
+      "time_zone": "UTC"
+    },
+    "service-user": {
+      "name": "cortxub",
+      "secret": "gAAAAABgDsD-ON8L7ILRuiYnlPj9Smx83ZeujyjozBO558GTzZDrz2gAPShCZAqDu0Eb-pUy3uDPpG5T7x4YlJHHJaOegjdQkg==",
+      "groups": [
+        "wheel"
+      ],
+      "shell": "/usr/bin/bash"
+    },
+    "cortx-user": {
+      "name": "cortxcli",
+      "secret": "gAAAAABgDsD_c16J83oNhbF8bOr24XNKwvMXfuOjJxe8NthzSWxN3HkfOIsKyFzEhRl9lHgSdK-Eu9BAzu5VhgMqFiKQJeVr2g=="
+    }
+  },
+  "cluster": {
+    "cluster_id": "e766bd52-c19c-45b6-9c91-663fd8203c2e",
+    "storage_sets": {
+      "storage-set-1": [
+        "srvnode-1"
+      ]
+    },
+    "search_domains": null,
+    "dns_servers": null,
+    "server_nodes": {
+      "7c4fd75dfedd7662e6a39b0a53274922": "srvnode-1"
+    },
+    "srvnode-1": {
+      "rack_id": null,
+      "site_id": null,
+      "storage_set_id": "storage-set-1",
+      "node_id": null,
+      "machine_id": "7c4fd75dfedd7662e6a39b0a53274922",
+      "hostname": "ssc-vm-2132.colo.seagate.com",
+      "node_type": "VM",
+      "roles": [
+        "primary",
+        "openldap_server",
+        "kafka_server"
+      ],
+      "is_primary": true,
+      "bmc": {
+        "ip": null,
+        "user": "",
+        "secret": "gAAAAABgDsEaBIobmtxzLHgW4nc6k7UJyUzLItnHqgFW-R9gaGgOTZM8AR0aazeeOoc0lAFoa6KxpBhH-levkOBs4SNmwHATQA=="
+      },
+      "network": {
+        "mgmt": {
+          "interfaces": [
+            "eth0"
+          ],
+          "public_ip": null,
+          "netmask": null,
+          "gateway": null
+        },
+        "data": {
+          "public_interfaces": [
+            "eth1",
+            "eth2"
+          ],
+          "private_interfaces": [
+            "eth3",
+            "eth4"
+          ],
+          "interface_type": "tcp",
+          "transport_type": "lnet",
+          "public_ip": null,
+          "private_ip": "",
+          "netmask": null,
+          "gateway": null,
+          "roaming_ip": "127.0.0.1"
+        }
+      },
+      "storage": {
+        "enclosure_id": "enclosure-1",
+        "metadata_devices": [
+          "/dev/sdb"
+        ],
+        "data_devices": [
+          "/dev/sdc"
+        ]
+      },
+      "s3_instances": 11
+    }
+  }
+}
