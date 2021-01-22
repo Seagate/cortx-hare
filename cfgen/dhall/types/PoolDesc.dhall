@@ -18,14 +18,10 @@
 
 -}
 
-let M0Server = ./M0ServerDesc.dhall
-
-let Node = ./NodeDesc.dhall
-
-let Pool = ./PoolDesc.dhall
-
-in
-{ nodes : List Node
-, pools : List Pool
-, profiles : Optional (List ./PoolsRef.dhall)
+{ name : Text
+, type : Optional ./PoolType.dhall
+, disk_refs : Optional (List ./DiskRef.dhall)
+, data_units : Natural
+, parity_units : Natural
+, allowed_failures : Optional ./FailVec.dhall
 }
