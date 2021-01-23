@@ -246,6 +246,14 @@ class m0HaProcessEvent(IntEnum):
     def __repr__(self):
         return self.name
 
+    def event_to_svchealth(self):
+        m0ProcessEvToSvcHealth = {
+            m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTING: ServiceHealth.OK,
+            m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED: ServiceHealth.OK,
+            m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPING: ServiceHealth.FAILED,
+            m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED: ServiceHealth.FAILED}
+        return m0ProcessEvToSvcHealth[self]
+
 
 class m0HaProcessType(Enum):
     M0_CONF_HA_PROCESS_OTHER = 0
