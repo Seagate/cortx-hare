@@ -289,9 +289,24 @@ class Motr:
         service_list = cns.get_services_by_parent_process(fid)
         LOG.debug('Process fid=%s encloses %s services as follows: %s', fid,
                   len(service_list), service_list)
+        service_notes = [HaNoteStruct(no_id=x.fid.to_c(), no_state=new_state)
+                         for x in service_list]
+        service_notes += self._generate_sub_disks(note, service_list, cns)
+        return service_notes
+
+    def _generate_sub_disks(self, note: HaNoteStruct,
+                            services: List,
+                            cns: ConsulUtil) -> List[HaNoteStruct]:
+        disk_list = []
+        new_state = note.no_state
+        proc_fid = Fid.from_struct(note.no_id)
+        for svc in services:
+            disk_list += cns.get_disks_by_parent_process(proc_fid, svc.fid)
+        LOG.debug('proc fid=%s encloses %d disks as follows: %s', proc_fid,
+                  len(disk_list), disk_list)
         return [
-            HaNoteStruct(no_id=x.fid.to_c(), no_state=new_state)
-            for x in service_list
+            HaNoteStruct(no_id=x.to_c(), no_state=new_state)
+            for x in disk_list
         ]
 
     def close(self):
