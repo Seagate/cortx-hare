@@ -32,7 +32,7 @@ export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
 : ${SSC_AUTH:=}
 : ${VERBOSE:=false}
 : ${SSC_URL:=https://ssc-cloud.colo.seagate.com}
-: ${WAIT_TIMEOUT:=5}  # How many minutes to wait for a VM to start or stop.
+: ${WAIT_TIMEOUT:=15}  # How many minutes to wait for a VM to start or stop.
 
 die() {
     >&2 echo "[${BASH_LINENO[0]}:${FUNCNAME[1]}] $@"
@@ -117,6 +117,11 @@ vm_power_state_set() {
     wait_till $vm_id $state
 }
 
+vm_task_state() {
+    local task_id=$1
+    _curl /api/tasks/$task_id | jq -r '.state'
+}
+
 vm_snapshot_revert() {
     local vm_id=$1
     local snapshot_id=$2
@@ -128,7 +133,23 @@ vm_snapshot_revert() {
           )
     >&2 jq -r '.message' <<< "$resp"
     [[ $(jq '.success' <<< "$resp") == true ]] || die 'Cannot revert snapshot'
-    sleep 120  # XXX Can we do better?
+    
+    local snapshot_task_id
+    snapshot_task_id=$(jq -r '.task_id' <<< "$resp")
+
+    local interval=30  # seconds
+    local wait_steps=8 # wait for snapshot revert
+    while true; do
+        sleep $interval
+        echo -n '.'
+        ((--wait_steps > 0)) || die 'Timed out'
+
+        if [[ $(vm_task_state $snapshot_task_id) == "Finished" ]]; then
+            echo  # add a newline after all those dots
+            >&2 echo "Snapshot revert completed"
+            return
+        fi
+    done    
 }
 
 main() {
