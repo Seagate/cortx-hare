@@ -118,7 +118,8 @@ TBD
 setup_hare post_install --config <str>
 ```
 Verifies that
-1. Consul binary has a version that Hare supports (1.7.8 at the moment - TBD clarify)
+1. Motr, Hare, Consul rpms are installed.
+2. Consul binary has a version that Hare supports (1.7.8 at the moment - TBD clarify)
 
 Exit codes: 0 if no issues found, 1 otherwise.
 
@@ -151,7 +152,9 @@ Exit codes: 0 if no issues found, 1 otherwise.
 ```
 setup_hare init --config <str>
 ```
-Invokes 'hctl bootstrap --mkfs'
+1. Invokes 'hctl bootstrap --mkfs'(If cluster is not already running)
+
+2. Invokes 'hctl shutdown'
 
 Exit codes: 0 if no issues found (so Hare cluster running), 1 otherwise.
 
@@ -159,7 +162,10 @@ Exit codes: 0 if no issues found (so Hare cluster running), 1 otherwise.
 ```
 setup_hare test --config <str>
 ```
+
 Run functional tests against a running singlenode cluster (TBD).
+
+Runs 'hctl status --json' and compares output with info extracted from CDF used during bootstrap to check if all the services are running correctly.
 
 
 
