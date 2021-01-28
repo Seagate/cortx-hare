@@ -189,6 +189,13 @@ class Cleanup(argparse.Action):
                           error)
             exit(-1)
 
+class Config(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+        try:
+            return os.system('cp /opt/seagate/cortx/hare/share/cfgen/examples/singlenode.yaml /var/lib/hare/cluster.yaml') == 0
+        except Exception as error:
+            logging.error('Failed to perform configuration (%s)',
+                          error)
 def checkRpm(rpm_name):
     rpm_list = subprocess.Popen(["rpm", "-qa"],
                                 stdin=subprocess.PIPE,
@@ -277,6 +284,10 @@ def main():
                    nargs=0,
                    help='Perform component initialization',
                    action=Init)
+    p.add_argument('--config',
+                   nargs=0,
+                   help='Perform component configuration',
+                   action=Config)
     p.add_argument('--test',
                    nargs=0,
                    help='Testing cluster status',

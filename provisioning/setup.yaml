@@ -6,8 +6,8 @@ hare:
     script: /opt/seagate/cortx/hare/conf/hare_setup.py
     args: --init
   config:
-    script: null
-    args: null
+    script: /opt/seagate/cortx/hare/conf/hare_setup.py
+    args: --config
   test:
     script: /opt/seagate/cortx/hare/conf/hare_setup.py
     args: --test
