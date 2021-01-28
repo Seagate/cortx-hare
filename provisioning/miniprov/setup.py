@@ -16,13 +16,29 @@
 # please email opensource@seagate.com or cortx-questions@seagate.com.
 #
 
+import os
+import os.path as P
+
 import pkgconfig
 from setuptools import find_packages, setup
 
+
+def read(fname):
+    return open(P.join(P.dirname(__file__), fname)).read().rstrip('\n')
+
+
+def get_mini_prov_version():
+    v = os.environ.get('HAX_VERSION')
+    if v:
+        return v
+    else:
+        return read('../../VERSION')
+
+
 setup(name='hare_mp',
-      version='0.0.1',
+      version=get_mini_prov_version(),
       packages=find_packages(),
       setup_requires=['flake8', 'mypy', 'pkgconfig'],
       install_requires=['setuptools', 'dataclasses'],
       package_data={'': '*.dhall'},
-      entry_points={'console_scripts': ['setup_hare=hare_mp.main:main']})
+      entry_points={'console_scripts': ['hare_setup=hare_mp.main:main']})
