@@ -9,6 +9,8 @@ from hare_mp.store import ValueProvider
 from hare_mp.types import DList, Maybe, NodeDesc, Text
 
 DHALL_PATH = '/opt/seagate/cortx/hare/share/cfgen/dhall'
+DHALL_EXE = '/opt/seagate/cortx/hare/bin/dhall'
+DHALL_TO_YAML_EXE = '/opt/seagate/cortx/hare/bin/dhall-to-yaml'
 
 
 class CdfGenerator:
@@ -47,13 +49,13 @@ class CdfGenerator:
     def generate(self) -> str:
         gencdf = self._get_cdf_dhall()
 
-        dhall = S.Popen(['dhall'],
+        dhall = S.Popen([DHALL_EXE],
                         stdin=S.PIPE,
                         stdout=S.PIPE,
                         stderr=S.PIPE,
                         encoding='utf8')
 
-        to_yaml = S.Popen(['dhall-to-yaml'],
+        to_yaml = S.Popen([DHALL_TO_YAML_EXE],
                           stdin=dhall.stdout,
                           stdout=S.PIPE,
                           stderr=S.PIPE,
