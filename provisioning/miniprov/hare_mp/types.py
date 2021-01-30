@@ -85,3 +85,4 @@ class NodeDesc(DhallTuple):
     data_iface: Text
     data_iface_type: Maybe  # [Protocol]
     io_disks: DList  # [str]
+    meta_data: Text

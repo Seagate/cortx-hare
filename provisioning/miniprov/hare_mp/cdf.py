@@ -6,7 +6,7 @@ from typing import Dict, List
 import pkg_resources
 
 from hare_mp.store import ValueProvider
-from hare_mp.types import DList, Maybe, NodeDesc, Text
+from hare_mp.types import DList, Maybe, NodeDesc, Text, Protocol
 
 DHALL_PATH = '/opt/seagate/cortx/hare/share/cfgen/dhall'
 DHALL_EXE = '/opt/seagate/cortx/hare/bin/dhall'
@@ -88,8 +88,9 @@ class CdfGenerator:
             data_iface=Text(iface),
 
             # data iface is not yet provided by ConfStore
-            data_iface_type=Maybe(None, 'P'),
+            data_iface_type=Maybe(Protocol.tcp, 'P'),
             io_disks=DList([
                 Text(device)
                 for device in store.get(f'cluster>{name}>storage>data_devices')
-            ], 'List Text'))
+            ], 'List Text'),
+            meta_data=Text(store.get(f'cluster>{name}>storage>metadata_devices')[0]))

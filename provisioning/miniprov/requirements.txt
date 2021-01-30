@@ -6,4 +6,3 @@ pkgconfig
 #:runtime-requirements:
 setuptools
 dataclasses
-
