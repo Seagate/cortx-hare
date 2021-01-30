@@ -7,7 +7,7 @@ hare:
     args: --init
   config:
     script: /opt/seagate/cortx/hare/bin/hare_setup
-    args: --config $URL
+    args: --config $URL --filename '/var/lib/hare/cluster.yaml'
   test:
     script: /opt/seagate/cortx/hare/bin/hare_setup
     args: --test
