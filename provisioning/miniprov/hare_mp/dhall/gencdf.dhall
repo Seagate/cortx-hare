@@ -8,6 +8,7 @@ let NodeInfo =
       , data_iface : Text
       , data_iface_type : Optional T.Protocol
       , io_disks : List Text
+      , meta_data : Text
       }
 
 let toNodeDesc
@@ -19,10 +20,10 @@ let toNodeDesc
           , m0_clients = { other = 3, s3 = 11 }
           , m0_servers =
               Some
-              [ { io_disks = { data = [] : List Text, meta_data = None Text }
+              [ { io_disks = { data = [] : List Text, meta_data = Some n.meta_data }
                 , runs_confd = Some True
                 }
-              , { io_disks = { data = n.io_disks, meta_data = None Text }
+              , { io_disks = { data = n.io_disks, meta_data = Some n.meta_data }
                 , runs_confd = None Bool
                 }
               ]
@@ -45,10 +46,10 @@ let genCdf
                 , disk_refs = None (List { node : Optional Text, path : Text })
                 , name = "the pool"
                 , parity_units = 0
-                , type = None < dix | md | sns >
+                , type = Some T.PoolType.sns
                 }
               ]
-          , profiles = None (List { name : Text, pools : List Text })
+          , profiles = Some [ { name = "Profile_the_pool", pools = [ "the pool" ] } ]
           }
 
 in  genCdf

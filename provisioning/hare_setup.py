@@ -226,7 +226,7 @@ def list2dict(nodes_data_hctl: list) -> dict:
     for node in nodes_data_hctl:
         node_svc_info = {}
         for service in node['svcs']:
-            if not service['name'] in node_svc_info.keys(): 
+            if not service['name'] in node_svc_info.keys():
                 node_svc_info[service['name']] = []
             if (service['status'] == 'started'):
                 node_svc_info[service['name']].append(service['status'])
