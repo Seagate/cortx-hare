@@ -61,18 +61,35 @@ validate_args() {
 
 wait_till() {
     local vm_id=$1
-    local state=$2
+    local action_type=$2
+    local interval
+    local nr_steps
 
-    local interval=5  # seconds
-    local nr_steps=$((WAIT_TIMEOUT*60 / interval))
+    if [ $action_type == "power" ]; then
+        local state=$3
+        interval=5  # seconds
+        nr_steps=$((WAIT_TIMEOUT*60 / interval))
+    else
+        local task_id=$3 
+        interval=30  # seconds
+        nr_steps=8   # wait for task to finish
+    fi
+
     while true; do
         sleep $interval
         echo -n '.'
         ((--nr_steps > 0)) || die 'Timed out'
 
-        if [[ $(vm_power_state $vm_id) == $state ]]; then
-            echo  # add a newline after all those dots
-            return
+        if [ $action_type == "power" ]; then
+            if [[ $(vm_power_state $vm_id) == $state ]]; then
+                echo  # add a newline after all those dots
+                return
+            fi
+        else
+            if [[ $(vm_task_state $task_id) == "Finished" ]]; then
+                echo  # add a newline after all those dots                
+                return
+            fi
         fi
     done
 }
@@ -114,7 +131,7 @@ vm_power_state_set() {
     [[ $(jq '.success' <<< "$resp") == true ]] ||
         die 'VM $action request failed'
 
-    wait_till $vm_id $state
+    wait_till $vm_id power $state
 }
 
 vm_task_state() {
@@ -137,19 +154,7 @@ vm_snapshot_revert() {
     local snapshot_task_id
     snapshot_task_id=$(jq -r '.task_id' <<< "$resp")
 
-    local interval=30  # seconds
-    local wait_steps=8 # wait for snapshot revert
-    while true; do
-        sleep $interval
-        echo -n '.'
-        ((--wait_steps > 0)) || die 'Timed out'
-
-        if [[ $(vm_task_state $snapshot_task_id) == "Finished" ]]; then
-            echo  # add a newline after all those dots
-            >&2 echo "Snapshot revert completed"
-            return
-        fi
-    done    
+    wait_till $vm_id task $snapshot_task_id   
 }
 
 main() {

@@ -331,11 +331,13 @@ Pools of {t!r} type can only have 1 data unit."""
         assert t is PoolT.sns, \
             f"{name}: disk_refs are only supported for pools of 'sns' type"
         disk_refs = pool['disk_refs']
-        assert disk_refs, \
-            f'Pool {name!r}: disk_refs must not be empty' \
-            ' (it can be omitted though)'
-        assert all_unique(repr(x) for x in disk_refs), \
-            f'Pool {name!r}: disk_refs must be unique'
+        # Allowing diskrefs to be empty until the CDF generation is fixed.
+        if disk_refs:
+            assert disk_refs, \
+                f'Pool {name!r}: disk_refs must not be empty' \
+                ' (it can be omitted though)'
+            assert all_unique(repr(x) for x in disk_refs), \
+                f'Pool {name!r}: disk_refs must be unique'
 
     assert PoolT.sns in pool_types, \
         "At least one pool of 'sns' type must be defined"

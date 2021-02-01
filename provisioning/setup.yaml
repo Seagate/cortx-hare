@@ -1,19 +1,22 @@
 hare:
   post_install:
-    script: /opt/seagate/cortx/hare/conf/setup.py
-    args: --report-unavailable-features
+    script: /opt/seagate/cortx/hare/bin/hare_setup
+    args: --report-unavailable-features --post_install
   init:
-    script: null
-    args: null
+    script: /opt/seagate/cortx/hare/bin/hare_setup
+    args: --init
   config:
-    script: null
-    args: null
+    script: /opt/seagate/cortx/hare/bin/hare_setup
+    args: --config $URL --filename '/var/lib/hare/cluster.yaml'
   test:
-    script: null
-    args: null
+    script: /opt/seagate/cortx/hare/bin/hare_setup
+    args: --test
+  support_bundle:
+    script: /opt/seagate/cortx/hare/bin/hare_setup
+    args: --support_bundle
   reset:
-    script: null
-    args: null
-
-support_bundle:
-    - /opt/seagate/cortx/hare/bin/hctl reportbug
+    script: /opt/seagate/cortx/hare/bin/hare_setup
+    args: --reset
+  cleanup:
+    script: /opt/seagate/cortx/hare/bin/hare_setup
+    args: --cleanup

@@ -1,0 +1,8 @@
+#:build-requirements:
+flake8
+mypy
+pkgconfig
+
+#:runtime-requirements:
+setuptools
+dataclasses
