@@ -68,8 +68,8 @@ and health-checking mechanisms.
 
   * .. or from sources
     ```sh
-    git clone --recursive https://github.com/Seagate/cortx-motr.git motr
-    cd motr
+    git clone --recursive https://github.com/Seagate/cortx-motr.git
+    cd cortx-motr
 
     scripts/m0 make
     sudo scripts/install-motr-service --link
