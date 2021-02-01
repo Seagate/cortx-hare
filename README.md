@@ -59,6 +59,104 @@ and health-checking mechanisms.
   sudo yum -y install consul-1.7.8
   ```
 
+* Create new file:
+
+  ```vi /etc/yum.repos.d/cortx_iso.repo```
+* Paste following code into file:
+  ``` 
+  [cortx_iso]
+  baseurl=file:///var/artifacts/0//cortx_iso
+  gpgcheck=0
+  name=Repository cortx_iso
+  enabled=1
+  ```
+* Create new file:
+  ```vi /etc/yum.repos.d/C7.8.2003.repo```
+* Paste into file:
+  ```
+  # C7.8.2003
+  [C7.8.2003-base]
+  name=CentOS-7.8.2003 - Base
+  baseurl=http://linuxsoft.cern.ch/centos-vault/7.8.2003/os/$basearch/
+  gpgcheck=1
+  gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-7
+  enabled=1
+
+  [C7.8.2003-updates]
+  name=CentOS-7.8.2003 - Updates
+  baseurl=http://linuxsoft.cern.ch/centos-vault/7.8.2003/updates/$basearch/
+  gpgcheck=1
+  gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-7
+  enabled=0
+
+  [C7.8.2003-extras]
+  name=CentOS-7.8.2003 - Extras
+  baseurl=http://linuxsoft.cern.ch/centos-vault/7.8.2003/extras/$basearch/
+  gpgcheck=1
+  gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-7
+  enabled=1
+
+  [C7.8.2003-centosplus]
+  name=CentOS-7.8.2003 - CentOSPlus
+  baseurl=http://linuxsoft.cern.ch/centos-vault/7.8.2003/centosplus/$basearch/
+  gpgcheck=1
+  gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-7
+  enabled=1
+
+  [C7.8.2003-fasttrack]
+  name=CentOS-7.8.2003 - Fasttrack
+  baseurl=http://linuxsoft.cern.ch/centos-vault/7.8.2003/fasttrack/$basearch/
+  gpgcheck=1
+  gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-7
+  enabled=1
+  ```
+* Create new file:
+  ```sh 
+  vi /etc/yum.repos.d/cortx_iso.repo 
+  ```
+
+* Paste into file:
+
+  ```sh
+  [cortx_3rdparty]
+  baseurl=file:///var/artifacts/0/3rd_party
+  gpgcheck=0
+  name=Repositoryi 3rdparty
+  enabled=1
+  ```
+
+* Make sure that "lustre-whamcloud-2.12.5" is not listed:
+
+    ```sh
+      yum list lustre-client-devel kmod-lustre-client 
+    ```
+
+    * If "lustre-whamcloud-2.12.5" is listed:
+
+      ```sh
+        vi /etc/yum.repos.d/lustre-whamcloud.repo
+      ```
+
+   * and change from: 
+
+      ```sh
+      [lustre-whamcloud-2.12.5]
+      baseurl = https://downloads.whamcloud.com/public/lustre/lustre-2.12.5/el7/client/
+      enabled = 1
+      gpgcheck = 0
+      name = Whamcloud - Lustre 2.12.5
+      ```
+   * to:
+
+      ```sh
+      [lustre-whamcloud-2.12.5]
+      baseurl = https://downloads.whamcloud.com/public/lustre/lustre-2.12.5/el7/client/
+      enabled = 0
+      gpgcheck = 0
+      name = Whamcloud - Lustre 2.12.5
+      ```
+
+
 * Install Motr.
 
   * .. from RPMs
