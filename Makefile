@@ -94,11 +94,11 @@ $(MP_WHL): $(PY_VENV_DIR) $(HAX_SRC)
 
 $(PY_VENV_DIR): $(patsubst %,%/requirements.txt,cfgen hax provisioning/miniprov)
 	@$(call _info,Initializing virtual env in $(PY_VENV_DIR))
-	@$(PYTHON) -m venv $@
+	@$(PYTHON) -m venv --system-site-packages $@
 	@$(call _info,Installing pip modules in virtual env)
 	@for f in $^; do \
 	     $(call _log,processing $$f); \
-	     $(PIP) install -r $$f; \
+	     $(PIP) install --ignore-installed -r $$f; \
 	 done
 
 # Clean ----------------------------------------------- {{{1
