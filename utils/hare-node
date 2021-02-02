@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/env python3
 #
 # Copyright (c) 2020 Seagate Technology LLC and/or its Affiliates
 #
@@ -17,9 +17,39 @@
 # For any questions about this software or licensing,
 # please email opensource@seagate.com or cortx-questions@seagate.com.
 
-set -eu -o pipefail
-# set -x
-export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
+# :help: stop the cluster
 
-# :help: manage the cluster nodes
-PCSCLI_PROG_NAME='hctl node' pcswrap "$@"
+import getopt
+import sys
+from socket import gethostname
+from util import setup_logging, stop_parallel
+from util import processes_node, shutdown_sequence
+from consul import Consul
+
+
+def local_node_shutdown():
+
+#    setup_logging()
+    cns = Consul()
+    node = gethostname()
+    processes = processes_node(cns, node)
+
+    for svc in shutdown_sequence:
+        if svc in processes:
+            stop_parallel([proc for proc in processes[svc]])
+
+
+def main() -> None:
+
+    try:
+        opts, args = getopt.getopt(sys.argv[1:], "h:c:", ["help", "command"])
+    except getopt.GetoptError as err:
+        sys.exit(err)
+    for (opt, value) in opts:
+        if (opt == "-c") or (opt == "--command"):
+            if value == 'shutdown':
+                local_node_shutdown()
+
+
+if __name__ == '__main__':
+    main()
