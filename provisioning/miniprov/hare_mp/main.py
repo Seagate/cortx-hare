@@ -75,24 +75,24 @@ def get_data_from_provisioner_cli(method, output_format='json') -> str:
     res = stdout.decode('utf-8')
     return json.loads(res)['ret'] if res else 'unknown'
 
-
-def logrotate_config():
-    try:
-        setup_info = get_data_from_provisioner_cli('get_setup_info')
-        if setup_info != 'unknown':
-            server_type = setup_info['server_type']
-            shutil.copyfile(
-                f'/opt/seagate/cortx/hare/conf/logrotate/{server_type}',
-                '/etc/logrotate.d/hare')
-    except Exception as error:
-        logging.error('Error setting logrotate values for hare (%s)', error)
-
-
 def _report_unsupported_features(features_unavailable):
     uf_db = unsupported_features.UnsupportedFeaturesDB()
     loop = asyncio.get_event_loop()
     loop.run_until_complete(
         uf_db.store_unsupported_features('hare', features_unavailable))
+
+
+class Logrotate(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+        try:
+            setup_info = get_data_from_provisioner_cli('get_setup_info')
+            if setup_info != 'unknown':
+                server_type = setup_info['server_type']
+                shutil.copyfile(
+                    f'/opt/seagate/cortx/hare/conf/logrotate/{server_type}',
+                    '/etc/logrotate.d/hare')
+        except Exception as error:
+            logging.error('Cannot configure logrotate for hare (%s)', error)
 
 
 class UnsupportedFeatures(argparse.Action):
@@ -295,6 +295,10 @@ def main():
                    nargs=0,
                    help='Report unsupported features according to setup type',
                    action=UnsupportedFeatures)
+    p.add_argument('--configure-logrotate',
+                   nargs=0,
+                   help='Configure logrotate for hare',
+                   action=Logrotate)
     p.add_argument('--post_install',
                    nargs=0,
                    help='Perform post installation checks',
@@ -316,7 +320,6 @@ def main():
                    nargs=0,
                    help='Reset/cleanup step',
                    action=Cleanup)
-
     p.add_argument('--filename',
                    help='Full path to the CDF file to generate at this stage.',
                    nargs=1,
@@ -340,10 +343,6 @@ def main():
         url = parsed.config_url[0]
         filename = parsed.filename[0] or '/var/lib/hare/cluster.yaml'
         save(filename, generate_cdf(url))
-    #
-    # Below function assumes that provisioner is installed.
-    # Might need to revisit if this assumption is not true always
-    logrotate_config()
 
 
 if __name__ == '__main__':
