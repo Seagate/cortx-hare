@@ -6,7 +6,7 @@ from typing import Dict, List
 import pkg_resources
 
 from hare_mp.store import ValueProvider
-from hare_mp.types import DList, Maybe, NodeDesc, Text, Protocol
+from hare_mp.types import DList, Maybe, NodeDesc, Protocol, Text
 
 DHALL_PATH = '/opt/seagate/cortx/hare/share/cfgen/dhall'
 DHALL_EXE = '/opt/seagate/cortx/hare/bin/dhall'
@@ -97,4 +97,5 @@ class CdfGenerator:
             # [KN] This is a hotfix for singlenode deployment
             # TODO in the future the value must be taken from a correct
             # ConfStore key (it doesn't exist now).
-            meta_data=Text('/dev/vg_metadata_srvnode-1/lv_raw_metadata'))
+            meta_data=Text('/dev/vg_metadata_srvnode-1/lv_raw_metadata'),
+            s3_instances=int(store.get(f'cluster>{name}>s3_instances')))
