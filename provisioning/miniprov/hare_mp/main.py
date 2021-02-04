@@ -38,6 +38,88 @@ from hare_mp.cdf import CdfGenerator
 from hare_mp.store import ConfStoreProvider
 
 
+# returns 1 if v1 is bigger
+#         -1 if v2 is bigger
+#         0 if equal
+def version_compare(v1: str, v2: str) -> int:
+
+    # This will split both the versions by '.'
+    arr1 = v1.split(".")
+    arr2 = v2.split(".")
+    n = len(arr1)
+    m = len(arr2)
+
+    # converts to integer from string
+    arr1 = [int(i) for i in arr1]
+    arr2 = [int(i) for i in arr2]
+
+    # compares which list is bigger and fills
+    # smaller list with zero (for unequal delimeters)
+    if n>m:
+      for i in range(m, n):
+         arr2.append(0)
+    elif m>n:
+      for i in range(n, m):
+         arr1.append(0)
+
+    # returns 1 if version 1 is bigger and -1 if
+    # version 2 is bigger and 0 if equal
+    for i in range(len(arr1)):
+      if arr1[i]>arr2[i]:
+         return 1
+      elif arr2[i]>arr1[i]:
+         return -1
+    return 0
+
+
+def check_version(rpm_name: str, required_rpm_name: str) -> int:
+    try:
+        rpm_list = subprocess.Popen(["rpm", "-qa" , "--requires", rpm_name],
+                                    stdin=subprocess.PIPE,
+                                    stdout=subprocess.PIPE,
+                                    stderr=subprocess.PIPE,
+                                    env={},
+                                    encoding='utf8')
+        rpm_search = subprocess.Popen(["grep", required_rpm_name],
+                                      stdin=rpm_list.stdout,
+                                      stdout=subprocess.PIPE,
+                                      stderr=subprocess.PIPE,
+                                      env={},
+                                      encoding='utf8')
+        requires, err = rpm_search.communicate()
+        if rpm_search.returncode:
+            raise Exception(f'Command exited with error code {rpm_search.returncode}. Command output: {err}')
+
+        logging.debug("Rpms required: {}".format(requires))
+
+        cmd = ['rpm', '-q', '--queryformat', '%{VERSION}', required_rpm_name]
+        version_installed = execute(cmd)
+
+        for r in requires.split("\n"):
+            # rpm requirement will be in format e.g. 'consul < 1.10.0' or 'consul'
+            # 'consul' will indicate that there is no specific requirement for version
+            # 'consul < 1.10.0' has 3 parts. 0th is rpm name, 1st is condition and 2nd is version value.
+            rpm_required = r.split(" ")
+            if len(rpm_required) > 1:
+                logging.debug('Checking if ' + version_installed + rpm_required[1] + rpm_required[2])
+                result = version_compare(version_installed, rpm_required[2])
+                if rpm_required[1] == '=':
+                    if not result == 0: return -1
+                elif rpm_required[1] == '>':
+                    if not result == 1: return -1
+                elif rpm_required[1] == '>=':
+                    if not result >= 0: return -1
+                elif rpm_required[1] == '<':
+                    if not result == -1: return -1
+                elif rpm_required[1] == '<=':
+                    if not result <= 0: return -1
+        return 0
+
+    except Exception as error:
+        logging.error('Error during version checking (%s)', error)
+        return -1
+
+
 def execute(cmd: List[str]) -> str:
     process = subprocess.Popen(cmd,
                                stdin=subprocess.PIPE,
@@ -128,6 +210,9 @@ class PostInstall(argparse.Action):
                 exit(-1)
             if checkRpm('consul') != 0:
                 logging.error('\'consul\' is not installed')
+                exit(-1)
+            if check_version('cortx-hare', 'consul') != 0:
+                logging.error('\'consul\' version do not satisfy requirement')
                 exit(-1)
             if checkRpm('cortx-hare') != 0:
                 logging.error('\'cortx-hare\' is not installed')
