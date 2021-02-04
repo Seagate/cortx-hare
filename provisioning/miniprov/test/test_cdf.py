@@ -72,9 +72,11 @@ class TestCDF(unittest.TestCase):
                 'cluster>server_nodes': {
                     "blah": "srvnode_1"
                 },
-                'cluster>srvnode_1>hostname': 'myhost',
+                'cluster>srvnode_1>hostname':
+                'myhost',
                 'cluster>srvnode_1>storage>data_devices': ['/dev/sdb'],
-                'cluster>srvnode_1>network>data>public_interfaces': ['eth1', 'eno2']
+                'cluster>srvnode_1>network>data>public_interfaces':
+                ['eth1', 'eno2']
             }
             return data[value]
 
@@ -90,9 +92,11 @@ class TestCDF(unittest.TestCase):
                 'cluster>server_nodes': {
                     "blah": "srvnode_1"
                 },
-                'cluster>srvnode_1>hostname': 'myhost',
+                'cluster>srvnode_1>hostname':
+                'myhost',
                 'cluster>srvnode_1>storage>data_devices': ['/dev/sdb'],
-                'cluster>srvnode_1>network>data>public_interfaces': ['eth1', 'eno2']
+                'cluster>srvnode_1>network>data>public_interfaces':
+                ['eth1', 'eno2']
             }
             return data[value]
 
@@ -104,6 +108,30 @@ class TestCDF(unittest.TestCase):
         self.assertEqual(Text('myhost'), ret[0].hostname)
         self.assertEqual(Text('eth1'), ret[0].data_iface)
 
+    def test_metadata_is_hardcoded(self):
+        store = ValueProvider()
+
+        def ret_values(value: str) -> Any:
+            data = {
+                'cluster>server_nodes': {
+                    "blah": "srvnode_1"
+                },
+                'cluster>srvnode_1>hostname':
+                'myhost',
+                'cluster>srvnode_1>storage>data_devices': ['/dev/sdb'],
+                'cluster>srvnode_1>network>data>public_interfaces':
+                ['eth1', 'eno2']
+            }
+            return data[value]
+
+        store._raw_get = Mock(side_effect=ret_values)
+
+        ret = CdfGenerator(provider=store)._create_node_descriptions()
+        self.assertIsInstance(ret, list)
+        self.assertEqual(1, len(ret))
+        self.assertEqual(Text('/dev/vg_metadata_srvnode-1/lv_raw_metadata'),
+                         ret[0].meta_data)
+
     def test_multiple_nodes_supported(self):
         store = ValueProvider()
 
@@ -113,10 +141,13 @@ class TestCDF(unittest.TestCase):
                     "blah": "srvnode_1",
                     "zweite": "srvnode_2"
                 },
-                'cluster>srvnode_1>hostname': 'myhost',
-                'cluster>srvnode_1>network>data>public_interfaces': ['eth1', 'eno2'],
+                'cluster>srvnode_1>hostname':
+                'myhost',
+                'cluster>srvnode_1>network>data>public_interfaces':
+                ['eth1', 'eno2'],
                 'cluster>srvnode_1>storage>data_devices': ['/dev/sdb'],
-                'cluster>srvnode_2>hostname': 'host-2',
+                'cluster>srvnode_2>hostname':
+                'host-2',
                 'cluster>srvnode_2>network>data>public_interfaces': ['eno1'],
                 'cluster>srvnode_2>storage>data_devices': ['/dev/sdb']
             }

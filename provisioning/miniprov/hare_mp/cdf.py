@@ -93,4 +93,8 @@ class CdfGenerator:
                 Text(device)
                 for device in store.get(f'cluster>{name}>storage>data_devices')
             ], 'List Text'),
-            meta_data=Text(store.get(f'cluster>{name}>storage>metadata_devices')[0]))
+            #
+            # [KN] This is a hotfix for singlenode deployment
+            # TODO in the future the value must be taken from a correct
+            # ConfStore key (it doesn't exist now).
+            meta_data=Text('/dev/vg_metadata_srvnode-1/lv_raw_metadata'))
