@@ -21,31 +21,32 @@
 
 import getopt
 import sys
+import logging
+import utils
 from socket import gethostname
-from util import setup_logging, stop_parallel
-from util import processes_node, shutdown_sequence
 from consul import Consul
 
 
 def local_node_shutdown():
-
-#    setup_logging()
     cns = Consul()
     node = gethostname()
-    processes = processes_node(cns, node)
+    processes = utils.processes_node(cns, node)
 
-    for svc in shutdown_sequence:
+    for svc in utils.shutdown_sequence:
         if svc in processes:
-            stop_parallel([proc for proc in processes[svc]])
+            utils.stop_parallel([proc for proc in processes[svc]])
 
 
 def main() -> None:
-
     try:
         opts, args = getopt.getopt(sys.argv[1:], "h:c:", ["help", "command"])
     except getopt.GetoptError as err:
         sys.exit(err)
     for (opt, value) in opts:
+        if (opt == '-v') or (opt == "--verbose"):
+            logging.basicConfig(level=logging.DEBUG, format='%(message)s')
+        else:
+            logging.basicConfig(level=logging.INFO, format='%(message)s')
         if (opt == "-c") or (opt == "--command"):
             if value == 'shutdown':
                 local_node_shutdown()
