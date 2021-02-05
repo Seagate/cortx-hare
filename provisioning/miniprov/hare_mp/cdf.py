@@ -74,7 +74,7 @@ class CdfGenerator:
 
     def _get_iface(self, nodename: str) -> str:
         ifaces = self.provider.get(
-            f'cluster>{nodename}>network>data>public_interfaces')
+            f'cluster>{nodename}>network>data>private_interfaces')
         if not ifaces:
             raise RuntimeError('No data network interfaces found')
         return ifaces[0]
