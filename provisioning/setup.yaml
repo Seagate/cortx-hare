@@ -1,6 +1,6 @@
 hare:
   post_install:
-    script: /opt/seagate/cortx/hare/bin/hare_setup
+    cmd: /opt/seagate/cortx/hare/bin/hare_setup
     args: --report-unavailable-features --configure-logrotate --post_install
   init:
     cmd: /opt/seagate/cortx/hare/bin/hare_setup
