@@ -20,18 +20,15 @@
 # :help: stop the cluster
 
 import logging
-from util import setup_logging, consul_is_active_at, get_kv
-from util import pcs_consul_is_active_at, stop_parallel
-from util import shutdown_sequence, processes_by_consul_svc_name
-from util import is_fake_leader_name, ssh_prefix
+import utils
 from consul import Consul
 from hax.util import repeat_if_fails
 
 
 def main() -> None:
-    setup_logging()
-    if not consul_is_active_at('localhost'):
-        if pcs_consul_is_active_at('localhost'):
+    utils.setup_logging()
+    if not utils.consul_is_active_at('localhost'):
+        if utils.pcs_consul_is_active_at('localhost'):
             exit("Cluster is run by Pacemaker, try `pcs cluster stop --all'")
         else:
             exit('Cluster is not running')
@@ -40,20 +37,20 @@ def main() -> None:
 
     @repeat_if_fails()
     def _get_processes_and_node():
-        processes = processes_by_consul_svc_name(cns)
-        leader_node = get_kv(cns, 'leader')
+        processes = utils.processes_by_consul_svc_name(cns)
+        leader_node = utils.get_kv(cns, 'leader')
         return (processes, leader_node)
 
     (processes, leader_node) = _get_processes_and_node()
-    for svc in shutdown_sequence:
+    for svc in utils.shutdown_sequence:
         # Some processes may be not started as per configuration
         if svc in processes:
-            stop_parallel([proc for proc in processes[svc]])
+            utils.stop_parallel([proc for proc in processes[svc]])
 
-    if leader_node and not is_fake_leader_name(leader_node):
+    if leader_node and not utils.is_fake_leader_name(leader_node):
         logging.info(f'Shutting down RC Leader at {leader_node}... ')
         pkill: str = 'sudo pkill --exact -KILL consul &> /dev/null'
-        exec(ssh_prefix(leader_node) + pkill)
+        utils.exec_custom(utils.ssh_prefix(leader_node) + pkill)
 
 
 if __name__ == '__main__':

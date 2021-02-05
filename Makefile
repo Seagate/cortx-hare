@@ -458,7 +458,7 @@ uninstall:
 # Linters --------------------------------------------- {{{1
 #
 
-PYTHON_SCRIPTS := utils/hare-shutdown utils/hare-status utils/gen-uuid utils/hare-node utils/util.py
+PYTHON_SCRIPTS := utils/hare-shutdown utils/hare-status utils/gen-uuid utils/hare-node utils/utils.py
 
 .PHONY: check
 check: check-cfgen check-hax flake8 mypy
