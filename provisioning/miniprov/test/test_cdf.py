@@ -75,7 +75,7 @@ class TestCDF(unittest.TestCase):
                 'cluster>srvnode_1>hostname':
                 'myhost',
                 'cluster>srvnode_1>storage>data_devices': ['/dev/sdb'],
-                'cluster>srvnode_1>network>data>public_interfaces':
+                'cluster>srvnode_1>network>data>private_interfaces':
                 ['eth1', 'eno2']
             }
             return data[value]
@@ -95,7 +95,7 @@ class TestCDF(unittest.TestCase):
                 'cluster>srvnode_1>hostname':
                 'myhost',
                 'cluster>srvnode_1>storage>data_devices': ['/dev/sdb'],
-                'cluster>srvnode_1>network>data>public_interfaces':
+                'cluster>srvnode_1>network>data>private_interfaces':
                 ['eth1', 'eno2']
             }
             return data[value]
@@ -119,7 +119,7 @@ class TestCDF(unittest.TestCase):
                 'cluster>srvnode_1>hostname':
                 'myhost',
                 'cluster>srvnode_1>storage>data_devices': ['/dev/sdb'],
-                'cluster>srvnode_1>network>data>public_interfaces':
+                'cluster>srvnode_1>network>data>private_interfaces':
                 ['eth1', 'eno2']
             }
             return data[value]
@@ -143,12 +143,12 @@ class TestCDF(unittest.TestCase):
                 },
                 'cluster>srvnode_1>hostname':
                 'myhost',
-                'cluster>srvnode_1>network>data>public_interfaces':
+                'cluster>srvnode_1>network>data>private_interfaces':
                 ['eth1', 'eno2'],
                 'cluster>srvnode_1>storage>data_devices': ['/dev/sdb'],
                 'cluster>srvnode_2>hostname':
                 'host-2',
-                'cluster>srvnode_2>network>data>public_interfaces': ['eno1'],
+                'cluster>srvnode_2>network>data>private_interfaces': ['eno1'],
                 'cluster>srvnode_2>storage>data_devices': ['/dev/sdb']
             }
             return data[value]
