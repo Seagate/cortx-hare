@@ -145,15 +145,15 @@ class PostInstall(argparse.Action):
 class Init(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
         try:
+            rc = 0
             if not is_cluster_running() and bootstrap_cluster() != 0:
                 logging.error('Failed to bootstrap the custer')
-                exit(1)
-
-            while is_cluster_running():
-                shutdown_cluster()
-
+                rc = -1
+            shutdown_cluster()
+            exit(rc)
         except Exception as error:
             logging.error('Error while initializing the cluster (%s)', error)
+            shutdown_cluster()
             exit(-1)
 
 
@@ -164,21 +164,19 @@ class Test(argparse.Action):
     """
     def __call__(self, parser, namespace, values, option_string=None):
         try:
+            rc = 0
             if not is_cluster_running() and bootstrap_cluster() != 0:
                 logging.error('Failed to bootstrap the cluster')
-                exit(-1)
-
+                rc = -1
             cluster_status = check_cluster_status()
-
-            while is_cluster_running():
-                shutdown_cluster()
-
+            shutdown_cluster()
             if cluster_status:
                 logging.error('Cluster status reports failure')
-                exit(-1)
-
+                rc = -1
+            exit(rc)
         except Exception as error:
             logging.error('Error while checking cluster status (%s)', error)
+            shutdown_cluster()
             exit(-1)
 
 
@@ -232,7 +230,8 @@ def bootstrap_cluster():
 
 
 def shutdown_cluster():
-    return os.system('hctl shutdown')
+    while is_cluster_running():
+        os.system('hctl shutdown')
 
 
 def list2dict(nodes_data_hctl: list) -> dict:
