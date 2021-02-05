@@ -23,6 +23,7 @@ import getopt
 import sys
 import logging
 import utils
+import subprocess
 from socket import gethostname
 from consul import Consul
 
@@ -39,7 +40,9 @@ def local_node_shutdown():
 
 def main() -> None:
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "h:c:", ["help", "command"])
+        opts, args = getopt.getopt(sys.argv[1:],
+                                   "hvc:",
+                                   ["help", "verbose", "command", "pcs"])
     except getopt.GetoptError as err:
         sys.exit(err)
     for (opt, value) in opts:
@@ -47,7 +50,10 @@ def main() -> None:
             logging.basicConfig(level=logging.DEBUG, format='%(message)s')
         else:
             logging.basicConfig(level=logging.INFO, format='%(message)s')
-        if (opt == "-c") or (opt == "--command"):
+        if (opt == "--pcs"):
+            cmd = '/opt/seagate/cortx/hare/libexec/pcs-node'
+            subprocess.call(cmd, shell=True)
+        elif (opt == "-c") or (opt == "--command"):
             if value == 'shutdown':
                 local_node_shutdown()
 
