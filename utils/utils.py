@@ -17,13 +17,11 @@
 # For any questions about this software or licensing,
 # please email opensource@seagate.com or cortx-questions@seagate.com.
 
-# :help: stop the cluster
-
 import logging
-import os
 import re
 import threading
 import argparse
+import subprocess
 from queue import Queue
 from socket import gethostname
 from typing import Dict, List, NamedTuple
@@ -32,10 +30,6 @@ from consul import Consul, ConsulException
 from requests.exceptions import RequestException
 from urllib3.exceptions import HTTPError
 from hax.exception import HAConsistencyException
-
-__all__ = ['setup_logging', 'consul_is_active_at', 'pcs_consul_is_active_at',
-           'processes_by_consul_svc_name', 'get_kv', 'shutdown_sequence',
-           'stop_parallel', 'is_fake_leader_name', 'ssh_prefix']
 
 Process = NamedTuple('Process', [('node', str), ('consul_name', str),
                                  ('systemd_name', str), ('fidk', int),
@@ -77,8 +71,7 @@ def get_systemd_name(fidk: int, svc_name: str) -> str:
 
 
 def processes_node(cns: Consul, node_name: str) -> Dict[str, List[Process]]:
-    """Processes grouped by Consul service name.
-    """
+    """Processes grouped by Consul service name."""
     try:
         processes: Dict[str, List[Process]] = {}
         for node in cns.catalog.nodes()[1]:
@@ -109,13 +102,11 @@ def processes_node(cns: Consul, node_name: str) -> Dict[str, List[Process]]:
 
 
 def processes_by_consul_svc_name(cns: Consul) -> Dict[str, List[Process]]:
-    """Processes grouped by Consul service name.
-    """
+    """Processes grouped by Consul service name."""
     try:
         processes: Dict[str, List[Process]] = {}
         for node in cns.catalog.nodes()[1]:
             for svc in cns.health.node(node['Node'])[1]:
-                print("In the loop")
                 svc_name = svc['ServiceName']
                 if svc_name:
                     fidk = int(svc['ServiceID'])
@@ -156,20 +147,20 @@ def ssh_prefix(hostname: str) -> str:
 def consul_is_active_at(hostname: str) -> bool:
     cmd = ssh_prefix(hostname) + \
         'sudo systemctl is-active --quiet hare-consul-agent'
-    return os.system(cmd) == 0
+    return subprocess.call(cmd, shell=True) == 0
 
 
 def pcs_consul_is_active_at(hostname: str) -> bool:
     cmd = ssh_prefix(hostname) + \
         'sudo systemctl is-active --quiet hare-consul-agent*'
-    return os.system(cmd) == 0
+    return subprocess.call(cmd, shell=True) == 0
 
 
 def exec_silent(cmd: str) -> bool:
-    return os.system(cmd) == 0
+    return subprocess.call(cmd, shell=True) == 0
 
 
-def exec(cmd: str) -> None:
+def exec_custom(cmd: str) -> None:
     assert cmd
     if exec_silent(cmd):
         logging.info('OK')
@@ -205,7 +196,7 @@ class Worker(threading.Thread):
     def __init__(self, queue: Queue):
         super().__init__(target=self._do_work, args=(queue, ))
 
-    def _do_work(self, queue):
+    def _do_work(self, queue: Queue):
         logging.debug('Started thread')
         while True:
             msg = queue.get()
