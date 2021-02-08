@@ -156,7 +156,6 @@ and health-checking mechanisms.
       name = Whamcloud - Lustre 2.12.5
       ```
 
-
 * Install Motr.
 
   * .. from RPMs
