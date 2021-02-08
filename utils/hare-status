@@ -23,6 +23,7 @@ import json
 import argparse
 import io
 import logging
+import simplejson
 import sys
 from subprocess import PIPE, Popen
 from typing import Any, Dict, List, NamedTuple, Optional
@@ -45,12 +46,8 @@ class Fid:
     def __repr__(self):
         return f'{self.__class__.__name__}({self.container:#x}, {self.key:#x})'
 
-
-class FidEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, Fid):
-            return str(obj)
-        return super().default(obj)
+    def for_json(self):
+        return self.__str__()
 
 
 Profile = NamedTuple('Profile', [
@@ -228,17 +225,21 @@ def devices(cns: Consul, node_name: str) -> List[Device]:
 
 
 @repeat_if_fails(max_retries=24)
-def get_cluster_status(cns: Consul) -> Dict[str, Any]:
-    return {
+def get_cluster_status(cns: Consul, devices_requested: bool) -> Dict[str, Any]:
+    result: Dict[str, Any] = {
         'pools': [x for x in sns_pools(cns)],
         'profiles': [{'fid': x.fid, 'name': x.name, 'pools': x.pools}
                      for x in profiles(cns)],
         'filesystem': get_fs_stats(cns),
         'nodes': [Node(name=h, svcs=processes(cns, h))
-                  for h in node_names(cns)],
-        'devices': [Devices(node_name=h, devs=devices(cns, h))
-                    for h in node_names(cns)]
+                  for h in node_names(cns)]
     }
+
+    if devices_requested:
+        result['devices'] = [Devices(node_name=h, devs=devices(cns, h))
+                             for h in node_names(cns)]
+
+    return result
 
 
 def parse_opts(argv):
@@ -246,6 +247,9 @@ def parse_opts(argv):
                                 usage='%(prog)s [OPTION]')
     p.add_argument('--json',
                    help='show output in JSON format',
+                   action='store_true')
+    p.add_argument("-d", "--devices",
+                   help='include devices info',
                    action='store_true')
     return p.parse_args(argv)
 
@@ -255,7 +259,7 @@ def setup_logging():
 
 
 @repeat_if_fails(max_retries=24)
-def show_text_status(cns: Consul) -> None:
+def show_text_status(cns: Consul, devices_requested: bool) -> None:
     # In-memory buffer required because an intermittent Consul exception can
     # happen right in the middle of printing something. It is good to postpone
     # the printing to stdout until the moment when those exceptions can't
@@ -288,11 +292,12 @@ def show_text_status(cns: Consul) -> None:
             for p in processes(cns, h):
                 fid: str = f'{p.fid}'
                 echo(f'    [{p.status}]  {p.name:<9}  {fid:<23}  {p.ep}')
-        echo('Devices:')
-        for h in node_names(cns):
-            echo(f'    {h}')
-            for d in devices(cns, h):
-                echo(f'    [{d.status}]  {d.name}')
+        if devices_requested:
+            echo('Devices:')
+            for h in node_names(cns):
+                echo(f'    {h}')
+                for d in devices(cns, h):
+                    echo(f'    [{d.status}]  {d.name}')
         print(stream.getvalue(), end='')  # flush
 
 
@@ -305,10 +310,10 @@ def main(argv=None):
         return 1
 
     if opts.json:
-        status = get_cluster_status(cns)
-        print(json.dumps(status, indent=2, cls=FidEncoder))
+        status = get_cluster_status(cns, opts.devices)
+        print(simplejson.dumps(status, indent=2, for_json=True))
     else:
-        show_text_status(cns)
+        show_text_status(cns, opts.devices)
     return 0
 
 

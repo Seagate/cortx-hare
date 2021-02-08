@@ -18,14 +18,9 @@
 
 -}
 
-let M0Server = ./M0ServerDesc.dhall
-
-let Node = ./NodeDesc.dhall
-
-let Pool = ./PoolDesc.dhall
-
-in
-{ nodes : List Node
-, pools : List Pool
-, profiles : Optional (List ./PoolsRef.dhall)
+{ hostname : Text
+, data_iface : Text
+, data_iface_type : Optional ./Protocol.dhall
+, m0_servers : Optional (List ./M0ServerDesc.dhall)
+, m0_clients : { s3 : Natural, other : Natural }
 }
