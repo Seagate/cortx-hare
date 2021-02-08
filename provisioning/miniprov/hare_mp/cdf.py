@@ -1,12 +1,12 @@
 import os.path as P
 import subprocess as S
 from string import Template
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import pkg_resources
 
 from hare_mp.store import ValueProvider
-from hare_mp.types import DList, Maybe, NodeDesc, Text, Protocol
+from hare_mp.types import DList, Maybe, NodeDesc, Protocol, Text
 
 DHALL_PATH = '/opt/seagate/cortx/hare/share/cfgen/dhall'
 DHALL_EXE = '/opt/seagate/cortx/hare/bin/dhall'
@@ -74,10 +74,17 @@ class CdfGenerator:
 
     def _get_iface(self, nodename: str) -> str:
         ifaces = self.provider.get(
-            f'cluster>{nodename}>network>data>public_interfaces')
+            f'cluster>{nodename}>network>data>private_interfaces')
         if not ifaces:
             raise RuntimeError('No data network interfaces found')
         return ifaces[0]
+
+    def _get_iface_type(self, nodename: str) -> Optional[Protocol]:
+        iface = self.provider.get(
+            f'cluster>{nodename}>network>data>interface_type')
+        if iface is None:
+            return None
+        return Protocol[iface]
 
     def _create_node(self, name: str) -> NodeDesc:
         store = self.provider
@@ -86,11 +93,14 @@ class CdfGenerator:
         return NodeDesc(
             hostname=Text(hostname),
             data_iface=Text(iface),
-
-            # data iface is not yet provided by ConfStore
-            data_iface_type=Maybe(Protocol.tcp, 'P'),
+            data_iface_type=Maybe(self._get_iface_type(name), 'P'),
             io_disks=DList([
                 Text(device)
                 for device in store.get(f'cluster>{name}>storage>data_devices')
             ], 'List Text'),
-            meta_data=Text(store.get(f'cluster>{name}>storage>metadata_devices')[0]))
+            #
+            # [KN] This is a hotfix for singlenode deployment
+            # TODO in the future the value must be taken from a correct
+            # ConfStore key (it doesn't exist now).
+            meta_data=Text('/dev/vg_metadata_srvnode-1/lv_raw_metadata'),
+            s3_instances=int(store.get(f'cluster>{name}>s3_instances')))

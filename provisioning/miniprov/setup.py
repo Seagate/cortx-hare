@@ -40,5 +40,5 @@ setup(name='hare_mp',
       packages=find_packages(),
       setup_requires=['flake8', 'mypy', 'pkgconfig'],
       install_requires=['setuptools', 'dataclasses'],
-      package_data={'': '*.dhall'},
+      package_data={'': ['*.dhall']},
       entry_points={'console_scripts': ['hare_setup=hare_mp.main:main']})
