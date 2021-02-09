@@ -26,6 +26,7 @@ import utils
 from socket import gethostname
 from consul import Consul
 from hax.util import repeat_if_fails
+from typing import Dict, List
 
 
 def check_cluster():
@@ -37,20 +38,31 @@ def check_cluster():
 
 
 @repeat_if_fails()
-def _get_processes_and_node():
+def _get_processes_for_cluster():
     cns = Consul()
     processes = utils.processes_by_consul_svc_name(cns)
     leader_node = utils.get_kv(cns, 'leader')
     return (processes, leader_node)
 
 
-def shutdown_cluster():
-    check_cluster()
-    (processes, leader_node) = _get_processes_and_node()
+@repeat_if_fails()
+def _get_processes_for_node():
+    cns = Consul()
+    node = gethostname()
+    processes = utils.processes_node(cns, node)
+    return processes
+
+
+def stop_process(processes: Dict[str, List[utils.Process]]):
     for svc in utils.shutdown_sequence:
-        # Some processes may be not started as per configuration
         if svc in processes:
             utils.stop_parallel([proc for proc in processes[svc]])
+
+
+def shutdown_cluster():
+    check_cluster()
+    (processes, leader_node) = _get_processes_for_cluster()
+    stop_process(processes)
 
     if leader_node and not utils.is_fake_leader_name(leader_node):
         logging.info(f'Shutting down RC Leader at {leader_node}... ')
@@ -58,15 +70,10 @@ def shutdown_cluster():
         utils.exec_custom(utils.ssh_prefix(leader_node) + pkill)
 
 
-def local_node_shutdown():
+def node_shutdown():
     check_cluster()
-    cns = Consul()
-    node = gethostname()
-    processes = utils.processes_node(cns, node)
-
-    for svc in utils.shutdown_sequence:
-        if svc in processes:
-            utils.stop_parallel([proc for proc in processes[svc]])
+    processes = _get_processes_for_node()
+    stop_process(processes)
 
 
 def main() -> None:
@@ -77,18 +84,16 @@ def main() -> None:
     except getopt.GetoptError as err:
         sys.exit(err)
 
-    shut_cluster = True
+    logging.basicConfig(level=logging.INFO, format='%(message)s')
+
     for (opt, value) in opts:
         if opt in ['-v', '--verbose']:
             logging.basicConfig(level=logging.DEBUG, format='%(message)s')
-        else:
-            logging.basicConfig(level=logging.INFO, format='%(message)s')
         if opt in ['--node']:
-            shut_cluster = False
-            local_node_shutdown()
+            node_shutdown()
+            return
 
-    if shut_cluster is True:
-        shutdown_cluster()
+    shutdown_cluster()
 
 
 if __name__ == '__main__':
