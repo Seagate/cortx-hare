@@ -74,11 +74,14 @@ class TestCDF(unittest.TestCase):
                 },
                 'cluster>srvnode_1>hostname':
                 'myhost',
+                'cluster>srvnode_1>network>data>interface_type':
+                'tcp',
                 'cluster>srvnode_1>storage>data_devices': ['/dev/sdb'],
                 'cluster>srvnode_1>network>data>private_interfaces':
                 ['eth1', 'eno2'],
                 'cluster>srvnode_1>storage>metadata_devices': ['/dev/meta'],
-                'cluster>srvnode_1>s3_instances': 1,
+                'cluster>srvnode_1>s3_instances':
+                1,
             }
             return data[value]
 
@@ -100,7 +103,10 @@ class TestCDF(unittest.TestCase):
                 'cluster>srvnode_1>network>data>private_interfaces':
                 ['eth1', 'eno2'],
                 'cluster>srvnode_1>storage>metadata_devices': ['/dev/meta'],
-                'cluster>srvnode_1>s3_instances': 1,
+                'cluster>srvnode_1>s3_instances':
+                1,
+                'cluster>srvnode_1>network>data>interface_type':
+                'o2ib',
             }
             return data[value]
 
@@ -126,7 +132,10 @@ class TestCDF(unittest.TestCase):
                 'cluster>srvnode_1>storage>data_devices': ['/dev/sdb'],
                 'cluster>srvnode_1>network>data>private_interfaces':
                 ['eth1', 'eno2'],
-                'cluster>srvnode_1>s3_instances': 1,
+                'cluster>srvnode_1>s3_instances':
+                1,
+                'cluster>srvnode_1>network>data>interface_type':
+                'o2ib',
             }
             return data[value]
 
@@ -147,13 +156,11 @@ class TestCDF(unittest.TestCase):
                     "blah": "srvnode_1",
                     "zweite": "srvnode_2"
                 },
-                'cluster>srvnode_1>hostname':
-                'myhost',
-                'cluster>srvnode_1>network>data>private_interfaces':
-                ['eth1', 'eno2'],
+                'cluster>srvnode_1>hostname': 'myhost',
+                'cluster>srvnode_1>network>data>private_interfaces': ['eth1'],
+                'cluster>srvnode_1>network>data>interface_type': 'o2ib',
                 'cluster>srvnode_1>storage>data_devices': ['/dev/sdb'],
-                'cluster>srvnode_2>hostname':
-                'host-2',
+                'cluster>srvnode_2>hostname': 'host-2',
                 'cluster>srvnode_2>network>data>private_interfaces': ['eno1'],
                 'cluster>srvnode_2>storage>data_devices': ['/dev/sdb'],
                 'cluster>srvnode_1>storage>metadata_devices': ['/dev/meta'],
@@ -162,6 +169,8 @@ class TestCDF(unittest.TestCase):
                 'cluster>srvnode_2>storage>data_devices': ['/dev/sdb'],
                 'cluster>srvnode_2>storage>metadata_devices': ['/dev/meta'],
                 'cluster>srvnode_2>s3_instances': 5,
+                'cluster>srvnode_2>network>data>interface_type': 'tcp',
+                'cluster>srvnode_2>storage>data_devices': ['/dev/sdb']
             }
             return data[value]
 
@@ -176,3 +185,30 @@ class TestCDF(unittest.TestCase):
         self.assertEqual(Text('host-2'), ret[1].hostname)
         self.assertEqual(Text('eno1'), ret[1].data_iface)
         self.assertEqual(5, ret[1].s3_instances)
+        self.assertEqual('Some P.o2ib', str(ret[0].data_iface_type))
+        self.assertEqual('Some P.tcp', str(ret[1].data_iface_type))
+
+    def test_iface_type_can_be_null(self):
+        store = ValueProvider()
+
+        def ret_values(value: str) -> Any:
+            data = {
+                'cluster>server_nodes': {
+                    "blah": "srvnode_1"
+                },
+                'cluster>srvnode_1>hostname':
+                'myhost',
+                'cluster>srvnode_1>storage>data_devices': ['/dev/sdb'],
+                'cluster>srvnode_1>network>data>interface_type':
+                None,
+                'cluster>srvnode_1>s3_instances':
+                1,
+                'cluster>srvnode_1>network>data>private_interfaces':
+                ['eth1', 'eno2']
+            }
+            return data[value]
+
+        store._raw_get = Mock(side_effect=ret_values)
+
+        ret = CdfGenerator(provider=store)._create_node_descriptions()
+        self.assertEqual('None P', str(ret[0].data_iface_type))
