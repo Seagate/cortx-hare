@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env bash
 #
 # Copyright (c) 2020 Seagate Technology LLC and/or its Affiliates
 #
@@ -17,46 +17,9 @@
 # For any questions about this software or licensing,
 # please email opensource@seagate.com or cortx-questions@seagate.com.
 
-# :help: stop the cluster
+set -eu -o pipefail
+# set -x
+export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
 
-import getopt
-import sys
-import logging
-import utils
-import subprocess
-from socket import gethostname
-from consul import Consul
-
-
-def local_node_shutdown():
-    cns = Consul()
-    node = gethostname()
-    processes = utils.processes_node(cns, node)
-
-    for svc in utils.shutdown_sequence:
-        if svc in processes:
-            utils.stop_parallel([proc for proc in processes[svc]])
-
-
-def main() -> None:
-    try:
-        opts, args = getopt.getopt(sys.argv[1:],
-                                   "hvc:",
-                                   ["help", "verbose", "command", "pcs"])
-    except getopt.GetoptError as err:
-        sys.exit(err)
-    for (opt, value) in opts:
-        if (opt == '-v') or (opt == "--verbose"):
-            logging.basicConfig(level=logging.DEBUG, format='%(message)s')
-        else:
-            logging.basicConfig(level=logging.INFO, format='%(message)s')
-        if (opt == "--pcs"):
-            cmd = '/opt/seagate/cortx/hare/libexec/pcs-node'
-            subprocess.call(cmd, shell=True)
-        elif (opt == "-c") or (opt == "--command"):
-            if value == 'shutdown':
-                local_node_shutdown()
-
-
-if __name__ == '__main__':
-    main()
+# :help: manage the cluster nodes
+PCSCLI_PROG_NAME='hctl node' pcswrap "$@"
