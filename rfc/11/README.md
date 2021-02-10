@@ -88,6 +88,21 @@ Stopped hare-consul-agent at ssc-vm-c-0553.colo.seagate.com
 Killing RC Leader at ssc-vm-c-0552.colo.seagate.com... **ERROR**
 ```
 
+## Cluster shutdown --node
+## Stops Hare, Motr and Consul processes on the local node only
+
+```
+$ hctl shutdown --node
+Stopping m0d@0x7200000000000001:0x30 (ios) at ssc-vm-2090.colo.seagate.com...
+Stopped m0d@0x7200000000000001:0x30 (ios) at ssc-vm-2090.colo.seagate.com
+Stopping m0d@0x7200000000000001:0x2d (confd) at ssc-vm-2090.colo.seagate.com...
+Stopped m0d@0x7200000000000001:0x2d (confd) at ssc-vm-2090.colo.seagate.com
+Stopping hare-hax at ssc-vm-2090.colo.seagate.com...
+Stopped hare-hax at ssc-vm-2090.colo.seagate.com
+Stopping hare-consul-agent at ssc-vm-2090.colo.seagate.com...
+Stopped hare-consul-agent at ssc-vm-2090.colo.seagate.com
+```
+
 ## Cluster start
 
 ```
