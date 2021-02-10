@@ -458,7 +458,7 @@ uninstall:
 # Linters --------------------------------------------- {{{1
 #
 
-PYTHON_SCRIPTS := utils/hare-shutdown utils/hare-status utils/gen-uuid
+PYTHON_SCRIPTS := utils/hare-shutdown utils/hare-status utils/gen-uuid utils/utils.py
 
 .PHONY: check
 check: check-cfgen check-hax flake8 mypy
@@ -485,7 +485,7 @@ override MYPY_OPTS := --config-file hax/mypy.ini $(MYPY_OPTS)
 mypy: $(PYTHON_SCRIPTS)
 	@$(call _info,Checking files with mypy)
 	@$(PY_VENV); \
-	  set -eu -o pipefail; for f in $^; do MYPYPATH=stubs:hax mypy $(MYPY_OPTS) $$f; done
+          set -eu -o pipefail; for f in $^; do MYPYPATH=stubs:hax:utils mypy $(MYPY_OPTS) $$f; done
 
 # Tests ----------------------------------------------- {{{1
 #
