@@ -32,7 +32,6 @@ export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
 : ${SSC_AUTH:=}
 : ${VERBOSE:=false}
 : ${SSC_URL:=https://ssc-cloud.colo.seagate.com}
-: ${WAIT_TIMEOUT:=15}  # How many minutes to wait for a VM to start or stop.
 
 die() {
     >&2 echo "[${BASH_LINENO[0]}:${FUNCNAME[1]}] $@"
@@ -61,15 +60,10 @@ validate_args() {
 
 wait_till() {
     local vm_id=$1
-    local interval=$2
+    local wait_timeout=$2
     local state=$3
-    local nr_steps
-
-    if [ $interval -eq 5 ]; then
-        nr_steps=$((WAIT_TIMEOUT*60 / interval))
-    else
-        nr_steps=8   # wait for task
-    fi
+    local interval=30
+    local nr_steps=$((wait_timeout*60 / interval))
 
     while true; do
         sleep $interval
@@ -127,7 +121,7 @@ vm_power_state_set() {
     [[ $(jq '.success' <<< "$resp") == true ]] ||
         die 'VM $action request failed'
 
-    wait_till $vm_id 5 $state
+    wait_till $vm_id 15 $state
 }
 
 vm_task_state() {
@@ -150,7 +144,7 @@ vm_snapshot_revert() {
     local snapshot_task_id
     snapshot_task_id=$(jq -r '.task_id' <<< "$resp")
 
-    wait_till $vm_id 30 $snapshot_task_id   
+    wait_till $vm_id 5 $snapshot_task_id   
 }
 
 main() {
