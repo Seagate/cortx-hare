@@ -194,7 +194,11 @@ class QuitMessage:
 
 class Worker(threading.Thread):
     def __init__(self, queue: Queue):
-        super().__init__(target=self._do_work, args=(queue, ))
+        # [KN] We mark the thread as daemonic to make sure it will
+        # exit as soon as the main thread exits.
+        # That will make sure that the application shuts down on
+        # SIGINT event (Ctrl-C)
+        super().__init__(target=self._do_work, args=(queue, ), daemon=True)
 
     def _do_work(self, queue: Queue):
         logging.debug('Started thread')
