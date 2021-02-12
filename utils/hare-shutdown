@@ -20,13 +20,14 @@
 # help stop the cluster or local node
 
 import getopt
-import sys
 import logging
-import utils
-from socket import gethostname
+import sys
+from typing import Dict, List, Tuple
+
 from consul import Consul
-from hax.util import repeat_if_fails
-from typing import Dict, List
+from hax.util import ConsulUtil, repeat_if_fails
+
+import utils
 
 
 def check_cluster():
@@ -38,7 +39,7 @@ def check_cluster():
 
 
 @repeat_if_fails()
-def _get_processes_for_cluster():
+def _get_processes_for_cluster() -> Tuple[Dict[str, List[utils.Process]], str]:
     cns = Consul()
     processes = utils.processes_by_consul_svc_name(cns)
     leader_node = utils.get_kv(cns, 'leader')
@@ -46,17 +47,30 @@ def _get_processes_for_cluster():
 
 
 @repeat_if_fails()
-def _get_processes_for_node():
+def _get_processes_for_node() -> Dict[str, List[utils.Process]]:
     cns = Consul()
-    node = gethostname()
+    cns_util = ConsulUtil(raw_client=cns)
+    node = cns_util.get_local_nodename()
     processes = utils.processes_node(cns, node)
     return processes
 
 
 def stop_process(processes: Dict[str, List[utils.Process]]):
     for svc in utils.shutdown_sequence:
-        if svc in processes:
+        if svc not in processes:
+            continue
+        if svc != 'consul':
             utils.stop_parallel([proc for proc in processes[svc]])
+        else:
+            # Consul process at the current node must stopped the last.
+            # Reason: if something goes wrong and the user will want to
+            # shutdown the cluster again, local Consul must be available.
+            remote_procs = [
+                proc for proc in processes[svc] if not proc.is_local
+            ]
+            utils.stop_parallel(remote_procs)
+            local_procs = [proc for proc in processes[svc] if proc.is_local]
+            utils.stop_parallel(local_procs)
 
 
 def shutdown_cluster():
@@ -78,9 +92,7 @@ def node_shutdown():
 
 def main() -> None:
     try:
-        opts, args = getopt.getopt(sys.argv[1:],
-                                   "v",
-                                   ["verbose", "node"])
+        opts, args = getopt.getopt(sys.argv[1:], "v", ["verbose", "node"])
     except getopt.GetoptError as err:
         sys.exit(err)
 
