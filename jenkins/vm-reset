@@ -58,12 +58,13 @@ validate_args() {
         die 'Cannot communicate with CloudForms Management Engine'
 }
 
-# Wait till the certain condition is met or timout occurs
-# currently power state (on/off) and snapshot task progress is checked
+# Wait till the certain condition (state transition or task completion) is met, 
+# or timeout occurs.
+# Currently power state (on/off) and snapshot task progress is checked.
 # It takes inputs,
-#           vm_id         id of VM 
-#           wait_timeout  minutes to wait for state or task before timeout
-#           state         power state or task whose progress needs to checked  
+# vm_id         id of VM 
+# wait_timeout  minutes to wait for state or task before timeout
+# state         power state or task whose progress needs to checked  
 wait_till() {
     local vm_id=$1
     local wait_timeout=$2
