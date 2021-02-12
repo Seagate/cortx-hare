@@ -22,13 +22,14 @@ from errno import EAGAIN
 from typing import Any, List
 
 from hax.exception import ConfdQuorumException, RepairRebalanceException
-from hax.message import (EntrypointRequest, HaNvecGetEvent,
-                         ProcessEvent)
+from hax.message import (BroadcastHAStates, EntrypointRequest,
+                         FirstEntrypointRequest, HaNvecGetEvent, ProcessEvent)
 from hax.motr.delivery import DeliveryHerald
 from hax.motr.ffi import HaxFFI, make_array, make_c_str
 from hax.types import (ConfHaProcess, Fid, FidStruct, FsStats, HaNote,
-                       HaNoteStruct, HAState, MessageId, ObjT, ReprebStatus,
-                       StobIoqError, ServiceHealth)
+                       HaNoteStruct, HAState, MessageId, ObjT, Profile,
+                       ReprebStatus, ServiceHealth, StobIoqError,
+                       m0HaProcessEvent, m0HaProcessType)
 from hax.util import ConsulUtil
 
 LOG = logging.getLogger('hax')
@@ -60,6 +61,7 @@ class Motr:
         self.rm_fid = rm_fid
         self.herald = herald
         self.consul_util = consul_util
+        self.spiel_ready = False
 
         if not self._ha_ctx:
             LOG.error('Cannot initialize Motr API. m0_halon_interface_init'
@@ -67,9 +69,10 @@ class Motr:
             raise RuntimeError('Cannot initialize Motr API')
 
     def start(self, rpc_endpoint: str, process: Fid, ha_service: Fid,
-              rm_service: Fid):
+              rm_service: Fid, profile: Profile):
         LOG.debug('Starting m0_halon_interface')
         self._process_fid = process
+        self._profile = profile
         result = self._ffi.start(self._ha_ctx, make_c_str(rpc_endpoint),
                                  process.to_c(), ha_service.to_c(),
                                  rm_service.to_c())
@@ -82,8 +85,8 @@ class Motr:
 
     def start_rconfc(self) -> int:
         LOG.debug('Starting rconfc')
-        result: int = self._ffi.start_rconfc(self._ha_ctx,
-                                             self._process_fid.to_c())
+        profile_fid: Fid = self._profile.fid
+        result: int = self._ffi.start_rconfc(self._ha_ctx, profile_fid.to_c())
         if result:
             raise RuntimeError('Cannot start rconfc.'
                                ' Please check Motr logs for more details.')
@@ -102,6 +105,9 @@ class Motr:
         LOG.debug('confc has been stopped successfuly')
         return result
 
+    def is_spiel_ready(self):
+        return self.spiel_ready
+
     @log_exception
     def _entrypoint_request_cb(self, reply_context: Any, req_id: Any,
                                remote_rpc_endpoint: str, process_fid: Fid,
@@ -110,16 +116,42 @@ class Motr:
                   " '{}', process fid = {}".format(remote_rpc_endpoint,
                                                    str(process_fid)) +
                   ' The request will be processed in another thread.')
+        try:
+            if (is_first_request
+                    and (not self.consul_util.is_proc_client(process_fid))):
+                # This is the first start of this process or the process has
+                # restarted.
+                # Let everyone know that the process has restarted so that
+                # they can re-establish their connections with the process.
+                # Disconnect all the halinks this process is any.
+                # Motr clients are filtered out as they are the initiators of
+                # the rpc connections to motr ioservices. Presently there's no
+                # need identified to report motr client restarts, Consul will
+                # anyway detect the failure and report the same so we exclude
+                # reporting the same during their first entrypoint request.
+                # But we need to do it for motr server processes.
+                self.queue.put(
+                    FirstEntrypointRequest(
+                        reply_context=reply_context,
+                        req_id=req_id,
+                        remote_rpc_endpoint=remote_rpc_endpoint,
+                        process_fid=process_fid,
+                        git_rev=git_rev,
+                        pid=pid,
+                        is_first_request=is_first_request))
+                return
+        except Exception:
+            LOG.exception('Failed to notify failure for %s', process_fid)
+
+        LOG.debug('enqueue entrypoint request for %s', remote_rpc_endpoint)
         self.queue.put(
-            EntrypointRequest(
-                reply_context=reply_context,
-                req_id=req_id,
-                remote_rpc_endpoint=remote_rpc_endpoint,
-                process_fid=process_fid,
-                git_rev=git_rev,
-                pid=pid,
-                is_first_request=is_first_request,
-            ))
+            EntrypointRequest(reply_context=reply_context,
+                              req_id=req_id,
+                              remote_rpc_endpoint=remote_rpc_endpoint,
+                              process_fid=process_fid,
+                              git_rev=git_rev,
+                              pid=pid,
+                              is_first_request=is_first_request))
 
     def send_entrypoint_request_reply(self, message: EntrypointRequest):
         reply_context = message.reply_context
@@ -197,6 +229,13 @@ class Motr:
                               chp_pid=chp_pid,
                               fid=fid)))
 
+        if chp_type == m0HaProcessType.M0_CONF_HA_PROCESS_M0D:
+            if chp_event == m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED:
+                self.queue.put(
+                    BroadcastHAStates(
+                        states=[HAState(fid=fid, status=ServiceHealth.OK)],
+                        reply_to=None))
+
     def _stob_ioq_event_cb(self, fid, sie_conf_sdev, sie_stob_id, sie_fd,
                            sie_opcode, sie_rc, sie_offset, sie_size,
                            sie_bshift):
@@ -213,6 +252,14 @@ class Motr:
             'tag= %d', tag)
         self.herald.notify_delivered(MessageId(halink_ctx=halink_ctx, tag=tag))
 
+    def _msg_not_delivered_cb(self, proc_fid, proc_endpoint: str, tag: int,
+                              halink_ctx: int):
+        LOG.info(
+            'Message delivery failed, endpoint'
+            "'{}', process fid = {}".format(proc_endpoint, str(proc_fid)) +
+            'tag= %d', tag)
+        self.herald.notify_delivered(MessageId(halink_ctx=halink_ctx, tag=tag))
+
     @log_exception
     def ha_nvec_get(self, hax_msg: int, nvec: List[HaNote]) -> None:
         LOG.debug('Got ha nvec of length %s from Motr land', len(nvec))
@@ -225,10 +272,9 @@ class Motr:
         notes: List[HaNoteStruct] = []
         for n in event.nvec:
             n.note.no_state = HaNoteStruct.M0_NC_ONLINE
-            if (n.obj_t in (ObjT.PROCESS.name, ObjT.SERVICE.name) and
-                self.consul_util.get_conf_obj_status(ObjT[n.obj_t],
-                                                     n.note.no_id.f_key) !=
-                    'passing'):
+            if (n.obj_t in (ObjT.PROCESS.name, ObjT.SERVICE.name)
+                    and self.consul_util.get_conf_obj_status(
+                        ObjT[n.obj_t], n.note.no_id.f_key) != 'passing'):
                 n.note.no_state = HaNoteStruct.M0_NC_FAILED
             notes.append(n.note)
 
@@ -249,6 +295,8 @@ class Motr:
         ]
 
     def close(self):
+        LOG.debug('Stopping rconfc')
+        self.stop_rconfc()
         LOG.debug('Shutting down Motr API')
         self._ffi.destroy(self._ha_ctx)
         self._ha_ctx = 0

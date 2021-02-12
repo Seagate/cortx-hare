@@ -139,10 +139,10 @@ def main(argv=None):
     cluster = build_cluster(cluster_desc)
 
     outs: List[Tuple[str, Callable[..., str], List[Any]]] = [
-        ('consul-agents.json', generate_consul_agents, cluster),
-        ('consul-kv.json', generate_consul_kv, cluster, opts.dhall_dir),
-        ('confd.dhall', generate_confd, cluster.m0conf, opts.dhall_dir)]
-    for path, generate, *args in outs:
+        ('consul-agents.json', generate_consul_agents, [cluster]),
+        ('consul-kv.json', generate_consul_kv, [cluster, opts.dhall_dir]),
+        ('confd.dhall', generate_confd, [cluster.m0conf, opts.dhall_dir])]
+    for path, generate, args in outs:
         with open(os.path.join(opts.output_dir, path), 'w') as f:
             f.write(generate(*args))
 
@@ -331,11 +331,13 @@ Pools of {t!r} type can only have 1 data unit."""
         assert t is PoolT.sns, \
             f"{name}: disk_refs are only supported for pools of 'sns' type"
         disk_refs = pool['disk_refs']
-        assert disk_refs, \
-            f'Pool {name!r}: disk_refs must not be empty' \
-            ' (it can be omitted though)'
-        assert all_unique(repr(x) for x in disk_refs), \
-            f'Pool {name!r}: disk_refs must be unique'
+        # Allowing diskrefs to be empty until the CDF generation is fixed.
+        if disk_refs:
+            assert disk_refs, \
+                f'Pool {name!r}: disk_refs must not be empty' \
+                ' (it can be omitted though)'
+            assert all_unique(repr(x) for x in disk_refs), \
+                f'Pool {name!r}: disk_refs must be unique'
 
     assert PoolT.sns in pool_types, \
         "At least one pool of 'sns' type must be defined"
@@ -409,7 +411,9 @@ def run_command(hostname: str, *args: str) -> str:
 def get_facts(hostname: str, mock_p: bool, *args: str) -> Dict[str, Any]:
     if mock_p:
         return fabricate_facts(hostname, *args)
-    return json.loads(run_command(hostname, 'facter', '--json', *args))
+    result: Dict[str, Any] = json.loads(
+        run_command(hostname, 'facter', '--json', *args))
+    return result
 
 
 def fabricate_facts(hostname: str, *args: str) -> Dict[str, Any]:
@@ -787,7 +791,8 @@ def service_types(proc_t: ProcT,
                        SvcT.M0_CST_SNS_REB,
                        SvcT.M0_CST_ADDB2,
                        SvcT.M0_CST_CAS,
-                       SvcT.M0_CST_ISCS])
+                       SvcT.M0_CST_ISCS,
+                       SvcT.M0_CST_FDMI])
     return ts
 
 

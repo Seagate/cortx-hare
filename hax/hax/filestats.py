@@ -19,12 +19,11 @@
 import datetime
 import logging
 from threading import Event
-from typing import List
 
 from hax.exception import HAConsistencyException, InterruptedException
 from hax.motr import Motr, log_exception
 from hax.types import FsStatsWithTime, StoppableThread
-from hax.util import ConsulUtil, repeat_if_fails
+from hax.util import ConsulUtil, wait_for_event
 
 LOG = logging.getLogger('hax')
 
@@ -44,42 +43,35 @@ class FsStatsUpdater(StoppableThread):
         self.stopped = True
         self.event.set()
 
-    def _sleep(self, interval_sec) -> None:
-        interrupted = self.event.wait(timeout=interval_sec)
-        if interrupted:
-            raise InterruptedException()
-
     @log_exception
     def _execute(self, motr: Motr):
         try:
             ffi = motr._ffi
             LOG.info('filesystem stats updater thread has started')
             ffi.adopt_motr_thread()
-            self._ensure_motr_all_started()
             while not self.stopped:
-                started = self._ioservices_running()
-                if not all(started):
-                    self._sleep(self.interval_sec)
+                if not self._am_i_rc():
+                    wait_for_event(self.event, self.interval_sec)
                     continue
-                result: int = motr.start_rconfc()
-                if result == 0:
-                    stats = motr.get_filesystem_stats()
-                    motr.stop_rconfc()
-                    if not stats:
-                        continue
-                    LOG.debug('FS stats are as follows: %s', stats)
-                    now_time = datetime.datetime.now()
-                    data = FsStatsWithTime(stats=stats,
-                                           timestamp=now_time.timestamp(),
-                                           date=now_time.isoformat())
-                    try:
-                        self.consul.update_fs_stats(data)
-                    except HAConsistencyException:
-                        LOG.debug('Failed to update Consul KV '
-                                  'due to an intermittent error. The '
-                                  'error is swallowed since new attempts '
-                                  'will be made timely')
-                self._sleep(self.interval_sec)
+                if not motr.is_spiel_ready():
+                    wait_for_event(self.event, self.interval_sec)
+                    continue
+                stats = motr.get_filesystem_stats()
+                if not stats:
+                    continue
+                LOG.debug('FS stats are as follows: %s', stats)
+                now_time = datetime.datetime.now()
+                data = FsStatsWithTime(stats=stats,
+                                       timestamp=now_time.timestamp(),
+                                       date=now_time.isoformat())
+                try:
+                    self.consul.update_fs_stats(data)
+                except HAConsistencyException:
+                    LOG.debug('Failed to update Consul KV '
+                              'due to an intermittent error. The '
+                              'error is swallowed since new attempts '
+                              'will be made timely')
+                wait_for_event(self.event, self.interval_sec)
         except InterruptedException:
             # No op. _sleep() has interrupted before the timeout exceeded:
             # the application is shutting down.
@@ -92,18 +84,9 @@ class FsStatsUpdater(StoppableThread):
             ffi.shun_motr_thread()
             LOG.debug('filesystem stats updater thread exited')
 
-    @repeat_if_fails()
-    def _ioservices_running(self) -> List[bool]:
-        statuses = self.consul.get_m0d_statuses()
-        LOG.debug('The following statuses received: %s', statuses)
-        started = ['M0_CONF_HA_PROCESS_STARTED' == v[1] for v in statuses]
-        return started
-
-    @repeat_if_fails()
-    def _ensure_motr_all_started(self):
-        while True:
-            started = self._ioservices_running()
-            if all(started):
-                LOG.debug('According to Consul all confds have been started')
-                return
-            self._sleep(5)
+    def _am_i_rc(self):
+        # The call is already marked with @repeat_if_fails
+        leader = self.consul.get_leader_node()
+        # The call doesn't communicate via Consul REST API
+        this_node = self.consul.get_local_nodename()
+        return leader == this_node

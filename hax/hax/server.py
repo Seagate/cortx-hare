@@ -34,6 +34,7 @@ from hax.message import (BaseMessage, BroadcastHAStates, SnsDiskAttach,
 from hax.motr.delivery import DeliveryHerald
 from hax.queue import BQProcessor
 from hax.queue.offset import InboxFilter, OffsetStorage
+from hax.queue.confobjutil import ConfObjUtil
 from hax.types import Fid, HAState, ServiceHealth, StoppableThread
 from hax.util import ConsulUtil, create_process_fid, dump_json
 
@@ -44,7 +45,7 @@ async def hello_reply(request):
     return json_response(text="I'm alive! Sincerely, HaX")
 
 
-def to_ha_states(data: Any) -> List[HAState]:
+def to_ha_states(data: Any, consul_util: ConsulUtil) -> List[HAState]:
     """Converts a dictionary, obtained from JSON data, into a list of
     HA states.
 
@@ -54,17 +55,29 @@ def to_ha_states(data: Any) -> List[HAState]:
     if not data:
         return []
 
-    def get_status(checks: List[Dict[str, Any]]) -> ServiceHealth:
-        ok = all(x.get('Status') == 'passing' for x in checks)
-        return ServiceHealth.OK if ok else ServiceHealth.FAILED
+    def get_svc_node(checks: List[Dict[str, Any]], svc_id: str) -> str:
+        for x in checks:
+            if x.get('ServiceID') == svc_id:
+                return str(x.get('Node'))
+        return ""
+
+    def get_svc_health(item: Any) -> ServiceHealth:
+        node = get_svc_node(item['Checks'], item['Service']['ID'])
+        LOG.debug('Checking current state of the process %s',
+                  item['Service']['ID'])
+        status: ServiceHealth = consul_util.get_service_health(
+                                               item['Service']['Service'],
+                                               node,
+                                               int(item['Service']['ID']))
+        return status
 
     return [
         HAState(fid=create_process_fid(int(t['Service']['ID'])),
-                status=get_status(t['Checks'])) for t in data
+                status=get_svc_health(t)) for t in data
     ]
 
 
-def process_ha_states(queue: Queue):
+def process_ha_states(queue: Queue, consul_util: ConsulUtil):
     async def _process(request):
         data = await request.json()
 
@@ -72,7 +85,8 @@ def process_ha_states(queue: Queue):
         # Note that queue.put is potentially a blocking call
         await loop.run_in_executor(
             None, lambda: queue.put(
-                BroadcastHAStates(states=to_ha_states(data), reply_to=None)))
+                BroadcastHAStates(states=to_ha_states(data, consul_util),
+                                  reply_to=None)))
         return web.Response()
 
     return _process
@@ -121,7 +135,7 @@ def get_sns_status(motr_queue: Queue,
                    status_type: Union[Type[SnsRepairStatus],
                                       Type[SnsRebalanceStatus]]):
     def fn(request):
-        queue = Queue(1)
+        queue: Queue = Queue(1)
         motr_queue.put(
             status_type(reply_to=queue,
                         fid=Fid.parse(request.query['pool_fid'])))
@@ -201,12 +215,16 @@ def run_server(
     inbox_filter = InboxFilter(
         OffsetStorage(node_address, key_prefix='bq-delivered'))
 
+    conf_obj = ConfObjUtil(consul_util)
+
     app = web.Application(middlewares=[encode_exception])
     app.add_routes([
         web.get('/', hello_reply),
-        web.post('/', process_ha_states(queue)),
-        web.post('/watcher/bq',
-                 process_bq_update(inbox_filter, BQProcessor(queue, herald))),
+        web.post('/', process_ha_states(queue, consul_util)),
+        web.post(
+            '/watcher/bq',
+            process_bq_update(inbox_filter,
+                              BQProcessor(queue, herald, conf_obj))),
         web.post('/api/v1/sns/{operation}', process_sns_operation(queue)),
         web.get('/api/v1/sns/repair-status',
                 get_sns_status(queue, SnsRepairStatus)),

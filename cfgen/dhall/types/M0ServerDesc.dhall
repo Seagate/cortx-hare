@@ -18,14 +18,7 @@
 
 -}
 
-let M0Server = ./M0ServerDesc.dhall
-
-let Node = ./NodeDesc.dhall
-
-let Pool = ./PoolDesc.dhall
-
-in
-{ nodes : List Node
-, pools : List Pool
-, profiles : Optional (List ./PoolsRef.dhall)
+-- m0d process
+{ runs_confd : Optional Bool
+, io_disks : { meta_data : Optional Text, data : List Text }
 }

@@ -1,12 +1,6 @@
-[![Codacy Badge](https://app.codacy.com/project/badge/Grade/0642a6f7d92542e39f2dd68139cd5586)](https://www.codacy.com/gh/Seagate/cortx-hare/dashboard?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=Seagate/cortx-hare&amp;utm_campaign=Badge_Grade) [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/Seagate/cortx-hare/blob/main/LICENSE) [![Slack](https://img.shields.io/badge/chat-on%20Slack-blue")](https://join.slack.com/t/cortxcommunity/shared_invite/zt-femhm3zm-yiCs5V9NBxh89a_709FFXQ?)
+[![Codacy Badge](https://app.codacy.com/project/badge/Grade/0642a6f7d92542e39f2dd68139cd5586)](https://www.codacy.com/gh/Seagate/cortx-hare/dashboard?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=Seagate/cortx-hare&amp;utm_campaign=Badge_Grade) [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/Seagate/cortx-hare/blob/main/LICENSE) [![Slack](https://img.shields.io/badge/chat-on%20Slack-blue")](https://join.slack.com/t/cortxcommunity/shared_invite/zt-femhm3zm-yiCs5V9NBxh89a_709FFXQ?) [![YouTube](https://img.shields.io/badge/Video-YouTube-red)](https://cortx.link/videos)
 
 # Hare User Guide
-
-## Welcome
-
-Hare is an experiment in
-[Social Architecture](https://www.youtube.com/watch?v=uj-li0LO_2g),
-disguised as a software project.
 
 ## What Hare does?
 
@@ -62,7 +56,7 @@ and health-checking mechanisms.
   ```sh
   sudo yum -y install yum-utils
   sudo yum-config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo
-  sudo yum -y install consul-1.7.8
+  sudo yum -y install consul-1.9.1
   ```
 
 * Install Motr.
@@ -95,6 +89,35 @@ and health-checking mechanisms.
   sudo usermod --append --groups hare $USER
   ```
   Log out and log back in.
+
+
+### Build and install `hare` rpm from source.
+
+* Install Motr.
+
+  * .. from RPMS
+    ```sh
+    sudo yum -y install cortx-motr cortx-motr-devel
+    ```
+
+  * .. or from sources
+    ```sh
+    git clone --recursive https://github.com/Seagate/cortx-motr.git motr
+    cd motr
+
+    scripts/m0 make rpms
+    sudo rpm -ivh ~/rpmbuild/RPMS/x86_64/cortx-motr-*.rpm
+    ```
+
+* Build `hare` rpm.
+
+  Download hare source as mentioned above.
+  ```sh
+  cd hare
+
+  make rpm
+  sudo rpm -ivh ~/rpmbuild/RPMS/x86_64/cortx-hare-*.rpm
+  ```
 
 
 <!------------------------------------------------------------------->
@@ -189,6 +212,12 @@ You will probably need to modify `host`, `data_iface`, and `io_disks` values.
   dd if=/dev/urandom of=/tmp/128M bs=1M count=128
   sudo m0crate -S /tmp/m0crate-io.yaml
   ```
+  Please note that m0crate will run as shown above when it will be
+  available in default system PATH which will be the case when
+  setup is created using RPMs. If its created by building Motr
+  source code, then m0crate utility can be run using full path from
+  the motr source directory (say MOTR_SRC).
+  ./MOTR_SRC/motr/m0crate/m0crate
 
 * Stop the cluster.
   ```sh

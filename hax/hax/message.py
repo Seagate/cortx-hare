@@ -40,6 +40,17 @@ class EntrypointRequest(BaseMessage):
 
 
 @dataclass
+class FirstEntrypointRequest(BaseMessage):
+    reply_context: Any
+    req_id: Uint128
+    remote_rpc_endpoint: str
+    process_fid: Fid
+    git_rev: str
+    pid: int
+    is_first_request: bool
+
+
+@dataclass
 class ProcessEvent(BaseMessage):
     evt: Any
 

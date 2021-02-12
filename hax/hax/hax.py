@@ -19,42 +19,32 @@
 #
 
 import logging
-import sys
 from queue import Queue
-from typing import NamedTuple
+from typing import List, NamedTuple
 
 from hax.filestats import FsStatsUpdater
 from hax.handler import ConsumerThread
+from hax.log import setup_logging
 from hax.motr import Motr
 from hax.motr.delivery import DeliveryHerald
 from hax.motr.ffi import HaxFFI
+from hax.motr.rconfc import RconfcStarter
 from hax.server import run_server
-from hax.types import Fid
+from hax.types import Fid, Profile
 from hax.util import ConsulUtil, repeat_if_fails
 
 __all__ = ['main']
 
 HL_Fids = NamedTuple('HL_Fids', [('hax_ep', str), ('hax_fid', Fid),
-                                 ('ha_fid', Fid), ('rm_fid', Fid)])
+                                 ('ha_fid', Fid), ('rm_fid', Fid),
+                                 ('profiles', List[Profile])])
 
 LOG = logging.getLogger('hax')
 
 
-def _setup_logging():
-    hax_logger = LOG
-    hax_logger.setLevel(logging.DEBUG)
-
-    formatter = logging.Formatter(
-        '%(asctime)s [%(levelname)s] {%(threadName)s} %(message)s')
-    console = logging.StreamHandler(sys.stdout)
-    console.setFormatter(formatter)
-
-    logging.getLogger('').addHandler(console)
-    logging.getLogger('consul').setLevel(logging.WARN)
-
-
-def _run_qconsumer_thread(queue: Queue, motr: Motr) -> ConsumerThread:
-    thread = ConsumerThread(queue, motr)
+def _run_qconsumer_thread(queue: Queue, motr: Motr, herald: DeliveryHerald,
+                          consul: ConsulUtil) -> ConsumerThread:
+    thread = ConsumerThread(queue, motr, herald, consul)
     thread.start()
     return thread
 
@@ -72,13 +62,24 @@ def _get_motr_fids(util: ConsulUtil) -> HL_Fids:
     hax_fid: Fid = util.get_hax_fid()
     ha_fid: Fid = util.get_ha_fid()
     rm_fid: Fid = util.get_rm_fid()
-    return HL_Fids(hax_ep, hax_fid, ha_fid, rm_fid)
+    profiles = util.get_profiles()
+    if not profiles:
+        raise RuntimeError('Configuration error: no profile '
+                           'is found in Consul KV')
+    return HL_Fids(hax_ep, hax_fid, ha_fid, rm_fid, profiles)
+
+
+def _run_rconfc_starter_thread(motr: Motr,
+                               consul_util: ConsulUtil) -> RconfcStarter:
+    rconfc_starter = RconfcStarter(motr, consul_util)
+    rconfc_starter.start()
+    return rconfc_starter
 
 
 def main():
     # Note: no logging must happen before this call.
     # Otherwise the log configuration will not apply.
-    _setup_logging()
+    setup_logging()
 
     # [KN] The elements in the queue will appear if
     # 1. A callback is invoked from ha_link (this will happen in a motr
@@ -88,10 +89,10 @@ def main():
     # _run_qconsumer_thread function.
     #
     # [KN] Note: The server is launched in the main thread.
-    q = Queue(maxsize=8)
+    q: Queue = Queue(maxsize=8)
 
     util: ConsulUtil = ConsulUtil()
-    cfg = _get_motr_fids(util)
+    cfg: HL_Fids = _get_motr_fids(util)
 
     LOG.info('Welcome to HaX')
     LOG.info(f'Setting up ha_link interface with the options as follows: '
@@ -100,25 +101,34 @@ def main():
 
     ffi = HaxFFI()
     herald = DeliveryHerald()
-    motr = Motr(queue=q, rm_fid=cfg.rm_fid, ffi=ffi, herald=herald,
+    motr = Motr(queue=q,
+                rm_fid=cfg.rm_fid,
+                ffi=ffi,
+                herald=herald,
                 consul_util=util)
 
     # Note that consumer thread must be started before we invoke motr.start(..)
     # Reason: hax process will send entrypoint request and somebody needs
     # to reply it.
-    consumer = _run_qconsumer_thread(q, motr)
+    consumer = _run_qconsumer_thread(q, motr, herald, util)
 
     try:
+        # [KN] We use just the first profile for Spiel API for now.
         motr.start(cfg.hax_ep,
                    process=cfg.hax_fid,
                    ha_service=cfg.ha_fid,
-                   rm_service=cfg.rm_fid)
+                   rm_service=cfg.rm_fid,
+                   profile=cfg.profiles[0])
         LOG.info('Motr API has been started')
+        rconfc_starter = _run_rconfc_starter_thread(motr, consul_util=util)
+
         stats_updater = _run_stats_updater_thread(motr, consul_util=util)
         # [KN] This is a blocking call. It will work until the program is
         # terminated by signal
-        run_server(q, herald, consul_util=util,
-                   threads_to_wait=[consumer, stats_updater])
+        run_server(q,
+                   herald,
+                   consul_util=util,
+                   threads_to_wait=[consumer, stats_updater, rconfc_starter])
     except Exception:
         LOG.exception('Exiting due to an exception')
     finally:

@@ -6,9 +6,5 @@ setuptools
 wheel
 
 #:runtime-requirements:
-idna<3,>=2.5
-aiohttp
-click
+setuptools
 dataclasses
-python-consul
-simplejson

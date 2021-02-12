@@ -22,8 +22,10 @@ import os
 import re
 from base64 import b64encode
 from functools import wraps
-from time import sleep
 from typing import Any, Dict, List, NamedTuple, Optional, Tuple
+from hax.log import TRACE
+from threading import Event
+from time import sleep
 
 import simplejson
 from consul import Consul, ConsulException
@@ -31,8 +33,9 @@ from consul.base import ClientError
 from requests.exceptions import RequestException
 from urllib3.exceptions import HTTPError
 
-from hax.exception import HAConsistencyException
-from hax.types import ConfHaProcess, Fid, FsStatsWithTime, ObjT
+from hax.exception import HAConsistencyException, InterruptedException
+from hax.types import (ConfHaProcess, Fid, FsStatsWithTime,
+                       ObjT, ServiceHealth, Profile)
 
 __all__ = ['ConsulUtil', 'create_process_fid', 'create_service_fid',
            'create_sdev_fid', 'create_drive_fid']
@@ -112,22 +115,18 @@ def repeat_if_fails(wait_seconds=5, max_retries=-1):
             attempt_count = 0
             while (True):
                 try:
-                    LOG.debug('Attempting to invoke the repeatable call: %s',
-                              f.__name__)
-                    result = f(*args, **kwds)
-                    LOG.debug('The repeatable call succeeded: %s', f.__name__)
-                    return result
+                    return f(*args, **kwds)
                 except HAConsistencyException as e:
                     attempt_count += 1
                     if max_retries >= 0 and attempt_count > max_retries:
                         LOG.warn(
-                            'Too many errors happened in a row '
-                            '(max_retries = %d)', max_retries)
+                            'Function %s: Too many errors happened in a row '
+                            '(max_retries = %d)', f.__name__, max_retries)
                         raise e
-                    LOG.warn(
-                        f'Got HAConsistencyException: {e.message} '
-                        f'(attempt {attempt_count}). The'
-                        f' attempt will be repeated in {wait_seconds} seconds')
+                    LOG.warn(f'Got HAConsistencyException: {e.message} while '
+                             f'invoking function {f.__name__} '
+                             f'(attempt {attempt_count}). The attempt will be '
+                             f'repeated in {wait_seconds} seconds')
                     sleep(wait_seconds)
 
         return wrapper
@@ -137,6 +136,16 @@ def repeat_if_fails(wait_seconds=5, max_retries=-1):
 
 TxPutKV = NamedTuple('TxPutKV', [('key', str), ('value', str),
                                  ('cas', Optional[Any])])
+
+
+def wait_for_event(event: Event, interval_sec) -> None:
+    """
+    Caller sleeps until the @event happens or the wait timesout after
+    @interval_sec.
+    """
+    interrupted = event.wait(timeout=interval_sec)
+    if interrupted:
+        raise InterruptedException()
 
 
 class ConsulKVBasic:
@@ -230,6 +239,11 @@ class ConsulUtil:
             f'No {svc_name!r} Consul service found at node {hostname!r}')
 
     def get_local_nodename(self) -> str:
+        """
+        Returns the logical name of the current node. This is the name that
+        Consul is aware of. In other words, whenever Consul references a node,
+        it will use the names that this function can return.
+        """
         try:
             local_nodename = os.environ.get('HARE_HAX_NODE_NAME') or \
                 self.cns.agent.self()['Config']['NodeName']
@@ -281,6 +295,18 @@ class ConsulUtil:
         return self._service_data().ip_addr
 
     @repeat_if_fails()
+    def get_leader_node(self) -> str:
+        """
+        Returns the node name of RC leader.
+        Note: in case when RC leader is not elected yet, the node name may be
+        just a randomly generated string (see hare-node-join script for
+        more details).
+        """
+        leader = self.kv.kv_get('leader')
+        node: bytes = leader['Value']
+        return node.decode('utf-8')
+
+    @repeat_if_fails()
     def get_leader_session(self) -> str:
         """
         Blocking version of `get_leader_session_no_wait()`.
@@ -305,38 +331,38 @@ class ConsulUtil:
         try:
             session = self.cns.session.info(session_id)[1]
             return str(session['Node'])  # principal RM
-        except ConsulException as e:
+        except (ConsulException, HTTPError, RequestException) as e:
             raise HAConsistencyException('Failed to communicate to'
                                          ' Consul Agent') from e
+
+    def get_svc_status(self, srv_fid: Fid) -> str:
+        try:
+            key = f'processes/{srv_fid}'
+            raw_data = self.kv.kv_get(key)
+            LOG.log(TRACE, 'Raw value from KV: %s', raw_data)
+            data = raw_data['Value']
+            value: str = json.loads(data)['state']
+            return value
+        except Exception:
+            return 'Unknown'
 
     def get_m0d_statuses(self) -> List[Tuple[ServiceData, str]]:
         """
         Return the list of all Motr service statuses according to Consul
         watchers. The following services are considered: ios, confd.
         """
-        def get_status(srv: ServiceData) -> str:
-            try:
-                key = f'processes/{srv.fid}'
-                raw_data = self.kv.kv_get(key)
-                LOG.debug('Raw value from KV: %s', raw_data)
-                data = raw_data['Value']
-                value: str = json.loads(data)['state']
-                return value
-            except Exception:
-                return 'Unknown'
-
         m0d_services = set(['ios', 'confd'])
         result = []
         for service_name in self._catalog_service_names():
             if service_name not in m0d_services:
                 continue
             data = self.get_service_data_by_name(service_name)
-            result += [(item, get_status(item)) for item in data]
+            result += [(item, self.get_svc_status(item.fid)) for item in data]
         return result
 
     def get_service_data_by_name(self, name: str) -> List[ServiceData]:
         services = self._catalog_service_get(name)
-        LOG.debug('Services "%s" received: %s', name, services)
+        LOG.log(TRACE, 'Services "%s" received: %s', name, services)
         return list(map(mkServiceData, services))
 
     def get_confd_list(self) -> List[ServiceData]:
@@ -373,6 +399,33 @@ class ConsulUtil:
         return services
 
     @repeat_if_fails()
+    def is_proc_client(self, process_fid: Fid) -> bool:
+        node_items = self.kv.kv_get('m0conf/nodes', recurse=True)
+        fidk = str(process_fid.key)
+
+        # This is the RegExp to match the keys in Consul KV that describe
+        # the Motr services that are enclosed into the Motr process that has
+        # the given fidk.
+        # We filter out motr client entries to check if the given process fid
+        # corresponds to a motr client or server process.
+        #
+        # Note: we assume that fidk uniquely identifies the given process
+        # within the whole cluster (that's why we are not interested in the
+        # hostnames here).
+        #
+        # Examples of the key that will match:
+        #   m0conf/nodes/srvnode-1/processes/39/services/m0_client_s3
+        regex = re.compile(
+            f'^m0conf\\/.*\\/processes\\/{fidk}\\/services\\/(.+)$')
+        for node in node_items:
+            match_result = re.match(regex, node['Key'])
+            if not match_result:
+                continue
+            srv_type = match_result.group(1)
+            if 'm0_client' in srv_type:
+                return True
+        return False
+
     def get_conf_obj_status(self, obj_t: ObjT, fidk: int) -> str:
         # 'node/<node_name>/process/<process_fidk>/service/type'
         node_items = self.kv.kv_get('m0conf/nodes', recurse=True)
@@ -500,6 +553,24 @@ class ConsulUtil:
                     break
         return self.sdev_to_drive_fid(sdev_fid)
 
+    def get_process_status(self, event: ConfHaProcess) -> None:
+        assert 0 <= event.chp_event < len(ha_process_events), \
+            f'Invalid event type: {event.chp_event}'
+
+        data = json.dumps({'state': ha_process_events[event.chp_event]})
+        key = f'processes/{event.fid}'
+        LOG.debug('Setting process status in KV: %s:%s', key, data)
+        self.kv.kv_put(key, data)
+
+    def drive_name_to_id(self, uid: str) -> str:
+        drive_id = ''
+        # 'm0conf/nodes/<node_name>/processes/<process_fidk>/disks/<disk_uuid>'
+        node_items = self.kv.kv_get('m0conf/nodes', recurse=True)
+        for x in node_items:
+            if '/disks/' in x['Key'] and uid in x['Key']:
+                drive_id = x['Value']
+        return drive_id
+
     def set_m0_disk_state(self, fid: str, objstate: int) -> None:
         assert 0 <= objstate < len(ha_conf_obj_states), \
             f'Invalid object state: {objstate}'
@@ -508,6 +579,61 @@ class ConsulUtil:
         key = f'process/{fid}'
         LOG.debug('Setting disk state in KV: %s:%s', key, data)
         self.kv.kv_put(key, data)
+
+    @repeat_if_fails()
+    def get_service_health(self, service_name: str,
+                           node: str, svc_id: int) -> ServiceHealth:
+
+        try:
+            node_data: List[Dict[str, Any]] = self.cns.health.node(node)[1]
+            LOG.debug('Node Data: %s', node_data)
+            status = ServiceHealth.UNKNOWN
+            for item in node_data:
+                if (item['ServiceName'] == service_name and
+                        item['ServiceID'] == str(svc_id)):
+                    if item['Status'] == 'passing':
+                        status = ServiceHealth.OK
+                    elif item['Status'] == 'warning':
+                        fid = create_process_fid(svc_id)
+                        svc_consul_status = self.get_svc_status(fid)
+                        if svc_consul_status in ('M0_CONF_HA_PROCESS_STARTING',
+                                                 'M0_CONF_HA_PROCESS_STARTED'):
+                            status = ServiceHealth.OK
+                    else:
+                        status = ServiceHealth.FAILED
+        except (ConsulException, HTTPError, RequestException) as e:
+            raise HAConsistencyException('Failed to communicate '
+                                         'to Consul Agent') from e
+        return status
+
+    def get_profiles(self) -> List[Profile]:
+        def to_profile(k: str, v: Dict[str, Any]) -> Profile:
+            return Profile(fid=Fid.parse(k),
+                           name=v['name'],
+                           pool_names=v['pools'])
+
+        result: List[Profile] = []
+        for x in self.kv.kv_get('m0conf/profiles/', recurse=True):
+            fidstr = x['Key'].split('/')[-1]
+            payload = simplejson.loads(x['Value'])
+            result.append(to_profile(fidstr, payload))
+        return result
+
+    @repeat_if_fails()
+    def ensure_ioservices_running(self) -> List[bool]:
+        statuses = self.get_m0d_statuses()
+        LOG.debug('The following statuses received: %s', statuses)
+        started = ['M0_CONF_HA_PROCESS_STARTED' == v[1] for v in statuses]
+        return started
+
+    @repeat_if_fails()
+    def ensure_motr_all_started(self, event: Event):
+        while True:
+            started = self.ensure_ioservices_running()
+            if all(started):
+                LOG.debug('According to Consul all confds have been started')
+                return
+            wait_for_event(event, 5)
 
 
 def dump_json(obj) -> str:

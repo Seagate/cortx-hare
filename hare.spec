@@ -45,7 +45,7 @@ BuildRequires: python36-devel
 BuildRequires: python36-pip
 BuildRequires: python36-setuptools
 
-Requires: consul = 1.7.8
+Requires: consul = 1.9.1
 Requires: facter
 Requires: jq
 Requires: cortx-motr = %{h_motr_version}
@@ -66,6 +66,8 @@ make %{?_smp_mflags}
 rm -rf %{buildroot}
 make install DESTDIR=%{buildroot}
 sed -i -e 's@^#!.*\.py3venv@#!/usr@' %{buildroot}/opt/seagate/cortx/hare/bin/*
+sed -i "7i sys.path.insert(1, '/opt/seagate/cortx/hare/lib64/python3.6/site-packages')" %{buildroot}/opt/seagate/cortx/hare/bin/hare_setup
+sed -i "8i sys.path.insert(2, '/opt/seagate/cortx/hare/lib/python3.6/site-packages')" %{buildroot}/opt/seagate/cortx/hare/bin/hare_setup
 
 %clean
 rm -rf %{buildroot}
