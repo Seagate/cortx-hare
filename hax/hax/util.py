@@ -209,8 +209,8 @@ class ConsulKVBasic:
 
 
 class ConsulUtil:
-    def __init__(self):
-        self.cns: Consul = Consul()
+    def __init__(self, raw_client: Optional[Consul] = None):
+        self.cns: Consul = raw_client or Consul()
         self.kv = ConsulKVBasic(cns=self.cns)
 
     def _catalog_service_names(self) -> List[str]:
