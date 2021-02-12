@@ -32,7 +32,6 @@ export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
 : ${SSC_AUTH:=}
 : ${VERBOSE:=false}
 : ${SSC_URL:=https://ssc-cloud.colo.seagate.com}
-: ${WAIT_TIMEOUT:=5}  # How many minutes to wait for a VM to start or stop.
 
 die() {
     >&2 echo "[${BASH_LINENO[0]}:${FUNCNAME[1]}] $@"
@@ -59,20 +58,35 @@ validate_args() {
         die 'Cannot communicate with CloudForms Management Engine'
 }
 
+# Wait till the certain condition (state transition or task completion) is met, 
+# or timeout occurs.
+# Currently power state (on/off) and snapshot task progress is checked.
+# It takes inputs,
+# vm_id         id of VM 
+# wait_timeout  minutes to wait for state or task before timeout
+# state         power state or task whose progress needs to checked  
 wait_till() {
     local vm_id=$1
-    local state=$2
+    local wait_timeout=$2
+    local state=$3
+    local interval=30
+    local nr_steps=$((wait_timeout*60 / interval))
 
-    local interval=5  # seconds
-    local nr_steps=$((WAIT_TIMEOUT*60 / interval))
     while true; do
         sleep $interval
         echo -n '.'
         ((--nr_steps > 0)) || die 'Timed out'
 
-        if [[ $(vm_power_state $vm_id) == $state ]]; then
-            echo  # add a newline after all those dots
-            return
+        if [[ $state == "on" || $state == "off" ]]; then
+            if [[ $(vm_power_state $vm_id) == $state ]]; then
+                echo  # add a newline after all those dots
+                return
+            fi
+        else
+            if [[ $(vm_task_state $state) == "Finished" ]]; then
+                echo  # add a newline after all those dots                
+                return
+            fi
         fi
     done
 }
@@ -114,7 +128,12 @@ vm_power_state_set() {
     [[ $(jq '.success' <<< "$resp") == true ]] ||
         die 'VM $action request failed'
 
-    wait_till $vm_id $state
+    wait_till $vm_id 15 $state
+}
+
+vm_task_state() {
+    local task_id=$1
+    _curl /api/tasks/$task_id | jq -r '.state'
 }
 
 vm_snapshot_revert() {
@@ -128,7 +147,11 @@ vm_snapshot_revert() {
           )
     >&2 jq -r '.message' <<< "$resp"
     [[ $(jq '.success' <<< "$resp") == true ]] || die 'Cannot revert snapshot'
-    sleep 120  # XXX Can we do better?
+    
+    local snapshot_task_id
+    snapshot_task_id=$(jq -r '.task_id' <<< "$resp")
+
+    wait_till $vm_id 5 $snapshot_task_id   
 }
 
 main() {
