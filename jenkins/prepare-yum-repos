@@ -27,7 +27,7 @@ STORAGE='http://cortx-storage.colo.seagate.com'
 
 cat <<EOF > /etc/yum.repos.d/motr_last_successful.repo
 [motr-dev]
-baseurl=$STORAGE/releases/eos/github/release/rhel-7.7.1908/last_successful/
+baseurl=$STORAGE/releases/cortx/github/main/centos-7.8.2003/last_successful/
 gpgcheck=0
 name=motr-dev
 enabled=1
@@ -35,7 +35,7 @@ EOF
 
 cat <<EOF > /etc/yum.repos.d/lustre_release.repo
 [lustre]
-baseurl=$STORAGE/releases/cortx/uploads/rhel/rhel-7.7.1908/lustre/lustre-2.12.3/
+baseurl=$STORAGE/releases/cortx/third-party-deps/centos/centos-7.8.2003-2.0.0-latest/lustre/custom/tcp/
 gpgcheck=0
 name=lustre
 enabled=1
