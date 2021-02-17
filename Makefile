@@ -69,7 +69,7 @@ DHALL_PRELUDE_URL     := https://github.com/dhall-lang/dhall-lang/archive/v$(DHA
 #
 
 .PHONY: build
-build: hax
+build: hax miniprov
 	@$(MAKE) --quiet check
 
 .PHONY: hax
@@ -82,13 +82,23 @@ $(HAX_WHL): $(PY_VENV_DIR) $(HAX_SRC)
 	@$(call _info,Building hax .whl package)
 	@cd hax && $(SETUP_PY) bdist_wheel
 
-$(PY_VENV_DIR): $(patsubst %,%/requirements.txt,cfgen hax)
+.PHONY: miniprov
+MP_VERSION := $(shell cat VERSION)
+MP_WHL      := provisioning/miniprov/dist/hare_mp-$(MP_VERSION)-py3-none-any.whl
+miniprov: $(MP_WHL)
+
+MP_SRC := $(wildcard provisioning/miniprov/setup.py provisioning/miniprov/hare_mp/*.py provisioning/miniprov/hare_mp/dhall/*.dhall)
+$(MP_WHL): $(PY_VENV_DIR) $(HAX_SRC)
+	@$(call _info,Building miniprov .whl package)
+	@cd provisioning/miniprov && $(SETUP_PY) bdist_wheel
+
+$(PY_VENV_DIR): $(patsubst %,%/requirements.txt,cfgen hax provisioning/miniprov)
 	@$(call _info,Initializing virtual env in $(PY_VENV_DIR))
-	@$(PYTHON) -m venv $@
+	@$(PYTHON) -m venv --system-site-packages $@
 	@$(call _info,Installing pip modules in virtual env)
 	@for f in $^; do \
 	     $(call _log,processing $$f); \
-	     $(PIP) install -r $$f; \
+	     $(PIP) install --ignore-installed -r $$f; \
 	 done
 
 # Clean ----------------------------------------------- {{{1
@@ -108,7 +118,7 @@ distclean: clean
 	 fi
 
 .PHONY: clean
-clean: clean-hax clean-mypy clean-dhall-prelude
+clean: clean-hax clean-mypy clean-dhall-prelude clean-miniprov
 
 .PHONY: clean-hax
 clean-hax:
@@ -134,6 +144,9 @@ clean-mypy:
 clean-dhall-prelude:
 	$(MAKE) --quiet -C cfgen clean-dhall-prelude
 
+.PHONY: clean-miniprov
+clean-miniprov:
+	$(MAKE) --quiet -C provisioning/miniprov clean
 # Install --------------------------------------------- {{{1
 #
 
@@ -147,7 +160,9 @@ HARE_CONF_LOG      = $(DESTDIR)/$(PREFIX)/conf/logrotate
 HARE_LIBEXEC       = $(DESTDIR)/$(PREFIX)/libexec
 HARE_RULES         = $(DESTDIR)/$(PREFIX)/rules
 HAX_EXE            = $(DESTDIR)/$(PREFIX)/bin/hax
+MP_EXE       	   = $(DESTDIR)/$(PREFIX)/bin/hare_setup
 HAX_EGG_LINK       = $(DESTDIR)/$(PREFIX)/lib/python3.$(PY3_VERSION_MINOR)/site-packages/hax.egg-link
+MP_EGG_LINK        = $(DESTDIR)/$(PREFIX)/lib/python3.$(PY3_VERSION_MINOR)/site-packages/hare_mp.egg-link
 SYSTEMD_CONFIG_DIR = $(DESTDIR)/usr/lib/systemd/system
 LOGROTATE_CONF_DIR = $(DESTDIR)/etc/logrotate.d
 ETC_CRON_DIR       = $(DESTDIR)/etc/cron.hourly
@@ -207,7 +222,7 @@ unpack-dhall-prelude: fetch-dhall-prelude
 
 # install {{{2
 .PHONY: install
-install: install-dirs install-cfgen install-hax install-systemd install-vendor install-provisioning
+install: install-dirs install-cfgen install-hax install-miniprov install-systemd install-vendor install-provisioning
 	@$(call _info,Installing hare utils)
 	@for f in utils/*; do \
 	     $(call _log,copying $$f -> $(HARE_LIBEXEC)); \
@@ -290,6 +305,14 @@ $(HAX_EGG_LINK) $(HAX_EXE): $(HAX_WHL)
 	@$(call _info,Installing hax with '$(HAX_INSTALL_CMD)')
 	@cd hax && $(HAX_INSTALL_CMD)
 
+.PHONY: install-miniprov
+install-miniprov: MP_INSTALL_CMD = $(PIP) install --ignore-installed --prefix $(DESTDIR)/$(PREFIX) $(MP_WHL)
+install-miniprov: $(MP_EXE)
+
+$(MP_EGG_LINK) $(MP_EXE): $(MP_WHL)
+	@$(call _info,Installing miniprov with '$(MP_INSTALL_CMD)')
+	@$(MP_INSTALL_CMD)
+
 .PHONY: install-vendor
 install-vendor:
 	@$(call _info,Installing Dhall)
@@ -313,7 +336,7 @@ install-provisioning:
 
 # devinstall {{{2
 .PHONY: devinstall
-devinstall: install-dirs devinstall-cfgen devinstall-hax devinstall-systemd devinstall-vendor devinstall-provisioning
+devinstall: install-dirs devinstall-cfgen devinstall-hax devinstall-miniprov devinstall-systemd devinstall-vendor devinstall-provisioning
 	@$(call _info,linking hare utils)
 	@for f in utils/*; do \
 	     $(call _log,linking $$f -> $(HARE_LIBEXEC)); \
@@ -376,6 +399,14 @@ devinstall-hax: hax/requirements.txt $(HAX_EGG_LINK)
 	@$(PIP) install --ignore-installed --prefix $(DESTDIR)/$(PREFIX) \
 					--requirement <(sed -ne '/^#:runtime-requirements:/,$$p' $<)
 
+.PHONY: devinstall-miniprov
+devinstall-miniprov: MP_INSTALL_CMD = $(SETUP_PY) develop --prefix $(DESTDIR)/$(PREFIX)
+devinstall-miniprov: export PYTHONPATH = $(DESTDIR)/$(PREFIX)/lib/python3.$(PY3_VERSION_MINOR)/site-packages
+devinstall-miniprov: provisioning/miniprov/requirements.txt $(HAX_EGG_LINK)
+	@$(call _info,Installing miniprov development dependencies)
+	@$(PIP) install --ignore-installed --prefix $(DESTDIR)/$(PREFIX) \
+					--requirement <(sed -ne '/^#:runtime-requirements:/,$$p' $<)
+
 .PHONY: devinstall-vendor
 devinstall-vendor:
 	@$(call _info,Installing Dhall)
@@ -427,7 +458,7 @@ uninstall:
 # Linters --------------------------------------------- {{{1
 #
 
-PYTHON_SCRIPTS := utils/hare-shutdown utils/hare-status utils/gen-uuid
+PYTHON_SCRIPTS := utils/hare-shutdown utils/hare-status utils/gen-uuid utils/utils.py
 
 .PHONY: check
 check: check-cfgen check-hax flake8 mypy
@@ -454,7 +485,7 @@ override MYPY_OPTS := --config-file hax/mypy.ini $(MYPY_OPTS)
 mypy: $(PYTHON_SCRIPTS)
 	@$(call _info,Checking files with mypy)
 	@$(PY_VENV); \
-	  set -eu -o pipefail; for f in $^; do MYPYPATH=stubs:hax mypy $(MYPY_OPTS) $$f; done
+          set -eu -o pipefail; for f in $^; do MYPYPATH=stubs:hax:utils mypy $(MYPY_OPTS) $$f; done
 
 # Tests ----------------------------------------------- {{{1
 #

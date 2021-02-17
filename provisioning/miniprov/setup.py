@@ -1,5 +1,3 @@
-#!/usr/bin/env bash
-#
 # Copyright (c) 2020 Seagate Technology LLC and/or its Affiliates
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,31 +14,31 @@
 #
 # For any questions about this software or licensing,
 # please email opensource@seagate.com or cortx-questions@seagate.com.
+#
 
-set -e -o pipefail
-# set -x
-export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
+import os
+import os.path as P
 
-export
+import pkgconfig
+from setuptools import find_packages, setup
 
-STORAGE='http://cortx-storage.colo.seagate.com'
 
-cat <<EOF > /etc/yum.repos.d/motr_last_successful.repo
-[motr-dev]
-baseurl=$STORAGE/releases/cortx/github/main/centos-7.8.2003/last_successful/
-gpgcheck=0
-name=motr-dev
-enabled=1
-EOF
+def read(fname):
+    return open(P.join(P.dirname(__file__), fname)).read().rstrip('\n')
 
-cat <<EOF > /etc/yum.repos.d/lustre_release.repo
-[lustre]
-baseurl=$STORAGE/releases/cortx/third-party-deps/centos/centos-7.8.2003-2.0.0-latest/lustre/custom/tcp/
-gpgcheck=0
-name=lustre
-enabled=1
-EOF
 
-# Hashicorp Consul repo
-yum -y install yum-utils
-yum-config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo
+def get_mini_prov_version():
+    v = os.environ.get('HAX_VERSION')
+    if v:
+        return v
+    else:
+        return read('../../VERSION')
+
+
+setup(name='hare_mp',
+      version=get_mini_prov_version(),
+      packages=find_packages(),
+      setup_requires=['flake8', 'mypy', 'pkgconfig'],
+      install_requires=['setuptools', 'dataclasses'],
+      package_data={'': ['*.dhall']},
+      entry_points={'console_scripts': ['hare_setup=hare_mp.main:main']})

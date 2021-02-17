@@ -1,5 +1,3 @@
-#!/usr/bin/env bash
-#
 # Copyright (c) 2020 Seagate Technology LLC and/or its Affiliates
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,31 +14,30 @@
 #
 # For any questions about this software or licensing,
 # please email opensource@seagate.com or cortx-questions@seagate.com.
+#
 
-set -e -o pipefail
-# set -x
-export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
+# Setup utility for Hare to configure Hare related settings, e.g. logrotate,
+# report unsupported features, etc.
 
-export
+from typing import Any
 
-STORAGE='http://cortx-storage.colo.seagate.com'
+from cortx.utils.conf_store import ConfStore
 
-cat <<EOF > /etc/yum.repos.d/motr_last_successful.repo
-[motr-dev]
-baseurl=$STORAGE/releases/cortx/github/main/centos-7.8.2003/last_successful/
-gpgcheck=0
-name=motr-dev
-enabled=1
-EOF
 
-cat <<EOF > /etc/yum.repos.d/lustre_release.repo
-[lustre]
-baseurl=$STORAGE/releases/cortx/third-party-deps/centos/centos-7.8.2003-2.0.0-latest/lustre/custom/tcp/
-gpgcheck=0
-name=lustre
-enabled=1
-EOF
+class ValueProvider:
+    def get(self, key: str) -> Any:
+        return self._raw_get(key)
 
-# Hashicorp Consul repo
-yum -y install yum-utils
-yum-config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo
+    def _raw_get(self, key: str) -> str:
+        raise NotImplementedError()
+
+
+class ConfStoreProvider(ValueProvider):
+    def __init__(self, url: str):
+        self.url = url
+        conf = ConfStore()
+        conf.load('hare', url)
+        self.conf = conf
+
+    def _raw_get(self, key: str) -> str:
+        return self.conf.get('hare', key)

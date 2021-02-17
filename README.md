@@ -56,7 +56,7 @@ and health-checking mechanisms.
   ```sh
   sudo yum -y install yum-utils
   sudo yum-config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo
-  sudo yum -y install consul-1.7.8
+  sudo yum -y install consul-1.9.1
   ```
 
 * Install Motr.
@@ -89,6 +89,35 @@ and health-checking mechanisms.
   sudo usermod --append --groups hare $USER
   ```
   Log out and log back in.
+
+
+### Build and install `hare` rpm from source.
+
+* Install Motr.
+
+  * .. from RPMS
+    ```sh
+    sudo yum -y install cortx-motr cortx-motr-devel
+    ```
+
+  * .. or from sources
+    ```sh
+    git clone --recursive https://github.com/Seagate/cortx-motr.git motr
+    cd motr
+
+    scripts/m0 make rpms
+    sudo rpm -ivh ~/rpmbuild/RPMS/x86_64/cortx-motr-*.rpm
+    ```
+
+* Build `hare` rpm.
+
+  Download hare source as mentioned above.
+  ```sh
+  cd hare
+
+  make rpm
+  sudo rpm -ivh ~/rpmbuild/RPMS/x86_64/cortx-hare-*.rpm
+  ```
 
 
 <!------------------------------------------------------------------->
