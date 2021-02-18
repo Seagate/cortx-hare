@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+#
+# Copyright (c) 2020 Seagate Technology LLC and/or its Affiliates
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# For any questions about this software or licensing,
+# please email opensource@seagate.com or cortx-questions@seagate.com.
+
+set -eu -o pipefail
+# set -x
+export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
+
+PROG=${0##*/}
+
+. hare-utils # import utility functions
+
+die() {
+    echo "$PROG: $*" >&2
+    exit 1
+}
+
+say() {
+    echo -n "$(date '+%F %T'): $*"
+}
+
+is_server_node() {
+    get_server_nodes | grep -w $(node-name) > /dev/null
+}
+
+if sudo systemctl --quiet is-active hare-consul-agent; then
+    die 'hare-consul-agent is active ==> cluster is already running'
+fi
+
+say 'Starting Consul agent on this node...'
+sudo systemctl start hare-consul-agent
+
+# Wait for Consul's internal leader to be ready.
+# (Until then the KV store won't be accessible.)
+# Here we are checking if any of the peer nodes is already elected as the
+# leader. 
+while [[ ! $(get_leader) ]]; do
+    sleep 1
+    echo -n '.'
+done
+echo ' OK'
+
+if is_server_node; then
+    # Starting phase 1 (confd servers)
+    start_motr m0d phase1
+fi
+
+# Starting phase 2 (ios)
+start_motr m0d phase2
+
+. update-consul-conf --dry-run  # import S3_IDs
+if [[ -n $S3_IDs ]]; then
+    # Starting phase 3 (s3servers).
+    start_s3server
+fi
+
+say 'Checking health of services...'
+check_services
+
+echo ' OK'
