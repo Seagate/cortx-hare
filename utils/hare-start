@@ -21,7 +21,7 @@ set -eu -o pipefail
 # set -x
 export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
 
-# :help: start cluster
+# :help: start cluster or local node
 
 PROG=${0##*/}
 
@@ -30,7 +30,37 @@ die() {
     exit 1
 }
 
+usage() {
+    cat <<EOF
+Usage: $PROG [<option>]...
+
+Starts Hare and Motr services on local or all the nodes in the cluster.
+
+Options:
+  --node       Starts hare and motr services on current node only.
+  -h, --help   Shows this help and exit.
+EOF
+
+    exit 1;
+}
+
+TEMP=$(getopt --options h \
+              --longoptions help,node \
+              --name "$PROG" -- "$@" || true)
+
+eval set -- "$TEMP"
+
 conf_dir=/var/lib/hare
+node=false
+
+while true; do
+    case "$1" in
+        -h|--help)           usage ;;
+        --node)              node=true; shift ;;
+        --)                  shift; break ;;
+        *)                   break ;;
+    esac
+done
 
 if ! [[ -d $conf_dir ]]; then
     die 'Cluster is not configured on this node.'
@@ -40,4 +70,9 @@ if  hctl status > /dev/null 2>&1; then
     die 'Cluster is up and running.'
 fi
 
-hctl bootstrap -c $conf_dir
+if [[ $node ]]; then
+    hare-start-node
+else
+    hctl bootstrap -c $conf_dir
+fi
+
