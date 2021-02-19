@@ -70,7 +70,9 @@ and health-checking mechanisms.
     ```sh
     git clone --recursive https://github.com/Seagate/cortx-motr.git motr
     cd motr
-
+    
+    sudo ./scripts/install-build-deps
+    
     scripts/m0 make
     sudo scripts/install-motr-service --link
 
