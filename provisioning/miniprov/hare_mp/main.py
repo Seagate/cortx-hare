@@ -20,7 +20,6 @@
 # report unsupported features, etc.
 
 # TODO [KN] polish the code, resolve flake8 complaints
-# flake8: noqa
 import argparse
 import asyncio
 import json
@@ -29,8 +28,7 @@ import os
 import shutil
 import subprocess
 import sys
-from typing import List
-
+from typing import Dict, List
 import yaml
 from cortx.utils.product_features import unsupported_features
 
@@ -74,6 +72,7 @@ def get_data_from_provisioner_cli(method, output_format='json') -> str:
         return 'unknown'
     res = stdout.decode('utf-8')
     return json.loads(res)['ret'] if res else 'unknown'
+
 
 def _report_unsupported_features(features_unavailable):
     uf_db = unsupported_features.UnsupportedFeaturesDB()
@@ -121,6 +120,7 @@ class PostInstall(argparse.Action):
     Approach: Will use 'rpm -qa | grep -q <rpm_name>' command to check if
     rpm is installed
     """
+
     def __call__(self, parser, namespace, values, option_string=None):
         try:
             if checkRpm('cortx-motr') != 0:
@@ -162,6 +162,7 @@ class Test(argparse.Action):
     Read CDF file and compare fields with output of 'hctl status'
     Will start the cluster(and shutdown before exiting) if not already started
     """
+
     def __call__(self, parser, namespace, values, option_string=None):
         try:
             rc = 0
@@ -237,7 +238,7 @@ def shutdown_cluster():
 def list2dict(nodes_data_hctl: list) -> dict:
     node_info_dict = {}
     for node in nodes_data_hctl:
-        node_svc_info = {}
+        node_svc_info: Dict[str, List[str]] = {}
         for service in node['svcs']:
             if not service['name'] in node_svc_info.keys():
                 node_svc_info[service['name']] = []
@@ -262,17 +263,16 @@ def check_cluster_status():
         m0ds = node.get('m0_servers', [])
         ios_cnt = 0
         for m0d in m0ds:
-            if ('runs_confd' in m0d.keys() and
-                (node_info_dict[node['hostname']]['confd'][0] != 'started')):
+            if 'runs_confd' in m0d.keys() and node_info_dict[
+                    node['hostname']]['confd'][0] != 'started':
                 return -1
             if m0d['io_disks']['data']:
                 if node_info_dict[
-                        node['hostname']]['ioservice'][ios_cnt] != 'started':
+                   node['hostname']]['ioservice'][ios_cnt] != 'started':
                     return -1
                 ios_cnt += 1
-        if (m0client_s3_cnt > 0
-                and len(node_info_dict[node['hostname']]['s3server']) !=
-                m0client_s3_cnt):
+        if (m0client_s3_cnt > 0 and len(node_info_dict[
+                node['hostname']]['s3server'] != m0client_s3_cnt)):
             return -1
 
     return 0
