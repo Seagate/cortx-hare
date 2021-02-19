@@ -30,7 +30,7 @@ from hax.types import (ConfHaProcess, Fid, FidStruct, FsStats, HaNote,
                        HaNoteStruct, HAState, MessageId, ObjT, Profile,
                        ReprebStatus, ServiceHealth, StobIoqError,
                        m0HaProcessEvent, m0HaProcessType)
-from hax.util import ConsulUtil
+from hax.util import ConsulUtil, repeat_if_fails
 
 LOG = logging.getLogger('hax')
 
@@ -49,7 +49,6 @@ class Motr:
     def __init__(self,
                  ffi: HaxFFI,
                  queue,
-                 rm_fid: Fid,
                  herald: DeliveryHerald,
                  consul_util: ConsulUtil,
                  node_uuid: str = ''):
@@ -58,7 +57,6 @@ class Motr:
         # hax.c function
         self._ha_ctx = self._ffi.init_motr_api(self, make_c_str(node_uuid))
         self.queue = queue
-        self.rm_fid = rm_fid
         self.herald = herald
         self.consul_util = consul_util
         self.spiel_ready = False
@@ -69,13 +67,19 @@ class Motr:
             raise RuntimeError('Cannot initialize Motr API')
 
     def start(self, rpc_endpoint: str, process: Fid, ha_service: Fid,
-              rm_service: Fid, profile: Profile):
+              profile: Profile):
         LOG.debug('Starting m0_halon_interface')
         self._process_fid = process
         self._profile = profile
+
+        @repeat_if_fails()
+        def _get_rm_fid() -> Fid:
+            return self.consul_util.get_rm_fid()
+
+        rm_fid = _get_rm_fid()
         result = self._ffi.start(self._ha_ctx, make_c_str(rpc_endpoint),
                                  process.to_c(), ha_service.to_c(),
-                                 rm_service.to_c())
+                                 rm_fid.to_c())
         if result:
             LOG.error(
                 'Cannot start Motr API. m0_halon_interface::start'
@@ -164,17 +168,19 @@ class Motr:
                                                  str(process_fid)))
         sess = principal_rm = confds = None
         try:
-            prov = self.consul_util
-            sess = prov.get_leader_session_no_wait()
-            principal_rm = prov.get_session_node(sess)
-            confds = prov.get_confd_list()
+            util = self.consul_util
+            sess = util.get_leader_session_no_wait()
+            principal_rm = util.get_session_node(sess)
+            confds = util.get_confd_list()
+            rm_fid = util.get_rm_fid()
         except Exception:
             LOG.exception('Failed to get the data from Consul.'
                           ' Replying with EAGAIN error code.')
             self._ffi.entrypoint_reply(reply_context, req_id.to_c(), EAGAIN, 0,
                                        make_array(FidStruct, []),
                                        make_array(c.c_char_p, []), 0,
-                                       self.rm_fid.to_c(), None)
+                                       Fid(0, 0).to_c(),
+                                       None)
             LOG.debug('Reply sent')
             return
 
@@ -197,7 +203,8 @@ class Motr:
                                    make_array(FidStruct, confd_fids),
                                    make_array(c.c_char_p,
                                               confd_eps), rc_quorum,
-                                   self.rm_fid.to_c(), make_c_str(rm_eps))
+                                   rm_fid.to_c(),
+                                   make_c_str(rm_eps))
         LOG.debug('Entrypoint request has been replied to')
 
     def broadcast_ha_states(self, ha_states: List[HAState]) -> List[MessageId]:

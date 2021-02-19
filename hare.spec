@@ -45,7 +45,7 @@ BuildRequires: python36-devel
 BuildRequires: python36-pip
 BuildRequires: python36-setuptools
 
-Requires: consul = 1.9.1
+Requires: consul >= 1.7.0, consul < 1.10.0
 Requires: facter
 Requires: jq
 Requires: cortx-motr = %{h_motr_version}

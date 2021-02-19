@@ -272,7 +272,7 @@ def check_cluster_status():
                     return -1
                 ios_cnt += 1
         if (m0client_s3_cnt > 0 and len(node_info_dict[
-                node['hostname']]['s3server'] != m0client_s3_cnt)):
+                node['hostname']]['s3server']) != m0client_s3_cnt):
             return -1
 
     return 0
