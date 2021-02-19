@@ -30,10 +30,11 @@ from consul import Consul, ConsulException
 from requests.exceptions import RequestException
 from urllib3.exceptions import HTTPError
 from hax.exception import HAConsistencyException
+from hax.util import ConsulUtil
 
 Process = NamedTuple('Process', [('node', str), ('consul_name', str),
                                  ('systemd_name', str), ('fidk', int),
-                                 ('status', str)])
+                                 ('status', str), ('is_local', bool)])
 shutdown_sequence = ('s3service', 'ios', 'confd', 'hax', 'consul')
 
 
@@ -74,9 +75,13 @@ def processes_node(cns: Consul, node_name: str) -> Dict[str, List[Process]]:
     """Processes grouped by Consul service name."""
     try:
         processes: Dict[str, List[Process]] = {}
+        cns_util = ConsulUtil(raw_client=cns)
+        is_local = node_name == cns_util.get_local_nodename()
+
         for node in cns.catalog.nodes()[1]:
             if node_name != node['Node']:
                 continue
+
             for svc in cns.health.node(node['Node'])[1]:
                 svc_name = svc['ServiceName']
                 if svc_name:
@@ -86,6 +91,7 @@ def processes_node(cns: Consul, node_name: str) -> Dict[str, List[Process]]:
                                 consul_name=svc_name,
                                 systemd_name=get_systemd_name(fidk, svc_name),
                                 fidk=fidk,
+                                is_local=is_local,
                                 status=svc['Status']))
             consul_status = 'passing' if consul_is_active_at(node['Node']) \
                 else 'offline'
@@ -94,6 +100,7 @@ def processes_node(cns: Consul, node_name: str) -> Dict[str, List[Process]]:
                         consul_name='consul',
                         systemd_name='hare-consul-agent',
                         fidk=0,
+                        is_local=is_local,
                         status=consul_status))
         return processes
     except (ConsulException, HTTPError, RequestException) as e:
@@ -104,8 +111,11 @@ def processes_node(cns: Consul, node_name: str) -> Dict[str, List[Process]]:
 def processes_by_consul_svc_name(cns: Consul) -> Dict[str, List[Process]]:
     """Processes grouped by Consul service name."""
     try:
+        cns_util = ConsulUtil(raw_client=cns)
+
         processes: Dict[str, List[Process]] = {}
         for node in cns.catalog.nodes()[1]:
+            is_local = node['Node'] == cns_util.get_local_nodename()
             for svc in cns.health.node(node['Node'])[1]:
                 svc_name = svc['ServiceName']
                 if svc_name:
@@ -115,6 +125,7 @@ def processes_by_consul_svc_name(cns: Consul) -> Dict[str, List[Process]]:
                                 consul_name=svc_name,
                                 systemd_name=get_systemd_name(fidk, svc_name),
                                 fidk=fidk,
+                                is_local=is_local,
                                 status=svc['Status']))
             consul_status = 'passing' if consul_is_active_at(node['Node']) \
                 else 'offline'
@@ -123,6 +134,7 @@ def processes_by_consul_svc_name(cns: Consul) -> Dict[str, List[Process]]:
                         consul_name='consul',
                         systemd_name='hare-consul-agent',
                         fidk=0,
+                        is_local=is_local,
                         status=consul_status))
         return processes
     except (ConsulException, HTTPError, RequestException) as e:
@@ -194,7 +206,11 @@ class QuitMessage:
 
 class Worker(threading.Thread):
     def __init__(self, queue: Queue):
-        super().__init__(target=self._do_work, args=(queue, ))
+        # [KN] We mark the thread as daemonic to make sure it will
+        # exit as soon as the main thread exits.
+        # That will make sure that the application shuts down on
+        # SIGINT event (Ctrl-C)
+        super().__init__(target=self._do_work, args=(queue, ), daemon=True)
 
     def _do_work(self, queue: Queue):
         logging.debug('Started thread')
