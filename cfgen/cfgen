@@ -1092,6 +1092,7 @@ def pool_drives(m0conf: Dict[Oid, Any],
                        for drive_id, node_id in all_drives
                        if ref['path'] == m0conf[m0conf[drive_id].sdev].filename
                        and ref.get('node') in (None, m0conf[node_id].name)]
+            # XXX Improve validate_pools_desc() to catch this error.
             assert len(targets) == 1, 'Check {} config line'.format(ref)
             drives.extend(targets)
         assert all_unique(drives), \
