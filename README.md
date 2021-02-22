@@ -68,8 +68,8 @@ and health-checking mechanisms.
 
   * .. or from sources
     ```sh
-    git clone --recursive https://github.com/Seagate/cortx-motr.git motr
-    cd motr
+    git clone --recursive https://github.com/Seagate/cortx-motr.git
+    cd cortx-motr
     
     sudo ./scripts/install-build-deps
     
@@ -104,8 +104,8 @@ and health-checking mechanisms.
 
   * .. or from sources
     ```sh
-    git clone --recursive https://github.com/Seagate/cortx-motr.git motr
-    cd motr
+    git clone --recursive https://github.com/Seagate/cortx-motr.git
+    cd cortx-motr
 
     scripts/m0 make rpms
     sudo rpm -ivh ~/rpmbuild/RPMS/x86_64/cortx-motr-*.rpm

@@ -1,2 +1,3 @@
+idna<3,>=2.5
 PyYAML
 ply  # cfgen tests execute `m0confgen`, which depends on `ply`
