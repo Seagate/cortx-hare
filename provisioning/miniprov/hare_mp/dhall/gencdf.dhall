@@ -9,6 +9,7 @@ let NodeInfo =
       , data_iface_type : Optional T.Protocol
       , io_disks : List Text
       , meta_data : Text
+      , s3_instances : Natural
       }
 
 let toNodeDesc
@@ -17,7 +18,7 @@ let toNodeDesc
       ->  { hostname = n.hostname
           , data_iface = n.data_iface
           , data_iface_type = n.data_iface_type
-          , m0_clients = { other = 3, s3 = 11 }
+          , m0_clients = { other = 3, s3 = n.s3_instances }
           , m0_servers =
               Some
               [ { io_disks = { data = [] : List Text, meta_data = Some n.meta_data }

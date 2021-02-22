@@ -47,9 +47,9 @@ $(MP_WHL): $(PY_VENV_DIR) $(MP_SRC)
 
 $(PY_VENV_DIR): requirements.txt
 	@$(call _info,Initializing virtual env in $(PY_VENV_DIR))
-	@$(PYTHON) -m venv $@
+	@$(PYTHON) -m venv --system-site-packages $@
 	@$(call _info,Installing pip modules in virtual env)
-	@$(PIP) install -r ./requirements.txt
+	@$(PIP) install --ignore-installed -r ./requirements.txt
 
 # Install ----------------------------------------------- {{{1
 #
@@ -88,11 +88,8 @@ clean:
 # Linters --------------------------------------------- {{{1
 #
 
-# TODO: resolve mypy issues (probably ConfStore should
-# be added to exceptions)
-# Note that mypy is disabled for now when building miniprov
 .PHONY: check
-check: flake8 test
+check: flake8 mypy test
 
 .PHONY: test
 test: $(PY_VENV_DIR) $(MP_SRC)

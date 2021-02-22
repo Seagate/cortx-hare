@@ -14,8 +14,8 @@ import re
 import socket
 import subprocess
 import sys
-from typing import Any, Callable, Dict, Iterator, List, NamedTuple, Optional, \
-    Set, Tuple
+from typing import (Any, Callable, Dict, Iterable, Iterator, List, NamedTuple,
+                    Optional, Set, Tuple)
 import yaml
 
 
@@ -154,6 +154,15 @@ def die(msg: str, status: int = 1):
     sys.exit(status)
 
 
+def all_not_none(xs: Iterable) -> bool:
+    """Returns True iff the iterable contains no None elements.
+    """
+    for t in xs:
+        if t is None:
+            return False
+    return True
+
+
 def all_unique(xs) -> bool:
     """Returns True iff all entries of the sequence are unique.
     """
@@ -243,9 +252,17 @@ def validate_nodes_desc(nodes_desc: List[Dict[str, Any]]) -> None:
     nodes = [Node(name=x['hostname'],
                   ipaddr=x['facts'][ipaddr_key(x['data_iface'])])
              for x in nodes_desc]
+    assert all_not_none(
+        x.name
+        for x in nodes), f'Unexpected None hostname found in list: {nodes}\n' \
+                         f'Full context: {nodes_desc}'
     assert all_unique(x.name for x in nodes), \
         "Node names ('hostname' values in the CDF) are not unique:\n" + \
         '\n'.join('  ' + x.name for x in nodes)
+    assert all_not_none(
+        x.ipaddr
+        for x in nodes), f'Unexpected None ipaddr found in list: {nodes}\n' \
+                         f'Full context: {nodes_desc}'
     assert all_unique(x.ipaddr for x in nodes), \
         'IP addresses are not unique:\n' + \
         '\n'.join('  ' + x.ipaddr for x in nodes)
@@ -1094,7 +1111,8 @@ def pool_drives(m0conf: Dict[Oid, Any],
                        for drive_id, node_id in all_drives
                        if ref['path'] == m0conf[m0conf[drive_id].sdev].filename
                        and ref.get('node') in (None, m0conf[node_id].name)]
-            assert len(targets) == 1  # guaranteed by validate_pools_desc()
+            # XXX Improve validate_pools_desc() to catch this error.
+            assert len(targets) == 1, 'Check {} config line'.format(ref)
             drives.extend(targets)
         assert all_unique(drives), \
             'Pool {!r}: some of disk_refs refer to the same disk'.format(

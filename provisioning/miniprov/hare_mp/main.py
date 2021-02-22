@@ -20,7 +20,6 @@
 # report unsupported features, etc.
 
 # TODO [KN] polish the code, resolve flake8 complaints
-# flake8: noqa
 import argparse
 import asyncio
 import json
@@ -29,8 +28,7 @@ import os
 import shutil
 import subprocess
 import sys
-from typing import List
-
+from typing import Dict, List
 import yaml
 from cortx.utils.product_features import unsupported_features
 
@@ -76,23 +74,24 @@ def get_data_from_provisioner_cli(method, output_format='json') -> str:
     return json.loads(res)['ret'] if res else 'unknown'
 
 
-def logrotate_config():
-    try:
-        setup_info = get_data_from_provisioner_cli('get_setup_info')
-        if setup_info != 'unknown':
-            server_type = setup_info['server_type']
-            shutil.copyfile(
-                f'/opt/seagate/cortx/hare/conf/logrotate/{server_type}',
-                '/etc/logrotate.d/hare')
-    except Exception as error:
-        logging.error('Error setting logrotate values for hare (%s)', error)
-
-
 def _report_unsupported_features(features_unavailable):
     uf_db = unsupported_features.UnsupportedFeaturesDB()
     loop = asyncio.get_event_loop()
     loop.run_until_complete(
         uf_db.store_unsupported_features('hare', features_unavailable))
+
+
+class Logrotate(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+        try:
+            setup_info = get_data_from_provisioner_cli('get_setup_info')
+            if setup_info != 'unknown':
+                server_type = setup_info['server_type']
+                shutil.copyfile(
+                    f'/opt/seagate/cortx/hare/conf/logrotate/{server_type}',
+                    '/etc/logrotate.d/hare')
+        except Exception as error:
+            logging.error('Cannot configure logrotate for hare (%s)', error)
 
 
 class UnsupportedFeatures(argparse.Action):
@@ -121,6 +120,7 @@ class PostInstall(argparse.Action):
     Approach: Will use 'rpm -qa | grep -q <rpm_name>' command to check if
     rpm is installed
     """
+
     def __call__(self, parser, namespace, values, option_string=None):
         try:
             if checkRpm('cortx-motr') != 0:
@@ -145,15 +145,15 @@ class PostInstall(argparse.Action):
 class Init(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
         try:
+            rc = 0
             if not is_cluster_running() and bootstrap_cluster() != 0:
                 logging.error('Failed to bootstrap the custer')
-                exit(1)
-
-            while is_cluster_running():
-                shutdown_cluster()
-
+                rc = -1
+            shutdown_cluster()
+            exit(rc)
         except Exception as error:
             logging.error('Error while initializing the cluster (%s)', error)
+            shutdown_cluster()
             exit(-1)
 
 
@@ -162,23 +162,22 @@ class Test(argparse.Action):
     Read CDF file and compare fields with output of 'hctl status'
     Will start the cluster(and shutdown before exiting) if not already started
     """
+
     def __call__(self, parser, namespace, values, option_string=None):
         try:
+            rc = 0
             if not is_cluster_running() and bootstrap_cluster() != 0:
                 logging.error('Failed to bootstrap the cluster')
-                exit(-1)
-
+                rc = -1
             cluster_status = check_cluster_status()
-
-            while is_cluster_running():
-                shutdown_cluster()
-
+            shutdown_cluster()
             if cluster_status:
                 logging.error('Cluster status reports failure')
-                exit(-1)
-
+                rc = -1
+            exit(rc)
         except Exception as error:
             logging.error('Error while checking cluster status (%s)', error)
+            shutdown_cluster()
             exit(-1)
 
 
@@ -232,13 +231,14 @@ def bootstrap_cluster():
 
 
 def shutdown_cluster():
-    return os.system('hctl shutdown')
+    while is_cluster_running():
+        os.system('hctl shutdown')
 
 
 def list2dict(nodes_data_hctl: list) -> dict:
     node_info_dict = {}
     for node in nodes_data_hctl:
-        node_svc_info = {}
+        node_svc_info: Dict[str, List[str]] = {}
         for service in node['svcs']:
             if not service['name'] in node_svc_info.keys():
                 node_svc_info[service['name']] = []
@@ -263,17 +263,16 @@ def check_cluster_status():
         m0ds = node.get('m0_servers', [])
         ios_cnt = 0
         for m0d in m0ds:
-            if ('runs_confd' in m0d.keys() and
-                (node_info_dict[node['hostname']]['confd'][0] != 'started')):
+            if 'runs_confd' in m0d.keys() and node_info_dict[
+                    node['hostname']]['confd'][0] != 'started':
                 return -1
             if m0d['io_disks']['data']:
                 if node_info_dict[
-                        node['hostname']]['ioservice'][ios_cnt] != 'started':
+                   node['hostname']]['ioservice'][ios_cnt] != 'started':
                     return -1
                 ios_cnt += 1
-        if (m0client_s3_cnt > 0
-                and len(node_info_dict[node['hostname']]['s3server']) !=
-                m0client_s3_cnt):
+        if (m0client_s3_cnt > 0 and len(node_info_dict[
+                node['hostname']]['s3server']) != m0client_s3_cnt):
             return -1
 
     return 0
@@ -295,6 +294,10 @@ def main():
                    nargs=0,
                    help='Report unsupported features according to setup type',
                    action=UnsupportedFeatures)
+    p.add_argument('--configure-logrotate',
+                   nargs=0,
+                   help='Configure logrotate for hare',
+                   action=Logrotate)
     p.add_argument('--post_install',
                    nargs=0,
                    help='Perform post installation checks',
@@ -316,7 +319,6 @@ def main():
                    nargs=0,
                    help='Reset/cleanup step',
                    action=Cleanup)
-
     p.add_argument('--filename',
                    help='Full path to the CDF file to generate at this stage.',
                    nargs=1,
@@ -340,10 +342,6 @@ def main():
         url = parsed.config_url[0]
         filename = parsed.filename[0] or '/var/lib/hare/cluster.yaml'
         save(filename, generate_cdf(url))
-    #
-    # Below function assumes that provisioner is installed.
-    # Might need to revisit if this assumption is not true always
-    logrotate_config()
 
 
 if __name__ == '__main__':

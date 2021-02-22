@@ -56,7 +56,7 @@ and health-checking mechanisms.
   ```sh
   sudo yum -y install yum-utils
   sudo yum-config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo
-  sudo yum -y install consul-1.7.8
+  sudo yum -y install consul-1.9.1
   ```
 
 * Install Motr.
@@ -70,7 +70,9 @@ and health-checking mechanisms.
     ```sh
     git clone --recursive https://github.com/Seagate/cortx-motr.git
     cd cortx-motr
-
+    
+    sudo ./scripts/install-build-deps
+    
     scripts/m0 make
     sudo scripts/install-motr-service --link
 
