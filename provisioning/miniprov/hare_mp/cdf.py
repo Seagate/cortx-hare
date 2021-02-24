@@ -55,22 +55,21 @@ class CdfGenerator:
                         stderr=S.PIPE,
                         encoding='utf8')
 
+        dhall_out, err_d = dhall.communicate(input=gencdf)
+        if dhall.returncode:
+            raise RuntimeError(f'dhall binary failed: {err_d}')
+
         to_yaml = S.Popen([DHALL_TO_YAML_EXE],
-                          stdin=dhall.stdout,
+                          stdin=S.PIPE,
                           stdout=S.PIPE,
                           stderr=S.PIPE,
                           encoding='utf8')
 
-        _, err_d = dhall.communicate(input=gencdf)
-        to_yaml.wait()
-        out, err = to_yaml.communicate()
-        if dhall.returncode:
-            raise RuntimeError(f'dhall binary failed: {err_d}')
-
+        yaml_out, err = to_yaml.communicate(input=dhall_out)
         if to_yaml.returncode:
             raise RuntimeError(f'dhall-to-yaml binary failed: {err}')
 
-        return out
+        return yaml_out
 
     def _get_iface(self, nodename: str) -> str:
         ifaces = self.provider.get(
