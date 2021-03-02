@@ -115,7 +115,7 @@ TBD
 
 #### post_install
 ```
-/opt/seagate/cortx/hare/bin/hare_setup --post_install
+/opt/seagate/cortx/hare/bin/hare_setup post_install
 ```
 Verifies that
 1. Motr, Hare, Consul rpms are installed.
@@ -125,7 +125,7 @@ Exit codes: 0 if no issues found, 1 otherwise.
 
 #### config
 ```
-/opt/seagate/cortx/hare/bin/hare_setup --config 'json:///tmp/exampleV2.json' --filename '/var/lib/hare/cluster.yaml'
+/opt/seagate/cortx/hare/bin/hare_setup config --config 'json:///tmp/exampleV2.json' --file '/var/lib/hare/cluster.yaml'
 ```
 1. Generates CDF file according to the configuration provided by <str> (URL) parameter.
 2. Applies configuration to Consul.
@@ -150,7 +150,7 @@ Exit codes: 0 if no issues found, 1 otherwise.
 
 #### init
 ```
-/opt/seagate/cortx/hare/bin/hare_setup --init
+/opt/seagate/cortx/hare/bin/hare_setup init
 ```
 1. Invokes 'hctl bootstrap --mkfs'(If cluster is not already running)
 
@@ -160,7 +160,7 @@ Exit codes: 0 if no issues found (so Hare cluster running), 1 otherwise.
 
 #### test
 ```
-/opt/seagate/cortx/hare/bin/hare_setup --test
+/opt/seagate/cortx/hare/bin/hare_setup test
 ```
 Run functional tests against a running singlenode cluster (TBD).
 Runs 'hctl status --json' and compares output with info extracted from CDF used during bootstrap to check if all the services are running correctly.
