@@ -295,6 +295,12 @@ def main():
     parser = subparser.add_parser('post_install',
                                   help='Perform post installation checks')
     parser.set_defaults(func=post_install)
+    parser.add_argument('--config',
+                        help='Conf Store URL with cluster info',
+                        required=True,
+                        nargs=1,
+                        type=str,
+                        action='store')
     parser.add_argument(
         '--report-unavailable-features',
         help='Report unsupported features according to setup type',
@@ -322,6 +328,12 @@ def main():
     parser = subparser.add_parser('init',
                                   help='Perform component initialization')
     parser.set_defaults(func=init)
+    parser.add_argument('--config',
+                        help='Conf Store URL with cluster info',
+                        required=True,
+                        nargs=1,
+                        type=str,
+                        action='store')
     parser.add_argument('--file',
                         help='Full path to the CDF file.',
                         nargs=1,
@@ -331,6 +343,12 @@ def main():
 
     parser = subparser.add_parser('test', help='Testing cluster status')
     parser.set_defaults(func=test)
+    parser.add_argument('--config',
+                        help='Conf Store URL with cluster info',
+                        required=True,
+                        nargs=1,
+                        type=str,
+                        action='store')
     parser.add_argument('--file',
                         help='Full path to the CDF file.',
                         nargs=1,
@@ -341,11 +359,29 @@ def main():
     parser = subparser.add_parser('support_bundle',
                                   help='Generating support bundle')
     parser.set_defaults(func=generate_support_bundle)
+    parser.add_argument('--config',
+                        help='Conf Store URL with cluster info',
+                        required=True,
+                        nargs=1,
+                        type=str,
+                        action='store')
 
     parser = subparser.add_parser('reset', help='Reset/cleanup step')
     parser.set_defaults(func=cleanup)
+    parser.add_argument('--config',
+                        help='Conf Store URL with cluster info',
+                        required=True,
+                        nargs=1,
+                        type=str,
+                        action='store')
     parser = subparser.add_parser('cleanup', help='Reset/cleanup step')
     parser.set_defaults(func=cleanup)
+    parser.add_argument('--config',
+                        help='Conf Store URL with cluster info',
+                        required=True,
+                        nargs=1,
+                        type=str,
+                        action='store')
 
     setup_logging()
 
