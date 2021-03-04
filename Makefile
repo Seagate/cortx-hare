@@ -306,8 +306,10 @@ $(HAX_EGG_LINK) $(HAX_EXE): $(HAX_WHL)
 	@cd hax && $(HAX_INSTALL_CMD)
 
 .PHONY: install-miniprov
-install-miniprov: MP_INSTALL_CMD = $(PIP) install --ignore-installed --prefix $(DESTDIR)/$(PREFIX) $(MP_WHL)
+install-miniprov: MP_INSTALL_CMD = $(PIP) install --ignore-installed $(MP_WHL)
 install-miniprov: $(MP_EXE)
+	@$(call _info,Symlink created for mini provisioner)
+	@ln -v -sf $(PY_VENV_DIR)/bin/hare_setup $(DESTDIR)/$(PREFIX)/bin
 
 $(MP_EGG_LINK) $(MP_EXE): $(MP_WHL)
 	@$(call _info,Installing miniprov with '$(MP_INSTALL_CMD)')
