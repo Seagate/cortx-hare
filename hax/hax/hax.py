@@ -88,7 +88,7 @@ def main():
     # _run_qconsumer_thread function.
     #
     # [KN] Note: The server is launched in the main thread.
-    q: Queue = Queue(maxsize=512)
+    q: Queue = Queue(maxsize=8191)
 
     util: ConsulUtil = ConsulUtil()
     cfg: HL_Fids = _get_motr_fids(util)
