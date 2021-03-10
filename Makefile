@@ -308,9 +308,8 @@ $(HAX_EGG_LINK) $(HAX_EXE): $(HAX_WHL)
 
 .PHONY: install-miniprov
 install-miniprov: MP_INSTALL_CMD = $(PIP) install --ignore-installed --prefix $(DESTDIR)/$(PREFIX) $(MP_WHL:provisioning/miniprov/%=%)
-install-miniprov: MP_SETUP_PY_CMD = python ./setup.py install
 install-miniprov: $(MP_EXE)
-	@$(PY_VENV); cd /root/cortx-hare/provisioning/miniprov && $(MP_SETUP_PY_CMD)
+	@cd provisioning/miniprov && $(SETUP_PY) install
 
 $(MP_EGG_LINK) $(MP_EXE): $(MP_WHL)
 	@$(call _info,Installing miniprov with '$(MP_INSTALL_CMD)')
