@@ -17,7 +17,7 @@
 #
 
 import ctypes as c
-from enum import Enum
+from enum import Enum, IntEnum
 from threading import Thread
 from typing import List, NamedTuple, Set
 
@@ -198,6 +198,13 @@ class HaLinkMessagePromise:
     def __init__(self, message_ids: List[MessageId]):
         self._ids: Set[MessageId] = set(message_ids)
 
+    def exclude_ids(self, ids: List[MessageId]) -> None:
+        for message_id in ids:
+            self._ids.discard(message_id)
+
+    def is_empty(self) -> bool:
+        return not self._ids
+
     def __contains__(self, message_id: MessageId) -> bool:
         return message_id in self._ids
 
@@ -218,21 +225,22 @@ class ServiceHealth(Enum):
 HAState = NamedTuple('HAState', [('fid', Fid), ('status', ServiceHealth)])
 
 
-class m0HaProcessEvent(Enum):
+class m0HaProcessEvent(IntEnum):
     M0_CONF_HA_PROCESS_STARTING = 0
     M0_CONF_HA_PROCESS_STARTED = 1
     M0_CONF_HA_PROCESS_STOPPING = 2
     M0_CONF_HA_PROCESS_STOPPED = 3
 
-    def str_to_Enum(self, evt):
+    @staticmethod
+    def str_to_Enum(evt: str):
         events = {'M0_CONF_HA_PROCESS_STARTING':
-                  self.M0_CONF_HA_PROCESS_STARTING,
+                  m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTING,
                   'M0_CONF_HA_PROCESS_STARTED':
-                  self.M0_CONF_HA_PROCESS_STARTED,
+                  m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED,
                   'M0_CONF_HA_PROCESS_STOPPING':
-                  self.M0_CONF_HA_PROCESS_STOPPING,
+                  m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPING,
                   'M0_CONF_HA_PROCESS_STOPPED':
-                  self.M0_CONF_HA_PROCESS_STOPPED}
+                  m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED}
         return events[evt]
 
     def __repr__(self):

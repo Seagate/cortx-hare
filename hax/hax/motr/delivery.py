@@ -18,7 +18,7 @@
 
 import logging
 from threading import Condition, Lock
-from typing import Dict
+from typing import Dict, List
 
 from hax.exception import NotDelivered
 from hax.types import HaLinkMessagePromise, MessageId
@@ -39,9 +39,11 @@ class DeliveryHerald:
         delivery_herald.wait_for_any(HaLinkMessagePromise(tag_list))
         # if we are here then the delivery was confirmed
     """
-    recently_delivered: Dict[HaLinkMessagePromise, MessageId] = {}
-    waiting_clients: Dict[HaLinkMessagePromise, Condition] = {}
-    lock = Lock()
+    def __init__(self):
+        self.recently_delivered: Dict[HaLinkMessagePromise,
+                                      List[MessageId]] = {}
+        self.waiting_clients: Dict[HaLinkMessagePromise, Condition] = {}
+        self.lock = Lock()
 
     def wait_for_any(self,
                      promise: HaLinkMessagePromise,
@@ -78,11 +80,13 @@ class DeliveryHerald:
 
         Raises NotDelivered exception when timeout_sec exceeds.
         """
-        for msg in promise._ids:
-            condition = Condition()
-            with self.lock:
-                self.waiting_clients[promise] = condition
 
+        condition = Condition()
+        with self.lock:
+            self.waiting_clients[promise] = condition
+            LOG.debug('waiting clients %s', self.waiting_clients)
+
+        while not promise.is_empty():
             with condition:
                 LOG.debug('Blocking until %s is confirmed', promise)
                 condition.wait(timeout=timeout_sec)
@@ -91,12 +95,14 @@ class DeliveryHerald:
                     raise NotDelivered('None of message tags =' +
                                        str(promise) +
                                        '  were delivered to Motr')
-                msgid = self.recently_delivered[promise]
-                if msgid in promise:
-                    promise._ids.remove(msgid)
+                confirmed_msgs = self.recently_delivered.pop(promise)
                 LOG.debug('Thread unblocked - %s just received',
-                          self.recently_delivered[promise])
-                del self.recently_delivered[promise]
+                          confirmed_msgs)
+                del self.waiting_clients[promise]
+                promise.exclude_ids(confirmed_msgs)
+                LOG.debug('After exclusion: %s', promise)
+                if not promise.is_empty():
+                    self.waiting_clients[promise] = condition
 
     def notify_delivered(self, message_id: MessageId):
         # [KN] This function is expected to be called from Motr.
@@ -104,10 +110,14 @@ class DeliveryHerald:
             LOG.debug('notify waiting clients %s',
                       self.waiting_clients.items())
             for promise, client in self.waiting_clients.items():
+                LOG.debug('received msg id %s, waiting promise %s', message_id,
+                          promise)
                 if message_id in promise:
                     LOG.debug('Found a waiting client for %s: %s', message_id,
                               promise)
-                    self.recently_delivered[promise] = message_id
+                    old_list = self.recently_delivered.get(promise, [])
+                    old_list.append(message_id)
+                    self.recently_delivered[promise] = old_list
                     with client:
                         client.notify()
                     return
