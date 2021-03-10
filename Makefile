@@ -313,7 +313,7 @@ install-miniprov: $(MP_EXE)
 
 $(MP_EGG_LINK) $(MP_EXE): $(MP_WHL)
 	@$(call _info,Installing miniprov with '$(MP_INSTALL_CMD)')
-	@$(MP_INSTALL_CMD)
+	@$cd provisioning/miniprov && (MP_INSTALL_CMD)
 
 .PHONY: install-vendor
 install-vendor:
