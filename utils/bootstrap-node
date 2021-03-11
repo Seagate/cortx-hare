@@ -112,7 +112,7 @@ EOF
     die "'motr-kernel' systemd service is not installed"
 fi
 
-. update-consul-conf --dry-run  # import CONFD_IDs, IOS_IDs, id2fid()
+. update-consul-conf --dry-run  # import CONFD_IDs, IOS_IDs, S3_IDs, id2fid()
 
 if [[ $do_mkfs ]] && [[ ! -e /etc/sysconfig/motr-kernel ]]; then
     # Auto-start of `motr-kernel` systemd unit will cause kernel panic

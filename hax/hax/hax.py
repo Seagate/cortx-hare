@@ -36,7 +36,7 @@ from hax.util import ConsulUtil, repeat_if_fails
 __all__ = ['main']
 
 HL_Fids = NamedTuple('HL_Fids', [('hax_ep', str), ('hax_fid', Fid),
-                                 ('ha_fid', Fid), ('rm_fid', Fid),
+                                 ('ha_fid', Fid),
                                  ('profiles', List[Profile])])
 
 LOG = logging.getLogger('hax')
@@ -61,12 +61,11 @@ def _get_motr_fids(util: ConsulUtil) -> HL_Fids:
     hax_ep: str = util.get_hax_endpoint()
     hax_fid: Fid = util.get_hax_fid()
     ha_fid: Fid = util.get_ha_fid()
-    rm_fid: Fid = util.get_rm_fid()
     profiles = util.get_profiles()
     if not profiles:
         raise RuntimeError('Configuration error: no profile '
                            'is found in Consul KV')
-    return HL_Fids(hax_ep, hax_fid, ha_fid, rm_fid, profiles)
+    return HL_Fids(hax_ep, hax_fid, ha_fid, profiles)
 
 
 def _run_rconfc_starter_thread(motr: Motr,
@@ -89,7 +88,7 @@ def main():
     # _run_qconsumer_thread function.
     #
     # [KN] Note: The server is launched in the main thread.
-    q: Queue = Queue(maxsize=8)
+    q: Queue = Queue(maxsize=8192)
 
     util: ConsulUtil = ConsulUtil()
     cfg: HL_Fids = _get_motr_fids(util)
@@ -97,12 +96,11 @@ def main():
     LOG.info('Welcome to HaX')
     LOG.info(f'Setting up ha_link interface with the options as follows: '
              f'hax fid = {cfg.hax_fid}, hax endpoint = {cfg.hax_ep}, '
-             f'HA fid = {cfg.ha_fid}, RM fid = {cfg.rm_fid}')
+             f'HA fid = {cfg.ha_fid}')
 
     ffi = HaxFFI()
     herald = DeliveryHerald()
     motr = Motr(queue=q,
-                rm_fid=cfg.rm_fid,
                 ffi=ffi,
                 herald=herald,
                 consul_util=util)
@@ -117,7 +115,6 @@ def main():
         motr.start(cfg.hax_ep,
                    process=cfg.hax_fid,
                    ha_service=cfg.ha_fid,
-                   rm_service=cfg.rm_fid,
                    profile=cfg.profiles[0])
         LOG.info('Motr API has been started')
         rconfc_starter = _run_rconfc_starter_thread(motr, consul_util=util)

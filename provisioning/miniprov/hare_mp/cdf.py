@@ -1,12 +1,12 @@
 import os.path as P
 import subprocess as S
 from string import Template
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import pkg_resources
 
 from hare_mp.store import ValueProvider
-from hare_mp.types import DList, Maybe, NodeDesc, Text, Protocol
+from hare_mp.types import DList, Maybe, NodeDesc, Protocol, Text
 
 DHALL_PATH = '/opt/seagate/cortx/hare/share/cfgen/dhall'
 DHALL_EXE = '/opt/seagate/cortx/hare/bin/dhall'
@@ -55,29 +55,35 @@ class CdfGenerator:
                         stderr=S.PIPE,
                         encoding='utf8')
 
+        dhall_out, err_d = dhall.communicate(input=gencdf)
+        if dhall.returncode:
+            raise RuntimeError(f'dhall binary failed: {err_d}')
+
         to_yaml = S.Popen([DHALL_TO_YAML_EXE],
-                          stdin=dhall.stdout,
+                          stdin=S.PIPE,
                           stdout=S.PIPE,
                           stderr=S.PIPE,
                           encoding='utf8')
 
-        _, err_d = dhall.communicate(input=gencdf)
-        to_yaml.wait()
-        out, err = to_yaml.communicate()
-        if dhall.returncode:
-            raise RuntimeError(f'dhall binary failed: {err_d}')
-
+        yaml_out, err = to_yaml.communicate(input=dhall_out)
         if to_yaml.returncode:
             raise RuntimeError(f'dhall-to-yaml binary failed: {err}')
 
-        return out
+        return yaml_out
 
     def _get_iface(self, nodename: str) -> str:
         ifaces = self.provider.get(
-            f'cluster>{nodename}>network>data>public_interfaces')
+            f'cluster>{nodename}>network>data>private_interfaces')
         if not ifaces:
             raise RuntimeError('No data network interfaces found')
         return ifaces[0]
+
+    def _get_iface_type(self, nodename: str) -> Optional[Protocol]:
+        iface = self.provider.get(
+            f'cluster>{nodename}>network>data>interface_type')
+        if iface is None:
+            return None
+        return Protocol[iface]
 
     def _create_node(self, name: str) -> NodeDesc:
         store = self.provider
@@ -86,9 +92,7 @@ class CdfGenerator:
         return NodeDesc(
             hostname=Text(hostname),
             data_iface=Text(iface),
-
-            # data iface is not yet provided by ConfStore
-            data_iface_type=Maybe(Protocol.tcp, 'P'),
+            data_iface_type=Maybe(self._get_iface_type(name), 'P'),
             io_disks=DList([
                 Text(device)
                 for device in store.get(f'cluster>{name}>storage>data_devices')
@@ -97,4 +101,5 @@ class CdfGenerator:
             # [KN] This is a hotfix for singlenode deployment
             # TODO in the future the value must be taken from a correct
             # ConfStore key (it doesn't exist now).
-            meta_data=Text('/dev/vg_metadata_srvnode-1/lv_raw_metadata'))
+            meta_data=Text('/dev/vg_metadata_srvnode-1/lv_raw_metadata'),
+            s3_instances=int(store.get(f'cluster>{name}>s3_instances')))

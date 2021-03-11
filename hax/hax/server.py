@@ -55,25 +55,13 @@ def to_ha_states(data: Any, consul_util: ConsulUtil) -> List[HAState]:
     if not data:
         return []
 
-    def get_svc_node(checks: List[Dict[str, Any]], svc_id: str) -> str:
-        for x in checks:
-            if x.get('ServiceID') == svc_id:
-                return str(x.get('Node'))
-        return ""
-
-    def get_svc_health(item: Any) -> ServiceHealth:
-        node = get_svc_node(item['Checks'], item['Service']['ID'])
-        LOG.debug('Checking current state of the process %s',
-                  item['Service']['ID'])
-        status: ServiceHealth = consul_util.get_service_health(
-                                               item['Service']['Service'],
-                                               node,
-                                               int(item['Service']['ID']))
-        return status
+    def get_status(checks: List[Dict[str, Any]]) -> ServiceHealth:
+        ok = all(x.get('Status') == 'passing' for x in checks)
+        return ServiceHealth.OK if ok else ServiceHealth.FAILED
 
     return [
         HAState(fid=create_process_fid(int(t['Service']['ID'])),
-                status=get_svc_health(t)) for t in data
+                status=get_status(t['Checks'])) for t in data
     ]
 
 

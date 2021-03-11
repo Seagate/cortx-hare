@@ -88,11 +88,8 @@ clean:
 # Linters --------------------------------------------- {{{1
 #
 
-# TODO: resolve mypy issues (probably ConfStore should
-# be added to exceptions)
-# Note that mypy is disabled for now when building miniprov
 .PHONY: check
-check: flake8 test
+check: flake8 mypy test
 
 .PHONY: test
 test: $(PY_VENV_DIR) $(MP_SRC)

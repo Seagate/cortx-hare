@@ -88,6 +88,21 @@ Stopped hare-consul-agent at ssc-vm-c-0553.colo.seagate.com
 Killing RC Leader at ssc-vm-c-0552.colo.seagate.com... **ERROR**
 ```
 
+### Cluster shutdown --node
+#### Stops Hare, Motr and Consul processes on the local node only
+
+```
+$ hctl shutdown --node
+Stopping m0d@0x7200000000000001:0x30 (ios) at ssc-vm-2090.colo.seagate.com...
+Stopped m0d@0x7200000000000001:0x30 (ios) at ssc-vm-2090.colo.seagate.com
+Stopping m0d@0x7200000000000001:0x2d (confd) at ssc-vm-2090.colo.seagate.com...
+Stopped m0d@0x7200000000000001:0x2d (confd) at ssc-vm-2090.colo.seagate.com
+Stopping hare-hax at ssc-vm-2090.colo.seagate.com...
+Stopped hare-hax at ssc-vm-2090.colo.seagate.com
+Stopping hare-consul-agent at ssc-vm-2090.colo.seagate.com...
+Stopped hare-consul-agent at ssc-vm-2090.colo.seagate.com
+```
+
 ## Cluster start
 
 ```
@@ -101,6 +116,18 @@ $ hctl start
 2020-09-18 07:00:12: Starting Motr (phase1, m0d)... OK
 2020-09-18 07:00:15: Starting Motr (phase2, m0d)... OK
 2020-09-18 07:00:18: Checking health of services... OK
+```
+
+### Cluster start --node
+#### Starts Hare, Motr and Consul processes on the current node only
+
+```
+$ hctl start --node
+2021-02-19 05:11:04: Starting Consul agent on this node.... OK
+2021-02-19 05:11:05: Starting Motr (phase1, m0d)... OK
+2021-02-19 05:11:09: Starting Motr (phase2, m0d)... OK
+2021-02-19 05:11:12: Checking health of services... OK
+OK
 ```
 
 ## Cluster status

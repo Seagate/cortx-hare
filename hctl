@@ -26,7 +26,7 @@ export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
 # constants
 PROG=${0##*/}
 SRC_DIR="$(dirname $(readlink -f $0))"
-M0_SRC_DIR=${M0_SRC_DIR:-${SRC_DIR%/*}/motr}
+M0_SRC_DIR=${M0_SRC_DIR:-${SRC_DIR%/*}/cortx-motr}
 
 # Quick fix for EOS-10650
 CORTX_HA_BIN=/opt/seagate/cortx/ha/bin/

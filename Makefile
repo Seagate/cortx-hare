@@ -263,6 +263,7 @@ install-dirs:
 
 .PHONY: install-cfgen
 install-cfgen: CFGEN_INSTALL_CMD = install
+install-cfgen: CFGEN_PIP_CMD = $(PIP) install --ignore-installed --prefix $(DESTDIR)/$(PREFIX) -r $<
 install-cfgen: $(CFGEN_EXE) install-cfgen-deps unpack-dhall-bin unpack-dhall-prelude
 	@$(call _info,Installing cfgen/dhall configs)
 	@install --verbose --directory $(CFGEN_SHARE)
@@ -274,7 +275,7 @@ install-cfgen: $(CFGEN_EXE) install-cfgen-deps unpack-dhall-bin unpack-dhall-pre
 .PHONY: install-cfgen-deps
 install-cfgen-deps: cfgen/requirements.txt $(PY_VENV_DIR)
 	@$(call _info,Installing cfgen dependencies)
-	@$(PIP) install --ignore-installed --prefix $(DESTDIR)/$(PREFIX) -r $<
+	@$(CFGEN_PIP_CMD)
 
 $(CFGEN_EXE): cfgen/cfgen
 	@$(call _info,Installing cfgen)
@@ -306,12 +307,12 @@ $(HAX_EGG_LINK) $(HAX_EXE): $(HAX_WHL)
 	@cd hax && $(HAX_INSTALL_CMD)
 
 .PHONY: install-miniprov
-install-miniprov: MP_INSTALL_CMD = $(PIP) install --ignore-installed --prefix $(DESTDIR)/$(PREFIX) $(MP_WHL)
+install-miniprov: MP_INSTALL_CMD = $(PIP) install --ignore-installed --prefix $(DESTDIR)/$(PREFIX) $(MP_WHL:provisioning/miniprov/%=%)
 install-miniprov: $(MP_EXE)
 
 $(MP_EGG_LINK) $(MP_EXE): $(MP_WHL)
 	@$(call _info,Installing miniprov with '$(MP_INSTALL_CMD)')
-	@$(MP_INSTALL_CMD)
+	@cd provisioning/miniprov && $(MP_INSTALL_CMD)
 
 .PHONY: install-vendor
 install-vendor:
@@ -361,9 +362,13 @@ devinstall: install-dirs devinstall-cfgen devinstall-hax devinstall-miniprov dev
 	@chmod --changes g+w $(DESTDIR)/var/lib/hare
 	@$(call _log,copying m0trace-prune -> $(ETC_CRON_DIR))
 	@install utils/m0trace-prune $(ETC_CRON_DIR)
+	@$(call _log,linking virtual environment to $(DESTDIR)/$(PREFIX))
+	@ln -s $(PY_VENV_DIR)/lib $(DESTDIR)/$(PREFIX)/lib
+	@ln -s $(PY_VENV_DIR)/lib64 $(DESTDIR)/$(PREFIX)/lib64
 
 .PHONY: devinstall-cfgen
 devinstall-cfgen: CFGEN_INSTALL_CMD = ln -sf
+devinstall-cfgen: CFGEN_PIP_CMD = $(PIP) install --ignore-installed -r $<
 devinstall-cfgen: $(CFGEN_EXE) install-cfgen-deps unpack-dhall-bin unpack-dhall-prelude
 	@$(call _info,Installing cfgen/dhall configs)
 	@install --verbose --directory $(CFGEN_SHARE)
@@ -392,20 +397,29 @@ devinstall-systemd: $(wildcard systemd/*)
 	@systemctl daemon-reload
 
 .PHONY: devinstall-hax
-devinstall-hax: HAX_INSTALL_CMD = $(SETUP_PY) develop --prefix $(DESTDIR)/$(PREFIX)
+# Don't specify --prefix $(DESTDIR)/$(PREFIX) since we do want to use our
+# virtualenv folder instead. Generated executables will point to python binary
+# from our virtualenv via shebang. Those executables will be put to /opt/seagate
+# as symlinks. So it is critical to have virtualenv folder populated.
+devinstall-hax: HAX_INSTALL_CMD = $(SETUP_PY) develop
 devinstall-hax: export PYTHONPATH = $(DESTDIR)/$(PREFIX)/lib/python3.$(PY3_VERSION_MINOR)/site-packages
 devinstall-hax: hax/requirements.txt $(HAX_EGG_LINK)
 	@$(call _info,Installing hax development dependencies)
-	@$(PIP) install --ignore-installed --prefix $(DESTDIR)/$(PREFIX) \
+	@$(PIP) install --ignore-installed \
 					--requirement <(sed -ne '/^#:runtime-requirements:/,$$p' $<)
+	@$(call _info,Creating symlinks for hax executables)
+	@ln -v -sf $(PY_VENV_DIR)/bin/hax $(DESTDIR)/$(PREFIX)/bin
+	@ln -v -sf $(PY_VENV_DIR)/bin/q $(DESTDIR)/$(PREFIX)/bin
 
 .PHONY: devinstall-miniprov
-devinstall-miniprov: MP_INSTALL_CMD = $(SETUP_PY) develop --prefix $(DESTDIR)/$(PREFIX)
+devinstall-miniprov: MP_INSTALL_CMD = $(SETUP_PY) develop
 devinstall-miniprov: export PYTHONPATH = $(DESTDIR)/$(PREFIX)/lib/python3.$(PY3_VERSION_MINOR)/site-packages
-devinstall-miniprov: provisioning/miniprov/requirements.txt $(HAX_EGG_LINK)
+devinstall-miniprov: provisioning/miniprov/requirements.txt $(MP_EGG_LINK)
 	@$(call _info,Installing miniprov development dependencies)
-	@$(PIP) install --ignore-installed --prefix $(DESTDIR)/$(PREFIX) \
+	@$(PIP) install --ignore-installed \
 					--requirement <(sed -ne '/^#:runtime-requirements:/,$$p' $<)
+	@$(call _info,Creating symlinks for mini-provisioner executables)
+	@ln -v -sf $(PY_VENV_DIR)/bin/hare_setup $(DESTDIR)/$(PREFIX)/bin
 
 .PHONY: devinstall-vendor
 devinstall-vendor:
@@ -458,7 +472,7 @@ uninstall:
 # Linters --------------------------------------------- {{{1
 #
 
-PYTHON_SCRIPTS := utils/hare-shutdown utils/hare-status utils/gen-uuid
+PYTHON_SCRIPTS := utils/hare-shutdown utils/hare-status utils/gen-uuid utils/utils.py
 
 .PHONY: check
 check: check-cfgen check-hax flake8 mypy
@@ -485,7 +499,7 @@ override MYPY_OPTS := --config-file hax/mypy.ini $(MYPY_OPTS)
 mypy: $(PYTHON_SCRIPTS)
 	@$(call _info,Checking files with mypy)
 	@$(PY_VENV); \
-	  set -eu -o pipefail; for f in $^; do MYPYPATH=stubs:hax mypy $(MYPY_OPTS) $$f; done
+          set -eu -o pipefail; for f in $^; do MYPYPATH=stubs:hax:utils mypy $(MYPY_OPTS) $$f; done
 
 # Tests ----------------------------------------------- {{{1
 #

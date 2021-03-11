@@ -86,3 +86,4 @@ class NodeDesc(DhallTuple):
     data_iface_type: Maybe  # [Protocol]
     io_disks: DList  # [str]
     meta_data: Text
+    s3_instances: int
