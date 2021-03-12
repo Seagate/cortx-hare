@@ -162,6 +162,7 @@ Exit codes: 0 if no issues found (so Hare cluster running), 1 otherwise.
 ```
 /opt/seagate/cortx/hare/bin/hare_setup test --config 'json:///tmp/exampleV2.json'
 ```
+
 Run functional tests against a running singlenode cluster (TBD).
 Runs 'hctl status --json' and compares output with info extracted from CDF used during bootstrap to check if all the services are running correctly.
 
