@@ -23,7 +23,7 @@ export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
 
 PROG=${0##*/}
 
-. hare-utils # import utility functions
+. util # import utility functions
 
 die() {
     echo "$PROG: $*" >&2
