@@ -71,7 +71,7 @@ if  hctl status > /dev/null 2>&1; then
 fi
 
 if [[ $node ]]; then
-    hare-start-node
+    start-node
 else
     hctl bootstrap -c $conf_dir
 fi
