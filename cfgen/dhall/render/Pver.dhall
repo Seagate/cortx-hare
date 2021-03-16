@@ -31,6 +31,7 @@ in
       [ ./Oid.dhall x.id
       , named.Natural "N" x.data_units
       , named.Natural "K" x.parity_units
+      , named.Natural "S" x.spare_units
       , named.Natural "P" x.pool_width
       , named.Naturals "tolerance" x.tolerance
       , named.Oids "sitevs" x.sitevs
