@@ -25,6 +25,7 @@ in
 { id : Oid
 , data_units : Natural    -- N
 , parity_units : Natural  -- K
+, spare_units : Natural  -- S
 , pool_width : Natural    -- P
 , tolerance : List Natural
 , sitevs : List Oid
