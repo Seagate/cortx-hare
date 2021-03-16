@@ -22,6 +22,7 @@ let PoolInfo =
       , disk_refs : Optional (List T.DiskRef)
       , data_units : Natural
       , parity_units : Natural
+      , spare_units : Optional Natural
       , type : T.PoolType
       }
 
@@ -51,9 +52,10 @@ let toPoolDesc
     =     \(p : PoolInfo)
       ->  { name = p.name
           , type = Some p.type
-          , data_units = p.data_units
           , disk_refs = p.disk_refs
+          , data_units = p.data_units
           , parity_units = p.parity_units
+          , spare_units = p.spare_units
           , allowed_failures =
                     None
                       { ctrl : Natural

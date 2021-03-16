@@ -37,15 +37,24 @@ nodes:
     data_iface: <str>  # name of network interface; e.g., eth1, eth1:c1
     data_iface_type: tcp|o2ib  # type of network interface;
                                # optional, defaults to "tcp"
-    m0_servers:
+    m0_servers:        # optional for client-only nodes
       - runs_confd: <bool>  # optional, defaults to false
-        io_disks: [ <str> ] # e.g. [ "/dev/loop0", "/dev/loop1", "/dev/loop2" ]
+        io_disks:
+          meta_data: <str>  # device path for meta-data;
+                            # optional, Motr will use "/var/motr/m0d-<FID>/"
+                            # by default
+          data: [ <str> ]   # e.g. [ "/dev/loop0", "/dev/loop1", "/dev/loop2" ]
                             # Empty list means no IO service.
     m0_clients:
         s3: <int>     # number of S3 servers to start
         other: <int>  # max quantity of other Motr clients this host may have
 pools:
   - name: <str>
+    type: sns|dix|md   # optional, defaults to "sns";
+                       # "sns" - data pool, "dix" - KV, "md" - meta-data pool.
+    data_units: <int>
+    parity_units: <int>
+    spare_units: <int> # optional
     allowed_failures:  # optional section; no failures will be allowed
                        # if this section is missing or all of its elements
                        # are zeroes
@@ -54,17 +63,15 @@ pools:
       encl: <int>
       ctrl: <int>
       disk: <int>
-    data_units: <int>
-    parity_units: <int>
-    #
-    # There are two ways of assigning disks to pool:
-    #
-    # 1) Use all available disks of all nodes for this pool.
-    disks: all
-    # 2) Choose which disks of which host to use for this pool.
-    #disks:
-    #  select:
-    #    - { host: <str>, path_regex: <str> }
+      #
+      # There are two ways of assigning disks to pool:
+      #
+      # 1) Use all available disks of all nodes for this pool.
+      disks: all
+      # 2) Choose which disks of which host to use for this pool.
+      #disks:
+      #  select:
+      #    - { host: <str>, path_regex: <str> }
 ```
 
 ### `cfgen` script
