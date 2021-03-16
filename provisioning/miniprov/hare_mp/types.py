@@ -123,6 +123,7 @@ class PoolDesc(DhallTuple):
     disk_refs: Maybe[DList[DiskRef]]
     data_units: int
     parity_units: int
+    spare_units: Maybe[int]
     type: PoolType
 
 
