@@ -156,6 +156,7 @@ class CdfGenerator:
                     ], 'List DiskRef'), 'List DiskRef'),
                 data_units=layout.data,
                 parity_units=layout.parity,
+                spare_units=Maybe(layout.spare, 'Natural'),
                 type=PoolType[pool_type]))
 
     def _create_pool_descriptions(self) -> List[PoolDesc]:

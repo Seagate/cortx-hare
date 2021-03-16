@@ -95,6 +95,7 @@ pools:
         node: <str>  # optional; 'hostname' of the corresponding node
     data_units: <int>
     parity_units: <int>
+    spare_units: <int>
     allowed_failures:  # optional section; no failures will be allowed
                        # if this section is missing or all of its elements
                        # are zeroes
@@ -331,6 +332,10 @@ def validate_pools_desc(pools_desc: List[Dict[str, Any]]) -> None:
         t = pool_type(pool)
         if t is PoolT.sns:
             d = pool.get('allowed_failures')
+            spare_units = pool.get('spare_units')
+            assert spare_units is None\
+                or spare_units == 0\
+                or spare_units == pool['parity_units']
             assert d is None or d['disk'] <= pool['parity_units'], """\
 {}: Cannot allow that many disk failures ({})
 The number of allowed disk failures must not exceed the number of spare disks\
@@ -1190,12 +1195,23 @@ class ConfPool(ToDhall):
         m0conf[pool_id] = cls(pvers=[], name=pool_desc.get('name'))
         m0conf[parent].pools.append(pool_id)
 
+        spare_units = pool_desc.get('spare_units')
+        assert spare_units is None\
+            or spare_units == 0\
+            or spare_units == pool_desc['parity_units']
+
+        if spare_units is None:
+            spare_units = pool_desc.get('parity_units')
+
         drives = pool_drives(m0conf, pool_desc)
         t = pool_type(pool_desc)
         assert ('data_units' in pool_desc) == ('parity_units' in pool_desc)
         if 'data_units' in pool_desc:
+            if spare_units is None:
+                spare_units = pool_desc['parity_units']
             pd_attrs = PDClustAttrs0(pool_desc['data_units'],
-                                     pool_desc['parity_units'])
+                                     pool_desc['parity_units'],
+                                     spare_units)
         else:
             if t is PoolT.dix:
                 # For CAS service N must be equal to 1.  CAS records are
@@ -1205,7 +1221,8 @@ class ConfPool(ToDhall):
             else:
                 assert t is PoolT.md
                 data_units = len(drives)
-            pd_attrs = PDClustAttrs0(data_units=data_units, parity_units=0)
+            pd_attrs = PDClustAttrs0(
+                data_units=data_units, parity_units=0, spare_units=0)
         tolerance = None if t is PoolT.sns else Failures(0, 0, 0, 1, 0)
         pver = ConfPver.build(m0conf, pool_id, pd_attrs, drives, tolerance)
         if t is PoolT.dix:
@@ -1250,7 +1267,8 @@ def gen_allowances(allowed: Failures) -> List[Failures]:
 # m0_pdclust_attr
 PDClustAttrs0 = NamedTuple('PDClustAttrs0',
                            # XXX What about `unit_size` and `seed`?
-                           [('data_units', int), ('parity_units', int)])
+                           [('data_units', int), ('parity_units', int),\
+                            ('spare_units', int)])
 PDClustAttrs0.__doc__ = 'Motr parity de-clustering layout attributes'
 
 
@@ -1258,10 +1276,13 @@ def tolerated_failures(m0conf: Dict[Oid, Any], pd_attrs: PDClustAttrs0,
                        drives: List[Oid]) -> Failures:
     assert pd_attrs.data_units > 0
     assert pd_attrs.parity_units >= 0
+    assert pd_attrs.spare_units is None\
+        or pd_attrs.spare_units == 0\
+        or pd_attrs.spare_units == pd_attrs.parity_units
     assert drives and all(x.type is ObjT.drive for x in drives)
     assert all_unique(drives)
 
-    n, k = pd_attrs
+    n, k, s = pd_attrs
 
     nr_ctrls = 0
     for ctrl_id, ctrl in m0conf.items():
@@ -1271,7 +1292,7 @@ def tolerated_failures(m0conf: Dict[Oid, Any], pd_attrs: PDClustAttrs0,
             nr_ctrls += 1
     assert nr_ctrls > 0
 
-    q, r = divmod(n + 2*k, nr_ctrls)
+    q, r = divmod(n + k + s, nr_ctrls)
     # There are `r` controllers with `q+1` units and
     # `(nr_ctrls - r)` controllers with `q` units.
     #
@@ -1306,10 +1327,13 @@ class ConfPver(ToDhall):
     _objt = ObjT.pver
     _downlinks = {Downlink('sitevs', ObjT.objv)}
 
-    def __init__(self, data_units: int, parity_units: int, pool_width: int,
-                 tolerance: List[int], sitevs: List[Oid]):
+    def __init__(self, data_units: int, parity_units: int, spare_units: int,
+                 pool_width: int, tolerance: List[int], sitevs: List[Oid]):
         assert data_units > 0
         assert parity_units >= 0
+        assert spare_units is None\
+            or spare_units == 0\
+            or spare_units == parity_units
         assert pool_width > 0
         assert len(tolerance) == len(pver_levels)
         assert all(n >= 0 for n in tolerance)
@@ -1317,6 +1341,7 @@ class ConfPver(ToDhall):
 
         self.data_units = data_units
         self.parity_units = parity_units
+        self.spare_units = spare_units
         self.pool_width = pool_width
         self.tolerance = tolerance
         self.sitevs = sitevs
@@ -1324,6 +1349,7 @@ class ConfPver(ToDhall):
     def __repr__(self):
         args = ', '.join([f'data_units={self.data_units}',
                           f'parity_units={self.parity_units}',
+                          f'spare_units={self.spare_units}',
                           f'pool_width={self.pool_width}',
                           f'tolerance={self.tolerance}',
                           f'sitevs={self.sitevs}'])
@@ -1334,6 +1360,7 @@ class ConfPver(ToDhall):
         args = ', '.join([f'id = {oid_to_dhall(oid)}',
                           f'data_units = {self.data_units}',
                           f'parity_units = {self.parity_units}',
+                          f'spare_units = {self.spare_units}',
                           f'pool_width = {self.pool_width}',
                           f'tolerance = {self.tolerance}',
                           f'sitevs = {oids_to_dhall(self.sitevs)}'])
@@ -1351,6 +1378,7 @@ class ConfPver(ToDhall):
         m0conf[pver_id] = cls(
             data_units=pd_attrs.data_units,
             parity_units=pd_attrs.parity_units,
+            spare_units=pd_attrs.spare_units,
             pool_width=len(drives),
             tolerance=list(tolerated_failures(m0conf, pd_attrs, drives)
                            if tolerance is None else tolerance),

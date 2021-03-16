@@ -47,6 +47,7 @@ pools:
                        # "sns" - data pool, "dix" - KV, "md" - meta-data pool.
     data_units: <int>
     parity_units: <int>
+    spare_units: <int> # optional
     allowed_failures:  # optional section; no failures will be allowed
                        # if this section is missing or all of its elements
                        # are zeroes
