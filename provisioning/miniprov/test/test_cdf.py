@@ -62,10 +62,11 @@ class TestTypes(unittest.TestCase):
                        disk_refs=Maybe(DList([], 'List DiskRef'), []),
                        data_units=0,
                        parity_units=0,
+                       spare_units=Maybe(0, 'Natural'),
                        type=PoolType.sns)
         self.assertEqual(
             '{ name = "storage_set_name", disk_refs = Some ([] : List DiskRef), '
-            'data_units = 0, parity_units = 0, type = T.PoolType.sns }',
+            'data_units = 0, parity_units = 0, spare_units = Some (0), type = T.PoolType.sns }',
             str(val))
 
     def test_m0server_with_disks(self):
@@ -192,6 +193,7 @@ class TestCDF(unittest.TestCase):
         self.assertEqual(PoolType.sns, ret[0].type)
         self.assertEqual(1, ret[0].data_units)
         self.assertEqual(0, ret[0].parity_units)
+        self.assertEqual(0, ret[0].spare_units.get())
         disk_refs = ret[0].disk_refs.value
         self.assertEqual(Text('myhost'), disk_refs.value[0].node.value)
         self.assertEqual(Text('/dev/sdb'), disk_refs.value[0].path)
