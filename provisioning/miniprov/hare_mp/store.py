@@ -28,10 +28,16 @@ class ValueProvider:
             raise RuntimeError(f'ConfStore key {key} not found')
         return ret
 
+    def _raw_get(self, key: str) -> str:
+        raise NotImplementedError()
+
     def get_machine_id(self) -> str:
         raise NotImplementedError()
 
-    def _raw_get(self, key: str) -> str:
+    def get_cluster_id(self) -> str:
+        raise NotImplementedError()
+
+    def get_storage_set_id(self) -> int:
         raise NotImplementedError()
 
 
@@ -42,10 +48,21 @@ class ConfStoreProvider(ValueProvider):
         conf.load('hare', url)
         self.conf = conf
 
+    def _raw_get(self, key: str) -> str:
+        return self.conf.get('hare', key)
+
     def get_machine_id(self) -> str:
-        with open('/etc/machine_id', 'r') as f:
+        with open('/etc/machine-id', 'r') as f:
             machine_id = f.readline().strip('\n')
             return machine_id
 
-    def _raw_get(self, key: str) -> str:
-        return self.conf.get('hare', key)
+    def get_cluster_id(self) -> str:
+        machine_id = self.get_machine_id()
+        cluster_id = self._raw_get(f'server_node>{machine_id}>cluster_id')
+        return cluster_id
+
+    def get_storage_set_id(self) -> int:
+        machine_id = self.get_machine_id()
+        storage_set_id = self._raw_get((f'server_node>{machine_id}>'
+                                        f'storage_set_id'))
+        return int(storage_set_id)
