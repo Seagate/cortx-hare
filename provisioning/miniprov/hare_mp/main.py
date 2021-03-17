@@ -35,6 +35,7 @@ from cortx.utils.product_features import unsupported_features
 
 from hare_mp.cdf import CdfGenerator
 from hare_mp.store import ConfStoreProvider
+from hare_mp.validator import Validator
 
 
 def execute(cmd: List[str]) -> str:
@@ -142,11 +143,15 @@ def post_install(args):
 def init(args):
     try:
         rc = 0
-        path_to_cdf = args.file[0]
-        if not is_cluster_running() and bootstrap_cluster(path_to_cdf) != 0:
-            logging.error('Failed to bootstrap the custer')
-            rc = -1
-        shutdown_cluster()
+        url = args.config[0]
+        validator = Validator(ConfStoreProvider(url))
+        if validator.is_first_node_in_cluster():
+            path_to_cdf = args.file[0]
+            if (not is_cluster_running()) and (
+                    bootstrap_cluster(path_to_cdf) != 0):
+                logging.error('Failed to bootstrap the custer')
+                rc = -1
+            shutdown_cluster()
         exit(rc)
     except Exception as error:
         logging.error('Error while initializing the cluster (%s)', error)
@@ -157,15 +162,19 @@ def init(args):
 def test(args):
     try:
         rc = 0
-        path_to_cdf = args.file[0]
-        if not is_cluster_running() and bootstrap_cluster(path_to_cdf) != 0:
-            logging.error('Failed to bootstrap the cluster')
-            rc = -1
-        cluster_status = check_cluster_status(path_to_cdf)
-        shutdown_cluster()
-        if cluster_status:
-            logging.error('Cluster status reports failure')
-            rc = -1
+        url = args.config[0]
+        validator = Validator(ConfStoreProvider(url))
+        if validator.is_first_node_in_cluster():
+            path_to_cdf = args.file[0]
+            if (not is_cluster_running()) and (
+                    bootstrap_cluster(path_to_cdf) != 0):
+                logging.error('Failed to bootstrap the cluster')
+                rc = -1
+            cluster_status = check_cluster_status(path_to_cdf)
+            shutdown_cluster()
+            if cluster_status:
+                logging.error('Cluster status reports failure')
+                rc = -1
         exit(rc)
     except Exception as error:
         logging.error('Error while checking cluster status (%s)', error)
@@ -249,7 +258,7 @@ def check_cluster_status(path_to_cdf: str):
 
     node_info_dict = list2dict(nodes_data_hctl)
     for node in cluster_desc['nodes']:
-        m0client_s3_cnt = node['m0_clients']['s3']
+        s3_cnt = node['m0_clients']['s3']
         m0ds = node.get('m0_servers', [])
         ios_cnt = 0
         for m0d in m0ds:
@@ -261,9 +270,8 @@ def check_cluster_status(path_to_cdf: str):
                         node['hostname']]['ioservice'][ios_cnt] != 'started':
                     return -1
                 ios_cnt += 1
-        if (m0client_s3_cnt > 0
-                and len(node_info_dict[node['hostname']]['s3server']) !=
-                m0client_s3_cnt):
+        if (s3_cnt > 0) and (
+                len(node_info_dict[node['hostname']]['s3server']) != s3_cnt):
             return -1
 
     return 0
