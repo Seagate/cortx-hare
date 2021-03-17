@@ -71,9 +71,10 @@ class CdfGenerator:
             spare_units_count = int(conf.get(
                 f'cluster>{cluster_id}>storage_set{x+1}>durability>spare'))
 
-            if (data_devices_count != 0
-                and not data_devices_count >=
-                    data_units_count + parity_units_count + spare_units_count):
+            min_pool_width = data_units_count + parity_units_count \
+                + spare_units_count
+            if (data_devices_count != 0) and not (
+                    data_devices_count >= min_pool_width):
                 raise RuntimeError('Invalid storage set configuration')
 
             pools.append(PoolDesc(
