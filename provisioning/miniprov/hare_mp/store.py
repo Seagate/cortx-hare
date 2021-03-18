@@ -28,6 +28,9 @@ class ValueProvider:
             raise RuntimeError(f'ConfStore key {key} not found')
         return ret
 
+    def get_machine_id(self) -> str:
+        raise NotImplementedError()
+
     def _raw_get(self, key: str) -> str:
         raise NotImplementedError()
 
@@ -38,6 +41,11 @@ class ConfStoreProvider(ValueProvider):
         conf = ConfStore()
         conf.load('hare', url)
         self.conf = conf
+
+    def get_machine_id(self) -> str:
+        with open('/etc/machine_id', 'r') as f:
+            machine_id = f.readline().strip('\n')
+            return machine_id
 
     def _raw_get(self, key: str) -> str:
         return self.conf.get('hare', key)

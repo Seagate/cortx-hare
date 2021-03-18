@@ -1,10 +1,8 @@
 {
-  "cluster": {
-    "server_nodes": {
-      "SOME_ID": "srvnode_1"
-    },
-    "srvnode_1": {
+  "server_node": {
+    "SOME_MACHINE_ID": {
       "hostname": "myhost",
+      "cluster_id": "my-cluster",
       "network": {
         "data": {
           "interface_type": "tcp",
@@ -14,15 +12,36 @@
           ]
         }
       },
-      "storage": {
-        "data_devices": [
-          "/dev/sdb"
-        ],
-        "metadata_devices": [
-          "/dev/meta"
-        ]
-      },
+      "cvg": [
+        {
+          "data_devices": [
+            "/dev/sda",
+            "/dev/sdb"
+          ],
+          "metadata_devices": [
+            "/dev/meta"
+          ]
+        }
+      ],
       "s3_instances": "1"
+    }
+  },
+  "cluster": {
+    "my-cluster": {
+      "site": {
+        "storage_set_count": "1"
+      },
+      "storage_set1": {
+        "name": "storage1",
+        "server_nodes": [
+          "SOME_MACHINE_ID"
+        ],
+        "durability": {
+          "data": "1",
+          "parity": "0",
+          "spare": "0"
+        }
+      }
     }
   }
 }
