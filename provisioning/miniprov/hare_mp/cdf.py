@@ -1,7 +1,7 @@
 import os.path as P
 import subprocess as S
 from string import Template
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 import pkg_resources
 
@@ -25,7 +25,7 @@ class CdfGenerator:
         raise RuntimeError('CFGEN Dhall types not found')
 
     def _gencdf(self) -> str:
-        resource_path = '/'.join(('dhall', 'gencdf.dhall'))
+        resource_path = 'dhall/gencdf.dhall'
         raw_content: bytes = pkg_resources.resource_string(
             'hare_mp', resource_path)
         return raw_content.decode('utf-8')
@@ -42,9 +42,9 @@ class CdfGenerator:
     def _create_node_descriptions(self) -> List[NodeDesc]:
         nodes: List[NodeDesc] = []
         conf = self.provider
-        server_dict: Dict[str, str] = conf.get('cluster>server_nodes')
-        for _, node in server_dict.items():
-            nodes.append(self._create_node(node))
+        machines: Dict[str, Any] = conf.get('server_node')
+        for machine_id in machines.keys():
+            nodes.append(self._create_node(machine_id))
         return nodes
 
     def _create_pool_descriptions(self) -> List[PoolDesc]:
@@ -62,7 +62,7 @@ class CdfGenerator:
             for node in conf.get(
                     f'cluster>{cluster_id}>storage_set{x+1}>server_nodes'):
                 data_devices_count += len(
-                    conf.get(f'cluster>{node}>storage>data_devices'))
+                    conf.get(f'server_node>{node}>cvg[0]>data_devices'))
 
             data_units_count = int(conf.get(
                 f'cluster>{cluster_id}>storage_set{x+1}>durability>data'))
@@ -83,7 +83,7 @@ class CdfGenerator:
                     for node in conf.get(
                         f'cluster>{cluster_id}>storage_set{x+1}>server_nodes')
                     for device in conf.get(
-                        f'cluster>{node}>storage>data_devices')
+                        f'server_node>{node}>cvg[0]>data_devices')
                 ], 'List DiskRef'), 'List DiskRef'),
                 data_units=data_units_count,
                 parity_units=parity_units_count))
@@ -139,35 +139,37 @@ class CdfGenerator:
             raise RuntimeError(f'dhall-to-yaml binary failed: {err}')
         return yaml_out
 
-    def _get_iface(self, nodename: str) -> str:
+    def _get_iface(self, machine_id: str) -> str:
         ifaces = self.provider.get(
-            f'cluster>{nodename}>network>data>private_interfaces')
+            f'server_node>{machine_id}>network>data>private_interfaces')
         if not ifaces:
             raise RuntimeError('No data network interfaces found')
         return ifaces[0]
 
-    def _get_iface_type(self, nodename: str) -> Optional[Protocol]:
+    def _get_iface_type(self, machine_id: str) -> Optional[Protocol]:
         iface = self.provider.get(
-            f'cluster>{nodename}>network>data>interface_type', allow_null=True)
+            f'server_node>{machine_id}>network>data>interface_type',
+            allow_null=True)
         if iface is None:
             return None
         return Protocol[iface]
 
-    def _create_node(self, name: str) -> NodeDesc:
+    def _create_node(self, machine_id: str) -> NodeDesc:
         store = self.provider
-        hostname = store.get(f'cluster>{name}>hostname')
-        iface = self._get_iface(name)
+        hostname = store.get(f'server_node>{machine_id}>hostname')
+        iface = self._get_iface(machine_id)
         return NodeDesc(
             hostname=Text(hostname),
             data_iface=Text(iface),
-            data_iface_type=Maybe(self._get_iface_type(name), 'P'),
+            data_iface_type=Maybe(self._get_iface_type(machine_id), 'P'),
             io_disks=DList([
-                Text(device)
-                for device in store.get(f'cluster>{name}>storage>data_devices')
+                Text(device) for device in store.get(
+                    f'server_node>{machine_id}>cvg[0]>data_devices')
             ], 'List Text'),
             #
             # [KN] This is a hotfix for singlenode deployment
             # TODO in the future the value must be taken from a correct
             # ConfStore key (it doesn't exist now).
             meta_data=Text('/dev/vg_metadata_srvnode-1/lv_raw_metadata'),
-            s3_instances=int(store.get(f'cluster>{name}>s3_instances')))
+            s3_instances=int(
+                store.get(f'server_node>{machine_id}>s3_instances')))
