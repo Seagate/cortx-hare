@@ -22,11 +22,19 @@ set -e -x
 FILENAME=$1
 URL="json://$(readlink -f $FILENAME)"
 
-conf $URL set 'cluster>server_nodes>SOME_ID=srvnode_1'
-conf $URL set 'cluster>srvnode_1>hostname=myhost'
-conf $URL set 'cluster>srvnode_1>network>data>interface_type=tcp'
-conf $URL set 'cluster>srvnode_1>storage>data_devices[0]=/dev/sdb'
-conf $URL set 'cluster>srvnode_1>network>data>private_interfaces[0]=eth1'
-conf $URL set 'cluster>srvnode_1>network>data>private_interfaces[1]=eno2'
-conf $URL set 'cluster>srvnode_1>storage>metadata_devices[0]=/dev/meta'
-conf $URL set 'cluster>srvnode_1>s3_instances=1'
+conf $URL set 'server_node>SOME_MACHINE_ID>hostname=myhost'
+conf $URL set 'server_node>SOME_MACHINE_ID>cluster_id=my-cluster'
+conf $URL set 'server_node>SOME_MACHINE_ID>network>data>interface_type=tcp'
+conf $URL set 'server_node>SOME_MACHINE_ID>cvg[0]>data_devices[0]=/dev/sda'
+conf $URL set 'server_node>SOME_MACHINE_ID>cvg[0]>data_devices[1]=/dev/sdb'
+conf $URL set 'server_node>SOME_MACHINE_ID>network>data>private_interfaces[0]=eth1'
+conf $URL set 'server_node>SOME_MACHINE_ID>network>data>private_interfaces[1]=eno2'
+conf $URL set 'server_node>SOME_MACHINE_ID>cvg[0]>metadata_devices[0]=/dev/meta'
+conf $URL set 'server_node>SOME_MACHINE_ID>s3_instances=1'
+conf $URL set 'cluster>my-cluster>site>storage_set_count=1'
+conf $URL set 'cluster>my-cluster>storage_set1>name=storage1'
+conf $URL set 'cluster>my-cluster>storage_set1>server_nodes[0]=SOME_MACHINE_ID'
+conf $URL set 'cluster>my-cluster>storage_set1>durability>data=1'
+conf $URL set 'cluster>my-cluster>storage_set1>durability>parity=0'
+conf $URL set 'cluster>my-cluster>storage_set1>durability>spare=0'
+
