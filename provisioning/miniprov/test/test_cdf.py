@@ -20,12 +20,16 @@
 # report unsupported features, etc.
 
 # flake8: noqa
+#
+import os
+import tempfile
 import unittest
 from typing import Any
 from unittest.mock import MagicMock, Mock
 
+import pkg_resources
 from hare_mp.cdf import CdfGenerator
-from hare_mp.store import ValueProvider
+from hare_mp.store import ConfStoreProvider, ValueProvider
 from hare_mp.types import (DisksDesc, DList, M0Clients, M0ServerDesc, Maybe,
                            NodeDesc, PoolDesc, DiskRef, Protocol, Text)
 
@@ -74,6 +78,25 @@ class TestTypes(unittest.TestCase):
 
 
 class TestCDF(unittest.TestCase):
+    def _get_confstore_template(self) -> str:
+        resource_path = 'templates/hare.config.conf.tmpl.json'
+        raw_content: bytes = pkg_resources.resource_string(
+            'hare_mp', resource_path)
+        return raw_content.decode('utf-8')
+
+    def test_template_sane(self):
+        _, path = tempfile.mkstemp()
+        try:
+            with open(path, 'w') as f:
+                f.write(self._get_confstore_template())
+            store = ConfStoreProvider(f'json://{path}')
+            #
+            # the method will raise an exception if either
+            # Dhall is unhappy or some values are not found in ConfStore
+            CdfGenerator(provider=store).generate()
+        finally:
+            os.unlink(path)
+
     def test_it_works(self):
         store = ValueProvider()
 

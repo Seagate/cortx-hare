@@ -1,3 +1,5 @@
+#!/bin/bash
+#
 # Copyright (c) 2020 Seagate Technology LLC and/or its Affiliates
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,30 +16,17 @@
 #
 # For any questions about this software or licensing,
 # please email opensource@seagate.com or cortx-questions@seagate.com.
-#
 
-from typing import Any
+set -e -x
 
-from cortx.utils.conf_store import ConfStore
+FILENAME=$1
+URL="json://$(readlink -f $FILENAME)"
 
-
-class ValueProvider:
-    def get(self, key: str, allow_null: bool = False) -> Any:
-        ret = self._raw_get(key)
-        if ret is None and not allow_null:
-            raise RuntimeError(f'ConfStore key {key} not found')
-        return ret
-
-    def _raw_get(self, key: str) -> str:
-        raise NotImplementedError()
-
-
-class ConfStoreProvider(ValueProvider):
-    def __init__(self, url: str):
-        self.url = url
-        conf = ConfStore()
-        conf.load('hare', url)
-        self.conf = conf
-
-    def _raw_get(self, key: str) -> str:
-        return self.conf.get('hare', key)
+conf $URL set 'cluster>server_nodes>SOME_ID=srvnode_1'
+conf $URL set 'cluster>srvnode_1>hostname=myhost'
+conf $URL set 'cluster>srvnode_1>network>data>interface_type=tcp'
+conf $URL set 'cluster>srvnode_1>storage>data_devices[0]=/dev/sdb'
+conf $URL set 'cluster>srvnode_1>network>data>private_interfaces[0]=eth1'
+conf $URL set 'cluster>srvnode_1>network>data>private_interfaces[1]=eno2'
+conf $URL set 'cluster>srvnode_1>storage>metadata_devices[0]=/dev/meta'
+conf $URL set 'cluster>srvnode_1>s3_instances=1'

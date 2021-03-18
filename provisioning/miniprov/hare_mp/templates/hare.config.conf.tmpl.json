@@ -1,0 +1,28 @@
+{
+  "cluster": {
+    "server_nodes": {
+      "SOME_ID": "srvnode_1"
+    },
+    "srvnode_1": {
+      "hostname": "myhost",
+      "network": {
+        "data": {
+          "interface_type": "tcp",
+          "private_interfaces": [
+            "eth1",
+            "eno2"
+          ]
+        }
+      },
+      "storage": {
+        "data_devices": [
+          "/dev/sdb"
+        ],
+        "metadata_devices": [
+          "/dev/meta"
+        ]
+      },
+      "s3_instances": "1"
+    }
+  }
+}
