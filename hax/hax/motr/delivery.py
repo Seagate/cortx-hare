@@ -56,6 +56,9 @@ class DeliveryHerald:
         """
         condition = Condition()
         with self.lock:
+            promise = self.check_if_delivered_locked(promise)
+            if promise.is_empty():
+                return
             self.waiting_clients[promise] = condition
 
         with condition:
@@ -80,9 +83,11 @@ class DeliveryHerald:
 
         Raises NotDelivered exception when timeout_sec exceeds.
         """
-
         condition = Condition()
         with self.lock:
+            promise = self.check_if_delivered_locked(promise)
+            if promise.is_empty():
+                return
             self.waiting_clients[promise] = condition
             LOG.debug('waiting clients %s', self.waiting_clients)
 
@@ -95,11 +100,7 @@ class DeliveryHerald:
                     raise NotDelivered('None of message tags =' +
                                        str(promise) +
                                        '  were delivered to Motr')
-                confirmed_msgs = self.recently_delivered.pop(promise)
-                LOG.debug('Thread unblocked - %s just received',
-                          confirmed_msgs)
-                del self.waiting_clients[promise]
-                promise.exclude_ids(confirmed_msgs)
+                promise = self.check_if_delivered_locked(promise)
                 LOG.debug('After exclusion: %s', promise)
                 if not promise.is_empty():
                     self.waiting_clients[promise] = condition
@@ -121,3 +122,17 @@ class DeliveryHerald:
                     with client:
                         client.notify()
                     return
+
+    # This function must be invoked with the self.lock held.
+    def check_if_delivered_locked(
+            self,
+            promise: HaLinkMessagePromise) -> HaLinkMessagePromise:
+        if not self.lock.locked():
+            raise RuntimeError('DeliveryHerald.lock not acquired')
+        if promise in self.recently_delivered:
+            confirmed_msgs = self.recently_delivered.pop(promise)
+            LOG.debug('Thread unblocked - %s just received',
+                      confirmed_msgs)
+            del self.waiting_clients[promise]
+            promise.exclude_ids(confirmed_msgs)
+        return promise
