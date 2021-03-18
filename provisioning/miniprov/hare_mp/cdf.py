@@ -148,7 +148,7 @@ class CdfGenerator:
 
     def _get_iface_type(self, nodename: str) -> Optional[Protocol]:
         iface = self.provider.get(
-            f'cluster>{nodename}>network>data>interface_type')
+            f'cluster>{nodename}>network>data>interface_type', allow_null=True)
         if iface is None:
             return None
         return Protocol[iface]
