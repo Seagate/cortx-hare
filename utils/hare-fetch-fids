@@ -1,0 +1,198 @@
+#!/usr/bin/env python3
+#
+# Copyright (c) 2020 Seagate Technology LLC and/or its Affiliates
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# For any questions about this software or licensing,
+# please email opensource@seagate.com or cortx-questions@seagate.com.
+
+# :help: Fetch the fids for services configured on a node
+
+import sys
+import re
+from typing import List, NamedTuple
+import json
+import argparse
+import simplejson
+from hax.types import ObjT
+from utils import get_local_nodename
+
+
+class Node:
+    def __init__(self, name: str):
+        self.name = name
+        self.svcs = []
+
+    def add_service(self, svc: str, fid: str):
+        self.svcs.append(Process(svc, fid))
+
+    def get_service(self, service: str):
+        for svc in self.svcs:
+            if svc.name == service:
+                return svc.fid
+        print(f'Service {service} not found on node {self.name}.', file=sys.stderr)
+
+    def __repr__(self):
+        return f'{self.__class__.__name__}(name={self.name}, svcs={self.svcs})'
+
+    def for_json(self):
+        return self.__dict__
+
+
+Process = NamedTuple('Process', [('name', str), ('fid', str)])
+
+
+def to_fid(container: int, key: int) -> str:
+    return f'{container:#x}:{key:#x}'
+
+
+def node_names(data: List) -> List[Node]:
+    # Get entries from file
+    # ​"key": "m0conf/nodes/<node_fid>",
+    # "value": "{​​​​​\"name\": \"<node name>\", \"state\": \"<HA state>\"}​​​​​"
+    regex = re.compile(
+        f'm0conf/nodes/[a-zA-Z0-9:]+$')
+    nodes = []
+    for key in data:
+        match_result = re.match(regex, key['key'])
+        if not match_result:
+            continue
+        if len(key['key'].split('/')) == 3:
+            nodes.append(json.loads(key['value'])['name'])
+    return nodes
+
+
+def get_keys_for_processes(data: List) -> List[str]:
+    # Get 'm0conf/nodes/<node_id>/processes/<process_fidk>/services/<svc_type>' entries
+    # from the file.  See 'Consul KV Schema' in [4/KV](rfc/4/README.md).
+    regex = re.compile(
+        f'^m0conf\\/.*\\/processes\\/.*\\/services\\/(confd|ios|m0_client_s3)+$')
+
+    keys = []
+    for key in data:
+        match_result = re.match(regex, key['key'])
+        if not match_result:
+            continue
+        keys.append(match_result.group(0))
+    if not keys:
+        raise RuntimeError(
+            f'No ioservice, confd, or s3servers found in the cluster')
+    return keys
+
+
+def add_service_to_node(nodes: List[Node], node_name: str, svc_name: str, fid: str):
+    for node in nodes:
+        if node.name == node_name:
+            node.add_service(svc_name, fid)
+
+
+def get_service_for_node(nodes: List[Node], node_name: str = None, service: str = None) -> str:
+    # if node_name is not specified, then local node is used.
+    if node_name == None:
+        node_name = get_local_nodename()
+
+    # if service is not specified, return all the services for a node.
+    if service == None:
+        for node in nodes:
+            if node.name == node_name:
+                return simplejson.dumps(node, indent=2, for_json=True)
+
+    for node in nodes:
+        if node.name == node_name:
+            return node.get_service(service)
+
+    print(f'Node {node_name} not found in cluster.', file=sys.stderr)
+
+
+def process_all_keys(keys: List, nodes: List[Node]):
+    names = {
+        'confd': 'confd',
+        'ios': 'ioservice',
+        'm0_client_s3': 's3server'
+    }
+    for key in keys:
+        # key looks like
+        # 'm0conf/nodes/<name>/processes/<process_fidk>/services/<svc_type>'
+        parts = key.split('/')
+        svc_type = parts[-1]
+        node_name = parts[2]
+        process_fidk = parts[-3]
+        add_service_to_node(nodes, node_name, names[svc_type],
+                            to_fid(ObjT.PROCESS.value, int(process_fidk)))
+
+    for node in nodes:
+        if not node.svcs:
+            raise RuntimeError(
+                f'No ioservice, confd, or s3servers found on the node {node.name}')
+
+
+def read_file():
+    path = '/var/lib/hare/consul-kv.json'
+    with open(path) as consul_kv_file:
+        data = json.load(consul_kv_file)
+    return data
+
+
+def get_nodes_for_cluster() -> List[Node]:
+    file_data = read_file()
+    nodes = []
+    for n in node_names(file_data):
+        nodes.append(Node(n))
+
+    keys = get_keys_for_processes(file_data)
+    process_all_keys(keys, nodes)
+    return nodes
+
+
+def parse_opts(argv):
+    p = argparse.ArgumentParser(description='Fetches the fids for services configured on a node.',
+                                usage='%(prog)s [OPTION]')
+
+    p.add_argument('--service', '-s',
+                   help='service name. - Returns fid for given service. '
+                   'List of services- "confd", "ioservice", "s3server". '
+                   'Default: Returns the fids for all the services.',
+                   type=str,
+                   action='store')
+    p.add_argument('--node', '-n',
+                   help='node-name - Returns the fids of services for the given node. '
+                   'Default: Local node',
+                   type=str,
+                   action='store')
+    p.add_argument('--all',
+                   help='Returns fids of all the services for nodes in cluster.',
+                   action='store_true')
+
+    return p.parse_args(argv)
+
+
+def main(argv=None):
+    opts = parse_opts(argv)
+    try:
+        nodes = get_nodes_for_cluster()
+
+        if opts.all:
+            return simplejson.dumps(nodes, indent=2, for_json=True)
+
+        fid = get_service_for_node(nodes, opts.node, opts.service)
+        if fid:
+            print(fid)
+    except RuntimeError as e:
+        print(e, file=sys.stderr)
+
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())
