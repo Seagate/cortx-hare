@@ -66,14 +66,9 @@ and health-checking mechanisms.
     sudo yum -y install cortx-motr cortx-motr-devel
     ```
 
-  * .. or from sources
+  * .. or from [sources](https://github.com/Seagate/cortx-motr/blob/main/doc/Quick-Start-Guide.rst) use this link to build Motr from source. Once you built Motr continue with the steps listed below.
+    
     ```sh
-    git clone --recursive https://github.com/Seagate/cortx-motr.git
-    cd cortx-motr
-    
-    sudo ./scripts/install-build-deps
-    
-    scripts/m0 make
     sudo scripts/install-motr-service --link
 
     export M0_SRC_DIR=$PWD
@@ -83,7 +78,7 @@ and health-checking mechanisms.
 * Build and install Hare.
   ```sh
   make
-  sudo make devinstall
+  sudo make install
   ```
 
 * Add current user to `hare` group.
@@ -94,7 +89,7 @@ and health-checking mechanisms.
 
 
 ### Build and install `hare` rpm from source.
-
+**NOTE: If you have built Motr and HARE from source you will not need to generate RPM packages below**
 * Install Motr.
 
   * .. from RPMS
@@ -102,7 +97,7 @@ and health-checking mechanisms.
     sudo yum -y install cortx-motr cortx-motr-devel
     ```
 
-  * .. or from sources
+  * .. or
     ```sh
     git clone --recursive https://github.com/Seagate/cortx-motr.git
     cd cortx-motr
