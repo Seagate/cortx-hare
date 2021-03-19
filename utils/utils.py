@@ -146,6 +146,12 @@ def is_localhost(hostname: str) -> bool:
     name = gethostname()
     return hostname in ('localhost', '127.0.0.1', name, f'{name}.local')
 
+def get_local_nodename() -> str:
+    process = subprocess.run("node-name",
+                            check=True,
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    node_name = process.stdout.strip()
+    return node_name.decode('utf-8')
 
 def is_fake_leader_name(leader: str) -> bool:
     return re.match(r'^elect[0-9]+$', leader) is not None
