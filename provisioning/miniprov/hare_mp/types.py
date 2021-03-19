@@ -12,7 +12,7 @@ class Maybe:
         if self.value is None:
             return f'None {self.comment}'
 
-        return f'Some {self.value}'
+        return f'Some ({self.value})'
 
 
 @dataclass
@@ -87,3 +87,30 @@ class NodeDesc(DhallTuple):
     io_disks: DList  # [str]
     meta_data: Text
     s3_instances: int
+
+
+@dataclass(repr=False)
+class DiskRef(DhallTuple):
+    path: Text
+    node: Maybe
+
+
+@dataclass(repr=False)
+class PoolDesc(DhallTuple):
+    name: Text
+    disk_refs: Maybe  # [DList]
+    data_units: int
+    parity_units: int
+
+
+@dataclass(repr=False)
+class ProfileDesc(DhallTuple):
+    name: Text
+    pools: DList  # [str]
+
+
+@dataclass(repr=False)
+class ClusterDesc(DhallTuple):
+    node_info: List[NodeDesc]
+    pool_info: List[PoolDesc]
+    profile_info: List[ProfileDesc]
