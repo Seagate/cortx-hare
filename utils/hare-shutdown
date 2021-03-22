@@ -95,9 +95,23 @@ def processes_by_consul_svc_name(cns: Consul) -> Dict[str, List[Process]]:
             from e
 
 
+def get_node_name() -> str:
+    with open('/var/lib/hare/node-name') as f:
+        return f.readline().strip('\n')
+
+
 def is_localhost(hostname: str) -> bool:
-    name = gethostname()
-    return hostname in ('localhost', '127.0.0.1', name, f'{name}.local')
+    def match_node_file() -> bool:
+        try:
+            return hostname == get_node_name()
+        except OSError:
+            return False
+
+    def match_localhost() -> bool:
+        name = gethostname()
+        return hostname in ('localhost', '127.0.0.1', name, f'{name}.local')
+
+    return match_node_file() or match_localhost()
 
 
 def is_fake_leader_name(leader: str) -> bool:
