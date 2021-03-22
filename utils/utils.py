@@ -142,9 +142,18 @@ def processes_by_consul_svc_name(cns: Consul) -> Dict[str, List[Process]]:
             from e
 
 
+def get_node_name() -> str:
+    with open('/var/lib/hare/node-name') as f:
+        return f.readline().strip('\n')
+
+
 def is_localhost(hostname: str) -> bool:
-    name = gethostname()
-    return hostname in ('localhost', '127.0.0.1', name, f'{name}.local')
+    try:
+        return hostname == get_node_name()
+    except OSError:
+        # If the node-name file doesn't exist, then fallback to default logic
+        name = gethostname()
+        return hostname in ('localhost', '127.0.0.1', name, f'{name}.local')
 
 
 def get_local_nodename() -> str:
