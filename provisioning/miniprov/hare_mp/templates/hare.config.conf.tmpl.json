@@ -1,8 +1,28 @@
 {
+  "cluster": {
+    "my-cluster": {
+      "site": {
+        "storage_set_count": "1"
+      },
+      "storage_set": [
+        {
+          "durability": {
+            "data": "1",
+            "parity": "0",
+            "spare": "0"
+          },
+          "name": "storage1",
+          "server_nodes": [
+            "SOME_MACHINE_ID"
+          ]
+        }
+      ]
+    }
+  },
   "server_node": {
     "SOME_MACHINE_ID": {
-      "hostname": "myhost",
       "cluster_id": "my-cluster",
+      "hostname": "myhost",
       "network": {
         "data": {
           "interface_type": "tcp",
@@ -12,35 +32,19 @@
           ]
         }
       },
-      "cvg": [
-        {
-          "data_devices": [
-            "/dev/sda",
-            "/dev/sdb"
-          ],
-          "metadata_devices": [
-            "/dev/meta"
-          ]
-        }
-      ],
-      "s3_instances": "1"
-    }
-  },
-  "cluster": {
-    "my-cluster": {
-      "site": {
-        "storage_set_count": "1"
-      },
-      "storage_set1": {
-        "name": "storage1",
-        "server_nodes": [
-          "SOME_MACHINE_ID"
-        ],
-        "durability": {
-          "data": "1",
-          "parity": "0",
-          "spare": "0"
-        }
+      "s3_instances": "1",
+      "storage": {
+        "cvg": [
+          {
+            "data_devices": [
+              "/dev/sda",
+              "/dev/sdb"
+            ],
+            "metadata_devices": [
+              "/dev/meta"
+            ]
+          }
+        ]
       }
     }
   }
