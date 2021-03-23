@@ -6,8 +6,8 @@ from typing import Any, Dict, List, Optional
 import pkg_resources
 
 from hare_mp.store import ValueProvider
-from hare_mp.types import (DList, Maybe, DiskRef, PoolDesc, ProfileDesc,
-                           NodeDesc, ClusterDesc, Protocol, Text)
+from hare_mp.types import (ClusterDesc, DiskRef, DList, Maybe, NodeDesc,
+                           PoolDesc, ProfileDesc, Protocol, Text)
 
 DHALL_PATH = '/opt/seagate/cortx/hare/share/cfgen/dhall'
 DHALL_EXE = '/opt/seagate/cortx/hare/bin/dhall'
@@ -56,51 +56,62 @@ class CdfGenerator:
 
         for x in range(storage_set_count):
             storage_set_name = conf.get(
-                f'cluster>{cluster_id}>storage_set{x+1}>name')
+                f'cluster>{cluster_id}>storage_set[{x}]>name')
 
             data_devices_count: int = 0
             for node in conf.get(
-                    f'cluster>{cluster_id}>storage_set{x+1}>server_nodes'):
+                    f'cluster>{cluster_id}>storage_set[{x}]>server_nodes'):
                 data_devices_count += len(
-                    conf.get(f'server_node>{node}>cvg[0]>data_devices'))
+                    conf.get(
+                        f'server_node>{node}>storage>cvg[0]>data_devices'))
 
-            data_units_count = int(conf.get(
-                f'cluster>{cluster_id}>storage_set{x+1}>durability>data'))
-            parity_units_count = int(conf.get(
-                f'cluster>{cluster_id}>storage_set{x+1}>durability>parity'))
-            spare_units_count = int(conf.get(
-                f'cluster>{cluster_id}>storage_set{x+1}>durability>spare'))
+            data_units_count = int(
+                conf.get(
+                    f'cluster>{cluster_id}>storage_set[{x}]>durability>data'))
+            parity_units_count = int(
+                conf.get(
+                    f'cluster>{cluster_id}>storage_set[{x}]>durability>parity')
+            )
+            spare_units_count = int(
+                conf.get(
+                    f'cluster>{cluster_id}>storage_set[{x}]>durability>spare'))
 
             min_pool_width = data_units_count + parity_units_count \
                 + spare_units_count
-            if (data_devices_count != 0) and not (
-                    data_devices_count >= min_pool_width):
+            if (data_devices_count !=
+                    0) and not (data_devices_count >= min_pool_width):
                 raise RuntimeError('Invalid storage set configuration')
 
-            pools.append(PoolDesc(
-                name=Text(storage_set_name),
-                disk_refs=Maybe(DList([
-                    DiskRef(path=Text(device), node=Maybe(Text(node), 'Text'))
-                    for node in conf.get(
-                        f'cluster>{cluster_id}>storage_set{x+1}>server_nodes')
-                    for device in conf.get(
-                        f'server_node>{node}>cvg[0]>data_devices')
-                ], 'List DiskRef'), 'List DiskRef'),
-                data_units=data_units_count,
-                parity_units=parity_units_count))
+            pools.append(
+                PoolDesc(
+                    name=Text(storage_set_name),
+                    disk_refs=Maybe(
+                        DList([
+                            DiskRef(
+                                path=Text(device),
+                                node=Maybe(
+                                    Text(
+                                        conf.get(f'server_node>{node}>hostname'
+                                                 )), 'Text')) for node in
+                            conf.get(f'cluster>{cluster_id}>'
+                                     f'storage_set[{x}]>server_nodes')
+                            for device in conf.get(
+                                f'server_node>{node}>'
+                                f'storage>cvg[0]>data_devices')
+                        ], 'List DiskRef'), 'List DiskRef'),
+                    data_units=data_units_count,
+                    parity_units=parity_units_count))
 
         return pools
 
     def _create_profile_descriptions(
-        self, pool_desc: List[PoolDesc]
-    ) -> List[ProfileDesc]:
+            self, pool_desc: List[PoolDesc]) -> List[ProfileDesc]:
         profiles: List[ProfileDesc] = []
 
-        profiles.append(ProfileDesc(
-            name=Text('Profile_the_pool'),
-            pools=DList([pool.name
-                         for pool in pool_desc
-                         ], 'List Text')))
+        profiles.append(
+            ProfileDesc(name=Text('Profile_the_pool'),
+                        pools=DList([pool.name for pool in pool_desc],
+                                    'List Text')))
 
         return profiles
 
@@ -110,8 +121,10 @@ class CdfGenerator:
         pools = self._create_pool_descriptions()
         profiles = self._create_profile_descriptions(pools)
 
-        params_text = str(ClusterDesc(
-            node_info=nodes, pool_info=pools, profile_info=profiles))
+        params_text = str(
+            ClusterDesc(node_info=nodes,
+                        pool_info=pools,
+                        profile_info=profiles))
         gencdf = Template(self._gencdf()).substitute(path=dhall_path,
                                                      params=params_text)
         return gencdf
@@ -165,7 +178,7 @@ class CdfGenerator:
             data_iface_type=Maybe(self._get_iface_type(machine_id), 'P'),
             io_disks=DList([
                 Text(device) for device in store.get(
-                    f'server_node>{machine_id}>cvg[0]>data_devices')
+                    f'server_node>{machine_id}>storage>cvg[0]>data_devices')
             ], 'List Text'),
             #
             # [KN] This is a hotfix for singlenode deployment
