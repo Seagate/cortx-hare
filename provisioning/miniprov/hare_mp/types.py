@@ -114,3 +114,10 @@ class ClusterDesc(DhallTuple):
     node_info: List[NodeDesc]
     pool_info: List[PoolDesc]
     profile_info: List[ProfileDesc]
+
+
+@dataclass(repr=False)
+class MissingKeyError(Exception):
+    key: str
+    def __str__(self):
+        return f"Required key '{self.key}' not found"

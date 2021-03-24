@@ -19,13 +19,14 @@
 from typing import Any
 
 from cortx.utils.conf_store import ConfStore
+from hare_mp.types import MissingKeyError
 
 
 class ValueProvider:
     def get(self, key: str, allow_null: bool = False) -> Any:
         ret = self._raw_get(key)
         if ret is None and not allow_null:
-            raise RuntimeError(f'ConfStore key {key} not found')
+            raise MissingKeyError(key)
         return ret
 
     def _raw_get(self, key: str) -> str:
