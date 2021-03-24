@@ -148,12 +148,17 @@ def get_node_name() -> str:
 
 
 def is_localhost(hostname: str) -> bool:
-    try:
-        return hostname == get_node_name()
-    except OSError:
-        # If the node-name file doesn't exist, then fallback to default logic
+    def match_node_file() -> bool:
+        try:
+            return hostname == get_node_name()
+        except OSError:
+            return False
+
+    def match_localhost() -> bool:
         name = gethostname()
         return hostname in ('localhost', '127.0.0.1', name, f'{name}.local')
+
+    return match_node_file() or match_localhost()
 
 
 def get_local_nodename() -> str:
