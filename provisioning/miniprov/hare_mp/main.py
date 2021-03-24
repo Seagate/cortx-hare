@@ -294,6 +294,7 @@ def config(args):
         save(filename, generate_cdf(url))
     except Exception as error:
         logging.error('Error performing configuration (%s)', error)
+        exit(-1)
 
 
 def main():
