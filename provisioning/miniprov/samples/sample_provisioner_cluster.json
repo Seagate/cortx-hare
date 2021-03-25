@@ -7,21 +7,21 @@
     "software": {
       "csm": {
         "user": "csm",
-        "secret": "gAAAAABgVIvovcf7C69fTmEw7MYBLQM-aWjo-g49hzzFGFa9KK5e8-nwohdbGyRtOE42GrVEg2uKIL9mf2D1suvBFhoe7DvNow=="
+        "secret": "STUB"
       },
       "openldap": {
         "root": {
           "user": "admin",
-          "secret": "gAAAAABgVIvpWDrxDqt5HV9deN6CneGO-bKQaGTzha31_WYla-BrhM-pNjNfzgqYWAnXdcwDPZlyrKpvTNkTpkKrw_X_dlFGMQ=="
+          "secret": "STUB"
         },
         "sgiam": {
           "user": "sgiamadmin",
-          "secret": "gAAAAABgVIvp1oc8wt0vvwIs6U9_ghsx1GvJ3w9dFcvwqSW3T_7WjpeEfiC-Vx8qTMKRxDE9ODVxizH6VFXBZf9OvHiIpAraEg=="
+          "secret": "STUB"
         }
       },
       "corosync": {
         "user": "hacluster",
-        "secret": "gAAAAABgVIvq6g8MN3HDW0fnQ8c9Jm4LvID1eBTiz81D6LipbH_bF02ZZ1AQ5RYw7HcZimovfw6ygIsvAJFvqQ2PTvUhI-AQUA=="
+        "secret": "STUB"
       }
     },
     "release": {
@@ -71,7 +71,7 @@
       "bmc": {
         "ip": "None",
         "user": "None",
-        "secret": "gAAAAABgVIwTCdnbg4pLbISCt7nKFZ1aVzx31zJAxGJv7-JWrySDlEI8ioIaNV6YiFG-UdjbWFYRsVzMLt3TaqljqYt-BJtQ5A=="
+        "secret": "STUB"
       },
       "network": {
         "management": {
