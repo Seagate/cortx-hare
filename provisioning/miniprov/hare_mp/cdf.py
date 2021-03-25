@@ -171,6 +171,7 @@ class CdfGenerator:
     def _create_node(self, machine_id: str) -> NodeDesc:
         store = self.provider
         hostname = store.get(f'server_node>{machine_id}>hostname')
+        name = store.get(f'server_node>{machine_id}>name')
         iface = self._get_iface(machine_id)
         return NodeDesc(
             hostname=Text(hostname),
@@ -184,6 +185,7 @@ class CdfGenerator:
             # [KN] This is a hotfix for singlenode deployment
             # TODO in the future the value must be taken from a correct
             # ConfStore key (it doesn't exist now).
-            meta_data=Text('/dev/vg_metadata_srvnode-1/lv_raw_metadata'),
+            meta_data1=Text(f'/dev/vg_{name}_md1/lv_raw_md1'),
+            meta_data2=Text(f'/dev/vg_{name}_md2/lv_raw_md2'),
             s3_instances=int(
                 store.get(f'server_node>{machine_id}>s3_instances')))
