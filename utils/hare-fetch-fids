@@ -17,11 +17,11 @@
 # For any questions about this software or licensing,
 # please email opensource@seagate.com or cortx-questions@seagate.com.
 
-# :help: Fetch the fids for services configured on a node
+# :help: Fetch the fids for motr services (m0d and s3server)
 
 import sys
 import re
-from typing import List, NamedTuple
+from typing import List, NamedTuple, Optional
 import json
 import argparse
 import simplejson
@@ -29,19 +29,28 @@ from hax.types import ObjT
 from utils import get_local_nodename
 
 
+Process = NamedTuple('Process', [('name', str), ('fid', str)])
+
+
 class Node:
     def __init__(self, name: str):
         self.name = name
-        self.svcs = []
+        self.svcs: List[Process] = []
 
-    def add_service(self, svc: str, fid: str):
+    def add_service(self, svc: str, fid: str) -> None:
         self.svcs.append(Process(svc, fid))
 
-    def get_service(self, service: str):
+    def get_service(self, service: str) -> Optional[List[Process]]:
+        # Returns list of services matching the given service
+        services: List[Process] = []
         for svc in self.svcs:
             if svc.name == service:
-                return svc.fid
-        print(f'Service {service} not found on node {self.name}.', file=sys.stderr)
+                services.append(svc)
+        if services:
+            return services
+        print(
+            f'Service {service} not found on node {self.name}.', file=sys.stderr)
+        return None
 
     def __repr__(self):
         return f'{self.__class__.__name__}(name={self.name}, svcs={self.svcs})'
@@ -50,20 +59,17 @@ class Node:
         return self.__dict__
 
 
-Process = NamedTuple('Process', [('name', str), ('fid', str)])
-
-
 def to_fid(container: int, key: int) -> str:
     return f'{container:#x}:{key:#x}'
 
 
-def node_names(data: List) -> List[Node]:
+def node_names(data: List) -> List[str]:
     # Get entries from file
     # ​"key": "m0conf/nodes/<node_fid>",
     # "value": "{​​​​​\"name\": \"<node name>\", \"state\": \"<HA state>\"}​​​​​"
     regex = re.compile(
         f'm0conf/nodes/[a-zA-Z0-9:]+$')
-    nodes = []
+    nodes: List[str] = []
     for key in data:
         match_result = re.match(regex, key['key'])
         if not match_result:
@@ -91,13 +97,13 @@ def get_keys_for_processes(data: List) -> List[str]:
     return keys
 
 
-def add_service_to_node(nodes: List[Node], node_name: str, svc_name: str, fid: str):
+def add_service_to_node(nodes: List[Node], node_name: str, svc_name: str, fid: str) -> None:
     for node in nodes:
         if node.name == node_name:
             node.add_service(svc_name, fid)
 
 
-def get_service_for_node(nodes: List[Node], node_name: str = None, service: str = None) -> str:
+def get_service_for_node(nodes: List[Node], node_name: str, service: str) -> Optional[List[Process]]:
     # if node_name is not specified, then local node is used.
     if node_name == None:
         node_name = get_local_nodename()
@@ -106,16 +112,19 @@ def get_service_for_node(nodes: List[Node], node_name: str = None, service: str 
     if service == None:
         for node in nodes:
             if node.name == node_name:
-                return simplejson.dumps(node, indent=2, for_json=True)
+                return node.svcs
 
+    # returns all the services for the specified given service
     for node in nodes:
         if node.name == node_name:
             return node.get_service(service)
 
-    print(f'Node {node_name} not found in cluster.', file=sys.stderr)
+    print(
+        f'Node {node_name} not found in cluster.', file=sys.stderr)
+    return None
 
 
-def process_all_keys(keys: List, nodes: List[Node]):
+def process_all_keys(keys: List, nodes: List[Node]) -> None:
     names = {
         'confd': 'confd',
         'ios': 'ioservice',
@@ -146,9 +155,12 @@ def read_file():
 
 def get_nodes_for_cluster() -> List[Node]:
     file_data = read_file()
-    nodes = []
+    nodes: List[Node] = []
     for n in node_names(file_data):
         nodes.append(Node(n))
+
+    if not nodes:
+        raise RuntimeError('No nodes configured in the cluster')
 
     keys = get_keys_for_processes(file_data)
     process_all_keys(keys, nodes)
@@ -156,7 +168,7 @@ def get_nodes_for_cluster() -> List[Node]:
 
 
 def parse_opts(argv):
-    p = argparse.ArgumentParser(description='Fetches the fids for services configured on a node.',
+    p = argparse.ArgumentParser(description='Fetches the fids for motr services (m0d and s3server) in cluster or node.',
                                 usage='%(prog)s [OPTION]')
 
     p.add_argument('--service', '-s',
@@ -173,6 +185,9 @@ def parse_opts(argv):
     p.add_argument('--all',
                    help='Returns fids of all the services for nodes in cluster.',
                    action='store_true')
+    p.add_argument('--json',
+                   help='show output in JSON format',
+                   action='store_true')
 
     return p.parse_args(argv)
 
@@ -183,12 +198,14 @@ def main(argv=None):
         nodes = get_nodes_for_cluster()
 
         if opts.all:
-            return simplejson.dumps(nodes, indent=2, for_json=True)
+            print(simplejson.dumps(nodes, indent=2, for_json=True))
+            return 0
 
-        fid = get_service_for_node(nodes, opts.node, opts.service)
-        if fid:
-            print(fid)
-    except RuntimeError as e:
+        svcs = get_service_for_node(nodes, opts.node, opts.service)
+        if svcs:
+            print(simplejson.dumps(svcs, indent=2, for_json=True))
+
+    except (RuntimeError, FileNotFoundError) as e:
         print(e, file=sys.stderr)
 
     return 0
