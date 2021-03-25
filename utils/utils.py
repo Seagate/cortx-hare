@@ -148,12 +148,17 @@ def get_node_name() -> str:
 
 
 def is_localhost(hostname: str) -> bool:
-    try:
-        return hostname == get_node_name()
-    except OSError:
-        # If the node-name file doesn't exist, then fallback to default logic
+    def match_node_file() -> bool:
+        try:
+            return hostname == get_node_name()
+        except OSError:
+            return False
+
+    def match_localhost() -> bool:
         name = gethostname()
         return hostname in ('localhost', '127.0.0.1', name, f'{name}.local')
+
+    return match_node_file() or match_localhost()
 
 
 def get_local_nodename() -> str:
@@ -188,12 +193,17 @@ def exec_silent(cmd: str) -> bool:
     return subprocess.call(cmd, shell=True) == 0
 
 
-def exec_custom(cmd: str) -> None:
+def exec_custom(cmd: str, show_err: bool = True) -> None:
     assert cmd
-    if exec_silent(cmd):
-        logging.info('OK')
-    else:
-        logging.error('**ERROR**')
+
+    def handle(result: bool) -> None:
+        if not show_err:
+            return
+        if result:
+            logging.info('OK')
+        else:
+            logging.error('**ERROR**')
+    handle(exec_silent(cmd))
 
 
 def process_stop(proc: Process) -> None:
