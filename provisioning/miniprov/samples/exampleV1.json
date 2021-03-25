@@ -32,7 +32,7 @@
   "corosync-pacemaker": {
     "cluster_name": "cortx_cluster",
     "user": "hacluster",
-    "secret": "gAAAAABgDsD7pV2BxPXu6NeIIrVCwptUHbZaODtAAgo9Ik778Qz2lgu3xZzJUk7qNlU5ZMHZYq5HKoD500Df359jJ4JZ9z1KcQ=="
+    "secret": "STUB"
   },
   "elasticsearch": {
     "cluster_name": "elasticsearch_cluster",
@@ -200,11 +200,11 @@
     "backend_db": "mdb",
     "root": {
       "user": "admin",
-      "secret": "gAAAAABgDsD9AL9sc3GTifl67KHhXPvN8qDeL2qXg2fDl_ZzWDcamNUErrtN7NBextFXdyxrTW7s0o2e3MvfGVOZ4JA2rLkdVw=="
+      "secret": "STUB"
     },
     "sgiam": {
       "user": "admin",
-      "secret": "gAAAAABgDsD9Mn4dQH0lHiwfjxOaEc5JyFomf-0bjl4H0-5d2cuQ-3VWiZ2H5ZZg_k-oqk8crnzPFNa-Nnpz9oVD-97jXY3Eew=="
+      "secret": "STUB"
     }
   },
   "provisioner": {
@@ -251,7 +251,7 @@
           "port": 80
         },
         "user": "manage",
-        "secret": "gAAAAABgDsD-n8U52K1glqwVeEpqPzghG0eH53dMyceq62RMpmMr4-WFpQFUvPHF7yZZlwwy3TNevwUtB_3kHH_7ZoYf6l0mNQ=="
+        "secret": "STUB"
       }
     }
   },
@@ -262,7 +262,7 @@
     },
     "service-user": {
       "name": "cortxub",
-      "secret": "gAAAAABgDsD-ON8L7ILRuiYnlPj9Smx83ZeujyjozBO558GTzZDrz2gAPShCZAqDu0Eb-pUy3uDPpG5T7x4YlJHHJaOegjdQkg==",
+      "secret": "STUB",
       "groups": [
         "wheel"
       ],
@@ -270,7 +270,7 @@
     },
     "cortx-user": {
       "name": "cortxcli",
-      "secret": "gAAAAABgDsD_c16J83oNhbF8bOr24XNKwvMXfuOjJxe8NthzSWxN3HkfOIsKyFzEhRl9lHgSdK-Eu9BAzu5VhgMqFiKQJeVr2g=="
+      "secret": "STUB"
     }
   },
   "cluster": {
@@ -302,7 +302,7 @@
       "bmc": {
         "ip": null,
         "user": "",
-        "secret": "gAAAAABgDsEaBIobmtxzLHgW4nc6k7UJyUzLItnHqgFW-R9gaGgOTZM8AR0aazeeOoc0lAFoa6KxpBhH-levkOBs4SNmwHATQA=="
+        "secret": "STUB"
       },
       "network": {
         "mgmt": {
