@@ -9,7 +9,8 @@ let NodeInfo =
       , data_iface : Text
       , data_iface_type : Optional T.Protocol
       , io_disks : List Text
-      , meta_data : Text
+      , meta_data1 : Text
+      , meta_data2 : Text
       , s3_instances : Natural
       }
 
@@ -40,10 +41,10 @@ let toNodeDesc
           , m0_clients = { other = 3, s3 = n.s3_instances }
           , m0_servers =
               Some
-              [ { io_disks = { data = [] : List Text, meta_data = Some n.meta_data }
+              [ { io_disks = { data = [] : List Text, meta_data = Some n.meta_data1 }
                 , runs_confd = Some True
                 }
-              , { io_disks = { data = n.io_disks, meta_data = Some n.meta_data }
+              , { io_disks = { data = n.io_disks, meta_data = Some n.meta_data2 }
                 , runs_confd = None Bool
                 }
               ]

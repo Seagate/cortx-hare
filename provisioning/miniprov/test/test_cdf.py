@@ -104,6 +104,7 @@ class TestCDF(unittest.TestCase):
             data = {
                 'cluster>cluster_id': 'CLUSTER_ID',
                 'server_node>MACH_ID>hostname':                'myhost',
+                'server_node>MACH_ID>name': 'mynodename',
                 'server_node>MACH_ID>network>data>interface_type':                'tcp',
                 'server_node>MACH_ID>storage>cvg[0]>data_devices': ['/dev/sdb'],
                 'server_node>MACH_ID>network>data>private_interfaces':                ['eth1', 'eno2'],
@@ -143,6 +144,7 @@ class TestCDF(unittest.TestCase):
                 'server_node>MACH_ID>storage>cvg[0]>data_devices': ['/dev/sdb'],
                 'server_node>MACH_ID>storage>cvg[0]>metadata_devices': ['/dev/meta'],
                 'server_node>MACH_ID>hostname':                'myhost',
+                'server_node>MACH_ID>name': 'mynodename',
                 'server_node>MACH_ID>network>data>interface_type':                'o2ib',
                 'server_node>MACH_ID>network>data>private_interfaces':                ['eth1', 'eno2'],
                 'server_node>MACH_ID>s3_instances':                1,
@@ -193,6 +195,7 @@ class TestCDF(unittest.TestCase):
                 'server_node>srvnode_1>cluster_id': 'CLUSTER_ID',
                 'server_node>srvnode_1>storage>cvg[0]>data_devices': ['/dev/sdb'],
                 'server_node>srvnode_1>hostname':                'myhost',
+                'server_node>srvnode_1>name': 'mynodename',
                 'server_node>srvnode_1>network>data>interface_type':                'o2ib',
                 'server_node>srvnode_1>network>data>private_interfaces':                ['eth1', 'eno2'],
                 'server_node>srvnode_1>s3_instances':                1,
@@ -251,6 +254,7 @@ class TestCDF(unittest.TestCase):
                 },
                 'server_node>MACH_ID>hostname':
                 'myhost',
+                'server_node>MACH_ID>name': 'mynodename',
                 'server_node>MACH_ID>storage>cvg[0]>data_devices': ['/dev/sdb'],
                 'server_node>MACH_ID>network>data>private_interfaces':
                 ['eth1', 'eno2'],
@@ -272,8 +276,10 @@ class TestCDF(unittest.TestCase):
         ret = CdfGenerator(provider=store)._create_node_descriptions()
         self.assertIsInstance(ret, list)
         self.assertEqual(1, len(ret))
-        self.assertEqual(Text('/dev/vg_metadata_srvnode-1/lv_raw_metadata'),
-                         ret[0].meta_data)
+        self.assertEqual(Text('/dev/vg_mynodename_md1/lv_raw_md1'),
+                         ret[0].meta_data1)
+        self.assertEqual(Text('/dev/vg_mynodename_md2/lv_raw_md2'),
+                         ret[0].meta_data2)
 
     def test_multiple_nodes_supported(self):
         store = ValueProvider()
@@ -293,6 +299,7 @@ class TestCDF(unittest.TestCase):
                 'cluster>92f444df-87cc-4137-b680-aab3b35d1695>storage_set[0]>durability>parity': 0,
 
                 'server_node>MACH_ID>hostname': 'myhost',
+                'server_node>MACH_ID>name': 'mynodename',
                 'server_node>MACH_ID>network>data>interface_type': 'o2ib',
                 'server_node>MACH_ID>network>data>private_interfaces':
                 ['eth1'],
@@ -300,7 +307,7 @@ class TestCDF(unittest.TestCase):
                 'server_node>MACH_ID>storage>cvg[0]>data_devices': ['/dev/sdb'],
                 'server_node>MACH_ID>storage>cvg[0]>metadata_devices': ['/dev/meta'],
                 'server_node>MACH_2_ID>hostname': 'host-2',
-                'server_node>MACH_2_ID>hostname': 'host-2',
+                'server_node>MACH_2_ID>name': 'mynodename2',
                 'server_node>MACH_2_ID>network>data>interface_type': 'tcp',
                 'server_node>MACH_2_ID>network>data>private_interfaces':
                 ['eno1'],
@@ -332,6 +339,7 @@ class TestCDF(unittest.TestCase):
                 'server_node': {
                     'MACH_ID': 'stub'
                 },
+                'server_node>MACH_ID>name': 'mynodename',
                 'server_node>MACH_ID>hostname':
                 'myhost',
                 'server_node>MACH_ID>storage>cvg[0]>data_devices': ['/dev/sdb'],

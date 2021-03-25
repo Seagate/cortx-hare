@@ -21,6 +21,7 @@
     "SOME_MACHINE_ID": {
       "cluster_id": "my-cluster",
       "hostname": "myhost",
+      "name": "mynodename",
       "network": {
         "data": {
           "interface_type": "tcp",
