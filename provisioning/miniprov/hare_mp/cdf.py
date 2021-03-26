@@ -67,14 +67,14 @@ class CdfGenerator:
 
             data_units_count = int(
                 conf.get(
-                    f'cluster>{cluster_id}>storage_set[{x}]>durability>data'))
+                    f'cluster>{cluster_id}>storage_set[{x}]>data'))
             parity_units_count = int(
                 conf.get(
-                    f'cluster>{cluster_id}>storage_set[{x}]>durability>parity')
+                    f'cluster>{cluster_id}>storage_set[{x}]>parity')
             )
             spare_units_count = int(
                 conf.get(
-                    f'cluster>{cluster_id}>storage_set[{x}]>durability>spare'))
+                    f'cluster>{cluster_id}>storage_set[{x}]>spare'))
 
             min_pool_width = data_units_count + parity_units_count \
                 + spare_units_count

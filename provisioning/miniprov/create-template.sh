@@ -23,9 +23,9 @@ FILENAME=$1
 URL="json://$(readlink -f "$FILENAME")"
 
 conf "$URL" set 'cluster>my-cluster>site>storage_set_count=1'
-conf "$URL" set 'cluster>my-cluster>storage_set[0]>durability>data=1'
-conf "$URL" set 'cluster>my-cluster>storage_set[0]>durability>parity=0'
-conf "$URL" set 'cluster>my-cluster>storage_set[0]>durability>spare=0'
+conf "$URL" set 'cluster>my-cluster>storage_set[0]>data=1'
+conf "$URL" set 'cluster>my-cluster>storage_set[0]>parity=0'
+conf "$URL" set 'cluster>my-cluster>storage_set[0]>spare=0'
 conf "$URL" set 'cluster>my-cluster>storage_set[0]>name=storage1'
 conf "$URL" set 'cluster>my-cluster>storage_set[0]>server_nodes[0]=SOME_MACHINE_ID'
 conf "$URL" set 'server_node>SOME_MACHINE_ID>cluster_id=my-cluster'
