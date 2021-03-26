@@ -52,11 +52,9 @@
           "storage_enclosures": [
             "encla971a87aace34e05b4747bb3376d6661"
           ],
-          "durability":{
-            "data": "1",
-            "parity": "0",
-            "spare": "0"
-          }
+          "data": "1",
+          "parity": "0",
+          "spare": "0"
         }
       ]
     }
