@@ -79,7 +79,7 @@ class TestTypes(unittest.TestCase):
 
 class TestCDF(unittest.TestCase):
     def _get_confstore_template(self) -> str:
-        resource_path = 'templates/hare.config.conf.tmpl.json'
+        resource_path = 'templates/hare.config.conf.tmpl'
         raw_content: bytes = pkg_resources.resource_string(
             'hare_mp', resource_path)
         return raw_content.decode('utf-8')
