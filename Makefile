@@ -166,6 +166,7 @@ MP_EGG_LINK        = $(DESTDIR)/$(PREFIX)/lib/python3.$(PY3_VERSION_MINOR)/site-
 SYSTEMD_CONFIG_DIR = $(DESTDIR)/usr/lib/systemd/system
 LOGROTATE_CONF_DIR = $(DESTDIR)/etc/logrotate.d
 ETC_CRON_DIR       = $(DESTDIR)/etc/cron.hourly
+MINIPROV_TMPL_DIR  = $(DESTDIR)/$(PREFIX)/conf/
 
 # dhall-bin {{{2
 vendor/dhall-bin/$(DHALL_VERSION)/dhall-$(DHALL_VERSION)-x86_64-linux.tar.bz2:
@@ -244,6 +245,11 @@ install: install-dirs install-cfgen install-hax install-miniprov install-systemd
 	@ln -sf /$(PREFIX)/bin/h0q $(DESTDIR)/usr/bin
 	@$(call _log,copying m0trace-prune -> $(ETC_CRON_DIR))
 	@install utils/m0trace-prune $(ETC_CRON_DIR)
+	@for f in provisioning/miniprov/hare_mp/templates/hare.* \
+		  provisioning/setup.yaml ; do \
+	     $(call _log,copying $$f -> $(MINIPROV_TMPL_DIR)); \
+	     install $$f $(MINIPROV_TMPL_DIR); \
+	 done
 
 .PHONY: install-dirs
 install-dirs:
@@ -366,6 +372,11 @@ devinstall: install-dirs devinstall-cfgen devinstall-hax devinstall-miniprov dev
 	@$(call _log,linking virtual environment to $(DESTDIR)/$(PREFIX))
 	@ln -s $(PY_VENV_DIR)/lib $(DESTDIR)/$(PREFIX)/lib
 	@ln -s $(PY_VENV_DIR)/lib64 $(DESTDIR)/$(PREFIX)/lib64
+	@for f in provisioning/miniprov/hare_mp/templates/hare.* \
+		  provisioning/setup.yaml ; do \
+	     $(call _log,linking $$f -> $(MINIPROV_TMPL_DIR)); \
+	     ln -sf $(TOP_SRC_DIR)$$f $(MINIPROV_TMPL_DIR); \
+	 done
 
 .PHONY: devinstall-cfgen
 devinstall-cfgen: CFGEN_INSTALL_CMD = ln -sf
