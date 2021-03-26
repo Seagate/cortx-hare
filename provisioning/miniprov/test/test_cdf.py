@@ -113,9 +113,9 @@ class TestCDF(unittest.TestCase):
                 'cluster>CLUSTER_ID>storage_set>server_node_count': 1,
                 'cluster>CLUSTER_ID>storage_set[0]>name': 'StorageSet-1',
                 'cluster>CLUSTER_ID>storage_set[0]>server_nodes': ['MACH_ID'],
-                'cluster>CLUSTER_ID>storage_set[0]>durability>data': 1,
-                'cluster>CLUSTER_ID>storage_set[0]>durability>parity': 0,
-                'cluster>CLUSTER_ID>storage_set[0]>durability>spare': 0,
+                'cluster>CLUSTER_ID>storage_set[0]>data': 1,
+                'cluster>CLUSTER_ID>storage_set[0]>parity': 0,
+                'cluster>CLUSTER_ID>storage_set[0]>spare': 0,
                 'server_node>MACH_ID>cluster_id': 'CLUSTER_ID',
                 'server_node':{'MACH_ID': {'cluster_id': 'CLUSTER_ID'}}
             }
@@ -131,9 +131,9 @@ class TestCDF(unittest.TestCase):
         def ret_values(value: str) -> Any:
             data = {
                 'cluster>CLUSTER_ID>site>storage_set_count': 1,
-                'cluster>CLUSTER_ID>storage_set[0]>durability>data': 1,
-                'cluster>CLUSTER_ID>storage_set[0]>durability>parity': 0,
-                'cluster>CLUSTER_ID>storage_set[0]>durability>spare': 0,
+                'cluster>CLUSTER_ID>storage_set[0]>data': 1,
+                'cluster>CLUSTER_ID>storage_set[0]>parity': 0,
+                'cluster>CLUSTER_ID>storage_set[0]>spare': 0,
                 'cluster>CLUSTER_ID>storage_set[0]>name': 'StorageSet-1',
                 'cluster>CLUSTER_ID>storage_set[0]>server_nodes': ['MACH_ID'],
                 'cluster>CLUSTER_ID>storage_set>server_node_count': 1,
@@ -181,9 +181,9 @@ class TestCDF(unittest.TestCase):
         def ret_values(value: str) -> Any:
             data = {
                 'cluster>CLUSTER_ID>site>storage_set_count': 1,
-                'cluster>CLUSTER_ID>storage_set[0]>durability>data': 1,
-                'cluster>CLUSTER_ID>storage_set[0]>durability>parity': 0,
-                'cluster>CLUSTER_ID>storage_set[0]>durability>spare': 0,
+                'cluster>CLUSTER_ID>storage_set[0]>data': 1,
+                'cluster>CLUSTER_ID>storage_set[0]>parity': 0,
+                'cluster>CLUSTER_ID>storage_set[0]>spare': 0,
                 'cluster>CLUSTER_ID>storage_set[0]>name': 'StorageSet-1',
                 'cluster>CLUSTER_ID>storage_set[0]>server_nodes': ['srvnode_1'],
                 'cluster>CLUSTER_ID>storage_set>server_node_count': 1,
@@ -213,9 +213,9 @@ class TestCDF(unittest.TestCase):
         def ret_values(value: str) -> Any:
             data = {
                 'cluster>CLUSTER_ID>site>storage_set_count': 1,
-                'cluster>CLUSTER_ID>storage_set[0]>durability>data': 2,
-                'cluster>CLUSTER_ID>storage_set[0]>durability>parity': 0,
-                'cluster>CLUSTER_ID>storage_set[0]>durability>spare': 0,
+                'cluster>CLUSTER_ID>storage_set[0]>data': 2,
+                'cluster>CLUSTER_ID>storage_set[0]>parity': 0,
+                'cluster>CLUSTER_ID>storage_set[0]>spare': 0,
                 'cluster>CLUSTER_ID>storage_set[0]>name': 'StorageSet-1',
                 'cluster>CLUSTER_ID>storage_set[0]>server_nodes': ['MACH_ID'],
                 'cluster>CLUSTER_ID>storage_set>server_node_count': 1,
