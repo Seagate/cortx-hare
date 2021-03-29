@@ -89,7 +89,7 @@ clean:
 #
 
 .PHONY: check
-check: flake8 mypy test
+check: flake8 mypy
 
 .PHONY: test
 test: $(PY_VENV_DIR) $(MP_SRC)
