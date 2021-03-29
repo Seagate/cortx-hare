@@ -20,3 +20,6 @@ hare:
   cleanup:
     cmd: /opt/seagate/cortx/hare/bin/hare_setup cleanup
     args: --config $URL
+  prepare:
+    cmd: /opt/seagate/cortx/hare/bin/hare_setup prepare
+    args: --config $URL

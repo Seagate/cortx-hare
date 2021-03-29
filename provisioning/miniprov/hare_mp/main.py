@@ -19,7 +19,6 @@
 # Setup utility for Hare to configure Hare related settings, e.g. logrotate,
 # report unsupported features, etc.
 
-# TODO [KN] polish the code, resolve flake8 complaints
 import argparse
 import asyncio
 import json
@@ -28,7 +27,8 @@ import os
 import shutil
 import subprocess
 import sys
-from typing import Dict, List
+from typing import Dict, List, Any, Callable
+from sys import exit
 
 import yaml
 from cortx.utils.product_features import unsupported_features
@@ -147,8 +147,7 @@ def init(args):
         validator = Validator(ConfStoreProvider(url))
         if validator.is_first_node_in_cluster():
             path_to_cdf = args.file[0]
-            if (not is_cluster_running()) and (
-                    bootstrap_cluster(path_to_cdf) != 0):
+            if not is_cluster_running() and bootstrap_cluster(path_to_cdf):
                 logging.error('Failed to bootstrap the custer')
                 rc = -1
             shutdown_cluster()
@@ -166,8 +165,7 @@ def test(args):
         validator = Validator(ConfStoreProvider(url))
         if validator.is_first_node_in_cluster():
             path_to_cdf = args.file[0]
-            if (not is_cluster_running()) and (
-                    bootstrap_cluster(path_to_cdf) != 0):
+            if not is_cluster_running() and bootstrap_cluster(path_to_cdf):
                 logging.error('Failed to bootstrap the cluster')
                 rc = -1
             cluster_status = check_cluster_status(path_to_cdf)
@@ -193,12 +191,8 @@ def generate_support_bundle(args):
         exit(-1)
 
 
-def cleanup(args):
-    try:
-        exit(0)
-    except Exception as error:
-        logging.error('Failed to perform cleanup (%s)', error)
-        exit(-1)
+def noop(args):
+    exit(0)
 
 
 def checkRpm(rpm_name):
@@ -234,7 +228,9 @@ def shutdown_cluster():
         os.system('hctl shutdown')
 
 
-def list2dict(nodes_data_hctl: list) -> dict:
+def list2dict(
+        nodes_data_hctl: List[Dict[str,
+                                   Any]]) -> Dict[str, Dict[str, List[str]]]:
     node_info_dict = {}
     for node in nodes_data_hctl:
         node_svc_info: Dict[str, List[str]] = {}
@@ -258,7 +254,7 @@ def check_cluster_status(path_to_cdf: str):
 
     node_info_dict = list2dict(nodes_data_hctl)
     for node in cluster_desc['nodes']:
-        s3_cnt = node['m0_clients']['s3']
+        s3_cnt = int(node['m0_clients']['s3'])
         m0ds = node.get('m0_servers', [])
         ios_cnt = 0
         for m0d in m0ds:
@@ -270,8 +266,8 @@ def check_cluster_status(path_to_cdf: str):
                         node['hostname']]['ioservice'][ios_cnt] != 'started':
                     return -1
                 ios_cnt += 1
-        if (s3_cnt > 0) and (
-                len(node_info_dict[node['hostname']]['s3server']) != s3_cnt):
+        if s3_cnt and len(
+                node_info_dict[node['hostname']]['s3server']) != s3_cnt:
             return -1
 
     return 0
@@ -297,19 +293,37 @@ def config(args):
         exit(-1)
 
 
-def main():
-    p = argparse.ArgumentParser(description='Configure hare settings')
-    subparser = p.add_subparsers()
-
-    parser = subparser.add_parser('post_install',
-                                  help='Perform post installation checks')
-    parser.set_defaults(func=post_install)
+def add_subcommand(subparser, command: str, help_str: str,
+                   handler_fn: Callable[[Any], None]):
+    parser = subparser.add_parser(command, help=help_str)
+    parser.set_defaults(func=handler_fn)
     parser.add_argument('--config',
                         help='Conf Store URL with cluster info',
                         required=True,
                         nargs=1,
                         type=str,
                         action='store')
+    return parser
+
+
+def add_file_argument(parser):
+    parser.add_argument('--file',
+                        help='Full path to the CDF file.',
+                        nargs=1,
+                        default=['/var/lib/hare/cluster.yaml'],
+                        type=str,
+                        action='store')
+    return parser
+
+
+def main():
+    p = argparse.ArgumentParser(description='Configure hare settings')
+    subparser = p.add_subparsers()
+
+    parser = add_subcommand(subparser,
+                            'post_install',
+                            help_str='Perform post installation checks',
+                            handler_fn=post_install)
     parser.add_argument(
         '--report-unavailable-features',
         help='Report unsupported features according to setup type',
@@ -318,80 +332,41 @@ def main():
                         help='Configure logrotate for hare',
                         action='store_true')
 
-    parser = subparser.add_parser('config', help='Configure Hare')
-    parser.set_defaults(func=config)
-    parser.add_argument('--config',
-                        help='Conf Store URL with cluster info',
-                        required=True,
-                        nargs=1,
-                        type=str,
-                        action='store')
-    parser.add_argument(
-        '--file',
-        help='Full path to the CDF file to generate at this stage.',
-        nargs=1,
-        default=['/var/lib/hare/cluster.yaml'],
-        type=str,
-        action='store')
+    add_file_argument(
+        add_subcommand(subparser,
+                       'config',
+                       help_str='Configure Hare',
+                       handler_fn=config))
 
-    parser = subparser.add_parser('init',
-                                  help='Perform component initialization')
-    parser.set_defaults(func=init)
-    parser.add_argument('--config',
-                        help='Conf Store URL with cluster info',
-                        required=True,
-                        nargs=1,
-                        type=str,
-                        action='store')
-    parser.add_argument('--file',
-                        help='Full path to the CDF file.',
-                        nargs=1,
-                        default=['/var/lib/hare/cluster.yaml'],
-                        type=str,
-                        action='store')
+    add_file_argument(
+        add_subcommand(subparser,
+                       'init',
+                       help_str='Perform component initialization',
+                       handler_fn=init))
 
-    parser = subparser.add_parser('test', help='Testing cluster status')
-    parser.set_defaults(func=test)
-    parser.add_argument('--config',
-                        help='Conf Store URL with cluster info',
-                        required=True,
-                        nargs=1,
-                        type=str,
-                        action='store')
-    parser.add_argument('--file',
-                        help='Full path to the CDF file.',
-                        nargs=1,
-                        default=['/var/lib/hare/cluster.yaml'],
-                        type=str,
-                        action='store')
+    add_file_argument(
+        add_subcommand(subparser,
+                       'test',
+                       help_str='Testing cluster status',
+                       handler_fn=test))
 
-    parser = subparser.add_parser('support_bundle',
-                                  help='Generating support bundle')
-    parser.set_defaults(func=generate_support_bundle)
-    parser.add_argument('--config',
-                        help='Conf Store URL with cluster info',
-                        required=True,
-                        nargs=1,
-                        type=str,
-                        action='store')
+    add_subcommand(subparser,
+                   'support_bundle',
+                   help_str='Generating support bundle',
+                   handler_fn=generate_support_bundle)
+    add_subcommand(subparser,
+                   'reset',
+                   help_str='Reset/cleanup step',
+                   handler_fn=noop)
+    add_subcommand(subparser,
+                   'cleanup',
+                   help_str='Reset/cleanup step',
+                   handler_fn=noop)
 
-    parser = subparser.add_parser('reset', help='Reset/cleanup step')
-    parser.set_defaults(func=cleanup)
-    parser.add_argument('--config',
-                        help='Conf Store URL with cluster info',
-                        required=True,
-                        nargs=1,
-                        type=str,
-                        action='store')
-    parser = subparser.add_parser('cleanup', help='Reset/cleanup step')
-    parser.set_defaults(func=cleanup)
-    parser.add_argument('--config',
-                        help='Conf Store URL with cluster info',
-                        required=True,
-                        nargs=1,
-                        type=str,
-                        action='store')
-
+    add_subcommand(subparser,
+                   'prepare',
+                   help_str='Prepare step',
+                   handler_fn=noop)
     setup_logging()
 
     parsed = p.parse_args(sys.argv[1:])
