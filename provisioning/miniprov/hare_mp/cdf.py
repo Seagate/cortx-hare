@@ -78,8 +78,7 @@ class CdfGenerator:
 
             min_pool_width = data_units_count + parity_units_count \
                 + spare_units_count
-            if (data_devices_count !=
-                    0) and not (data_devices_count >= min_pool_width):
+            if data_devices_count and (data_devices_count < min_pool_width):
                 raise RuntimeError('Invalid storage set configuration')
 
             pools.append(
