@@ -487,7 +487,7 @@ uninstall:
 PYTHON_SCRIPTS := utils/hare-shutdown utils/hare-status utils/gen-uuid utils/utils.py
 
 .PHONY: check
-check: check-cfgen check-hax flake8 mypy
+check: check-cfgen check-hax check-miniprov flake8 mypy
 
 .PHONY: check-cfgen
 check-cfgen: $(PY_VENV_DIR)
@@ -500,6 +500,11 @@ check-hax: $(PY_VENV_DIR)
 	@cd hax &&\
 	  $(PY_VENV) &&\
 	  MYPYPATH=../stubs $(PYTHON) setup.py flake8 mypy test
+
+.PHONY: check-miniprov
+check-miniprov:
+	@$(call _info,Checking hare_mp)
+	@$(MAKE) --quiet -C provisioning/miniprov check
 
 .PHONY: flake8
 flake8: $(PYTHON_SCRIPTS)
