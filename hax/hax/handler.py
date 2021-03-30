@@ -31,7 +31,7 @@ from hax.motr import Motr
 from hax.motr.delivery import DeliveryHerald
 from hax.queue.publish import EQPublisher
 from hax.types import (ConfHaProcess, HAState, MessageId, StobIoqError,
-                       m0HaProcessEvent, m0HaProcessType, ServiceHealth,
+                       m0HaProcessEvent, ServiceHealth,
                        StoppableThread, HaLinkMessagePromise, ObjT)
 from hax.util import ConsulUtil, dump_json, repeat_if_fails
 
@@ -61,7 +61,8 @@ class ConsumerThread(StoppableThread):
         self.is_stopped = True
 
     @repeat_if_fails(wait_seconds=1)
-    def _update_process_status(self, q: Queue, event: ConfHaProcess) -> None:
+    def _update_process_status(self, q: Queue, motr: Motr,
+                               event: ConfHaProcess) -> None:
         # If a consul-related exception appears, it will
         # be processed by repeat_if_fails.
         #
@@ -69,12 +70,8 @@ class ConsumerThread(StoppableThread):
         # intermittent error gets resolved.
         self.consul.update_process_status(event)
         svc_status = m0HaProcessEvent.event_to_svchealth(event.chp_event)
-        if event.chp_type == m0HaProcessType.M0_CONF_HA_PROCESS_M0D:
-            # Broadcast the received motr process status to other motr
-            # processes in the cluster.
-            q.put(BroadcastHAStates(states=[HAState(fid=event.fid,
-                                    status=svc_status)],
-                  reply_to=None))
+        motr.broadcast_ha_states([HAState(fid=event.fid,
+                                          status=svc_status)])
 
     @repeat_if_fails(wait_seconds=1)
     def update_process_failure(self, q: Queue,
@@ -83,6 +80,9 @@ class ConsumerThread(StoppableThread):
         for state in ha_states:
             # We are only concerned with process statuses.
             if state.fid.container == ObjT.PROCESS.value:
+                if state.status == ServiceHealth.OK:
+                    new_ha_states.append(state)
+                    continue
                 current_status = self.consul.get_process_current_status(
                                      state.status, state.fid)
                 if current_status == ServiceHealth.FAILED:
@@ -104,7 +104,7 @@ class ConsumerThread(StoppableThread):
                     # already restarted. Thus it is important to confirm
                     # the real time status of the process before
                     # broadcasting failure.
-                    current_status = ServiceHealth.OK
+                    current_status = ServiceHealth.UNKNOWN
                     q.put(BroadcastHAStates(
                           states=[HAState(fid=state.fid,
                                           status=ServiceHealth.FAILED)],
@@ -162,7 +162,7 @@ class ConsumerThread(StoppableThread):
                         # hence will need to make new attempt by itself
                         motr.send_entrypoint_request_reply(item)
                     elif isinstance(item, ProcessEvent):
-                        self._update_process_status(q, item.evt)
+                        self._update_process_status(q, motr, item.evt)
                     elif isinstance(item, HaNvecGetEvent):
                         fn = motr.ha_nvec_get_reply
                         # If a consul-related exception appears, it will
