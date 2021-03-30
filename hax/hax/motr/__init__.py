@@ -216,10 +216,14 @@ class Motr:
 
         notes = []
         for st in ha_states:
+            if st.status in (ServiceHealth.UNKNOWN, ServiceHealth.OFFLINE):
+                continue
             note = HaNoteStruct(st.fid.to_c(), ha_obj_state(st))
             notes.append(note)
             notes += self._generate_sub_services(note, self.consul_util)
 
+        if not notes:
+            return []
         message_ids: List[MessageId] = self._ffi.ha_broadcast(
             self._ha_ctx, make_array(HaNoteStruct, notes), len(notes))
         LOG.debug(
@@ -299,6 +303,7 @@ class Motr:
         service_notes = [HaNoteStruct(no_id=x.fid.to_c(), no_state=new_state)
                          for x in service_list]
         service_notes += self._generate_sub_disks(note, service_list, cns)
+
         return service_notes
 
     def _generate_sub_disks(self, note: HaNoteStruct,
@@ -309,8 +314,8 @@ class Motr:
         proc_fid = Fid.from_struct(note.no_id)
         for svc in services:
             disk_list += cns.get_disks_by_parent_process(proc_fid, svc.fid)
-        LOG.debug('proc fid=%s encloses %d disks as follows: %s', proc_fid,
-                  len(disk_list), disk_list)
+        LOG.debug('proc fid=%s encloses %d disks with state %d as follows: %s',
+                  proc_fid, len(disk_list), int(new_state), disk_list)
         return [
             HaNoteStruct(no_id=x.to_c(), no_state=new_state)
             for x in disk_list

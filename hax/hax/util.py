@@ -625,6 +625,7 @@ class ConsulUtil:
             status = ServiceHealth.UNKNOWN
             for item in node_data:
                 if item['ServiceID'] == str(svc_id):
+                    LOG.debug('item.status %s', item['Status'])
                     if item['Status'] == 'passing':
                         status = ServiceHealth.OK
                     elif item['Status'] == 'warning':
@@ -648,6 +649,10 @@ class ConsulUtil:
                             # is failed, we will return OK or FAILED
                             # accordingly.
                             status = ServiceHealth.UNKNOWN
+                        elif (svc_consul_status in
+                                ('M0_CONF_HA_PROCESS_STOPPED',
+                                 'M0_CONF_HA_PROCESS_STOPPING')):
+                            status = ServiceHealth.OFFLINE
                         else:
                             status = ServiceHealth.FAILED
                     else:
