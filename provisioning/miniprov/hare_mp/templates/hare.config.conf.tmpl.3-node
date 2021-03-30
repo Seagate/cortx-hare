@@ -1,0 +1,49 @@
+{
+  "cluster": {
+    "my-cluster": {
+      "site": {
+        "storage_set_count": "1"
+      },
+      "storage_set": [
+        {
+          "data": "1",
+          "parity": "0",
+          "spare": "0",
+          "name": "storage1",
+          "server_nodes": [
+            "SOME_MACHINE_ID"
+          ]
+        }
+      ]
+    }
+  },
+  "server_node": {
+    "SOME_MACHINE_ID": {
+      "cluster_id": "my-cluster",
+      "hostname": "myhost",
+      "network": {
+        "data": {
+          "interface_type": "tcp",
+          "private_interfaces": [
+            "eth1",
+            "eno2"
+          ]
+        }
+      },
+      "s3_instances": "1",
+      "storage": {
+        "cvg": [
+          {
+            "data_devices": [
+              "/dev/sda",
+              "/dev/sdb"
+            ],
+            "metadata_devices": [
+              "/dev/meta"
+            ]
+          }
+        ]
+      }
+    }
+  }
+}
