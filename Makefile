@@ -484,7 +484,7 @@ uninstall:
 # Linters --------------------------------------------- {{{1
 #
 
-PYTHON_SCRIPTS := utils/hare-shutdown utils/hare-status utils/gen-uuid utils/utils.py
+PYTHON_SCRIPTS := $(shell grep 'python3' -n utils/* 2>/dev/null | grep ':1:' | sed 's/^\([^:]*\):.*$$/\1/g')
 
 .PHONY: check
 check: check-cfgen check-hax flake8 mypy
