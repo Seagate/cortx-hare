@@ -283,11 +283,22 @@ def save(filename: str, contents: str) -> None:
         f.write(contents)
 
 
+def generate_config(url: str, path_to_cdf: str) -> None:
+    conf_dir = '/var/lib/hare'
+    os.environ['PATH'] += os.pathsep + '/opt/seagate/cortx/hare/bin/'
+    cmd = ['cfgen', '-o', conf_dir, path_to_cdf]
+    execute(cmd)
+    conf = ConfStoreProvider(url)
+    hostname = conf.get_hostname()
+    save(f'{conf_dir}/node-name', hostname)
+
+
 def config(args):
     try:
         url = args.config[0]
         filename = args.file[0] or '/var/lib/hare/cluster.yaml'
         save(filename, generate_cdf(url))
+        generate_config(url, filename)
     except Exception as error:
         logging.error('Error performing configuration (%s)', error)
         exit(-1)
