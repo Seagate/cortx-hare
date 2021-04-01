@@ -120,5 +120,6 @@ class ClusterDesc(DhallTuple):
 @dataclass(repr=False)
 class MissingKeyError(Exception):
     key: str
+
     def __str__(self):
         return f"Required key '{self.key}' not found"
