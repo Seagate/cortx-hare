@@ -1,1 +1,108 @@
-{}
+{
+  "cluster": {
+    "my-cluster": {
+      "site": {
+        "storage_set_count": "1"
+      },
+      "storage_set": [
+        {
+          "data": "4",
+          "parity": "2",
+          "spare": "2",
+          "name": "storage1",
+          "server_nodes": [
+            "SERVER_NODE_0_MACHINE_ID",
+            "SERVER_NODE_1_MACHINE_ID",
+            "SERVER_NODE_2_MACHINE_ID",
+          ]
+        }
+      ]
+    }
+  },
+  "server_node": {
+    "SERVER_NODE_0_MACHINE_ID": {
+      "cluster_id": "my-cluster",
+      "hostname": "myhost",
+      "name": "mynodename",
+      "network": {
+        "data": {
+          "interface_type": "tcp",
+          "private_interfaces": [
+            "eth1",
+            "eno2"
+          ]
+        }
+      },
+      "s3_instances": "1",
+      "storage": {
+        "cvg": [
+          {
+            "data_devices": [
+              "/dev/sda",
+              "/dev/sdb"
+            ],
+            "metadata_devices": [
+              "/dev/meta"
+            ]
+          }
+        ]
+      }
+    },
+    "SERVER_NODE_1_MACHINE_ID": {
+      "cluster_id": "my-cluster",
+      "hostname": "myhost",
+      "name": "mynodename",
+      "network": {
+        "data": {
+          "interface_type": "tcp",
+          "private_interfaces": [
+            "eth1",
+            "eno2"
+          ]
+        }
+      },
+      "s3_instances": "1",
+      "storage": {
+        "cvg": [
+          {
+            "data_devices": [
+              "/dev/sda",
+              "/dev/sdb"
+            ],
+            "metadata_devices": [
+              "/dev/meta"
+            ]
+          }
+        ]
+      }
+    },
+    "SERVER_NODE_2_MACHINE_ID": {
+      "cluster_id": "my-cluster",
+      "hostname": "myhost",
+      "name": "mynodename",
+      "network": {
+        "data": {
+          "interface_type": "tcp",
+          "private_interfaces": [
+            "eth1",
+            "eno2"
+          ]
+        }
+      },
+      "s3_instances": "1",
+      "storage": {
+        "cvg": [
+          {
+            "data_devices": [
+              "/dev/sda",
+              "/dev/sdb"
+            ],
+            "metadata_devices": [
+              "/dev/meta"
+            ]
+          }
+        ]
+      }
+    }
+  }
+}
