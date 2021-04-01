@@ -67,3 +67,8 @@ class ConfStoreProvider(ValueProvider):
         storage_set_id = self._raw_get((f'server_node>{machine_id}>'
                                         f'storage_set_id'))
         return int(storage_set_id)
+
+    def get_hostname(self) -> str:
+        machine_id = self.get_machine_id()
+        hostname = self._raw_get(f'server_node>{machine_id}>hostname')
+        return hostname
