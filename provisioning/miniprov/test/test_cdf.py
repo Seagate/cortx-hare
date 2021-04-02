@@ -25,13 +25,14 @@ import os
 import tempfile
 import unittest
 from typing import Any
-from unittest.mock import MagicMock, Mock
+from unittest.mock import Mock
 
 import pkg_resources
+
 from hare_mp.cdf import CdfGenerator
 from hare_mp.store import ConfStoreProvider, ValueProvider
 from hare_mp.types import (DisksDesc, DList, M0Clients, M0ServerDesc, Maybe,
-                           NodeDesc, PoolDesc, DiskRef, Protocol, Text)
+                           MissingKeyError, PoolDesc, PoolType, Protocol, Text)
 
 
 class TestTypes(unittest.TestCase):
@@ -57,13 +58,14 @@ class TestTypes(unittest.TestCase):
             str(val))
 
     def test_pooldesc_empty(self):
-        val = PoolDesc(
-            name=Text('storage_set_name'),
-            disk_refs=Maybe(DList([], 'List DiskRef'), []),
-            data_units=0,
-            parity_units=0)
+        val = PoolDesc(name=Text('storage_set_name'),
+                       disk_refs=Maybe(DList([], 'List DiskRef'), []),
+                       data_units=0,
+                       parity_units=0,
+                       type=PoolType.sns)
         self.assertEqual(
-            '{ name = "storage_set_name", disk_refs = Some ([] : List DiskRef), data_units = 0, parity_units = 0 }',
+            '{ name = "storage_set_name", disk_refs = Some ([] : List DiskRef), '
+            'data_units = 0, parity_units = 0, type = T.PoolType.sns }',
             str(val))
 
     def test_m0server_with_disks(self):
@@ -102,25 +104,41 @@ class TestCDF(unittest.TestCase):
 
         def ret_values(value: str) -> Any:
             data = {
-                'cluster>cluster_id': 'CLUSTER_ID',
-                'server_node>MACH_ID>hostname':                'myhost',
-                'server_node>MACH_ID>name': 'mynodename',
-                'server_node>MACH_ID>network>data>interface_type':                'tcp',
-                'server_node>MACH_ID>storage>cvg[0]>data_devices': ['/dev/sdb'],
-                'server_node>MACH_ID>network>data>private_interfaces':                ['eth1', 'eno2'],
-                'server_node>MACH_ID>storage>cvg[0]>metadata_devices': ['/dev/meta'],
-                'server_node>MACH_ID>s3_instances':                1,
-                'cluster>CLUSTER_ID>site>storage_set_count': 1,
-                'cluster>CLUSTER_ID>storage_set>server_node_count': 1,
-                'cluster>CLUSTER_ID>storage_set[0]>name': 'StorageSet-1',
+                'cluster>cluster_id':
+                'CLUSTER_ID',
+                'server_node>MACH_ID>name': 'myhost',
+                'server_node>MACH_ID>hostname':
+                'myhost',
+                'server_node>MACH_ID>network>data>interface_type':
+                'tcp',
+                'server_node>MACH_ID>storage>cvg[0]>data_devices':
+                ['/dev/sdb'],
+                'server_node>MACH_ID>network>data>private_interfaces':
+                ['eth1', 'eno2'],
+                'server_node>MACH_ID>storage>cvg[0]>metadata_devices':
+                ['/dev/meta'],
+                'server_node>MACH_ID>s3_instances':
+                1,
+                'cluster>CLUSTER_ID>site>storage_set_count':
+                1,
+                'cluster>CLUSTER_ID>storage_set>server_node_count':
+                1,
+                'cluster>CLUSTER_ID>storage_set[0]>name':
+                'StorageSet-1',
                 'cluster>CLUSTER_ID>storage_set[0]>server_nodes': ['MACH_ID'],
+                'cluster>CLUSTER_ID>storage_set[0]>durability>sns': {'stub': 1},
                 'cluster>CLUSTER_ID>storage_set[0]>durability>sns>data': 1,
                 'cluster>CLUSTER_ID>storage_set[0]>durability>sns>parity': 0,
                 'cluster>CLUSTER_ID>storage_set[0]>durability>sns>spare': 0,
-                'server_node>MACH_ID>cluster_id': 'CLUSTER_ID',
-                'server_node':{'MACH_ID': {'cluster_id': 'CLUSTER_ID'}}
+                'server_node>MACH_ID>cluster_id':
+                'CLUSTER_ID',
+                'server_node': {
+                    'MACH_ID': {
+                        'cluster_id': 'CLUSTER_ID'
+                    }
+                }
             }
-            return data[value]
+            return data.get(value)
 
         store._raw_get = Mock(side_effect=ret_values)
 
@@ -132,14 +150,17 @@ class TestCDF(unittest.TestCase):
         def ret_values(value: str) -> Any:
             data = {
                 'cluster>CLUSTER_ID>site>storage_set_count': 1,
+                'cluster>CLUSTER_ID>storage_set>server_node_count':
+                1,
+                'cluster>CLUSTER_ID>storage_set[0]>name': 'StorageSet-1',
+                'cluster>CLUSTER_ID>storage_set[0]>durability>sns': {'a': 42},
                 'cluster>CLUSTER_ID>storage_set[0]>durability>sns>data': 1,
                 'cluster>CLUSTER_ID>storage_set[0]>durability>sns>parity': 0,
                 'cluster>CLUSTER_ID>storage_set[0]>durability>sns>spare': 0,
-                'cluster>CLUSTER_ID>storage_set[0]>name': 'StorageSet-1',
                 'cluster>CLUSTER_ID>storage_set[0]>server_nodes': ['MACH_ID'],
                 'cluster>CLUSTER_ID>storage_set>server_node_count': 1,
                 'cluster>cluster_id': 'CLUSTER_ID',
-                'server_node':{'MACH_ID': {'cluster_id': 'CLUSTER_ID'}},
+                'server_node': {'MACH_ID': {'cluster_id': 'CLUSTER_ID'}},
                 'server_node>MACH_ID>cluster_id': 'CLUSTER_ID',
                 'server_node>MACH_ID>storage>cvg[0]>data_devices': ['/dev/sdb'],
                 'server_node>MACH_ID>storage>cvg[0]>metadata_devices': ['/dev/meta'],
@@ -149,7 +170,7 @@ class TestCDF(unittest.TestCase):
                 'server_node>MACH_ID>network>data>private_interfaces':                ['eth1', 'eno2'],
                 'server_node>MACH_ID>s3_instances':                1,
             }
-            return data[value]
+            return data.get(value)
 
         store._raw_get = Mock(side_effect=ret_values)
 
@@ -164,6 +185,7 @@ class TestCDF(unittest.TestCase):
         self.assertIsInstance(ret, list)
         self.assertEqual(1, len(ret))
         self.assertEqual(Text('StorageSet-1'), ret[0].name)
+        self.assertEqual(PoolType.sns, ret[0].type)
         self.assertEqual(1, ret[0].data_units)
         self.assertEqual(0, ret[0].parity_units)
         disk_refs = ret[0].disk_refs.value
@@ -183,28 +205,40 @@ class TestCDF(unittest.TestCase):
         def ret_values(value: str) -> Any:
             data = {
                 'cluster>CLUSTER_ID>site>storage_set_count': 1,
+                'cluster>CLUSTER_ID>storage_set>server_node_count': 1,
+                'cluster>CLUSTER_ID>storage_set[0]>name': 'StorageSet-1',
+                'cluster>CLUSTER_ID>storage_set[0]>server_nodes': ['srvnode_1'],
+                'cluster>CLUSTER_ID>storage_set[0]>durability>sns': {'stub': 1},
                 'cluster>CLUSTER_ID>storage_set[0]>durability>sns>data': 1,
                 'cluster>CLUSTER_ID>storage_set[0]>durability>sns>parity': 0,
                 'cluster>CLUSTER_ID>storage_set[0]>durability>sns>spare': 0,
-                'cluster>CLUSTER_ID>storage_set[0]>name': 'StorageSet-1',
-                'cluster>CLUSTER_ID>storage_set[0]>server_nodes': ['srvnode_1'],
-                'cluster>CLUSTER_ID>storage_set>server_node_count': 1,
-                'cluster>cluster_id': 'CLUSTER_ID',
+                'cluster>cluster_id':
+                'CLUSTER_ID',
                 'cluster>srvnode_1>storage>metadata_devices': ['/dev/meta'],
-                'server_node':{'srvnode_1': {'cluster_id': 'CLUSTER_ID'}},
-                'server_node>srvnode_1>cluster_id': 'CLUSTER_ID',
-                'server_node>srvnode_1>storage>cvg[0]>data_devices': ['/dev/sdb'],
-                'server_node>srvnode_1>hostname':                'myhost',
-                'server_node>srvnode_1>name': 'mynodename',
-                'server_node>srvnode_1>network>data>interface_type':                'o2ib',
-                'server_node>srvnode_1>network>data>private_interfaces':                ['eth1', 'eno2'],
-                'server_node>srvnode_1>s3_instances':                1,
+                'server_node': {
+                    'srvnode_1': {
+                        'cluster_id': 'CLUSTER_ID'
+                    }
+                },
+                'server_node>srvnode_1>cluster_id':
+                'CLUSTER_ID',
+                'server_node>srvnode_1>name':
+                'myhost',
+                'server_node>srvnode_1>hostname':
+                'myhost',
+                'server_node>srvnode_1>network>data>interface_type':
+                'o2ib',
+                'server_node>srvnode_1>network>data>private_interfaces':
+                ['eth1', 'eno2'],
+                'server_node>srvnode_1>s3_instances':
+                1,
+                'server_node>srvnode_1>storage>cvg[0]>data_devices':
+                ['/dev/sdb'],
             }
-            return data[value]
+            return data.get(value)
 
         store._raw_get = Mock(side_effect=ret_values)
         ret = CdfGenerator(provider=store).generate()
-
 
     def test_invalid_storage_set_configuration_rejected(self):
         ''' This test case checks whether exception will be raise if total
@@ -215,34 +249,90 @@ class TestCDF(unittest.TestCase):
 
         def ret_values(value: str) -> Any:
             data = {
-                'cluster>CLUSTER_ID>site>storage_set_count': 1,
-                'cluster>CLUSTER_ID>storage_set[0]>durability>sns>data': 2,
-                'cluster>CLUSTER_ID>storage_set[0]>durability>sns>parity': 0,
-                'cluster>CLUSTER_ID>storage_set[0]>durability>sns>spare': 0,
-                'cluster>CLUSTER_ID>storage_set[0]>name': 'StorageSet-1',
+                'cluster>CLUSTER_ID>site>storage_set_count':
+                1,
+                'cluster>CLUSTER_ID>storage_set>server_node_count':
+                1,
+                'cluster>CLUSTER_ID>storage_set[0]>durability>md': {'stub': 1},
+                'cluster>CLUSTER_ID>storage_set[0]>durability>md>data': 2,
+                'cluster>CLUSTER_ID>storage_set[0]>durability>md>parity': 0,
+                'cluster>CLUSTER_ID>storage_set[0]>durability>md>spare': 0,
+                'cluster>CLUSTER_ID>storage_set[0]>name':
+                'StorageSet-1',
                 'cluster>CLUSTER_ID>storage_set[0]>server_nodes': ['MACH_ID'],
-                'cluster>CLUSTER_ID>storage_set>server_node_count': 1,
-                'cluster>cluster_id': 'CLUSTER_ID',
-                'server_node':{'MACH_ID': {'cluster_id': 'CLUSTER_ID'}},
-                'server_node':{'MACH_ID': {'cluster_id': 'CLUSTER_ID'}},
-                'server_node>MACH_ID>cluster_id': '92f444df-87cc-4137-b680-aab3b35d1695',
-                'server_node>MACH_ID>cluster_id': 'CLUSTER_ID',
-                'server_node>MACH_ID>storage>cvg[0]>data_devices': ['/dev/sdb'],
-                'server_node>MACH_ID>storage>cvg[0]>metadata_devices': ['/dev/meta'],
-                'server_node>MACH_ID>hostname':                'myhost',
-                'server_node>MACH_ID>network>data>interface_type':                'o2ib',
-                'server_node>MACH_ID>network>data>private_interfaces':                ['eth1', 'eno2'],
-                'server_node>MACH_ID>s3_instances':                1,
+                'cluster>cluster_id':
+                'CLUSTER_ID',
+                'server_node': {
+                    'MACH_ID': {
+                        'cluster_id': 'CLUSTER_ID'
+                    }
+                },
+                'server_node>MACH_ID>cluster_id':
+                'CLUSTER_ID',
+                'server_node>MACH_ID>hostname':
+                'myhost',
+                'server_node>MACH_ID>network>data>interface_type':
+                'o2ib',
+                'server_node>MACH_ID>network>data>private_interfaces':
+                ['eth1', 'eno2'],
+                'server_node>MACH_ID>s3_instances':
+                1,
+                'server_node>MACH_ID>storage>cvg[0]>data_devices':
+                ['/dev/sdb'],
+                'server_node>MACH_ID>storage>cvg[0]>metadata_devices':
+                ['/dev/meta'],
             }
-            return data[value]
+            return data.get(value)
 
         store._raw_get = Mock(side_effect=ret_values)
 
-        with self.assertRaises(RuntimeError) as e:
+        with self.assertRaisesRegex(RuntimeError,
+                                    r'Invalid storage set configuration'):
             CdfGenerator(provider=store)._create_pool_descriptions()
 
-        the_exception = e.exception
-        self.assertEqual('Invalid storage set configuration', str(the_exception))
+    def test_pool_type_is_required(self):
+        store = ValueProvider()
+
+        def ret_values(value: str) -> Any:
+            data = {
+                'cluster>CLUSTER_ID>site>storage_set_count':
+                1,
+                'cluster>CLUSTER_ID>storage_set>server_node_count':
+                1,
+                'cluster>CLUSTER_ID>storage_set[0]>durability>badtype>data': 2,
+                'cluster>CLUSTER_ID>storage_set[0]>durability>badtype>parity': 0,
+                'cluster>CLUSTER_ID>storage_set[0]>durability>badtype>spare': 0,
+                'cluster>CLUSTER_ID>storage_set[0]>name':
+                'StorageSet-1',
+                'cluster>CLUSTER_ID>storage_set[0]>server_nodes': ['MACH_ID'],
+                'cluster>cluster_id':
+                'CLUSTER_ID',
+                'server_node': {
+                    'MACH_ID': {
+                        'cluster_id': 'CLUSTER_ID'
+                    }
+                },
+                'server_node>MACH_ID>cluster_id':
+                'CLUSTER_ID',
+                'server_node>MACH_ID>hostname':
+                'myhost',
+                'server_node>MACH_ID>network>data>interface_type':
+                'o2ib',
+                'server_node>MACH_ID>network>data>private_interfaces':
+                ['eth1', 'eno2'],
+                'server_node>MACH_ID>s3_instances':
+                1,
+                'server_node>MACH_ID>storage>cvg[0]>data_devices':
+                ['/dev/sdb'],
+                'server_node>MACH_ID>storage>cvg[0]>metadata_devices':
+                ['/dev/meta'],
+            }
+            return data.get(value)
+
+        store._raw_get = Mock(side_effect=ret_values)
+
+        with self.assertRaisesRegex(MissingKeyError, r'No pool type.*'):
+            CdfGenerator(provider=store)._create_pool_descriptions()
 
     def test_metadata_is_hardcoded(self):
         store = ValueProvider()
@@ -255,19 +345,14 @@ class TestCDF(unittest.TestCase):
                 'server_node>MACH_ID>hostname':
                 'myhost',
                 'server_node>MACH_ID>name': 'mynodename',
-                'server_node>MACH_ID>storage>cvg[0]>data_devices': ['/dev/sdb'],
+                'server_node>MACH_ID>storage>cvg[0]>data_devices':
+                ['/dev/sdb'],
                 'server_node>MACH_ID>network>data>private_interfaces':
                 ['eth1', 'eno2'],
                 'server_node>MACH_ID>s3_instances':
                 1,
                 'server_node>MACH_ID>network>data>interface_type':
-                'o2ib',
-                'cluster>92f444df-87cc-4137-b680-aab3b35d1695>site>storage_set_count': 1,
-                'cluster>92f444df-87cc-4137-b680-aab3b35d1695>storage_set>server_node_count': 1,
-                'cluster>92f444df-87cc-4137-b680-aab3b35d1695>storage_set[0]>name': 'StorageSet-1',
-                'cluster>92f444df-87cc-4137-b680-aab3b35d1695>storage_set[0]>server_nodes': ['srvnode_1'],
-                'cluster>92f444df-87cc-4137-b680-aab3b35d1695>storage_set[0]>durability>sns>data': 1,
-                'cluster>92f444df-87cc-4137-b680-aab3b35d1695>storage_set[0]>durability>sns>parity': 0
+                'o2ib'
             }
             return data[value]
 
@@ -290,30 +375,37 @@ class TestCDF(unittest.TestCase):
                     'MACH_ID': 'stub',
                     'MACH_2_ID': 'stub'
                 },
-
-                'cluster>92f444df-87cc-4137-b680-aab3b35d1695>site>storage_set_count': 1,
-                'cluster>92f444df-87cc-4137-b680-aab3b35d1695>storage_set>server_node_count': 2,
-                'cluster>92f444df-87cc-4137-b680-aab3b35d1695>storage_set[0]>name': 'StorageSet-1',
-                'cluster>92f444df-87cc-4137-b680-aab3b35d1695>storage_set[0]>server_nodes': ['srvnode_1', 'srvnode_2'],
-                'cluster>92f444df-87cc-4137-b680-aab3b35d1695>storage_set[0]>durability>sns>data': 1,
-                'cluster>92f444df-87cc-4137-b680-aab3b35d1695>storage_set[0]>durability>sns>parity': 0,
-
-                'server_node>MACH_ID>hostname': 'myhost',
+                'cluster>92f444df-87cc-4137-b680-aab3b35d1695>site>storage_set_count':
+                1,
+                'cluster>92f444df-87cc-4137-b680-aab3b35d1695>storage_set>server_node_count':
+                2,
+                'cluster>92f444df-87cc-4137-b680-aab3b35d1695>storage_set[0]>name':
+                'StorageSet-1',
+                'cluster>92f444df-87cc-4137-b680-aab3b35d1695>storage_set[0]>server_nodes':
+                ['srvnode_1', 'srvnode_2'],
+                'server_node>MACH_ID>hostname':
+                'myhost',
                 'server_node>MACH_ID>name': 'mynodename',
-                'server_node>MACH_ID>network>data>interface_type': 'o2ib',
+                'server_node>MACH_ID>network>data>interface_type':
+                'o2ib',
                 'server_node>MACH_ID>network>data>private_interfaces':
                 ['eth1'],
-                'server_node>MACH_ID>s3_instances': 1,
-                'server_node>MACH_ID>storage>cvg[0]>data_devices': ['/dev/sdb'],
-                'server_node>MACH_ID>storage>cvg[0]>metadata_devices': ['/dev/meta'],
-                'server_node>MACH_2_ID>hostname': 'host-2',
-                'server_node>MACH_2_ID>name': 'mynodename2',
-                'server_node>MACH_2_ID>network>data>interface_type': 'tcp',
+                'server_node>MACH_ID>s3_instances':
+                1,
+                'server_node>MACH_ID>storage>cvg[0]>data_devices':
+                ['/dev/sdb'],
+                'server_node>MACH_ID>storage>cvg[0]>metadata_devices':
+                ['/dev/meta'],
+                'server_node>MACH_2_ID>name':                'host-2',
+                'server_node>MACH_2_ID>hostname':            'host-2',
+                'server_node>MACH_2_ID>network>data>interface_type':                'tcp',
                 'server_node>MACH_2_ID>network>data>private_interfaces':
                 ['eno1'],
-                'server_node>MACH_2_ID>s3_instances': 5,
-                'server_node>MACH_2_ID>storage>cvg[0]>data_devices': ['/dev/sdb'],
-                'server_node>MACH_2_ID>storage>cvg[0]>metadata_devices': ['/dev/meta'],
+                'server_node>MACH_2_ID>s3_instances':                5,
+                'server_node>MACH_2_ID>storage>cvg[0]>data_devices':
+                ['/dev/sdb'],
+                'server_node>MACH_2_ID>storage>cvg[0]>metadata_devices':
+                ['/dev/meta'],
             }
             return data[value]
 
@@ -342,7 +434,8 @@ class TestCDF(unittest.TestCase):
                 'server_node>MACH_ID>name': 'mynodename',
                 'server_node>MACH_ID>hostname':
                 'myhost',
-                'server_node>MACH_ID>storage>cvg[0]>data_devices': ['/dev/sdb'],
+                'server_node>MACH_ID>storage>cvg[0]>data_devices':
+                ['/dev/sdb'],
                 'server_node>MACH_ID>network>data>interface_type':
                 None,
                 'server_node>MACH_ID>s3_instances':
