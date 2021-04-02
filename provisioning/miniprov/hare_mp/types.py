@@ -35,6 +35,15 @@ class Protocol(Enum):
         return f'P.{self.name}'
 
 
+class PoolType(Enum):
+    sns = 1
+    dix = 2
+    md = 3
+
+    def __str__(self):
+        return f'T.PoolType.{self.name}'
+
+
 class DhallTuple:
     def __str__(self):
         def v(field):
@@ -102,6 +111,7 @@ class PoolDesc(DhallTuple):
     disk_refs: Maybe  # [DList]
     data_units: int
     parity_units: int
+    type: PoolType
 
 
 @dataclass(repr=False)
