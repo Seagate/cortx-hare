@@ -6,8 +6,9 @@ from typing import Any, Dict, List, Optional
 import pkg_resources
 
 from hare_mp.store import ValueProvider
-from hare_mp.types import (ClusterDesc, DiskRef, DList, Maybe, NodeDesc,
-                           PoolDesc, ProfileDesc, Protocol, Text)
+from hare_mp.types import (ClusterDesc, DiskRef, DList, Maybe, MissingKeyError,
+                           NodeDesc, PoolDesc, PoolType, ProfileDesc, Protocol,
+                           Text)
 
 DHALL_PATH = '/opt/seagate/cortx/hare/share/cfgen/dhall'
 DHALL_EXE = '/opt/seagate/cortx/hare/bin/dhall'
@@ -47,6 +48,41 @@ class CdfGenerator:
             nodes.append(self._create_node(machine_id))
         return nodes
 
+    def _get_pool_type(self, cluster_id: str, storage_ndx: int) -> PoolType:
+        conf = self.provider
+        for type_name in [p.name for p in PoolType]:
+            type_value = conf.get(
+                f'cluster>{cluster_id}>storage_set[{storage_ndx}]'
+                f'>durability>{type_name}',
+                allow_null=True)
+            if type_value:
+                return PoolType[type_name]
+        raise MissingKeyError(
+            'No pool type found under key '
+            f'cluster>{cluster_id}>storage_set[{storage_ndx}]')
+
+    def _get_pool_property(self, cluster_id: str, pool_type: str,
+                           storage_ndx: int, prop_name: str) -> int:
+        conf = self.provider
+        return int(
+            conf.get(f'cluster>{cluster_id}>storage_set[{storage_ndx}]>'
+                     f'durability>{pool_type}>{prop_name}'))
+
+    def _get_data_units(self, cluster_id: str, pool_type: str,
+                        storage_ndx: int) -> int:
+        return self._get_pool_property(cluster_id, pool_type, storage_ndx,
+                                       'data')
+
+    def _get_parity_units(self, cluster_id: str, pool_type: str,
+                          storage_ndx: int) -> int:
+        return self._get_pool_property(cluster_id, pool_type, storage_ndx,
+                                       'parity')
+
+    def _get_spare_units(self, cluster_id: str, pool_type: str,
+                         storage_ndx: int) -> int:
+        return self._get_pool_property(cluster_id, pool_type, storage_ndx,
+                                       'spare')
+
     def _create_pool_descriptions(self) -> List[PoolDesc]:
         pools: List[PoolDesc] = []
         conf = self.provider
@@ -64,19 +100,22 @@ class CdfGenerator:
                 data_devices_count += len(
                     conf.get(
                         f'server_node>{node}>storage>cvg[0]>data_devices'))
+            pool_type = self._get_pool_type(cluster_id, x)
+            type_str = pool_type.name
 
-            data_units_count = int(conf.get(
-                f'cluster>{cluster_id}>storage_set[{x}]>durability>sns>data'))
-            parity_units_count = int(conf.get(
-                f'cluster>{cluster_id}>'
-                f'storage_set[{x}]>durability>sns>parity'))
-            spare_units_count = int(conf.get(
-                f'cluster>{cluster_id}>storage_set[{x}]>durability>sns>spare'))
+            data_units_count = self._get_data_units(cluster_id, type_str, x)
+            parity_units_count = self._get_parity_units(
+                cluster_id, type_str, x)
+            spare_units_count = self._get_spare_units(cluster_id, type_str, x)
 
             min_pool_width = data_units_count + parity_units_count \
                 + spare_units_count
             if data_devices_count and (data_devices_count < min_pool_width):
-                raise RuntimeError('Invalid storage set configuration')
+                raise RuntimeError(
+                    'Invalid storage set configuration '
+                    f'(name={storage_set_name}):'
+                    f'data_devices_count ({data_devices_count}) must be not '
+                    f'less than N+K+S ({min_pool_width})')
 
             pools.append(
                 PoolDesc(
@@ -96,7 +135,8 @@ class CdfGenerator:
                                 f'storage>cvg[0]>data_devices')
                         ], 'List DiskRef'), 'List DiskRef'),
                     data_units=data_units_count,
-                    parity_units=parity_units_count))
+                    parity_units=parity_units_count,
+                    type=pool_type))
 
         return pools
 

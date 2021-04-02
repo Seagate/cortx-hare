@@ -19,6 +19,7 @@ let PoolInfo =
       , disk_refs : Optional (List T.DiskRef)
       , data_units : Natural
       , parity_units : Natural
+      , type : T.PoolType
       }
 
 let ProfileInfo =
@@ -54,7 +55,7 @@ let toPoolDesc
     : PoolInfo -> T.PoolDesc
     =     \(p : PoolInfo)
       ->  { name = p.name
-          , type = Some T.PoolType.sns
+          , type = Some p.type
           , data_units = p.data_units
           , disk_refs = p.disk_refs
           , parity_units = p.parity_units
