@@ -19,15 +19,16 @@
 
 # :help: Fetch the fids for motr services (m0d and s3server)
 
-import sys
-import re
-from typing import List, NamedTuple, Optional
-import json
 import argparse
+import json
+import re
+import sys
+from typing import List, NamedTuple, Optional
+
 import simplejson
 from hax.types import ObjT
-from utils import get_local_nodename
 
+from utils import get_local_nodename
 
 Process = NamedTuple('Process', [('name', str), ('fid', str)])
 
@@ -48,8 +49,8 @@ class Node:
                 services.append(svc)
         if services:
             return services
-        print(
-            f'Service {service} not found on node {self.name}.', file=sys.stderr)
+        print(f'Service {service} not found on node {self.name}.',
+              file=sys.stderr)
         return None
 
     def __repr__(self):
@@ -65,10 +66,9 @@ def to_fid(container: int, key: int) -> str:
 
 def node_names(data: List) -> List[str]:
     # Get entries from file
-    # ​"key": "m0conf/nodes/<node_fid>",
-    # "value": "{​​​​​\"name\": \"<node name>\", \"state\": \"<HA state>\"}​​​​​"
-    regex = re.compile(
-        f'm0conf/nodes/[a-zA-Z0-9:]+$')
+    # "key": "m0conf/nodes/<node_fid>",
+    # "value": "{\"name\": \"<node name>\", \"state\": \"<HA state>\"}"
+    regex = r'm0conf/nodes/[a-zA-Z0-9:]+$'
     nodes: List[str] = []
     for key in data:
         match_result = re.match(regex, key['key'])
@@ -80,10 +80,10 @@ def node_names(data: List) -> List[str]:
 
 
 def get_keys_for_processes(data: List) -> List[str]:
-    # Get 'm0conf/nodes/<node_id>/processes/<process_fidk>/services/<svc_type>' entries
-    # from the file.  See 'Consul KV Schema' in [4/KV](rfc/4/README.md).
-    regex = re.compile(
-        f'^m0conf\\/.*\\/processes\\/.*\\/services\\/(confd|ios|m0_client_s3)+$')
+    # Get 'm0conf/nodes/<node_id>/processes/<process_fidk>/services/<svc_type>'
+    # entries from the file.  See 'Consul KV Schema' in [4/KV](rfc/4/README.md)
+    regex = re.compile('^m0conf\\/.*\\/processes\\/.*\\/services\\'
+                       '/(confd|ios|m0_client_s3)+$')
 
     keys = []
     for key in data:
@@ -93,23 +93,25 @@ def get_keys_for_processes(data: List) -> List[str]:
         keys.append(match_result.group(0))
     if not keys:
         raise RuntimeError(
-            f'No ioservice, confd, or s3servers found in the cluster')
+            'No ioservice, confd, or s3servers found in the cluster')
     return keys
 
 
-def add_service_to_node(nodes: List[Node], node_name: str, svc_name: str, fid: str) -> None:
+def add_service_to_node(nodes: List[Node], node_name: str, svc_name: str,
+                        fid: str) -> None:
     for node in nodes:
         if node.name == node_name:
             node.add_service(svc_name, fid)
 
 
-def get_service_for_node(nodes: List[Node], node_name: str, service: str) -> Optional[List[Process]]:
+def get_service_for_node(nodes: List[Node], node_name: str,
+                         service: str) -> Optional[List[Process]]:
     # if node_name is not specified, then local node is used.
-    if node_name == None:
+    if not node_name:
         node_name = get_local_nodename()
 
     # if service is not specified, return all the services for a node.
-    if service == None:
+    if not service:
         for node in nodes:
             if node.name == node_name:
                 return node.svcs
@@ -119,17 +121,12 @@ def get_service_for_node(nodes: List[Node], node_name: str, service: str) -> Opt
         if node.name == node_name:
             return node.get_service(service)
 
-    print(
-        f'Node {node_name} not found in cluster.', file=sys.stderr)
+    print(f'Node {node_name} not found in cluster.', file=sys.stderr)
     return None
 
 
 def process_all_keys(keys: List, nodes: List[Node]) -> None:
-    names = {
-        'confd': 'confd',
-        'ios': 'ioservice',
-        'm0_client_s3': 's3server'
-    }
+    names = {'confd': 'confd', 'ios': 'ioservice', 'm0_client_s3': 's3server'}
     for key in keys:
         # key looks like
         # 'm0conf/nodes/<name>/processes/<process_fidk>/services/<svc_type>'
@@ -143,7 +140,8 @@ def process_all_keys(keys: List, nodes: List[Node]) -> None:
     for node in nodes:
         if not node.svcs:
             raise RuntimeError(
-                f'No ioservice, confd, or s3servers found on the node {node.name}')
+                'No ioservice, confd, or s3servers found on the '
+                f'node {node.name}')
 
 
 def read_file():
@@ -168,23 +166,29 @@ def get_nodes_for_cluster() -> List[Node]:
 
 
 def parse_opts(argv):
-    p = argparse.ArgumentParser(description='Fetches the fids for motr services (m0d and s3server) in cluster or node.',
-                                usage='%(prog)s [OPTION]')
+    p = argparse.ArgumentParser(
+        description='Fetches the fids for motr services (m0d and s3server) '
+        'in cluster or node.',
+        usage='%(prog)s [OPTION]')
 
-    p.add_argument('--service', '-s',
+    p.add_argument('--service',
+                   '-s',
                    help='service name. - Returns fid for given service. '
                    'List of services- "confd", "ioservice", "s3server". '
                    'Default: Returns the fids for all the services.',
                    type=str,
                    action='store')
-    p.add_argument('--node', '-n',
-                   help='node-name - Returns the fids of services for the given node. '
-                   'Default: Local node',
-                   type=str,
-                   action='store')
-    p.add_argument('--all',
-                   help='Returns fids of all the services for nodes in cluster.',
-                   action='store_true')
+    p.add_argument(
+        '--node',
+        '-n',
+        help='node-name - Returns the fids of services for the given node. '
+        'Default: Local node',
+        type=str,
+        action='store')
+    p.add_argument(
+        '--all',
+        help='Returns fids of all the services for nodes in cluster.',
+        action='store_true')
     p.add_argument('--json',
                    help='show output in JSON format',
                    action='store_true')
