@@ -6,9 +6,11 @@
       },
       "storage_set": [
         {
-          "data": "4",
-          "parity": "2",
-          "spare": "2",
+          "durability": {
+            "data": "4",
+            "parity": "2",
+            "spare": "2"
+          },
           "name": "storage1",
           "server_nodes": [
             "1114a50a6bf6f9c93ebd3c49d07d3fd4",
