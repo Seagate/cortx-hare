@@ -7,9 +7,11 @@
       "storage_set": [
         {
           "durability": {
-            "data": "4",
-            "parity": "2",
-            "spare": "2"
+            "sns": {
+              "data": "4",
+              "parity": "2",
+              "spare": "2"
+            }
           },
           "name": "storage1",
           "server_nodes": [

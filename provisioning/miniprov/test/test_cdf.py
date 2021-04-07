@@ -114,9 +114,9 @@ class TestCDF(unittest.TestCase):
                 'cluster>CLUSTER_ID>storage_set>server_node_count': 1,
                 'cluster>CLUSTER_ID>storage_set[0]>name': 'StorageSet-1',
                 'cluster>CLUSTER_ID>storage_set[0]>server_nodes': ['MACH_ID'],
-                'cluster>CLUSTER_ID>storage_set[0]>durability>data': 1,
-                'cluster>CLUSTER_ID>storage_set[0]>durability>parity': 0,
-                'cluster>CLUSTER_ID>storage_set[0]>durability>spare': 0,
+                'cluster>CLUSTER_ID>storage_set[0]>durability>sns>data': 1,
+                'cluster>CLUSTER_ID>storage_set[0]>durability>sns>parity': 0,
+                'cluster>CLUSTER_ID>storage_set[0]>durability>sns>spare': 0,
                 'server_node>MACH_ID>cluster_id': 'CLUSTER_ID',
                 'server_node':{'MACH_ID': {'cluster_id': 'CLUSTER_ID'}}
             }
@@ -132,9 +132,9 @@ class TestCDF(unittest.TestCase):
         def ret_values(value: str) -> Any:
             data = {
                 'cluster>CLUSTER_ID>site>storage_set_count': 1,
-                'cluster>CLUSTER_ID>storage_set[0]>durability>data': 1,
-                'cluster>CLUSTER_ID>storage_set[0]>durability>parity': 0,
-                'cluster>CLUSTER_ID>storage_set[0]>durability>spare': 0,
+                'cluster>CLUSTER_ID>storage_set[0]>durability>sns>data': 1,
+                'cluster>CLUSTER_ID>storage_set[0]>durability>sns>parity': 0,
+                'cluster>CLUSTER_ID>storage_set[0]>durability>sns>spare': 0,
                 'cluster>CLUSTER_ID>storage_set[0]>name': 'StorageSet-1',
                 'cluster>CLUSTER_ID>storage_set[0]>server_nodes': ['MACH_ID'],
                 'cluster>CLUSTER_ID>storage_set>server_node_count': 1,
@@ -183,9 +183,9 @@ class TestCDF(unittest.TestCase):
         def ret_values(value: str) -> Any:
             data = {
                 'cluster>CLUSTER_ID>site>storage_set_count': 1,
-                'cluster>CLUSTER_ID>storage_set[0]>durability>data': 1,
-                'cluster>CLUSTER_ID>storage_set[0]>durability>parity': 0,
-                'cluster>CLUSTER_ID>storage_set[0]>durability>spare': 0,
+                'cluster>CLUSTER_ID>storage_set[0]>durability>sns>data': 1,
+                'cluster>CLUSTER_ID>storage_set[0]>durability>sns>parity': 0,
+                'cluster>CLUSTER_ID>storage_set[0]>durability>sns>spare': 0,
                 'cluster>CLUSTER_ID>storage_set[0]>name': 'StorageSet-1',
                 'cluster>CLUSTER_ID>storage_set[0]>server_nodes': ['srvnode_1'],
                 'cluster>CLUSTER_ID>storage_set>server_node_count': 1,
@@ -216,9 +216,9 @@ class TestCDF(unittest.TestCase):
         def ret_values(value: str) -> Any:
             data = {
                 'cluster>CLUSTER_ID>site>storage_set_count': 1,
-                'cluster>CLUSTER_ID>storage_set[0]>durability>data': 2,
-                'cluster>CLUSTER_ID>storage_set[0]>durability>parity': 0,
-                'cluster>CLUSTER_ID>storage_set[0]>durability>spare': 0,
+                'cluster>CLUSTER_ID>storage_set[0]>durability>sns>data': 2,
+                'cluster>CLUSTER_ID>storage_set[0]>durability>sns>parity': 0,
+                'cluster>CLUSTER_ID>storage_set[0]>durability>sns>spare': 0,
                 'cluster>CLUSTER_ID>storage_set[0]>name': 'StorageSet-1',
                 'cluster>CLUSTER_ID>storage_set[0]>server_nodes': ['MACH_ID'],
                 'cluster>CLUSTER_ID>storage_set>server_node_count': 1,
@@ -266,8 +266,8 @@ class TestCDF(unittest.TestCase):
                 'cluster>92f444df-87cc-4137-b680-aab3b35d1695>storage_set>server_node_count': 1,
                 'cluster>92f444df-87cc-4137-b680-aab3b35d1695>storage_set[0]>name': 'StorageSet-1',
                 'cluster>92f444df-87cc-4137-b680-aab3b35d1695>storage_set[0]>server_nodes': ['srvnode_1'],
-                'cluster>92f444df-87cc-4137-b680-aab3b35d1695>storage_set[0]>durability>data': 1,
-                'cluster>92f444df-87cc-4137-b680-aab3b35d1695>storage_set[0]>durability>parity': 0
+                'cluster>92f444df-87cc-4137-b680-aab3b35d1695>storage_set[0]>durability>sns>data': 1,
+                'cluster>92f444df-87cc-4137-b680-aab3b35d1695>storage_set[0]>durability>sns>parity': 0
             }
             return data[value]
 
@@ -295,8 +295,8 @@ class TestCDF(unittest.TestCase):
                 'cluster>92f444df-87cc-4137-b680-aab3b35d1695>storage_set>server_node_count': 2,
                 'cluster>92f444df-87cc-4137-b680-aab3b35d1695>storage_set[0]>name': 'StorageSet-1',
                 'cluster>92f444df-87cc-4137-b680-aab3b35d1695>storage_set[0]>server_nodes': ['srvnode_1', 'srvnode_2'],
-                'cluster>92f444df-87cc-4137-b680-aab3b35d1695>storage_set[0]>durability>data': 1,
-                'cluster>92f444df-87cc-4137-b680-aab3b35d1695>storage_set[0]>durability>parity': 0,
+                'cluster>92f444df-87cc-4137-b680-aab3b35d1695>storage_set[0]>durability>sns>data': 1,
+                'cluster>92f444df-87cc-4137-b680-aab3b35d1695>storage_set[0]>durability>sns>parity': 0,
 
                 'server_node>MACH_ID>hostname': 'myhost',
                 'server_node>MACH_ID>name': 'mynodename',
