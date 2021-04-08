@@ -23,6 +23,7 @@ processes.
   * [17/CICD](17/README.md) — Continuous Integration and Continuous Deployment
   * [19/EVERULES](19/README.md) — Events and Rules
   * [21/EVERULES](21/README.md) — HA Event Subscription
+  * [22/MPAUX](22/README.md) — Multipool Auxiliary Layout Parameters Generation 
 * Draft
   * [4/KV](4/README.md) — Consul KV Schema
   * [5/HAX](5/README.md) — HAlink eXchange
