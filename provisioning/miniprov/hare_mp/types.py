@@ -14,11 +14,20 @@ class Maybe:
 
         return f'Some ({self.value})'
 
+    def get(self):
+        return self.value
+
 
 @dataclass
 class DList:
     value: List[Any]
     comment: str
+
+    def __getitem__(self, ndx: int):
+        return self.value[ndx]
+
+    def __len__(self):
+        return len(self.value)
 
     def __str__(self):
         if not self.value:
@@ -108,7 +117,7 @@ class DiskRef(DhallTuple):
 @dataclass(repr=False)
 class PoolDesc(DhallTuple):
     name: Text
-    disk_refs: Maybe  # [DList]
+    disk_refs: Maybe  # [DList[DiskRef]]
     data_units: int
     parity_units: int
     type: PoolType
