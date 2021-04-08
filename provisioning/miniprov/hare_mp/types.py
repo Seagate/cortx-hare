@@ -1,11 +1,13 @@
 from dataclasses import dataclass, fields
 from enum import Enum
-from typing import Any, List
+from typing import Generic, List, Optional, Sequence, TypeVar
+
+A = TypeVar('A')
 
 
 @dataclass
-class Maybe:
-    value: Any
+class Maybe(Generic[A]):
+    value: Optional[A]
     comment: str
 
     def __str__(self):
@@ -18,12 +20,15 @@ class Maybe:
         return self.value
 
 
+T = TypeVar('T')
+
+
 @dataclass
-class DList:
-    value: List[Any]
+class DList(Sequence[T]):
+    value: List[T]
     comment: str
 
-    def __getitem__(self, ndx: int):
+    def __getitem__(self, ndx):
         return self.value[ndx]
 
     def __len__(self):
@@ -87,13 +92,13 @@ class M0Clients(DhallTuple):
 
 @dataclass(repr=False)
 class DisksDesc(DhallTuple):
-    meta_data: Maybe  # [str]
-    data: DList
+    meta_data: Maybe[Text]
+    data: DList[Text]
 
 
 @dataclass(repr=False)
 class M0ServerDesc(DhallTuple):
-    runs_confd: Maybe  # [bool]
+    runs_confd: Maybe[bool]
     io_disks: DisksDesc
 
 
@@ -101,8 +106,8 @@ class M0ServerDesc(DhallTuple):
 class NodeDesc(DhallTuple):
     hostname: Text
     data_iface: Text
-    data_iface_type: Maybe  # [Protocol]
-    io_disks: DList  # [str]
+    data_iface_type: Maybe[Protocol]
+    io_disks: DList[Text]
     meta_data1: Text
     meta_data2: Text
     s3_instances: int
@@ -111,13 +116,13 @@ class NodeDesc(DhallTuple):
 @dataclass(repr=False)
 class DiskRef(DhallTuple):
     path: Text
-    node: Maybe
+    node: Maybe[Text]
 
 
 @dataclass(repr=False)
 class PoolDesc(DhallTuple):
     name: Text
-    disk_refs: Maybe  # [DList[DiskRef]]
+    disk_refs: Maybe[DList[DiskRef]]
     data_units: int
     parity_units: int
     type: PoolType
@@ -126,7 +131,7 @@ class PoolDesc(DhallTuple):
 @dataclass(repr=False)
 class ProfileDesc(DhallTuple):
     name: Text
-    pools: DList  # [str]
+    pools: DList[Text]
 
 
 @dataclass(repr=False)
