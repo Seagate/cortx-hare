@@ -1,18 +1,38 @@
 import os.path as P
 import subprocess as S
+from dataclasses import dataclass
 from string import Template
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import pkg_resources
 
 from hare_mp.store import ValueProvider
-from hare_mp.types import (ClusterDesc, DiskRef, DList, Maybe, MissingKeyError,
-                           NodeDesc, PoolDesc, PoolType, ProfileDesc, Protocol,
-                           Text)
+from hare_mp.types import (ClusterDesc, DiskRef, DList, Maybe, NodeDesc,
+                           PoolDesc, PoolType, ProfileDesc, Protocol, Text)
 
 DHALL_PATH = '/opt/seagate/cortx/hare/share/cfgen/dhall'
 DHALL_EXE = '/opt/seagate/cortx/hare/bin/dhall'
 DHALL_TO_YAML_EXE = '/opt/seagate/cortx/hare/bin/dhall-to-yaml'
+
+
+@dataclass
+class Layout:
+    data: int
+    parity: int
+    spare: int
+
+
+@dataclass
+class PoolHandle:
+    cluster_id: str
+    pool_type: str
+    storage_ndx: int
+
+    def tuple(self) -> Tuple[str, str, int]:
+        # We could have used dataclasses.astuple() instead here but explicit
+        # implementation is safer (we can be sure that the method is not
+        # broken after somebody has changed the order of fields)
+        return (self.cluster_id, self.pool_type, self.storage_ndx)
 
 
 class CdfGenerator:
@@ -48,40 +68,94 @@ class CdfGenerator:
             nodes.append(self._create_node(machine_id))
         return nodes
 
-    def _get_pool_type(self, cluster_id: str, storage_ndx: int) -> PoolType:
+    def _get_pool_property(self, pool: PoolHandle, prop_name: str) -> int:
         conf = self.provider
-        for type_name in [p.name for p in PoolType]:
-            type_value = conf.get(
-                f'cluster>{cluster_id}>storage_set[{storage_ndx}]'
-                f'>durability>{type_name}',
-                allow_null=True)
-            if type_value:
-                return PoolType[type_name]
-        raise MissingKeyError(
-            'No pool type found under key '
-            f'cluster>{cluster_id}>storage_set[{storage_ndx}]')
+        (cluster_id, pool_type, storage_ndx) = pool.tuple()
 
-    def _get_pool_property(self, cluster_id: str, pool_type: str,
-                           storage_ndx: int, prop_name: str) -> int:
-        conf = self.provider
         return int(
             conf.get(f'cluster>{cluster_id}>storage_set[{storage_ndx}]>'
                      f'durability>{pool_type}>{prop_name}'))
 
-    def _get_data_units(self, cluster_id: str, pool_type: str,
-                        storage_ndx: int) -> int:
-        return self._get_pool_property(cluster_id, pool_type, storage_ndx,
-                                       'data')
+    def _get_layout(self, pool: PoolHandle) -> Optional[Layout]:
+        conf = self.provider
+        (cluster_id, pool_type, storage_ndx) = pool.tuple()
+        type_value = conf.get(
+            f'cluster>{cluster_id}>storage_set[{storage_ndx}]'
+            f'>durability>{pool_type}',
+            allow_null=True)
+        if not type_value:
+            return None
 
-    def _get_parity_units(self, cluster_id: str, pool_type: str,
-                          storage_ndx: int) -> int:
-        return self._get_pool_property(cluster_id, pool_type, storage_ndx,
-                                       'parity')
+        def prop(name: str) -> int:
+            return self._get_pool_property(pool, name)
 
-    def _get_spare_units(self, cluster_id: str, pool_type: str,
-                         storage_ndx: int) -> int:
-        return self._get_pool_property(cluster_id, pool_type, storage_ndx,
-                                       'spare')
+        return Layout(data=prop('data'),
+                      spare=prop('spare'),
+                      parity=prop('parity'))
+
+    def _get_devices(self, pool: PoolHandle, node: str) -> List[str]:
+        conf = self.provider
+        pool_type = pool.pool_type
+        prop_name = 'data_devices'
+        if pool_type == 'dix':
+            prop_name = 'metadata_devices'
+        return conf.get(f'server_node>{node}>storage>cvg[0]>{prop_name}')
+
+    def _get_server_nodes(self, pool: PoolHandle) -> List[str]:
+        cid = pool.cluster_id
+        i = pool.storage_ndx
+        return self.provider.get(
+            f'cluster>{cid}>storage_set[{i}]>server_nodes')
+
+    def _validate_pool(self, pool: PoolHandle) -> None:
+        layout = self._get_layout(pool)
+        if not layout:
+            return
+
+        conf = self.provider
+        (cluster_id, pool_type, i) = pool.tuple()
+
+        storage_set_name = conf.get(
+            f'cluster>{cluster_id}>storage_set[{i}]>name')
+
+        data_devices_count: int = 0
+        for node in self._get_server_nodes(pool):
+            data_devices_count += len(self._get_devices(pool, node))
+
+        (data, parity, spare) = (layout.data, layout.parity, layout.spare)
+        min_width = data + parity + spare
+        if data_devices_count and (data_devices_count < min_width):
+            raise RuntimeError(
+                'Invalid storage set configuration '
+                f'(name={storage_set_name}):'
+                f'device count ({data_devices_count}) must be not '
+                f'less than N+K+S ({min_width})')
+
+    def _add_pool(self, pool: PoolHandle, out_list: List[PoolDesc]) -> None:
+        conf = self.provider
+        layout = self._get_layout(pool)
+        if not layout:
+            return
+        (cid, pool_type, i) = pool.tuple()
+        storage_set_name = conf.get(f'cluster>{cid}>storage_set[{i}]>name')
+        pool_name = f'{storage_set_name}__{pool_type}'
+
+        out_list.append(
+            PoolDesc(
+                name=Text(pool_name),
+                disk_refs=Maybe(
+                    DList([
+                        DiskRef(
+                            path=Text(device),
+                            node=Maybe(
+                                Text(conf.get(f'server_node>{node}>hostname')),
+                                'Text'))
+                        for node in self._get_server_nodes(pool)
+                        for device in self._get_devices(pool, node)
+                    ], 'List DiskRef'), 'List DiskRef'),
+                data_units=layout.data,
+                parity_units=layout.parity,
+                type=PoolType[pool_type]))
 
     def _create_pool_descriptions(self) -> List[PoolDesc]:
         pools: List[PoolDesc] = []
@@ -90,53 +164,13 @@ class CdfGenerator:
         storage_set_count = int(
             conf.get(f'cluster>{cluster_id}>site>storage_set_count'))
 
-        for x in range(storage_set_count):
-            storage_set_name = conf.get(
-                f'cluster>{cluster_id}>storage_set[{x}]>name')
-
-            data_devices_count: int = 0
-            for node in conf.get(
-                    f'cluster>{cluster_id}>storage_set[{x}]>server_nodes'):
-                data_devices_count += len(
-                    conf.get(
-                        f'server_node>{node}>storage>cvg[0]>data_devices'))
-            pool_type = self._get_pool_type(cluster_id, x)
-            type_str = pool_type.name
-
-            data_units_count = self._get_data_units(cluster_id, type_str, x)
-            parity_units_count = self._get_parity_units(
-                cluster_id, type_str, x)
-            spare_units_count = self._get_spare_units(cluster_id, type_str, x)
-
-            min_pool_width = data_units_count + parity_units_count \
-                + spare_units_count
-            if data_devices_count and (data_devices_count < min_pool_width):
-                raise RuntimeError(
-                    'Invalid storage set configuration '
-                    f'(name={storage_set_name}):'
-                    f'data_devices_count ({data_devices_count}) must be not '
-                    f'less than N+K+S ({min_pool_width})')
-
-            pools.append(
-                PoolDesc(
-                    name=Text(storage_set_name),
-                    disk_refs=Maybe(
-                        DList([
-                            DiskRef(
-                                path=Text(device),
-                                node=Maybe(
-                                    Text(
-                                        conf.get(f'server_node>{node}>hostname'
-                                                 )), 'Text')) for node in
-                            conf.get(f'cluster>{cluster_id}>'
-                                     f'storage_set[{x}]>server_nodes')
-                            for device in conf.get(
-                                f'server_node>{node}>'
-                                f'storage>cvg[0]>data_devices')
-                        ], 'List DiskRef'), 'List DiskRef'),
-                    data_units=data_units_count,
-                    parity_units=parity_units_count,
-                    type=pool_type))
+        for i in range(storage_set_count):
+            for pool_type in ('sns', 'dix'):
+                handle = PoolHandle(cluster_id=cluster_id,
+                                    pool_type=pool_type,
+                                    storage_ndx=i)
+                self._validate_pool(handle)
+                self._add_pool(handle, pools)
 
         return pools
 
