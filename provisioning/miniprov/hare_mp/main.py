@@ -147,7 +147,7 @@ def init(args):
         validator = Validator(ConfStoreProvider(url))
         if validator.is_first_node_in_cluster():
             path_to_cdf = args.file[0]
-            if not is_cluster_running() and bootstrap_cluster(path_to_cdf):
+            if not is_cluster_running() and bootstrap_cluster(path_to_cdf, True):
                 logging.error('Failed to bootstrap the custer')
                 rc = -1
             shutdown_cluster()
@@ -219,8 +219,11 @@ def is_cluster_running() -> bool:
     return os.system('hctl status >/dev/null') == 0
 
 
-def bootstrap_cluster(path_to_cdf: str):
-    return os.system('hctl bootstrap --mkfs ' + path_to_cdf)
+def bootstrap_cluster(path_to_cdf: str, domkfs=False):
+    if domkfs:
+        return os.system('hctl bootstrap --mkfs ' + path_to_cdf)
+    else:
+        return os.system('hctl bootstrap ' + path_to_cdf)
 
 
 def shutdown_cluster():
