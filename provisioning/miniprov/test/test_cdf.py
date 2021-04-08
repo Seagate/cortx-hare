@@ -184,7 +184,7 @@ class TestCDF(unittest.TestCase):
         ret = CdfGenerator(provider=store)._create_pool_descriptions()
         self.assertIsInstance(ret, list)
         self.assertEqual(1, len(ret))
-        self.assertEqual(Text('StorageSet-1'), ret[0].name)
+        self.assertEqual(Text('StorageSet-1__sns'), ret[0].name)
         self.assertEqual(PoolType.sns, ret[0].type)
         self.assertEqual(1, ret[0].data_units)
         self.assertEqual(0, ret[0].parity_units)
@@ -197,7 +197,7 @@ class TestCDF(unittest.TestCase):
         self.assertEqual(1, len(ret))
         self.assertEqual(Text('Profile_the_pool'), ret[0].name)
         self.assertEqual(1, len(ret[0].pools.value))
-        self.assertEqual(Text('StorageSet-1'), ret[0].pools.value[0])
+        self.assertEqual(Text('StorageSet-1__sns'), ret[0].pools.value[0])
 
     def test_disk_refs_can_be_empty(self):
         store = ValueProvider()
@@ -214,7 +214,6 @@ class TestCDF(unittest.TestCase):
                 'cluster>CLUSTER_ID>storage_set[0]>durability>sns>spare': 0,
                 'cluster>cluster_id':
                 'CLUSTER_ID',
-                'cluster>srvnode_1>storage>metadata_devices': ['/dev/meta'],
                 'server_node': {
                     'srvnode_1': {
                         'cluster_id': 'CLUSTER_ID'
@@ -253,10 +252,10 @@ class TestCDF(unittest.TestCase):
                 1,
                 'cluster>CLUSTER_ID>storage_set>server_node_count':
                 1,
-                'cluster>CLUSTER_ID>storage_set[0]>durability>md': {'stub': 1},
-                'cluster>CLUSTER_ID>storage_set[0]>durability>md>data': 2,
-                'cluster>CLUSTER_ID>storage_set[0]>durability>md>parity': 0,
-                'cluster>CLUSTER_ID>storage_set[0]>durability>md>spare': 0,
+                'cluster>CLUSTER_ID>storage_set[0]>durability>sns': {'stub': 1},
+                'cluster>CLUSTER_ID>storage_set[0]>durability>sns>data': 2,
+                'cluster>CLUSTER_ID>storage_set[0]>durability>sns>parity': 0,
+                'cluster>CLUSTER_ID>storage_set[0]>durability>sns>spare': 0,
                 'cluster>CLUSTER_ID>storage_set[0]>name':
                 'StorageSet-1',
                 'cluster>CLUSTER_ID>storage_set[0]>server_nodes': ['MACH_ID'],
@@ -290,7 +289,7 @@ class TestCDF(unittest.TestCase):
                                     r'Invalid storage set configuration'):
             CdfGenerator(provider=store)._create_pool_descriptions()
 
-    def test_pool_type_is_required(self):
+    def test_md_pool_ignored(self):
         store = ValueProvider()
 
         def ret_values(value: str) -> Any:
@@ -299,9 +298,10 @@ class TestCDF(unittest.TestCase):
                 1,
                 'cluster>CLUSTER_ID>storage_set>server_node_count':
                 1,
-                'cluster>CLUSTER_ID>storage_set[0]>durability>badtype>data': 2,
-                'cluster>CLUSTER_ID>storage_set[0]>durability>badtype>parity': 0,
-                'cluster>CLUSTER_ID>storage_set[0]>durability>badtype>spare': 0,
+                'cluster>CLUSTER_ID>storage_set[0]>durability>md': {'1':2},
+                'cluster>CLUSTER_ID>storage_set[0]>durability>md>data': 2,
+                'cluster>CLUSTER_ID>storage_set[0]>durability>md>parity': 0,
+                'cluster>CLUSTER_ID>storage_set[0]>durability>md>spare': 0,
                 'cluster>CLUSTER_ID>storage_set[0]>name':
                 'StorageSet-1',
                 'cluster>CLUSTER_ID>storage_set[0]>server_nodes': ['MACH_ID'],
@@ -330,9 +330,113 @@ class TestCDF(unittest.TestCase):
             return data.get(value)
 
         store._raw_get = Mock(side_effect=ret_values)
+        ret = CdfGenerator(provider=store)._create_pool_descriptions()
+        self.assertEqual(0, len(ret))
 
-        with self.assertRaisesRegex(MissingKeyError, r'No pool type.*'):
-            CdfGenerator(provider=store)._create_pool_descriptions()
+    def test_dix_pool_uses_metadata_devices(self):
+        store = ValueProvider()
+
+        def ret_values(value: str) -> Any:
+            data = {
+                'cluster>CLUSTER_ID>site>storage_set_count':
+                1,
+                'cluster>CLUSTER_ID>storage_set>server_node_count':
+                1,
+                'cluster>CLUSTER_ID>storage_set[0]>durability>dix': {'1':2},
+                'cluster>CLUSTER_ID>storage_set[0]>durability>dix>data': 1,
+                'cluster>CLUSTER_ID>storage_set[0]>durability>dix>parity': 0,
+                'cluster>CLUSTER_ID>storage_set[0]>durability>dix>spare': 0,
+                'cluster>CLUSTER_ID>storage_set[0]>name':
+                'StorageSet-1',
+                'cluster>CLUSTER_ID>storage_set[0]>server_nodes': ['MACH_ID'],
+                'cluster>cluster_id':
+                'CLUSTER_ID',
+                'server_node': {
+                    'MACH_ID': {
+                        'cluster_id': 'CLUSTER_ID'
+                    }
+                },
+                'server_node>MACH_ID>cluster_id':
+                'CLUSTER_ID',
+                'server_node>MACH_ID>hostname':
+                'myhost',
+                'server_node>MACH_ID>network>data>interface_type':
+                'o2ib',
+                'server_node>MACH_ID>network>data>private_interfaces':
+                ['eth1', 'eno2'],
+                'server_node>MACH_ID>s3_instances':
+                1,
+                'server_node>MACH_ID>storage>cvg[0]>data_devices':
+                ['/dev/sdb'],
+                'server_node>MACH_ID>storage>cvg[0]>metadata_devices':
+                ['/dev/meta'],
+            }
+            return data.get(value)
+
+        store._raw_get = Mock(side_effect=ret_values)
+        ret = CdfGenerator(provider=store)._create_pool_descriptions()
+        self.assertEqual(1, len(ret))
+        diskrefs = ret[0].disk_refs.get()
+        self.assertEqual(1, len(diskrefs))
+        self.assertEqual(Text('/dev/meta'), diskrefs[0].path)
+
+    def test_both_dix_and_sns_pools_can_exist(self):
+        store = ValueProvider()
+
+        def ret_values(value: str) -> Any:
+            data = {
+                'cluster>CLUSTER_ID>site>storage_set_count':
+                1,
+                'cluster>CLUSTER_ID>storage_set>server_node_count':
+                1,
+                'cluster>CLUSTER_ID>storage_set[0]>durability>dix': {'1':2},
+                'cluster>CLUSTER_ID>storage_set[0]>durability>dix>data': 1,
+                'cluster>CLUSTER_ID>storage_set[0]>durability>dix>parity': 0,
+                'cluster>CLUSTER_ID>storage_set[0]>durability>dix>spare': 0,
+                'cluster>CLUSTER_ID>storage_set[0]>durability>sns': {'1':2},
+                'cluster>CLUSTER_ID>storage_set[0]>durability>sns>data': 1,
+                'cluster>CLUSTER_ID>storage_set[0]>durability>sns>parity': 0,
+                'cluster>CLUSTER_ID>storage_set[0]>durability>sns>spare': 0,
+                'cluster>CLUSTER_ID>storage_set[0]>name':
+                'StorageSet-1',
+                'cluster>CLUSTER_ID>storage_set[0]>server_nodes': ['MACH_ID'],
+                'cluster>cluster_id':
+                'CLUSTER_ID',
+                'server_node': {
+                    'MACH_ID': {
+                        'cluster_id': 'CLUSTER_ID'
+                    }
+                },
+                'server_node>MACH_ID>cluster_id':
+                'CLUSTER_ID',
+                'server_node>MACH_ID>hostname':
+                'myhost',
+                'server_node>MACH_ID>network>data>interface_type':
+                'o2ib',
+                'server_node>MACH_ID>network>data>private_interfaces':
+                ['eth1', 'eno2'],
+                'server_node>MACH_ID>s3_instances':
+                1,
+                'server_node>MACH_ID>storage>cvg[0]>data_devices':
+                ['/dev/sda', '/dev/sdb'],
+                'server_node>MACH_ID>storage>cvg[0]>metadata_devices':
+                ['/dev/meta'],
+            }
+            return data.get(value)
+
+        store._raw_get = Mock(side_effect=ret_values)
+        ret = CdfGenerator(provider=store)._create_pool_descriptions()
+        self.assertEqual(['sns', 'dix'], [t.type.name for t in ret])
+        self.assertEqual(['StorageSet-1__sns', 'StorageSet-1__dix'],
+                         [t.name.s for t in ret])
+
+        diskrefs_sns = ret[0].disk_refs.get()
+        self.assertEqual([Text('/dev/sda'), Text('/dev/sdb')],
+                         [t.path for t in diskrefs_sns])
+
+        diskrefs_dix = ret[1].disk_refs.get()
+        self.assertEqual(1, len(diskrefs_dix))
+        self.assertEqual(Text('/dev/meta'), diskrefs_dix[0].path)
 
     def test_metadata_is_hardcoded(self):
         store = ValueProvider()
