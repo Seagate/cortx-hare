@@ -147,7 +147,8 @@ def init(args):
         validator = Validator(ConfStoreProvider(url))
         if validator.is_first_node_in_cluster():
             path_to_cdf = args.file[0]
-            if not is_cluster_running() and bootstrap_cluster(path_to_cdf, True):
+            if not is_cluster_running() and bootstrap_cluster(
+                    path_to_cdf, True):
                 logging.error('Failed to bootstrap the custer')
                 rc = -1
             shutdown_cluster()
