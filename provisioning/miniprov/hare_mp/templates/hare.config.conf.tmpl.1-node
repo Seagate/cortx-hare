@@ -1,50 +1,50 @@
 {
   "cluster": {
-    "my-cluster": {
+    "TMPL_CLUSTER_ID": {
       "site": {
-        "storage_set_count": "1"
+        "storage_set_count": "TMPL_STORAGESET_COUNT"
       },
       "storage_set": [
         {
           "durability": {
             "sns": {
-              "data": "1",
-              "parity": "0",
-              "spare": "0"
+              "data": "TMPL_DATA_UNITS_COUNT",
+              "parity": "TMPL_PARITY_UNITS_COUNT",
+              "spare": "TMPL_SPARE_UNITS_COUNT"
             }
           },
-          "name": "storage1",
+          "name": "TMPL_STORAGESET_NAME",
           "server_nodes": [
-            "SOME_MACHINE_ID"
+            "TMPL_MACHINE_ID"
           ]
         }
       ]
     }
   },
   "server_node": {
-    "SOME_MACHINE_ID": {
-      "cluster_id": "my-cluster",
-      "hostname": "myhost",
-      "name": "mynodename",
+    "TMPL_MACHINE_ID": {
+      "cluster_id": "TMPL_CLUSTER_ID",
+      "hostname": "TMPL_HOSTNAME",
+      "name": "TMPL_SERVER_NODE_NAME",
       "network": {
         "data": {
-          "interface_type": "tcp",
+          "interface_type": "TMPL_DATA_INTERFACE_TYPE",
           "private_interfaces": [
-            "eth1",
-            "eno2"
+            "TMPL_PRIVATE_DATA_INTERFACE_1",
+            "TMPL_PRIVATE_DATA_INTERFACE_2"
           ]
         }
       },
-      "s3_instances": "1",
+      "s3_instances": "TMPL_S3SERVER_INSTANCES_COUNT",
       "storage": {
         "cvg": [
           {
             "data_devices": [
-              "/dev/sda",
-              "/dev/sdb"
+              "TMPL_DATA_DEVICE_1",
+              "TMPL_DATA_DEVICE_2"
             ],
             "metadata_devices": [
-              "/dev/meta"
+              "TMPL_METADATA_DEVICE"
             ]
           }
         ]
