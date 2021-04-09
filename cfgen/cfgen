@@ -344,9 +344,10 @@ Pools of {t!r} type can only have 1 data unit."""
         if 'disk_refs' not in pool:
             continue
 
-        # XXX Do we want to support disk_refs for DIX and MD pools as well?
-        assert t is PoolT.sns, \
-            f"{name}: disk_refs are only supported for pools of 'sns' type"
+        # XXX Do we want to support disk_refs in MD pools as well?
+        assert t in (PoolT.sns, PoolT.dix), \
+            f"{name}: disk_refs are only supported for pools of either " \
+            "'sns' or 'dix' types"
         disk_refs = pool['disk_refs']
         # Allowing diskrefs to be empty until the CDF generation is fixed.
         if disk_refs:
@@ -387,12 +388,11 @@ def validate_profiles_desc(profiles_desc: List[Dict[str, Any]],
     for prof in profiles_desc:
         name, pools = prof['name'], prof['pools']
         assert pools, f"Profile {name!r} doesn't refer to any pools"
-        for case, select in [
-                ('unknown', lambda _: True),
-                ('non-sns', lambda t: t is PoolT.sns)]:
-            bad = [s for s in pools
-                   if s not in [pool.name for pool in all_pools
-                                if select(pool.type)]]
+        for case, select in [('unknown', lambda _: True)]:
+            bad = [
+                s for s in pools if s not in
+                [pool.name for pool in all_pools if select(pool.type)]
+            ]
             assert not bad, \
                 'Profile {!r} refers to {} pool{}: {}'.format(
                     name,
@@ -1071,7 +1071,6 @@ def pool_type(pool_desc: Dict[str, Any]) -> PoolT:
 def pool_drives(m0conf: Dict[Oid, Any],
                 pool_desc: Dict[str, Any]) -> List[Oid]:
     ptype = pool_type(pool_desc)
-    assert 'disk_refs' not in pool_desc or ptype is PoolT.sns
 
     if ptype is PoolT.dix:
         cas = [(svc_id, ctrl_id)
