@@ -70,8 +70,10 @@ class ConsumerThread(StoppableThread):
         # intermittent error gets resolved.
         self.consul.update_process_status(event)
         svc_status = m0HaProcessEvent.event_to_svchealth(event.chp_event)
-        motr.broadcast_ha_states([HAState(fid=event.fid,
-                                          status=svc_status)])
+        if event.chp_event in (m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED,
+                               m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED):
+            motr.broadcast_ha_states([HAState(fid=event.fid,
+                                              status=svc_status)])
 
     @repeat_if_fails(wait_seconds=1)
     def update_process_failure(self, q: Queue,
