@@ -32,8 +32,8 @@
         "data": {
           "interface_type": "TMPL_DATA_INTERFACE_TYPE",
           "private_interfaces": [
-            "TMPL_DATA_PRIVATE_INTERFACE_1",
-            "TMPL_DATA_PRIVATE_INTERFACE_2"
+            "TMPL_PRIVATE_DATA_INTERFACE_1",
+            "TMPL_PRIVATE_DATA_INTERFACE_2"
           ]
         }
       },
@@ -86,7 +86,7 @@
       "name": "TMPL_SERVER_NODE_NAME",
       "network": {
         "data": {
-          "interface_type": "TEMPL_DATA_INTERFACE_TYPE",
+          "interface_type": "TMPL_DATA_INTERFACE_TYPE",
           "private_interfaces": [
             "TMPL_PRIVATE_DATA_INTERFACE_1",
             "TMPL_PRIVATE_DATA_INTERFACE_2"
