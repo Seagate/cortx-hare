@@ -33,6 +33,14 @@ name=motr-dev
 enabled=1
 EOF
 
+cat <<EOF > /etc/yum.repos.d/motr_uploads.repo
+[motr-uploads]
+baseurl=$STORAGE/releases/cortx/third-party-deps/centos/centos-7.8.2003-2.0.0-latest/motr_uploads/
+gpgcheck=0
+name=motr-uploads
+enabled=1
+EOF
+
 cat <<EOF > /etc/yum.repos.d/lustre_release.repo
 [lustre]
 baseurl=$STORAGE/releases/cortx/third-party-deps/centos/centos-7.8.2003-2.0.0-latest/lustre/custom/tcp/
