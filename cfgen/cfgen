@@ -964,29 +964,35 @@ class ConfEnclosure(ToDhall):
     _objt = ObjT.enclosure
     _downlinks = {Downlink('ctrls', ObjT.controller)}
 
-    def __init__(self, ctrls: List[Oid], pvers: List[Oid]):
+    def __init__(self, node: Oid, ctrls: List[Oid], pvers: List[Oid]):
+        assert node.type is ObjT.node
+        self.node = node
         assert all(x.type is ObjT.controller for x in ctrls)
         self.ctrls = ctrls
         assert all(x.type is ObjT.pver for x in pvers)
         self.pvers = pvers
 
     def __repr__(self):
-        args = ', '.join([f'ctrls={self.ctrls}',
+        args = ', '.join([f'node={self.node}',
+                          f'ctrls={self.ctrls}',
                           f'pvers={self.pvers}'])
         return f'{self.__class__.__name__}({args})'
 
     def to_dhall(self, oid: Oid) -> str:
         assert oid.type is ObjT.enclosure
         args = ', '.join([f'id = {oid_to_dhall(oid)}',
+                          f'node = {oid_to_dhall(self.node)}',
                           f'ctrls = {oids_to_dhall(self.ctrls)}',
                           f'pvers = {oids_to_dhall(self.pvers)}'])
         return '{ %s }' % args
 
     @classmethod
-    def build(cls, m0conf: Dict[Oid, Any], parent: Oid) -> Oid:
+    def build(cls, m0conf: Dict[Oid, Any], parent: Oid, node: Oid) -> Oid:
         assert parent.type is ObjT.rack
+        assert node.type is ObjT.node
+
         encl_id = new_oid(ObjT.enclosure)
-        m0conf[encl_id] = cls(ctrls=[], pvers=[])
+        m0conf[encl_id] = cls(node, ctrls=[], pvers=[])
         m0conf[encl_id]._parent = parent
         m0conf[parent].encls.append(encl_id)
         return encl_id
@@ -996,35 +1002,30 @@ class ConfController(ToDhall):
     _objt = ObjT.controller
     _downlinks = {Downlink('drives', ObjT.drive)}
 
-    def __init__(self, node: Oid, drives: List[Oid], pvers: List[Oid]):
-        assert node.type is ObjT.node
-        self.node = node
+    def __init__(self, drives: List[Oid], pvers: List[Oid]):
         assert all(x.type is ObjT.drive for x in drives)
         self.drives = drives
         assert all(x.type is ObjT.pver for x in pvers)
         self.pvers = pvers
 
     def __repr__(self):
-        args = ', '.join([f'node={self.node}',
-                          f'drives={self.drives}',
+        args = ', '.join([f'drives={self.drives}',
                           f'pvers={self.pvers}'])
         return f'{self.__class__.__name__}({args})'
 
     def to_dhall(self, oid: Oid) -> str:
         assert oid.type is ObjT.controller
         args = ', '.join([f'id = {oid_to_dhall(oid)}',
-                          f'node = {oid_to_dhall(self.node)}',
                           f'drives = {oids_to_dhall(self.drives)}',
                           f'pvers = {oids_to_dhall(self.pvers)}'])
         return '{ %s }' % args
 
     @classmethod
-    def build(cls, m0conf: Dict[Oid, Any], parent: Oid, node: Oid) -> Oid:
+    def build(cls, m0conf: Dict[Oid, Any], parent: Oid) -> Oid:
         assert parent.type is ObjT.enclosure
-        assert node.type is ObjT.node
 
         ctrl_id = new_oid(ObjT.controller)
-        m0conf[ctrl_id] = cls(node, drives=[], pvers=[])
+        m0conf[ctrl_id] = cls(drives=[], pvers=[])
         m0conf[ctrl_id]._parent = parent
         m0conf[parent].ctrls.append(ctrl_id)
         return ctrl_id
@@ -1077,8 +1078,9 @@ def pool_drives(m0conf: Dict[Oid, Any],
 
     if ptype is PoolT.dix:
         cas = [(svc_id, ctrl_id)
-               for ctrl_id in m0conf if ctrl_id.type is ObjT.controller
-               for proc_id in m0conf[m0conf[ctrl_id].node].processes
+               for encl_id in m0conf if encl_id.type is ObjT.enclosure
+               for ctrl_id in m0conf[encl_id].ctrls
+               for proc_id in m0conf[m0conf[encl_id].node].processes
                for svc_id in m0conf[proc_id].services
                if m0conf[svc_id].type is SvcT.M0_CST_CAS]
         return [ConfDrive.build(m0conf, ctrl_id,
@@ -1094,8 +1096,9 @@ def pool_drives(m0conf: Dict[Oid, Any],
 
     assert ptype is PoolT.sns
     all_drives: List[Tuple[Oid, Oid]] = [
-        (drive_id, m0conf[ctrl_id].node)
-        for ctrl_id in m0conf if ctrl_id.type is ObjT.controller
+        (drive_id, m0conf[encl_id].node)
+        for encl_id in m0conf if encl_id.type is ObjT.enclosure
+        for ctrl_id in m0conf[encl_id].ctrls
         for drive_id in m0conf[ctrl_id].drives
     ]
     assert all_drives
@@ -1544,14 +1547,14 @@ def consul_kv_drives(m0conf: Dict[Oid, Any]) -> Dict[str, str]:
             for encl_id in m0conf[rack_id].encls:
                 assert encl_id.type is ObjT.enclosure
                 encl_key = f'{rack_key}/encls/' + oid_to_fidstr(encl_id)
-                d[encl_key] = state_unknown
+                d[encl_key] = json.dumps(
+                    {'node': oid_to_fidstr(m0conf[encl_id].node),
+                     'state': 'M0_NC_UNKNOWN'})
                 for ctrl_id in m0conf[encl_id].ctrls:
                     assert ctrl_id.type is ObjT.controller
                     ctrl_key = f'{encl_key}/ctrls/' + \
                         oid_to_fidstr(ctrl_id)
-                    d[ctrl_key] = json.dumps(
-                        {'node': oid_to_fidstr(m0conf[ctrl_id].node),
-                         'state': 'M0_NC_UNKNOWN'})
+                    d[ctrl_key] = state_unknown
                     for drive_id in m0conf[ctrl_id].drives:
                         assert drive_id.type is ObjT.drive
                         drive_key = f'{ctrl_key}/drives/' + \
@@ -1664,7 +1667,7 @@ def generate_consul_kv(cluster: Cluster, dhall_dir: str) -> str:
           for x in processes()],
         *consul_kv_sdevs(m0conf).items(),
         *consul_kv_drives(m0conf).items())],
-                      indent=2) + '\n'
+        indent=2) + '\n'
 
 
 def generate_confd(m0conf: Dict[Oid, ToDhall], dhall_dir: str) -> str:
@@ -1726,9 +1729,8 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
         m0ds = node.get('m0_servers', [])
         if any(m0d['_io_disks'] for m0d in m0ds):
             ctrl_id = ConfController.build(conf,
-                                           ConfEnclosure.build(conf, rack_id),
-                                           node_id)
-
+                                           ConfEnclosure.build(conf, rack_id,
+                                                               node_id))
         ConfProcess.build(conf, node_id, node, ProcT.hax)
 
         confd_p = False
