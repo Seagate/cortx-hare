@@ -242,6 +242,10 @@ EOF
     while read node _; do
         if is_localhost $node; then
             echo $node > $conf_dir/node-name
+            if [ $? -ne 0 ]
+                then
+                    echo "Permission Denied at" $node "for /var/lib/hare/node-name"
+            fi
         else
             # Redirect stdin to /dev/null (`-n`) to prevent
             # accidental stealing of `get_all_nodes` output.
