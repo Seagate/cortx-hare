@@ -241,11 +241,17 @@ EOF
 
     while read node _; do
         if is_localhost $node; then
-            echo $node > $conf_dir/node-name
+            echo $node > $conf_dir/node-name || {
+                echo "Permission Denied at $node for $conf_dir/node-name"
+                exit 1
+            }
         else
             # Redirect stdin to /dev/null (`-n`) to prevent
             # accidental stealing of `get_all_nodes` output.
-	    ssh -n $node "echo $node > $conf_dir/node-name"
+	    ssh -n $node "echo $node > $conf_dir/node-name" || {
+                echo "Permission Denied at $node for $conf_dir/node-name"
+                exit 1
+            } 
         fi
     done < <(get_all_nodes)
 
