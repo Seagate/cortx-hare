@@ -37,9 +37,10 @@ Group: System Environment/Daemons
 Source: %{name}-%{h_version}.tar.gz
 
 BuildRequires: binutils-devel
-BuildRequires: git
 BuildRequires: cortx-motr
 BuildRequires: cortx-motr-devel
+BuildRequires: cortx-py-utils
+BuildRequires: git
 BuildRequires: python36
 BuildRequires: python36-devel
 BuildRequires: python36-pip
@@ -49,6 +50,7 @@ Requires: consul >= 1.7.0, consul < 1.10.0
 Requires: facter >= 3.14.8
 Requires: jq
 Requires: cortx-motr = %{h_motr_version}
+Requires: cortx-py-utils
 Requires: python36
 
 Conflicts: halon
