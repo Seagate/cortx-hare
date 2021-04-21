@@ -55,13 +55,10 @@ def _get_processes_for_node() -> Dict[str, List[utils.Process]]:
     return processes
 
 
-def stop_process(processes: Dict[str, List[utils.Process]]):
+def stop_all_with_consul(processes: Dict[str, List[utils.Process]],
+                         leader_node: str):
     for svc in utils.shutdown_sequence:
-        if svc not in processes:
-            continue
-        if svc != 'consul':
-            utils.stop_parallel([proc for proc in processes[svc]])
-        else:
+        if svc in processes and svc == 'consul':
             # Consul process at the current node must stopped the last.
             # Reason: if something goes wrong and the user will want to
             # shutdown the cluster again, local Consul must be available.
@@ -72,17 +69,28 @@ def stop_process(processes: Dict[str, List[utils.Process]]):
             local_procs = [proc for proc in processes[svc] if proc.is_local]
             utils.stop_parallel(local_procs)
 
-
-def shutdown_cluster():
-    check_cluster()
-    (processes, leader_node) = _get_processes_for_cluster()
-    stop_process(processes)
-
     if leader_node and not utils.is_fake_leader_name(leader_node):
         logging.info(f'Shutting down RC Leader at {leader_node}... ')
         pkill: str = 'sudo pkill --exact -KILL consul &> /dev/null'
         utils.exec_custom(utils.ssh_prefix(leader_node) + pkill,
                           show_err=False)
+
+
+def stop_process(processes: Dict[str, List[utils.Process]]):
+    for svc in utils.shutdown_sequence:
+        if svc not in processes:
+            continue
+        if svc != 'consul':
+            utils.stop_parallel([proc for proc in processes[svc]])
+
+
+def shutdown_cluster(skip_consul_stop: bool):
+    check_cluster()
+    (processes, leader_node) = _get_processes_for_cluster()
+    stop_process(processes)
+
+    if not skip_consul_stop:
+        stop_all_with_consul(processes, leader_node)
 
 
 def node_shutdown():
@@ -93,20 +101,24 @@ def node_shutdown():
 
 def main() -> None:
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "v", ["verbose", "node"])
+        opts, args = getopt.getopt(sys.argv[1:], "v",
+                                   ["verbose", "node", "skip-consul-stop"])
     except getopt.GetoptError as err:
         sys.exit(err)
 
     logging.basicConfig(level=logging.INFO, format='%(message)s')
 
+    skip_consul_stop = False
     for (opt, value) in opts:
         if opt in ['-v', '--verbose']:
             logging.basicConfig(level=logging.DEBUG, format='%(message)s')
+        if opt in ['--skip-consul-stop']:
+            skip_consul_stop = True
         if opt in ['--node']:
             node_shutdown()
             return
 
-    shutdown_cluster()
+    shutdown_cluster(skip_consul_stop)
 
 
 if __name__ == '__main__':
