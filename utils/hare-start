@@ -70,7 +70,7 @@ if  hctl status > /dev/null 2>&1; then
     die 'Cluster is up and running.'
 fi
 
-if [[ $node ]]; then
+if $node; then
     start-node
 else
     hctl bootstrap -c $conf_dir
