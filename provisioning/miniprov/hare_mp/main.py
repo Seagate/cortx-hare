@@ -229,7 +229,7 @@ def bootstrap_cluster(path_to_cdf: str, domkfs=False):
 
 def shutdown_cluster():
     while is_cluster_running():
-        os.system('hctl shutdown')
+        os.system('hctl shutdown --skip-consul-stop')
 
 
 def list2dict(
