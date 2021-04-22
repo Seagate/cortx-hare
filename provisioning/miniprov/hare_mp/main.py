@@ -308,8 +308,8 @@ def config(args):
         exit(-1)
 
 
-def add_subcommand(subparser, command: str, help_str: str,
-                   handler_fn: Callable[[Any], None]):
+def add_subcommand_with_config(subparser, command: str, help_str: str,
+                               handler_fn: Callable[[Any], None]):
     parser = subparser.add_parser(command, help=help_str)
     parser.set_defaults(func=handler_fn)
     parser.add_argument('--config',
@@ -318,6 +318,13 @@ def add_subcommand(subparser, command: str, help_str: str,
                         nargs=1,
                         type=str,
                         action='store')
+    return parser
+
+
+def add_subcommand(subparser, command: str, help_str: str,
+                   handler_fn: Callable[[Any], None]):
+    parser = subparser.add_parser(command, help=help_str)
+    parser.set_defaults(func=handler_fn)
     return parser
 
 
@@ -335,10 +342,10 @@ def main():
     p = argparse.ArgumentParser(description='Configure hare settings')
     subparser = p.add_subparsers()
 
-    parser = add_subcommand(subparser,
-                            'post_install',
-                            help_str='Perform post installation checks',
-                            handler_fn=post_install)
+    parser = add_subcommand_with_config(subparser,
+                                        'post_install',
+                                        help_str='Validates installation',
+                                        handler_fn=post_install)
     parser.add_argument(
         '--report-unavailable-features',
         help='Report unsupported features according to setup type',
@@ -348,40 +355,46 @@ def main():
                         action='store_true')
 
     add_file_argument(
-        add_subcommand(subparser,
-                       'config',
-                       help_str='Configure Hare',
-                       handler_fn=config))
+        add_subcommand_with_config(subparser,
+                                   'config',
+                                   help_str='Configures Hare',
+                                   handler_fn=config))
 
     add_file_argument(
-        add_subcommand(subparser,
-                       'init',
-                       help_str='Perform component initialization',
-                       handler_fn=init))
+        add_subcommand_with_config(subparser,
+                                   'init',
+                                   help_str='Initializes Hare',
+                                   handler_fn=init))
 
     add_file_argument(
-        add_subcommand(subparser,
-                       'test',
-                       help_str='Testing cluster status',
-                       handler_fn=test))
+        add_subcommand_with_config(subparser,
+                                   'test',
+                                   help_str='Tests Hare sanity',
+                                   handler_fn=test))
 
     add_subcommand(subparser,
                    'support_bundle',
-                   help_str='Generating support bundle',
+                   help_str='Generates support bundle',
                    handler_fn=generate_support_bundle)
-    add_subcommand(subparser,
-                   'reset',
-                   help_str='Reset/cleanup step',
-                   handler_fn=noop)
-    add_subcommand(subparser,
-                   'cleanup',
-                   help_str='Reset/cleanup step',
-                   handler_fn=noop)
 
-    add_subcommand(subparser,
-                   'prepare',
-                   help_str='Prepare step',
-                   handler_fn=noop)
+    add_subcommand_with_config(
+        subparser,
+        'reset',
+        help_str='Resets temporary Hare data and configuration',
+        handler_fn=noop)
+
+    add_subcommand_with_config(
+        subparser,
+        'cleanup',
+        help_str='Resets Hare configuration, logs and formats Motr metadata',
+        handler_fn=noop)
+
+    add_subcommand_with_config(
+        subparser,
+        'prepare',
+        help_str='Validates configuration pre-requisites',
+        handler_fn=noop)
+
     setup_logging()
 
     parsed = p.parse_args(sys.argv[1:])
