@@ -1,12 +1,5 @@
 {
   "Slack Token": "(xox[p|b|o|a]-[0-9]{12}-[0-9]{12}-[0-9]{12}-[a-z0-9]{32})",
-  "Generic Private Key POST Encapsulation Boundary": " PRIVATE KEY-----",
-  "Generic Private Key Block POST Encapsulation Boundary": " PRIVATE KEY BLOCK-----",
-  "Private key": "-----BEGIN PRIVATE KEY-----",
-  "RSA private key": "-----BEGIN RSA PRIVATE KEY-----",
-  "SSH (DSA) private key": "-----BEGIN DSA PRIVATE KEY-----",
-  "SSH (EC) private key": "-----BEGIN EC PRIVATE KEY-----",
-  "PGP private key block": "-----BEGIN PGP PRIVATE KEY BLOCK-----",
   "Amazon AWS Access Key ID": "AKIA[0-9A-Z]{16}",
   "Amazon MWS Auth Token": "amzn\\.mws\\.[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
   "AWS API Key": "AKIA[0-9A-Z]{16}",
