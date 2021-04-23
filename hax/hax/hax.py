@@ -126,10 +126,11 @@ def main():
                    herald,
                    consul_util=util,
                    threads_to_wait=[consumer, stats_updater, rconfc_starter])
+
     except Exception:
         LOG.exception('Exiting due to an exception')
     finally:
-        motr.close()
+        motr.fini()
 
 
 if __name__ == '__main__':
