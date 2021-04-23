@@ -1,0 +1,30 @@
+name: Sync
+on:
+  push:
+    branches:
+    - main
+
+jobs:
+  pull-request:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: pull-request
+      id: open-pr
+      uses: repo-sync/pull-request@v2
+      with:
+        source_branch: "main"                                # If blank, default: triggered branch
+        destination_branch: "stable"                         # If blank, default: master
+        pr_title: "Pulling ${{ github.ref }} into stable"    # Title of pull request
+        pr_body: ":sync: *An automated PR*"                  # Full markdown support, requires pr_title to be set
+        pr_template: ".github/pull_request_template.md"      # Path to pull request template, requires pr_title to be set, excludes pr_body
+        pr_label: "auto-pr"                                  # Comma-separated list (no spaces)
+        pr_draft: true                                       # Creates pull request as draft
+        pr_allow_empty: true                                 # Creates pull request even if there are no changes
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+    - name: output-url
+      run: echo ${{steps.open-pr.outputs.pr_url}}
+    - name: output-number
+      run: echo ${{steps.open-pr.outputs.pr_number}}
+    - name: output-has-changed-files
+      run: echo ${{steps.open-pr.outputs.has_changed_files}}
