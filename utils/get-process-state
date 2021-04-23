@@ -50,4 +50,4 @@ case $1 in
 esac
 
 fid=$1
-consul kv get processes/$fid 2> /dev/null | jq -r '.state'
+consul kv get $HOSTNAME/processes/$fid 2> /dev/null | jq -r '.state'
