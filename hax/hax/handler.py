@@ -31,7 +31,7 @@ from hax.motr import Motr
 from hax.motr.delivery import DeliveryHerald
 from hax.queue.publish import EQPublisher
 from hax.types import (ConfHaProcess, HAState, MessageId, StobIoqError,
-                       m0HaProcessEvent, ServiceHealth,
+                       ServiceHealth, m0HaProcessEvent, m0HaProcessType,
                        StoppableThread, HaLinkMessagePromise, ObjT)
 from hax.util import ConsulUtil, dump_json, repeat_if_fails
 
@@ -73,7 +73,8 @@ class ConsumerThread(StoppableThread):
         if event.chp_event in (m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED,
                                m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED):
             motr.broadcast_ha_states([HAState(fid=event.fid,
-                                              status=svc_status)])
+                                              status=svc_status)],
+                                     notify_devices=False)
 
     @repeat_if_fails(wait_seconds=1)
     def update_process_failure(self, q: Queue,
@@ -82,15 +83,24 @@ class ConsumerThread(StoppableThread):
         for state in ha_states:
             # We are only concerned with process statuses.
             if state.fid.container == ObjT.PROCESS.value:
-                if state.status == ServiceHealth.OK:
-                    new_ha_states.append(state)
-                    continue
                 current_status = self.consul.get_process_current_status(
                                      state.status, state.fid)
-                if current_status == ServiceHealth.FAILED:
-                    self.consul.service_health_to_m0dstatus_update(
-                        state.fid, current_status)
-                elif current_status == ServiceHealth.UNKNOWN:
+                if current_status == ServiceHealth.OK:
+                    if (self.consul.get_process_local_status(state.fid) ==
+                            'M0_CONF_HA_PROCESS_STARTED'):
+                        continue
+                if current_status in (ServiceHealth.FAILED,
+                                      ServiceHealth.STOPPED):
+                    if (self.consul.get_process_local_status(state.fid) ==
+                            'M0_CONF_HA_PROCESS_STOPPED'):
+                        # Consul may report failure of a process multiple
+                        # times, so we don't want to send duplicate failure
+                        # notifications, it may cause delay in cleanup
+                        # activities.
+                        continue
+                    else:
+                        current_status = ServiceHealth.STOPPED
+                if current_status == ServiceHealth.UNKNOWN:
                     # We got service status as UNKNOWN, that means hax was
                     # notified about process failure but hax couldn't
                     # confirm if the process is in failed state or have
@@ -111,6 +121,23 @@ class ConsumerThread(StoppableThread):
                           states=[HAState(fid=state.fid,
                                           status=ServiceHealth.FAILED)],
                           reply_to=None))
+                if current_status not in (ServiceHealth.UNKNOWN,
+                                          ServiceHealth.OFFLINE):
+                    # We also need to account and report the failure of remote
+                    # Motr processes to this node's hax and motr processes.
+                    # When Consul reports a remote process failure, hax
+                    # confirms its current status from Consul KV and updates
+                    # the list of failed services and also adds it to the
+                    # broadcast list.
+                    if current_status != ServiceHealth.OK:
+                        event = m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED
+                    else:
+                        event = m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED
+                    self.consul.update_process_status(ConfHaProcess(
+                        chp_event=event,
+                        chp_type=m0HaProcessType.M0_CONF_HA_PROCESS_M0D,
+                        chp_pid=0,
+                        fid=state.fid))
                 new_ha_states.append(HAState(fid=state.fid,
                                              status=current_status))
             else:
@@ -118,9 +145,8 @@ class ConsumerThread(StoppableThread):
         return new_ha_states
 
     def _do_work(self, q: Queue, motr: Motr):
-        ffi = motr._ffi
         LOG.info('Handler thread has started')
-        ffi.adopt_motr_thread()
+        motr.adopt_motr_thread()
 
         def pull_msg():
             try:
@@ -145,9 +171,11 @@ class ConsumerThread(StoppableThread):
                         LOG.debug('first entrypoint request, broadcast FAILED')
                         ids: List[MessageId] = motr.broadcast_ha_states(
                             [HAState(fid=item.process_fid,
-                                     status=ServiceHealth.FAILED)])
+                                     status=ServiceHealth.FAILED)],
+                            notify_devices=False)
                         LOG.debug('waiting for broadcast of %s for ep: %s',
                                   ids, item.remote_rpc_endpoint)
+                        # Wait for failure delivery.
                         self.herald.wait_for_all(HaLinkMessagePromise(ids))
                         motr.send_entrypoint_request_reply(
                             EntrypointRequest(
@@ -232,6 +260,8 @@ class ConsumerThread(StoppableThread):
                     # no op, swallow the exception
                     LOG.exception('**ERROR**')
         except StopIteration:
-            ffi.shun_motr_thread()
+            LOG.info('Consumer Stopped')
+            motr.stop()
+            motr.shun_motr_thread()
         finally:
             LOG.info('Handler thread has exited')

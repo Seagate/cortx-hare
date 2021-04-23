@@ -217,6 +217,7 @@ class ServiceHealth(Enum):
     OK = 1
     UNKNOWN = 2
     OFFLINE = 3
+    STOPPED = 4
 
     def __repr__(self):
         """Return human-readable constant name (useful in log output)."""

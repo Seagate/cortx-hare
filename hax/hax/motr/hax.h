@@ -49,6 +49,7 @@ struct hax_link {
 	struct m0_ha_link *hxl_link;
 	struct m0_tlink    hxl_tlink;
 	uint64_t           hxl_magic;
+	bool               hxl_is_active;
 };
 
 struct hax_entrypoint_request {
@@ -62,8 +63,6 @@ struct hax_msg {
 };
 
 struct hax_context *init_motr_api(PyObject *obj, const char *node_uuid);
-
-void destroy_motr_api(unsigned long long ctx);
 
 int start(unsigned long long ctx, const char *local_rpc_endpoint,
 	  const struct m0_fid *process_fid, const struct m0_fid *ha_service_fid,
@@ -95,6 +94,15 @@ void m0_ha_broadcast_test(unsigned long long ctx);
  * hax.types.FsStats
  */
 PyObject *m0_ha_filesystem_stats_fetch(unsigned long long ctx);
+
+PyObject *m0_hax_stop(unsigned long long ctx, const struct m0_fid *process_fid,
+		      const char *hax_endpoint);
+void m0_hax_link_stopped(unsigned long long ctx, const char *proc_ep);
+void adopt_motr_thread(unsigned long long ctx);
+void shun_motr_thread(void);
+
+void motr_api_stop(unsigned long long ctx);
+void motr_api_fini(unsigned long long ctx);
 
 /* __HAX_H__ */
 #endif
