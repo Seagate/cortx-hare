@@ -295,6 +295,20 @@ class ConsulUtil:
     def get_hax_ip_address(self) -> str:
         return self._service_data().ip_addr
 
+    def fid_to_endpoint(self, proc_fid: Fid) -> Optional[str]:
+        pfidk = int(proc_fid.key)
+        process_items = self.kv.kv_get('m0conf/nodes', recurse=True)
+        regex = re.compile(
+            f'^m0conf\\/.*\\/processes\\/{pfidk}\\/endpoint')
+        for proc_item in process_items:
+            match_result = re.match(regex, proc_item['Key'])
+            if not match_result:
+                continue
+            proc_item_val = self.kv.kv_get(proc_item['Key'])
+            process_ep: bytes = proc_item_val['Value']
+            return process_ep.decode('utf-8')
+        return None
+
     @repeat_if_fails()
     def get_leader_node(self) -> str:
         """

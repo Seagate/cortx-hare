@@ -53,9 +53,11 @@ class ConsumerThread(StoppableThread):
                          name='qconsumer',
                          args=(q, motr))
         self.is_stopped = False
+        self.is_finalized = False
         self.consul = consul
         self.eq_publisher = EQPublisher()
         self.herald = herald
+        self.motr = motr
 
     def stop(self) -> None:
         self.is_stopped = True
@@ -118,9 +120,8 @@ class ConsumerThread(StoppableThread):
         return new_ha_states
 
     def _do_work(self, q: Queue, motr: Motr):
-        ffi = motr._ffi
         LOG.info('Handler thread has started')
-        ffi.adopt_motr_thread()
+        motr.adopt_motr_thread()
 
         def pull_msg():
             try:
@@ -232,6 +233,9 @@ class ConsumerThread(StoppableThread):
                     # no op, swallow the exception
                     LOG.exception('**ERROR**')
         except StopIteration:
-            ffi.shun_motr_thread()
+            LOG.info('Consumer Stopped')
         finally:
+            LOG.info('Closing motr')
+            motr.close()
+            motr.shun_motr_thread()
             LOG.info('Handler thread has exited')

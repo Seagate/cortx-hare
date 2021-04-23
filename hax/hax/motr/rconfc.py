@@ -34,10 +34,10 @@ class RconfcStarter(StoppableThread):
     @log_exception
     def _execute(self, motr: Motr):
         try:
-            ffi = motr._ffi
+            # ffi = motr._ffi
             LOG.debug('rconfc starter thread has started')
-            ffi.adopt_motr_thread()
             self.consul.ensure_motr_all_started(self.event)
+            motr.adopt_motr_thread()
             while (not self.stopped) and (not motr.spiel_ready):
                 started = self.consul.ensure_ioservices_running()
                 if not all(started):
@@ -46,6 +46,7 @@ class RconfcStarter(StoppableThread):
                 result: int = motr.start_rconfc()
                 if result == 0:
                     motr.spiel_ready = True
+            motr.shun_motr_thread()
         except InterruptedException:
             # No op. sleep() has interrupted before the timeout exceeded:
             # the application is shutting down.
@@ -54,5 +55,6 @@ class RconfcStarter(StoppableThread):
         except Exception:
             LOG.exception('Aborting due to an error')
         finally:
-            ffi.shun_motr_thread()
+            LOG.debug('Stopping rconfc')
+            motr.shun_motr_thread()
             LOG.debug('rconfc starter thread exited')

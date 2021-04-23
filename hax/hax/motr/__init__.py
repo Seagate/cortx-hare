@@ -22,14 +22,14 @@ from errno import EAGAIN
 from typing import Any, List
 
 from hax.exception import ConfdQuorumException, RepairRebalanceException
-from hax.message import (BroadcastHAStates, EntrypointRequest,
+from hax.message import (EntrypointRequest,
                          FirstEntrypointRequest, HaNvecGetEvent, ProcessEvent)
 from hax.motr.delivery import DeliveryHerald
 from hax.motr.ffi import HaxFFI, make_array, make_c_str
 from hax.types import (ConfHaProcess, Fid, FidStruct, FsStats, HaNote,
                        HaNoteStruct, HAState, MessageId, ObjT, Profile,
                        ReprebStatus, ServiceHealth, StobIoqError,
-                       m0HaProcessEvent, m0HaProcessType)
+                       m0HaProcessEvent, HaLinkMessagePromise)
 from hax.util import ConsulUtil, repeat_if_fails
 
 LOG = logging.getLogger('hax')
@@ -60,6 +60,7 @@ class Motr:
         self.herald = herald
         self.consul_util = consul_util
         self.spiel_ready = False
+        self.is_stopping = False
 
         if not self._ha_ctx:
             LOG.error('Cannot initialize Motr API. m0_halon_interface_init'
@@ -96,6 +97,10 @@ class Motr:
                                ' Please check Motr logs for more details.')
         LOG.debug('rconfc started')
         return result
+
+    def stop(self):
+        LOG.debug('Shutting down Motr API')
+        self._ffi.motr_stop(self._ha_ctx)
 
     def stop_rconfc(self) -> int:
         LOG.debug('Stopping rconfc')
@@ -148,7 +153,8 @@ class Motr:
             LOG.exception('Failed to notify failure for %s', process_fid)
 
         LOG.debug('enqueue entrypoint request for %s', remote_rpc_endpoint)
-        self.queue.put(
+        # self.queue.put(
+        self.send_entrypoint_request_reply(
             EntrypointRequest(reply_context=reply_context,
                               req_id=req_id,
                               remote_rpc_endpoint=remote_rpc_endpoint,
@@ -173,6 +179,14 @@ class Motr:
             principal_rm = util.get_session_node(sess)
             confds = util.get_confd_list()
             rm_fid = util.get_rm_fid()
+            # When stopping, there's a possibility that hax may receive
+            # an entrypoint request from motr land. In order to unblock
+            # motr land, reply with entrypoint request with no confds
+            # and RM endpoints as the processes might have already
+            # stopped.
+            if self.is_stopping:
+                confds = []
+                rm_fid = Fid(0, 0)
         except Exception:
             LOG.exception('Failed to get the data from Consul.'
                           ' Replying with EAGAIN error code.')
@@ -191,7 +205,7 @@ class Motr:
             if svc.node == principal_rm:
                 rm_eps = svc.address
                 break
-        if not rm_eps:
+        if not self.is_stopping and not rm_eps:
             raise RuntimeError('No RM node found in Consul')
 
         confd_fids = [x.fid.to_c() for x in confds]
@@ -240,12 +254,10 @@ class Motr:
                               chp_pid=chp_pid,
                               fid=fid)))
 
-        if chp_type == m0HaProcessType.M0_CONF_HA_PROCESS_M0D:
-            if chp_event == m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED:
-                self.queue.put(
-                    BroadcastHAStates(
-                        states=[HAState(fid=fid, status=ServiceHealth.OK)],
-                        reply_to=None))
+        if chp_event == m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED:
+            proc_ep = self.consul_util.fid_to_endpoint(fid)
+            if proc_ep:
+                self._ffi.hax_link_stopped(self._ha_ctx, make_c_str(proc_ep))
 
     def _stob_ioq_event_cb(self, fid, sie_conf_sdev, sie_stob_id, sie_fd,
                            sie_opcode, sie_rc, sie_offset, sie_size,
@@ -321,11 +333,27 @@ class Motr:
             for x in disk_list
         ]
 
+    def notify_hax_stop(self):
+        LOG.debug('Notifying hax stop')
+        hax_fid = self.consul_util.get_hax_fid()
+        profile_fid = self._profile.fid
+        hax_endpoint = self.consul_util.get_hax_endpoint()
+        self._ffi.hax_stop(self._ha_ctx, hax_fid.to_c(),
+                           make_c_str(hax_endpoint))
+        ids = self._ffi.hax_stop(self._ha_ctx, profile_fid.to_c(),
+                                 make_c_str(hax_endpoint))
+        self.herald.wait_for_all(HaLinkMessagePromise(ids))
+
+    def motr_stopping(self):
+        self.is_stopping = True
+        self._ffi.motr_stopping(self._ha_ctx)
+
     def close(self):
-        LOG.debug('Stopping rconfc')
+        self.notify_hax_stop()
+        self.motr_stopping()
+        self.stop()
         self.stop_rconfc()
-        LOG.debug('Shutting down Motr API')
-        self._ffi.destroy(self._ha_ctx)
+        self._ffi.motr_fini(self._ha_ctx)
         self._ha_ctx = 0
         LOG.debug('Motr API context is down. Bye!')
 
@@ -334,6 +362,7 @@ class Motr:
         self._ffi.adopt_motr_thread()
 
     def shun_motr_thread(self):
+        LOG.debug('Shunning Motr thread')
         self._ffi.shun_motr_thread()
 
     def get_filesystem_stats(self) -> FsStats:
