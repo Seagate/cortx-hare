@@ -108,7 +108,7 @@ if [[ $service =~ m0d ]]; then
 fi
 
 case $(systemctl is-active $service) in
-    active|deactivating)
+    active|activating)
         exit ${status[passing]};;
     failed)
         exit ${status[failing]};;

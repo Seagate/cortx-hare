@@ -20,6 +20,7 @@ import ctypes as c
 import logging
 import os
 
+from typing import Optional
 from hax.types import FidStruct, HaNoteStruct, Uint128Struct
 
 LOG = logging.getLogger('hax')
@@ -27,7 +28,9 @@ LOG = logging.getLogger('hax')
 py_func_proto = c.PYFUNCTYPE(None, c.c_void_p)
 
 
-def make_c_str(str_val: str) -> c.c_char_p:
+def make_c_str(str_val: Optional[str]) -> Optional[c.c_char_p]:
+    if str_val is None:
+        return None
     byte_str = str_val.encode('utf-8')
     return c.c_char_p(byte_str)
 
@@ -64,7 +67,8 @@ class HaxFFI:
         lib.start_rconfc.argtypes = [c.c_void_p, c.POINTER(FidStruct)]
         lib.start_rconfc.restype = c.c_int
         self.start_rconfc = lib.start_rconfc
-        self.destroy = py_func_proto(('destroy_motr_api', lib))
+        self.motr_stop = py_func_proto(('motr_api_stop', lib))
+        self.motr_fini = py_func_proto(('motr_api_fini', lib))
 
         lib.stop_rconfc.argtypes = [c.c_void_p]
         lib.stop_rconfc.restype = c.c_int
@@ -86,7 +90,7 @@ class HaxFFI:
         lib.m0_ha_notify.argtypes = [
             c.c_void_p,  # unsigned long long ctx
             c.POINTER(HaNoteStruct),  # struct m0_ha_note *notes
-            c.c_uint32  # uint32_t nr_notes
+            c.c_uint32,  # uint32_t nr_notes
         ]
         lib.m0_ha_notify.restype = c.py_object
         self.ha_broadcast = lib.m0_ha_notify
@@ -97,6 +101,20 @@ class HaxFFI:
             c.c_uint32  # uint32_t nr_notes
         ]
         self.ha_nvec_reply = lib.m0_ha_nvec_reply_send
+
+        lib.m0_hax_stop.argtypes = [
+            c.c_void_p,  # unsigned long long ctx
+            c.POINTER(FidStruct),  # const struct m0_fid *process_fid
+            c.c_char_p  # const char *hax_ep
+        ]
+        lib.m0_hax_stop.restype = c.py_object
+        self.hax_stop = lib.m0_hax_stop
+
+        lib.m0_hax_link_stopped.argtypes = [
+            c.c_void_p,  # unsigned long long  hax_msg
+            c.c_char_p  # const char *hax_ep
+        ]
+        self.hax_link_stopped = lib.m0_hax_link_stopped
 
         lib.adopt_motr_thread.argtypes = []
         lib.adopt_motr_thread.restype = c.c_int

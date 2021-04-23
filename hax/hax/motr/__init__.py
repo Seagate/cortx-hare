@@ -22,14 +22,14 @@ from errno import EAGAIN
 from typing import Any, List
 
 from hax.exception import ConfdQuorumException, RepairRebalanceException
-from hax.message import (BroadcastHAStates, EntrypointRequest,
+from hax.message import (EntrypointRequest,
                          FirstEntrypointRequest, HaNvecGetEvent, ProcessEvent)
 from hax.motr.delivery import DeliveryHerald
 from hax.motr.ffi import HaxFFI, make_array, make_c_str
 from hax.types import (ConfHaProcess, Fid, FidStruct, FsStats, HaNote,
                        HaNoteStruct, HAState, MessageId, ObjT, Profile,
                        ReprebStatus, ServiceHealth, StobIoqError,
-                       m0HaProcessEvent, m0HaProcessType)
+                       m0HaProcessEvent, HaLinkMessagePromise)
 from hax.util import ConsulUtil, repeat_if_fails
 
 LOG = logging.getLogger('hax')
@@ -60,6 +60,7 @@ class Motr:
         self.herald = herald
         self.consul_util = consul_util
         self.spiel_ready = False
+        self.is_stopping = False
 
         if not self._ha_ctx:
             LOG.error('Cannot initialize Motr API. m0_halon_interface_init'
@@ -96,6 +97,19 @@ class Motr:
                                ' Please check Motr logs for more details.')
         LOG.debug('rconfc started')
         return result
+
+    def stop(self):
+        LOG.info('Stopping motr')
+        self.is_stopping = True
+        self.notify_hax_stop()
+        self.stop_rconfc()
+        self._ffi.motr_stop(self._ha_ctx)
+
+    def fini(self):
+        LOG.info('Finalizing motr')
+        self._ffi.motr_fini(self._ha_ctx)
+        self._ha_ctx = 0
+        LOG.debug('Motr API context is down. Bye!')
 
     def stop_rconfc(self) -> int:
         LOG.debug('Stopping rconfc')
@@ -148,20 +162,27 @@ class Motr:
             LOG.exception('Failed to notify failure for %s', process_fid)
 
         LOG.debug('enqueue entrypoint request for %s', remote_rpc_endpoint)
-        self.queue.put(
-            EntrypointRequest(reply_context=reply_context,
-                              req_id=req_id,
-                              remote_rpc_endpoint=remote_rpc_endpoint,
-                              process_fid=process_fid,
-                              git_rev=git_rev,
-                              pid=pid,
-                              is_first_request=is_first_request))
+        entrypoint_req: EntrypointRequest = EntrypointRequest(
+            reply_context=reply_context,
+            req_id=req_id,
+            remote_rpc_endpoint=remote_rpc_endpoint,
+            process_fid=process_fid,
+            git_rev=git_rev,
+            pid=pid,
+            is_first_request=is_first_request)
+
+        # If rconfc from motr land sends an entrypoint request when
+        # the hax consumer thread is already stopping, there's no
+        # point in en-queueing the request as there's no one to process
+        # the same. Thus, invoke send_entrypoint_reply directly.
+        self.send_entrypoint_request_reply(entrypoint_req)
 
     def send_entrypoint_request_reply(self, message: EntrypointRequest):
         reply_context = message.reply_context
         req_id = message.req_id
         remote_rpc_endpoint = message.remote_rpc_endpoint
         process_fid = message.process_fid
+        e_rc = EAGAIN
 
         LOG.debug('Processing entrypoint request from remote endpoint'
                   " '{}', process fid {}".format(remote_rpc_endpoint,
@@ -169,30 +190,65 @@ class Motr:
         sess = principal_rm = confds = None
         try:
             util = self.consul_util
-            sess = util.get_leader_session_no_wait()
-            principal_rm = util.get_session_node(sess)
-            confds = util.get_confd_list()
-            rm_fid = util.get_rm_fid()
+            # When stopping, there's a possibility that hax may receive
+            # an entrypoint request from motr land. In order to unblock
+            # motr land, reply with entrypoint request with no confds
+            # and RM endpoints as the processes might have already
+            # stopped.
+            rc_quorum = 0
+            rm_fid = Fid(0, 0)
+            if self.is_stopping:
+                confds = []
+            else:
+                sess = util.get_leader_session_no_wait()
+                principal_rm = util.get_session_node(sess)
+                confds = util.get_confd_list()
+
+            # Hax may receive entrypoint requests multiple times during its
+            # lifetime. Hax starts motr rconfc to invoke spiel commands. Motr
+            # rconfc establishes connection with principal RM, in case of
+            # principal RM failure, rconfc invalidates its confc and again
+            # requests entrypoint in a hope that there will be another confd
+            # and principal RM elected so that rconfc can resume its
+            # functionality. During shutdown, when each motr process stops,
+            # including confds, hax broadcasts M0_NC_FAILED event for every
+            # STOPPED or FAILED motr process. Motr rconfc on receiving the
+            # failed events for confds, goes re-requests entrypoint information
+            # and this goes on in a loop. In order to break this loop, the
+            # the entrypoint reply must only report alive confds and rm
+            # endpoints. While doing this we need to handle the bootstrapping
+            # case, so we wait until bootstrapping is done that is all the
+            # motr services are up, we check the confd status and exclude
+            # corresponding confd from the entrypoint reply.
+            active_confds = []
+            if self.spiel_ready:
+                for confd in confds:
+                    if not util.is_confd_failed(confd.fid):
+                        active_confds.append(confd)
+                confds = active_confds
+
+            if confds:
+                rm_fid = util.get_rm_fid()
+                rc_quorum = int(len(confds) / 2 + 1)
+            rm_eps = None
+            for svc in confds:
+                if svc.node == principal_rm:
+                    rm_eps = svc.address
+                    break
+            if confds and (not self.is_stopping) and (not rm_eps):
+                if util.m0ds_stopping():
+                    e_rc = 0
+                raise RuntimeError('No RM node found in Consul')
         except Exception:
             LOG.exception('Failed to get the data from Consul.'
                           ' Replying with EAGAIN error code.')
-            self._ffi.entrypoint_reply(reply_context, req_id.to_c(), EAGAIN, 0,
+            self._ffi.entrypoint_reply(reply_context, req_id.to_c(), e_rc, 0,
                                        make_array(FidStruct, []),
                                        make_array(c.c_char_p, []), 0,
                                        Fid(0, 0).to_c(),
                                        None)
             LOG.debug('Reply sent')
             return
-
-        rc_quorum = int(len(confds) / 2 + 1)
-
-        rm_eps = None
-        for svc in confds:
-            if svc.node == principal_rm:
-                rm_eps = svc.address
-                break
-        if not rm_eps:
-            raise RuntimeError('No RM node found in Consul')
 
         confd_fids = [x.fid.to_c() for x in confds]
         confd_eps = [make_c_str(x.address) for x in confds]
@@ -207,7 +263,8 @@ class Motr:
                                    make_c_str(rm_eps))
         LOG.debug('Entrypoint request has been replied to')
 
-    def broadcast_ha_states(self, ha_states: List[HAState]) -> List[MessageId]:
+    def broadcast_ha_states(self, ha_states: List[HAState],
+                            notify_devices=True) -> List[MessageId]:
         LOG.debug('Broadcasting HA states %s over ha_link', ha_states)
 
         def ha_obj_state(st):
@@ -220,7 +277,11 @@ class Motr:
                 continue
             note = HaNoteStruct(st.fid.to_c(), ha_obj_state(st))
             notes.append(note)
-            notes += self._generate_sub_services(note, self.consul_util)
+            if (st.fid.container == ObjT.PROCESS.value and
+                    st.status == ServiceHealth.STOPPED):
+                notify_devices = False
+            notes += self._generate_sub_services(note, self.consul_util,
+                                                 notify_devices)
 
         if not notes:
             return []
@@ -240,12 +301,10 @@ class Motr:
                               chp_pid=chp_pid,
                               fid=fid)))
 
-        if chp_type == m0HaProcessType.M0_CONF_HA_PROCESS_M0D:
-            if chp_event == m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED:
-                self.queue.put(
-                    BroadcastHAStates(
-                        states=[HAState(fid=fid, status=ServiceHealth.OK)],
-                        reply_to=None))
+        if chp_event == m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED:
+            proc_ep = self.consul_util.fid_to_endpoint(fid)
+            if proc_ep:
+                self._ffi.hax_link_stopped(self._ha_ctx, make_c_str(proc_ep))
 
     def _stob_ioq_event_cb(self, fid, sie_conf_sdev, sie_stob_id, sie_fd,
                            sie_opcode, sie_rc, sie_offset, sie_size,
@@ -283,10 +342,9 @@ class Motr:
         notes: List[HaNoteStruct] = []
         for n in event.nvec:
             n.note.no_state = HaNoteStruct.M0_NC_ONLINE
-            if (n.obj_t in (ObjT.PROCESS.name, ObjT.SERVICE.name)
-                    and self.consul_util.get_conf_obj_status(
-                        ObjT[n.obj_t], n.note.no_id.f_key) != 'passing'):
-                n.note.no_state = HaNoteStruct.M0_NC_FAILED
+            if (n.obj_t in (ObjT.PROCESS.name, ObjT.SERVICE.name)):
+                n.note.no_state = self.consul_util.get_conf_obj_status(
+                                      ObjT[n.obj_t], n.note.no_id.f_key)
             notes.append(n.note)
 
         LOG.debug('Replying ha nvec of length ' + str(len(event.nvec)))
@@ -294,7 +352,8 @@ class Motr:
                                 len(notes))
 
     def _generate_sub_services(self, note: HaNoteStruct,
-                               cns: ConsulUtil) -> List[HaNoteStruct]:
+                               cns: ConsulUtil,
+                               notify_devices=True) -> List[HaNoteStruct]:
         new_state = note.no_state
         fid = Fid.from_struct(note.no_id)
         service_list = cns.get_services_by_parent_process(fid)
@@ -302,7 +361,8 @@ class Motr:
                   len(service_list), service_list)
         service_notes = [HaNoteStruct(no_id=x.fid.to_c(), no_state=new_state)
                          for x in service_list]
-        service_notes += self._generate_sub_disks(note, service_list, cns)
+        if notify_devices:
+            service_notes += self._generate_sub_disks(note, service_list, cns)
 
         return service_notes
 
@@ -321,19 +381,23 @@ class Motr:
             for x in disk_list
         ]
 
-    def close(self):
-        LOG.debug('Stopping rconfc')
-        self.stop_rconfc()
-        LOG.debug('Shutting down Motr API')
-        self._ffi.destroy(self._ha_ctx)
-        self._ha_ctx = 0
-        LOG.debug('Motr API context is down. Bye!')
+    def notify_hax_stop(self):
+        LOG.debug('Notifying hax stop')
+        hax_fid = self.consul_util.get_hax_fid()
+        profile_fid = self._profile.fid
+        hax_endpoint = self.consul_util.get_hax_endpoint()
+        self._ffi.hax_stop(self._ha_ctx, hax_fid.to_c(),
+                           make_c_str(hax_endpoint))
+        ids = self._ffi.hax_stop(self._ha_ctx, profile_fid.to_c(),
+                                 make_c_str(hax_endpoint))
+        self.herald.wait_for_all(HaLinkMessagePromise(ids))
 
     def adopt_motr_thread(self):
         LOG.debug('Adopting Motr thread')
-        self._ffi.adopt_motr_thread()
+        self._ffi.adopt_motr_thread(self._ha_ctx)
 
     def shun_motr_thread(self):
+        LOG.debug('Shunning Motr thread')
         self._ffi.shun_motr_thread()
 
     def get_filesystem_stats(self) -> FsStats:
