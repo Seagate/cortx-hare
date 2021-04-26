@@ -75,6 +75,11 @@ and health-checking mechanisms.
     cd -
     ```
 
+* Install py-utils.
+  ```sh
+  sudo yum -y install cortx-py-utils
+  ```
+
 * Build and install Hare.
   ```sh
   make
@@ -280,6 +285,24 @@ hctl shutdown
 sudo systemctl reset-failed hare-hax
 ```
 and bootstrap again.
+
+### `make install` fails because of mypy issues
+
+Symptoms:
+1. `make` or `make install` or `make devinstall` command fails
+2. The command output contains the output like this (perhaps this is not the latest lines in the output):
+    ```
+    19:58:19  running mypy
+    19:58:20  hare_mp/store.py:21: error: Cannot find implementation or library stub for module named 'cortx.utils.conf_store'
+    19:58:20  Success: no issues found in 1 source file
+    19:58:20  make[4]: Leaving directory `/root/rpmbuild/BUILD/cortx-hare/cfgen'
+    19:58:21  hare_mp/main.py:34: error: Cannot find implementation or library stub for module named 'cortx.utils.product_features'
+    19:58:21  hare_mp/main.py:34: note: See https://mypy.readthedocs.io/en/latest/running_mypy.html#missing-imports
+    19:58:21  Found 2 errors in 2 files (checked 8 source files)
+    19:58:21  make[4]: *** [mypy] Error 1
+    ```
+
+Solution: install cortx-py-utils RPM and retry.
 
 <!------------------------------------------------------------------->
 ## See also
