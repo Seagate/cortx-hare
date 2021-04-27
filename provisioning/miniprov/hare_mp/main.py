@@ -83,11 +83,28 @@ def _report_unsupported_features(features_unavailable):
         uf_db.store_unsupported_features('hare', features_unavailable))
 
 
-def logrotate():
+def get_server_type(url: str) -> str:
     try:
-        setup_info = get_data_from_provisioner_cli('get_setup_info')
-        if setup_info != 'unknown':
-            server_type = setup_info['server_type']
+        provider = ConfStoreProvider(url)
+        machine_id = provider.get_machine_id()
+        server_type = provider.get(
+            f'server_node>{machine_id}>type')
+
+        if server_type == 'VM':
+            return 'virtual'
+        else:
+            return 'physical'
+    except Exception as error:
+        logging.error('Cannot get server type (%s)', error)
+        return 'unknown'
+
+
+def logrotate(url: str):
+    try:
+        server_type = get_server_type(url)
+        logging.info('Server type (%s)', server_type)
+
+        if server_type != 'unknown':
             shutil.copyfile(
                 f'/opt/seagate/cortx/hare/conf/logrotate/{server_type}',
                 '/etc/logrotate.d/hare')
@@ -95,16 +112,19 @@ def logrotate():
         logging.error('Cannot configure logrotate for hare (%s)', error)
 
 
-def unsupported_feature():
+def unsupported_feature(url: str):
     try:
         features_unavailable = []
         path = '/opt/seagate/cortx/hare/conf/setup_info.json'
         with open(path) as hare_features_info:
             hare_unavailable_features = json.load(hare_features_info)
-            setup_info = get_data_from_provisioner_cli('get_setup_info')
-            if setup_info != 'unknown':
+
+            server_type = get_server_type(url)
+            logging.info('Server type (%s)', server_type)
+
+            if server_type != 'unknown':
                 for setup in hare_unavailable_features['setup_types']:
-                    if setup['server_type'] == setup_info['server_type']:
+                    if setup['server_type'] == server_type:
                         features_unavailable.extend(
                             setup['unsupported_features'])
                         _report_unsupported_features(features_unavailable)
@@ -130,10 +150,10 @@ def post_install(args):
             logging.warning('\'cortx-s3server\' is not installed')
 
         if args.report_unavailable_features:
-            unsupported_feature()
+            unsupported_feature(args.config[0])
 
         if args.configure_logrotate:
-            logrotate()
+            logrotate(args.config[0])
 
     except Exception as error:
         logging.error('Error while checking installed rpms (%s)', error)
