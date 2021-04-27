@@ -184,9 +184,12 @@ def test(args):
 def generate_support_bundle(args):
     try:
         # Default target directory is /tmp/hare
-        if os.system('hctl reportbug') != 0:
-            logging.error('Failed to generate support bundle')
-            exit(-1)
+        cmd = ['hctl', 'reportbug']
+        if args.bundleid:
+            cmd.append(args.bundleid)
+        if args.destdir:
+            cmd.append(args.destdir)
+        execute(cmd)
     except Exception as error:
         logging.error('Error while generating support bundle (%s)', error)
         exit(-1)
@@ -369,11 +372,21 @@ def main():
                        help_str='Tests Hare sanity',
                        handler_fn=test))
 
-    add_subcommand(subparser,
-                   'support_bundle',
-                   help_str='Generates support bundle',
-                   handler_fn=generate_support_bundle,
-                   config_required=False)
+    sb_sub_parser = add_subcommand(subparser,
+                                   'support_bundle',
+                                   help_str='Generates support bundle',
+                                   handler_fn=generate_support_bundle,
+                                   config_required=False)
+
+    sb_sub_parser.add_argument(
+        'bundleid', metavar='bundle-id', type=str,
+        nargs='?',
+        help='Support bundle ID; defaults to the local host name.')
+
+    sb_sub_parser.add_argument(
+        'destdir', metavar='dest-dir', type=str,
+        nargs='?',
+        help='Target directory; defaults to /tmp/hare.')
 
     add_subcommand(subparser,
                    'reset',
