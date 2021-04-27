@@ -98,7 +98,7 @@ Hare component must implement Mini-Provisioner API (see the [specification docum
 | [upgrade](#upgrade)  | Perform the upgrade of the component (3rd-party components included). | TBD | TBD |
 | [backup](#backup)  | Save and export component's state so that it is state can be reproduced at another machine (TBD is it feasible?) | TBD | TBD |
 | [restore](#restore)  | An action opposite to `backup`. Must ingest the exported backup and apply it. | TBD | TBD |
-| [support_bundle](#support_bundle)  | Prepare component-specific support bundle (TBD how will Provisioner Framework find all the files generated this way?) | TBD | TBD |
+| [support_bundle](#support_bundle)  | Generates support bundle using `hare_setup support_bundle` command | Destination directory must be writable | None (bundle generation may pass or fail) |
 
 
 ## Communication with ConfStore
@@ -165,4 +165,13 @@ Exit codes: 0 if no issues found (so Hare cluster running), 1 otherwise.
 Run functional tests against a running singlenode cluster (TBD).
 Runs 'hctl status --json' and compares output with info extracted from CDF used during bootstrap to check if all the services are running correctly.
 
+### support bundle
 
+```
+[root@ssc-vm-1623:root] /opt/seagate/cortx/hare/bin/hare_setup support_bundle
+[root@ssc-vm-1623:root] ls /tmp/hare
+hare_ssc-vm-1623.tar.gz
+[root@ssc-vm-1623:root] /opt/seagate/cortx/hare/bin/hare_setup support_bundle SB12345 /root
+[root@ssc-vm-1623:root] ls hare
+hare_SB12345.tar.gz
+```
