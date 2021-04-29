@@ -4,13 +4,16 @@ let T = $path/types.dhall
 let P = T.Protocol
 let DiskRef = T.DiskRef
 
+let M0dProcess =
+      { runs_confd : Optional Bool
+      , io_disks : { meta_data : Optional Text, data : List Text }
+      }
+
 let NodeInfo =
       { hostname : Text
       , data_iface : Text
       , data_iface_type : Optional T.Protocol
-      , io_disks : List Text
-      , meta_data1 : Text
-      , meta_data2 : Text
+      , m0_servers : Optional  (List M0dProcess)
       , s3_instances : Natural
       }
 
@@ -40,15 +43,7 @@ let toNodeDesc
           , data_iface = n.data_iface
           , data_iface_type = n.data_iface_type
           , m0_clients = { other = 3, s3 = n.s3_instances }
-          , m0_servers =
-              Some
-              [ { io_disks = { data = [] : List Text, meta_data = Some n.meta_data1 }
-                , runs_confd = Some True
-                }
-              , { io_disks = { data = n.io_disks, meta_data = Some n.meta_data2 }
-                , runs_confd = None Bool
-                }
-              ]
+          , m0_servers = n.m0_servers
           }
 
 let toPoolDesc
