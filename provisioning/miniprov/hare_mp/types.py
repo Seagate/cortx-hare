@@ -107,9 +107,7 @@ class NodeDesc(DhallTuple):
     hostname: Text
     data_iface: Text
     data_iface_type: Maybe[Protocol]
-    io_disks: DList[Text]
-    meta_data1: Text
-    meta_data2: Text
+    m0_servers: Maybe[DList[M0ServerDesc]]
     s3_instances: int
 
 

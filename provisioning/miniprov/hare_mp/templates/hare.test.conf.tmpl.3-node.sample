@@ -44,9 +44,14 @@
             "data_devices": [
               "/dev/sdb",
               "/dev/sdc",
-              "/dev/sdd",
-              "/dev/sde",
-              "/dev/sdf",
+              "/dev/sdd"
+            ],
+            "metadata_devices": [
+              "/dev/sde"
+            ]
+          },
+          {
+            "data_devices": [
               "/dev/sdg",
               "/dev/sdh",
               "/dev/sdi"
@@ -78,9 +83,14 @@
             "data_devices": [
               "/dev/sdb",
               "/dev/sdc",
-              "/dev/sdd",
-              "/dev/sde",
-              "/dev/sdf",
+              "/dev/sdd"
+            ],
+            "metadata_devices": [
+              "/dev/sde"
+            ]
+          },
+          {
+            "data_devices": [
               "/dev/sdg",
               "/dev/sdh",
               "/dev/sdi"
@@ -112,9 +122,14 @@
             "data_devices": [
               "/dev/sdb",
               "/dev/sdc",
-              "/dev/sdd",
-              "/dev/sde",
-              "/dev/sdf",
+              "/dev/sdd"
+            ],
+            "metadata_devices": [
+              "/dev/sde"
+            ]
+          },
+          {
+            "data_devices": [
               "/dev/sdg",
               "/dev/sdh",
               "/dev/sdi"
