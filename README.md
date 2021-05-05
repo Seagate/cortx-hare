@@ -59,14 +59,9 @@ and health-checking mechanisms.
   sudo yum -y install consul-1.9.1
   ```
 
-* Install Motr.
+* Build and Install Motr.
 
-  * .. from RPMs
-    ```sh
-    sudo yum -y install cortx-motr cortx-motr-devel
-    ```
-
-  * .. or from [sources](https://github.com/Seagate/cortx-motr/blob/main/doc/Quick-Start-Guide.rst) use this link to build Motr from source. Once you built Motr continue with the steps listed below.
+  *  from sources use [this](https://github.com/Seagate/cortx-motr/blob/main/doc/Quick-Start-Guide.rst) link to build Motr from source. Once you built Motr continue with the steps listed below.
     
     ```sh
     sudo scripts/install-motr-service --link
@@ -90,14 +85,9 @@ and health-checking mechanisms.
 
 ### Build and install `hare` rpm from source.
 **NOTE: If you have built Motr and HARE from source you will not need to generate RPM packages below**
-* Install Motr.
+* Build `Motr` RPMs.
 
-  * .. from RPMS
-    ```sh
-    sudo yum -y install cortx-motr cortx-motr-devel
-    ```
-
-  * .. or
+  * from sources
     ```sh
     git clone --recursive https://github.com/Seagate/cortx-motr.git
     cd cortx-motr
