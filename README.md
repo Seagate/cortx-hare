@@ -40,7 +40,7 @@ and health-checking mechanisms.
 
 ### Building from source
 
-* Download hare.
+* Download `hare`.
   ```sh
   git clone https://github.com/Seagate/cortx-hare.git hare
   cd hare
@@ -70,14 +70,14 @@ and health-checking mechanisms.
      cd -
      ```
 
-* Build and install hare.
+* Build and install `hare`.
 
   ```sh
   make
   sudo make install
   ```
 
-* Add current user to hare group.
+* Add current user to `hare` group.
 
   ```sh
   sudo usermod --append --groups hare $USER
@@ -100,9 +100,9 @@ and health-checking mechanisms.
     sudo rpm -ivh ~/rpmbuild/RPMS/x86_64/cortx-motr-*.rpm
     ```
 
-* Build hare RPMs.
+* Build `hare` RPMs.
 
-  * Download hare source as mentioned above.
+  * Download `hare` source as mentioned above.
   
     ```sh
     cd hare
