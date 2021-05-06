@@ -40,7 +40,7 @@ and health-checking mechanisms.
 
 ### Building from source
 
-* Download Hare.
+* Download `hare`.
   ```sh
   git clone https://github.com/Seagate/cortx-hare.git hare
   cd hare
@@ -59,23 +59,18 @@ and health-checking mechanisms.
   sudo yum -y install consul-1.9.1
   ```
 
-* Install Motr.
+* Build and Install Motr.
 
-  * .. from RPMs
-    ```sh
-    sudo yum -y install cortx-motr cortx-motr-devel
-    ```
-
-  * .. or from [sources](https://github.com/Seagate/cortx-motr/blob/main/doc/Quick-Start-Guide.rst) use this link to build Motr from source. Once you built Motr continue with the steps listed below.
+  *  Follow [Motr quick start guide](https://github.com/Seagate/cortx-motr/blob/main/doc/Quick-Start-Guide.rst) to build Motr from source. After compiling Motr sources, please continue with the below steps to build Hare using Motr sources.
     
-    ```sh
-    sudo scripts/install-motr-service --link
+     ```sh
+     sudo scripts/install-motr-service --link
+ 
+     export M0_SRC_DIR=$PWD
+     cd -
+     ```
 
-    export M0_SRC_DIR=$PWD
-    cd -
-    ```
-
-* Build and install Hare.
+* Build and install `hare`.
   ```sh
   make
   sudo make install
@@ -87,17 +82,13 @@ and health-checking mechanisms.
   ```
   Log out and log back in.
 
+### Build and install rpms from source
 
-### Build and install `hare` rpm from source.
-**NOTE: If you have built Motr and HARE from source you will not need to generate RPM packages below**
-* Install Motr.
+**NOTE: If you have built Motr and HARE from sources you need not generate RPM packages as below, however, it might be more convenient to build and install rpms on a multinode setup sometimes**
 
-  * .. from RPMS
-    ```sh
-    sudo yum -y install cortx-motr cortx-motr-devel
-    ```
+* Build Motr RPMs
 
-  * .. or
+  * From sources
     ```sh
     git clone --recursive https://github.com/Seagate/cortx-motr.git
     cd cortx-motr
@@ -106,15 +97,14 @@ and health-checking mechanisms.
     sudo rpm -ivh ~/rpmbuild/RPMS/x86_64/cortx-motr-*.rpm
     ```
 
-* Build `hare` rpm.
+* Build `hare` RPMs
 
-  Download hare source as mentioned above.
-  ```sh
-  cd hare
-
-  make rpm
-  sudo rpm -ivh ~/rpmbuild/RPMS/x86_64/cortx-hare-*.rpm
-  ```
+  * Download `hare` source as mentioned above
+    ```sh
+    cd hare
+    make rpm
+    sudo rpm -ivh ~/rpmbuild/RPMS/x86_64/cortx-hare-*.rpm
+    ```
 
 
 <!------------------------------------------------------------------->
