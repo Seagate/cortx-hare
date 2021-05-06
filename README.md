@@ -71,14 +71,12 @@ and health-checking mechanisms.
      ```
 
 * Build and install `hare`
-
   ```sh
   make
   sudo make install
   ```
 
 * Add current user to `hare` group
-
   ```sh
   sudo usermod --append --groups hare $USER
   ```
@@ -91,7 +89,6 @@ and health-checking mechanisms.
 * Build Motr RPMs
 
   * From sources
-  
     ```sh
     git clone --recursive https://github.com/Seagate/cortx-motr.git
     cd cortx-motr
@@ -103,10 +100,8 @@ and health-checking mechanisms.
 * Build `hare` RPMs
 
   * Download `hare` source as mentioned above
-  
     ```sh
     cd hare
-
     make rpm
     sudo rpm -ivh ~/rpmbuild/RPMS/x86_64/cortx-hare-*.rpm
     ```
