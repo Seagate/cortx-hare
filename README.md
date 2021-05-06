@@ -63,31 +63,35 @@ and health-checking mechanisms.
 
   *  Follow [Motr quick start guide](https://github.com/Seagate/cortx-motr/blob/main/doc/Quick-Start-Guide.rst) to build Motr from source. After compiling Motr sources, please continue with the below steps to build Hare using Motr sources.
     
-    ```sh
-    sudo scripts/install-motr-service --link
-
-    export M0_SRC_DIR=$PWD
-    cd -
-    ```
+     ```sh
+     sudo scripts/install-motr-service --link
+ 
+     export M0_SRC_DIR=$PWD
+     cd -
+     ```
 
 * Build and install hare.
+
   ```sh
   make
   sudo make install
   ```
 
 * Add current user to hare group.
+
   ```sh
   sudo usermod --append --groups hare $USER
   ```
   Log out and log back in.
 
+### Build and install rpms from source
 
-### Build and install rpms from source.
 **NOTE: If you have built Motr and HARE from sources you need not generate RPM packages as below, however, it might be more convenient to build and install rpms on a multinode setup sometimes**
+
 * Build Motr RPMs.
 
   * From sources
+  
     ```sh
     git clone --recursive https://github.com/Seagate/cortx-motr.git
     cd cortx-motr
@@ -99,6 +103,7 @@ and health-checking mechanisms.
 * Build hare RPMs.
 
   * Download hare source as mentioned above.
+  
     ```sh
     cd hare
 
