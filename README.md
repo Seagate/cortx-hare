@@ -70,13 +70,13 @@ and health-checking mechanisms.
      cd -
      ```
 
-* Build and install `hare`
+* Build and install `hare`  
   ```sh
   make
   sudo make install
   ```
 
-* Add current user to `hare` group
+* Add current user to `hare` group  
   ```sh
   sudo usermod --append --groups hare $USER
   ```
