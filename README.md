@@ -70,14 +70,14 @@ and health-checking mechanisms.
      cd -
      ```
 
-* Build and install `hare`.
+* Build and install `hare`
 
   ```sh
   make
   sudo make install
   ```
 
-* Add current user to `hare` group.
+* Add current user to `hare` group
 
   ```sh
   sudo usermod --append --groups hare $USER
@@ -88,7 +88,7 @@ and health-checking mechanisms.
 
 **NOTE: If you have built Motr and HARE from sources you need not generate RPM packages as below, however, it might be more convenient to build and install rpms on a multinode setup sometimes**
 
-* Build Motr RPMs.
+* Build Motr RPMs
 
   * From sources
   
@@ -100,9 +100,9 @@ and health-checking mechanisms.
     sudo rpm -ivh ~/rpmbuild/RPMS/x86_64/cortx-motr-*.rpm
     ```
 
-* Build `hare` RPMs.
+* Build `hare` RPMs
 
-  * Download `hare` source as mentioned above.
+  * Download `hare` source as mentioned above
   
     ```sh
     cd hare
