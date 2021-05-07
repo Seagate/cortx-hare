@@ -29,14 +29,11 @@ usage() {
     cat <<EOF
 Usage: $PROG [<option>]... <CDF>
        $PROG [<option>]... --conf-dir <dir>
-
 Bootstrap the cluster.
-
 Positional arguments:
   <CDF>                  Path to the cluster description file.
   -c, --conf-dir <dir>   Don't generate configuration files, use existing
                          ones from the specified directory.
-
 Options:
   --debug      Print commands and their arguments as they are executed.
   --mkfs       Execute m0mkfs.  *CAUTION* This wipes all Motr data!
@@ -51,6 +48,32 @@ die() {
 
 say() {
     echo -n "$(date '+%F %T'): $*"
+}
+
+ssh_error_info() {
+    local hostname=$1
+    shift
+    ssh -n $hostname "$@" ||
+    {
+        echo "Error at $hostname with command $@";
+        exit 1
+    }
+}
+
+conf_dir_perm_check() {
+    ssh -n $node """
+    if ! [[ -d $conf_dir ]]; then
+        echo "$conf_dir directory does not exist on $node \
+Try reinstalling Hare on the above mentioned node.";
+        exit 1
+    fi
+
+    if ! [[ -w $conf_dir ]]; then
+        echo "Cannot write to $conf_dir directory of $node";
+        exit 1
+    fi
+    echo $node > $conf_dir/node-name;
+"""
 }
 
 get_server_nodes() {
@@ -117,7 +140,7 @@ abort_if_RC_leader_election_is_impossible() {
         if [[ $node == $(node-name) ]]; then
             ssh=
         else
-            ssh="ssh $node"
+            ssh="ssh_error_info $node"
         fi
 
         for svc in hare-hax $confd_id; do
@@ -146,15 +169,12 @@ abort_if_RC_leader_election_is_impossible() {
             )
     cat >&2 <<EOF
 **ERROR** RC leader election is guaranteed to fail.
-
 The RC leader can only be elected if there is a Consul server node
 on which both hare-hax and confd m0d@ service are in "non-failed" state.
-
 To see details, type
 $(for cmd in "${status_commands[@]}"; do
     echo "    $cmd"
 done)
-
 To reset the "failed" state, type
 $(for cmd in "${status_commands[@]}"; do
     echo "    ${cmd/ status/ reset-failed}"
@@ -226,7 +246,6 @@ EOF
     if ! [[ -w $conf_dir ]]; then
         cat <<EOF >&2
 Cannot write to $conf_dir directory.
-
 Did you forget to add current user ($USER) to 'hare' group?
 If so, run
     sudo usermod --append --groups hare $USER
@@ -245,7 +264,7 @@ EOF
         else
             # Redirect stdin to /dev/null (`-n`) to prevent
             # accidental stealing of `get_all_nodes` output.
-	    ssh -n $node "echo $node > $conf_dir/node-name"
+            conf_dir_perm_check
         fi
     done < <(get_all_nodes)
 
@@ -260,7 +279,6 @@ read _ join_peers <<< $(get_server_nodes | grep -vw $(node-name))
 if [[ -z $join_ip ]]; then
     cat <<'EOF' >&2
 Bootstrap should be executed on a Consul server node.
-
 "Consul server nodes" are the nodes with 'runs_confd: true' in the CDF
 (cluster description file).
 EOF
@@ -275,12 +293,12 @@ if sudo systemctl --quiet is-active hare-consul-agent; then
     say 'Stopping Consul on other nodes...'
     pids=()
     while read node bind_ip; do
-        ssh $node "sudo systemctl stop hare-consul-agent" &
+        ssh_error_info "$node" "sudo systemctl stop hare-consul-agent" &
         pids+=($!)
     done < <(get_server_nodes | grep -vw $(node-name) || true)
 
     while read node bind_ip; do
-        ssh $node "sudo systemctl stop hare-consul-agent" &
+        ssh_error_info "$node" "sudo systemctl stop hare-consul-agent" &
         pids+=($!)
     done < <(get_client_nodes)
     wait4 ${pids[@]-}
@@ -311,14 +329,14 @@ echo ' OK'
 say 'Starting Consul on other nodes...'
 pids=()
 while read node bind_ip; do
-    ssh $node "PATH=$PATH $(which mk-consul-env) \
+    ssh_error_info "$node" "PATH=$PATH $(which mk-consul-env) \
                           --mode server --bind $bind_ip --join $join_ip &&
                sudo systemctl start hare-consul-agent" &
     pids+=($!)
 done < <(get_server_nodes | grep -vw $(node-name) || true)
 
 while read node bind_ip; do
-    ssh $node "PATH=$PATH $(which mk-consul-env) \
+    ssh_error_info "$node" "PATH=$PATH $(which mk-consul-env) \
                           --mode client --bind $bind_ip --join $join_ip &&
                sudo systemctl start hare-consul-agent" &
     pids+=($!)
@@ -346,7 +364,7 @@ say 'Updating Consul configuraton from the KV store...'
 update-consul-conf &
 pids=($!)
 while read node _; do
-    ssh $node "PATH=$PATH $(which update-consul-conf)" &
+    ssh_error_info "$node" "PATH=$PATH $(which update-consul-conf)" &
     pids+=($!)
 done < <(get_all_nodes | grep -vw $(node-name) || true)
 wait4 ${pids[@]}
@@ -392,7 +410,7 @@ start_motr() {
     pids=($!)
 
     while read node _; do
-        ssh $node "PATH=$PATH $(which bootstrap-node) $op --phase $phase" &
+        ssh_error_info "$node" "PATH=$PATH $(which bootstrap-node) $op --phase $phase" &
         pids+=($!)
     done < <(get_nodes $phase | grep -vw $(node-name) || true)
     wait4 ${pids[@]}
@@ -423,7 +441,7 @@ if [[ -n $S3_IDs ]]; then
     pids=($!)
 
     while read node _; do
-        ssh $node "PATH=$PATH $(which bootstrap-node) --phase phase3" &
+        ssh_error_info "$node" "PATH=$PATH $(which bootstrap-node) --phase phase3" &
         pids+=($!)
     done < <(get_all_nodes | grep -vw $(node-name) || true)
     wait4 ${pids[@]}
