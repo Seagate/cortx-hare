@@ -29,11 +29,14 @@ usage() {
     cat <<EOF
 Usage: $PROG [<option>]... <CDF>
        $PROG [<option>]... --conf-dir <dir>
+
 Bootstrap the cluster.
+
 Positional arguments:
   <CDF>                  Path to the cluster description file.
   -c, --conf-dir <dir>   Don't generate configuration files, use existing
                          ones from the specified directory.
+
 Options:
   --debug      Print commands and their arguments as they are executed.
   --mkfs       Execute m0mkfs.  *CAUTION* This wipes all Motr data!
@@ -169,12 +172,15 @@ abort_if_RC_leader_election_is_impossible() {
             )
     cat >&2 <<EOF
 **ERROR** RC leader election is guaranteed to fail.
+
 The RC leader can only be elected if there is a Consul server node
 on which both hare-hax and confd m0d@ service are in "non-failed" state.
+
 To see details, type
 $(for cmd in "${status_commands[@]}"; do
     echo "    $cmd"
 done)
+
 To reset the "failed" state, type
 $(for cmd in "${status_commands[@]}"; do
     echo "    ${cmd/ status/ reset-failed}"
@@ -246,6 +252,7 @@ EOF
     if ! [[ -w $conf_dir ]]; then
         cat <<EOF >&2
 Cannot write to $conf_dir directory.
+
 Did you forget to add current user ($USER) to 'hare' group?
 If so, run
     sudo usermod --append --groups hare $USER
@@ -279,6 +286,7 @@ read _ join_peers <<< $(get_server_nodes | grep -vw $(node-name))
 if [[ -z $join_ip ]]; then
     cat <<'EOF' >&2
 Bootstrap should be executed on a Consul server node.
+
 "Consul server nodes" are the nodes with 'runs_confd: true' in the CDF
 (cluster description file).
 EOF
