@@ -115,6 +115,8 @@ class TestCDF(unittest.TestCase):
                 ['/dev/sdb'],
                 'server_node>MACH_ID>network>data>private_interfaces':
                 ['eth1', 'eno2'],
+                'server_node>MACH_ID>storage>cvg':
+                [{'data_devices': ['/dev/sdb'], 'metadata_devices': ['/dev/meta']}],
                 'server_node>MACH_ID>storage>cvg[0]>metadata_devices':
                 ['/dev/meta'],
                 'server_node>MACH_ID>s3_instances':
@@ -162,6 +164,8 @@ class TestCDF(unittest.TestCase):
                 'cluster>cluster_id': 'CLUSTER_ID',
                 'server_node': {'MACH_ID': {'cluster_id': 'CLUSTER_ID'}},
                 'server_node>MACH_ID>cluster_id': 'CLUSTER_ID',
+                'server_node>MACH_ID>storage>cvg':
+                [{'data_devices': ['/dev/sdb'], 'metadata_devices': ['/dev/meta']}],
                 'server_node>MACH_ID>storage>cvg[0]>data_devices': ['/dev/sdb'],
                 'server_node>MACH_ID>storage>cvg[0]>metadata_devices': ['/dev/meta'],
                 'server_node>MACH_ID>hostname':                'myhost',
@@ -231,6 +235,8 @@ class TestCDF(unittest.TestCase):
                 ['eth1', 'eno2'],
                 'server_node>srvnode_1>s3_instances':
                 1,
+                'server_node>srvnode_1>storage>cvg':
+                [{'data_devices': ['/dev/sdb'], 'metadata_devices': ['/dev/meta']}],
                 'server_node>srvnode_1>storage>cvg[0]>data_devices':
                 ['/dev/sdb'],
             }
@@ -449,6 +455,8 @@ class TestCDF(unittest.TestCase):
                 'server_node>MACH_ID>hostname':
                 'myhost',
                 'server_node>MACH_ID>name': 'mynodename',
+                'server_node>MACH_ID>storage>cvg':
+                [{'data_devices': ['/dev/sdb'], 'metadata_devices': ['/dev/meta']}],
                 'server_node>MACH_ID>storage>cvg[0]>data_devices':
                 ['/dev/sdb'],
                 'server_node>MACH_ID>network>data>private_interfaces':
@@ -466,9 +474,8 @@ class TestCDF(unittest.TestCase):
         self.assertIsInstance(ret, list)
         self.assertEqual(1, len(ret))
         self.assertEqual(Text('/dev/vg_mynodename_md1/lv_raw_md1'),
-                         ret[0].meta_data1)
-        self.assertEqual(Text('/dev/vg_mynodename_md2/lv_raw_md2'),
-                         ret[0].meta_data2)
+                         (ret[0].m0_servers.value.value)[0].io_disks.meta_data.value)
+
 
     def test_multiple_nodes_supported(self):
         store = ValueProvider()
@@ -496,6 +503,8 @@ class TestCDF(unittest.TestCase):
                 ['eth1'],
                 'server_node>MACH_ID>s3_instances':
                 1,
+                'server_node>MACH_ID>storage>cvg':
+                [{'data_devices': ['/dev/sdb'], 'metadata_devices': ['/dev/meta']}],
                 'server_node>MACH_ID>storage>cvg[0]>data_devices':
                 ['/dev/sdb'],
                 'server_node>MACH_ID>storage>cvg[0]>metadata_devices':
@@ -506,6 +515,8 @@ class TestCDF(unittest.TestCase):
                 'server_node>MACH_2_ID>network>data>private_interfaces':
                 ['eno1'],
                 'server_node>MACH_2_ID>s3_instances':                5,
+                'server_node>MACH_2_ID>storage>cvg':
+                [{'data_devices': ['/dev/sdb'], 'metadata_devices': ['/dev/meta']}],
                 'server_node>MACH_2_ID>storage>cvg[0]>data_devices':
                 ['/dev/sdb'],
                 'server_node>MACH_2_ID>storage>cvg[0]>metadata_devices':
@@ -538,6 +549,8 @@ class TestCDF(unittest.TestCase):
                 'server_node>MACH_ID>name': 'mynodename',
                 'server_node>MACH_ID>hostname':
                 'myhost',
+                'server_node>MACH_ID>storage>cvg':
+                [{'data_devices': ['/dev/sdb'], 'metadata_devices': ['/dev/meta']}],
                 'server_node>MACH_ID>storage>cvg[0]>data_devices':
                 ['/dev/sdb'],
                 'server_node>MACH_ID>network>data>interface_type':

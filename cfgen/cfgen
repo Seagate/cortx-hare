@@ -231,6 +231,9 @@ def enrich_cluster_desc(desc: Dict[str, Any], mock_p: bool) -> None:
 
         for m0d in node['m0_servers']:
             m0d.setdefault('runs_confd', False)
+            if 'meta_data' in m0d['io_disks']:
+                if m0d['io_disks']['meta_data'] is None:
+                    del m0d['io_disks']['meta_data']
             m0d['_io_disks'] = get_disks(node['hostname'], mock_p,
                                          m0d['io_disks']['data'])
 

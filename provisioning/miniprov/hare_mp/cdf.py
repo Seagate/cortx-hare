@@ -8,7 +8,8 @@ import pkg_resources
 
 from hare_mp.store import ValueProvider
 from hare_mp.types import (ClusterDesc, DiskRef, DList, Maybe, NodeDesc,
-                           PoolDesc, PoolType, ProfileDesc, Protocol, Text)
+                           PoolDesc, PoolType, ProfileDesc, Protocol, Text,
+                           M0ServerDesc, DisksDesc)
 
 DHALL_PATH = '/opt/seagate/cortx/hare/share/cfgen/dhall'
 DHALL_EXE = '/opt/seagate/cortx/hare/bin/dhall'
@@ -238,24 +239,55 @@ class CdfGenerator:
             return None
         return Protocol[iface]
 
+    def _get_data_devices(self, machine_id: str, cvg: int) -> DList[Text]:
+        store = self.provider
+        data_devices = DList(
+            [Text(device) for device in store.get(
+                f'server_node>{machine_id}>'
+                f'storage>cvg[{cvg}]>data_devices')], 'List Text')
+        return data_devices
+
+    def _get_metadata_device(self, name: str, cvg: int) -> Text:
+        metadata_device = Text(f'/dev/vg_{name}_md{cvg+1}'
+                               f'/lv_raw_md{cvg+1}')
+        return metadata_device
+
     def _create_node(self, machine_id: str) -> NodeDesc:
         store = self.provider
         hostname = store.get(f'server_node>{machine_id}>hostname')
         name = store.get(f'server_node>{machine_id}>name')
         iface = self._get_iface(machine_id)
+        # We will create 1 IO service entry in CDF per cvg.
+        # An IO service entry will use data devices from corresponding cvg.
+        # meta data device is currently hardcoded.
+        servers = DList([
+            M0ServerDesc(
+                io_disks=DisksDesc(
+                    data=self._get_data_devices(machine_id, i),
+                    meta_data=Maybe(
+                        self._get_metadata_device(name, i), 'Text')),
+                runs_confd=Maybe(False, 'Bool'))
+            for i in range(len(store.get(
+                f'server_node>{machine_id}>storage>cvg')))
+        ], 'List M0ServerDesc')
+
+        # Adding a Motr confd entry per server node in CDF.
+        # The `runs_confd` value (true/false) determines if Motr confd process
+        # will be started on the node or not.
+        servers.value.append(M0ServerDesc(
+            io_disks=DisksDesc(
+                data=DList([], 'List Text'),
+                meta_data=Maybe(None, 'Text')),
+            runs_confd=Maybe(True, 'Bool')))
+
         return NodeDesc(
             hostname=Text(hostname),
             data_iface=Text(iface),
             data_iface_type=Maybe(self._get_iface_type(machine_id), 'P'),
-            io_disks=DList([
-                Text(device) for device in store.get(
-                    f'server_node>{machine_id}>storage>cvg[0]>data_devices')
-            ], 'List Text'),
+            m0_servers=Maybe(servers, 'List M0ServerDesc'),
             #
             # [KN] This is a hotfix for singlenode deployment
             # TODO in the future the value must be taken from a correct
             # ConfStore key (it doesn't exist now).
-            meta_data1=Text(f'/dev/vg_{name}_md1/lv_raw_md1'),
-            meta_data2=Text(f'/dev/vg_{name}_md2/lv_raw_md2'),
             s3_instances=int(
                 store.get(f'server_node>{machine_id}>s3_instances')))

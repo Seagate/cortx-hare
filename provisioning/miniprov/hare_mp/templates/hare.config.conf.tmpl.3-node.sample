@@ -42,11 +42,16 @@
         "cvg": [
           {
             "data_devices": [
+              "/dev/sda",
               "/dev/sdb",
-              "/dev/sdc",
-              "/dev/sdd",
-              "/dev/sde",
-              "/dev/sdf",
+              "/dev/sdc"
+            ],
+            "metadata_devices": [
+              "/dev/sdd"
+            ]
+          },
+          {
+            "data_devices": [
               "/dev/sdg",
               "/dev/sdh",
               "/dev/sdi"
@@ -78,15 +83,20 @@
             "data_devices": [
               "/dev/sdb",
               "/dev/sdc",
-              "/dev/sdd",
-              "/dev/sde",
-              "/dev/sdf",
-              "/dev/sdg",
-              "/dev/sdh",
-              "/dev/sdi"
+              "/dev/sdd"
             ],
             "metadata_devices": [
-              "/dev/sdj"
+              "/dev/sde"
+            ]
+          },
+          {
+            "data_devices": [
+              "/dev/sdf",
+              "/dev/sdg",
+              "/dev/sdh"
+            ],
+            "metadata_devices": [
+              "/dev/sdi"
             ]
           }
         ]
@@ -112,15 +122,20 @@
             "data_devices": [
               "/dev/sdb",
               "/dev/sdc",
-              "/dev/sdd",
-              "/dev/sde",
-              "/dev/sdf",
-              "/dev/sdg",
-              "/dev/sdh",
-              "/dev/sdi"
+              "/dev/sdd"
             ],
             "metadata_devices": [
-              "/dev/sdj"
+              "/dev/sde"
+            ]
+          },
+          {
+            "data_devices": [
+              "/dev/sdf",
+              "/dev/sdg",
+              "/dev/sdh"
+            ],
+            "metadata_devices": [
+              "/dev/sdi"
             ]
           }
         ]

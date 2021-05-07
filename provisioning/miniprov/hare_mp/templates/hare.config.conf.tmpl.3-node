@@ -42,11 +42,20 @@
         "cvg": [
           {
             "data_devices": [
-              "TMPL_DATA_DEVICE_1",
-              "TMPL_DATA_DEVICE_2"
+              "TMPL_DATA_DEVICE_11",
+              "TMPL_DATA_DEVICE_12"
             ],
             "metadata_devices": [
-              "TMPL_METADATA_DEVICE"
+              "TMPL_METADATA_DEVICE_1"
+            ]
+          },
+          {
+            "data_devices": [
+              "TMPL_DATA_DEVICE_21",
+              "TMPL_DATA_DEVICE_22"
+            ],
+            "metadata_devices": [
+              "TMPL_METADATA_DEVICE_2"
             ]
           }
         ]
@@ -70,11 +79,20 @@
         "cvg": [
           {
             "data_devices": [
-              "TMPL_DATA_DEVICE_1",
-              "TMPL_DATA_DEVICE_2"
+              "TMPL_DATA_DEVICE_11",
+              "TMPL_DATA_DEVICE_12"
             ],
             "metadata_devices": [
-              "TMPL_METADATA_DEVICE"
+              "TMPL_METADATA_DEVICE_1"
+            ]
+          },
+          {
+            "data_devices": [
+              "TMPL_DATA_DEVICE_21",
+              "TMPL_DATA_DEVICE_22"
+            ],
+            "metadata_devices": [
+              "TMPL_METADATA_DEVICE_2"
             ]
           }
         ]
@@ -98,11 +116,20 @@
         "cvg": [
           {
             "data_devices": [
-              "TMPL_DATA_DEVICE_1",
-              "TMPL_DATA_DEVICE_2"
+              "TMPL_DATA_DEVICE_11",
+              "TMPL_DATA_DEVICE_12"
             ],
             "metadata_devices": [
-              "TMPL_METADATA_DEVICE"
+              "TMPL_METADATA_DEVICE_1"
+            ]
+          },
+          {
+            "data_devices": [
+              "TMPL_DATA_DEVICE_21",
+              "TMPL_DATA_DEVICE_22"
+            ],
+            "metadata_devices": [
+              "TMPL_METADATA_DEVICE_2"
             ]
           }
         ]
