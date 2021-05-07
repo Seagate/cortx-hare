@@ -54,6 +54,10 @@ else
         die 'Hare is not installed, please run `make devinstall`.'
 fi
 
+if [[ -d $SRC_DIR/.py3venv ]]; then
+    source "$SRC_DIR/.py3venv/bin/activate"
+fi
+
 usage() {
     # NB: `local var=$(func)` expression ignores exit status of `func`
     # and always succeeds.
