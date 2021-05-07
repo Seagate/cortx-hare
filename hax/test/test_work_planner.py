@@ -29,6 +29,7 @@ from hax.message import (BroadcastHAStates, EntrypointRequest,
                          FirstEntrypointRequest, HaNvecGetEvent)
 from hax.motr.planner import WorkPlanner
 from hax.types import Fid, HaLinkMessagePromise, MessageId, Uint128
+import time
 
 
 def entrypoint():
@@ -44,8 +45,10 @@ def entrypoint():
 def broadcast():
     return BroadcastHAStates(states=[], reply_to=None)
 
+
 def nvec_get():
     return HaNvecGetEvent(hax_msg=1, nvec=[])
+
 
 class TestMessageOrder(unittest.TestCase):
     @classmethod
@@ -104,5 +107,56 @@ class TestMessageOrder(unittest.TestCase):
             assign(broadcast()),
             assign(entrypoint())
         ]
+        msgs_after_nvec = [
+            assign(entrypoint()),
+            assign(nvec_get()),
+            assign(nvec_get()),
+            assign(entrypoint())
+        ]
         self.assertEqual([0, 0, 1, 2], [m.group for m in msgs_after_bc])
         self.assertEqual([2, 2, 3, 4], [m.group for m in msgs_after_ep])
+        self.assertEqual([4, 4, 4, 4], [m.group for m in msgs_after_nvec])
+
+
+class TestWorkPlanner(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        # It seems like when unittest is invoked from setup.py,
+        # some default logging configuration is already applied;
+        # invoking setup_logging() will make the log messages to appear twice.
+        logging.addLevelName(TRACE, 'TRACE')
+        logging.getLogger('hax').setLevel(TRACE)
+
+    def test_parallelism_is_possible(self):
+        planner = WorkPlanner()
+        for i in range(80):
+            planner.add_command(entrypoint())
+
+        def fn(planner: WorkPlanner):
+            try:
+                logging.log(TRACE, "Requesting for a work")
+                cmd = planner.get_next_command()
+                logging.log(TRACE, "The command is received")
+                planner.ensure_allowed(cmd)
+                logging.log(TRACE, "I'm allowed to work on it!")
+                sleep(0.5)
+                logging.log(TRACE, "The job is done, notifying the planner")
+                planner.notify_finished(cmd)
+                logging.log(TRACE, "Notified. Exiting")
+
+            except:
+                logging.exception('*** ERROR ***')
+
+        workers = [
+            Thread(target=fn, args=(planner, ))
+            for i in range(1, 4)
+        ]
+        time_1 = time.time()
+        for t in workers:
+            t.start()
+
+        for t in workers:
+            t.join()
+        time_2 = time.time()
+        logging.info('Processing time %s', time_2 - time_1)
+        self.assertLess(40, time_2 - time_1, 'Suspiciously slow')

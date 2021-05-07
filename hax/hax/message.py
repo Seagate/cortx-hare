@@ -24,13 +24,13 @@ from typing import Any, List, Optional
 from hax.types import Fid, HaNote, HAState, Uint128
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class BaseMessage:
     # The group id used internally by WorkPlanner
     group: Optional[int] = field(default=None, init=False)
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class AnyEntrypointRequest(BaseMessage):
     reply_context: Any
     req_id: Uint128
@@ -41,7 +41,7 @@ class AnyEntrypointRequest(BaseMessage):
     is_first_request: bool
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class EntrypointRequest(AnyEntrypointRequest):
     pass
 
