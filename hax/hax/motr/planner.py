@@ -21,6 +21,7 @@ from collections import deque
 from dataclasses import dataclass
 from threading import Condition
 from typing import Deque, Set, Type
+from hax.motr.util import LinkedSet
 
 from hax.message import (AnyEntrypointRequest, BaseMessage, BroadcastHAStates,
                          HaNvecGetEvent, SnsOperation)
@@ -34,8 +35,8 @@ __all__ = ['WorkPlanner']
 class State:
     current_group_id: int
     next_group_id: int
-    active_commands: Set[BaseMessage]
-    next_group_commands: Set[Type[BaseMessage]]
+    active_commands: LinkedSet[BaseMessage]
+    next_group_commands: LinkedSet[Type[BaseMessage]]
 
 
 class WorkPlanner:
@@ -52,9 +53,9 @@ class WorkPlanner:
     """
     def __init__(self):
         self.state = State(next_group_id=0,
-                           active_commands=set(),
+                           active_commands=LinkedSet(),
                            current_group_id=0,
-                           next_group_commands=set())
+                           next_group_commands=LinkedSet())
         self.backlog: Deque[BaseMessage] = deque()
         self.b_lock = Condition()
 
@@ -117,7 +118,7 @@ class WorkPlanner:
             return cmd
 
         def inc_group() -> None:
-            self.state.next_group_commands = set()
+            self.state.next_group_commands = LinkedSet()
             self.state.next_group_id += 1
 
         def inc_group_if(cmd_type: Type[BaseMessage]) -> None:

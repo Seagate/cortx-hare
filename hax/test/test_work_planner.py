@@ -19,6 +19,7 @@
 # flake8: noqa
 import logging
 import sys
+import time
 import unittest
 from threading import Thread
 from time import sleep
@@ -26,10 +27,11 @@ from time import sleep
 from hax.exception import NotDelivered
 from hax.log import TRACE
 from hax.message import (BroadcastHAStates, EntrypointRequest,
-                         FirstEntrypointRequest, HaNvecGetEvent)
+                         FirstEntrypointRequest, HaNvecGetEvent, Die)
 from hax.motr.planner import WorkPlanner
 from hax.types import Fid, HaLinkMessagePromise, MessageId, Uint128
-import time
+
+LOG = logging.getLogger('hax')
 
 
 def entrypoint():
@@ -132,25 +134,33 @@ class TestWorkPlanner(unittest.TestCase):
         for i in range(80):
             planner.add_command(entrypoint())
 
+        for j in range(4):
+            planner.add_command(Die())
+
+        exc = None
+
         def fn(planner: WorkPlanner):
             try:
-                logging.log(TRACE, "Requesting for a work")
-                cmd = planner.get_next_command()
-                logging.log(TRACE, "The command is received")
-                planner.ensure_allowed(cmd)
-                logging.log(TRACE, "I'm allowed to work on it!")
-                sleep(0.5)
-                logging.log(TRACE, "The job is done, notifying the planner")
-                planner.notify_finished(cmd)
-                logging.log(TRACE, "Notified. Exiting")
+                while True:
+                    LOG.log(TRACE, "Requesting for a work")
+                    cmd = planner.get_next_command()
+                    LOG.log(TRACE, "The command is received")
+                    if isinstance(cmd, Die):
+                        LOG.log(TRACE, "Poison pill is received - exiting. Bye!")
+                        break
+                    
+                    planner.ensure_allowed(cmd)
+                    LOG.log(TRACE, "I'm allowed to work on it!")
+                    sleep(0.5)
+                    LOG.log(TRACE, "The job is done, notifying the planner")
+                    planner.notify_finished(cmd)
+                    LOG.log(TRACE, "Notified. ")
 
-            except:
-                logging.exception('*** ERROR ***')
+            except Exception as e:
+                LOG.exception('*** ERROR ***')
+                exc = e
 
-        workers = [
-            Thread(target=fn, args=(planner, ))
-            for i in range(1, 4)
-        ]
+        workers = [Thread(target=fn, args=(planner, )) for t in range(4)]
         time_1 = time.time()
         for t in workers:
             t.start()
@@ -159,4 +169,6 @@ class TestWorkPlanner(unittest.TestCase):
             t.join()
         time_2 = time.time()
         logging.info('Processing time %s', time_2 - time_1)
-        self.assertLess(40, time_2 - time_1, 'Suspiciously slow')
+        if exc:
+            raise exc
+        self.assertLess(time_2 - time_1, 40, 'Suspiciously slow')
