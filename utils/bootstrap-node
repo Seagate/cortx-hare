@@ -114,11 +114,14 @@ fi
 
 . update-consul-conf --dry-run  # import CONFD_IDs, IOS_IDs, S3_IDs, id2fid()
 
-if [[ $do_mkfs ]] && [[ ! -e /etc/sysconfig/motr-kernel ]]; then
+sysconfig_dir='/etc/sysconfig'
+[ -d $sysconfig_dir ] || sysconfig_dir='/etc/default'
+
+if [[ $do_mkfs ]] && [[ ! -e $sysconfig_dir/motr-kernel ]]; then
     # Auto-start of `motr-kernel` systemd unit will cause kernel panic
     # unless `MOTR_NODE_UUID` configuration option is provided.
     echo "MOTR_NODE_UUID='$(uuidgen --time)'" |
-        sudo tee /etc/sysconfig/motr-kernel >/dev/null
+        sudo tee $sysconfig_dir/motr-kernel >/dev/null
 fi
 
 wait_active() {

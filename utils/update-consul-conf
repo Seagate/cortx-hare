@@ -100,6 +100,9 @@ fi
 
 SVCS_CONF=''
 
+sysconfig_dir='/etc/sysconfig'
+[ -d $sysconfig_dir ] || sysconfig_dir='/etc/default'
+
 append_hax_svc() {
     local id=$1
     local ep=$(get_service_ep $id)
@@ -140,7 +143,7 @@ append_confd_svc() {
           }
         ]
     }"
-    cat <<EOF | sudo tee /etc/sysconfig/m0d-$fid > /dev/null
+    cat <<EOF | sudo tee $sysconfig_dir/m0d-$fid > /dev/null
 MOTR_M0D_EP='$ep'
 MOTR_HA_EP='$HAX_EP'
 MOTR_PROCESS_FID='$fid'
@@ -169,13 +172,13 @@ append_ios_svc() {
           }
         ]
     }"
-    cat <<EOF | sudo tee /etc/sysconfig/m0d-$fid > /dev/null
+    cat <<EOF | sudo tee $sysconfig_dir/m0d-$fid > /dev/null
 MOTR_M0D_EP='$ep'
 MOTR_HA_EP='$HAX_EP'
 MOTR_PROCESS_FID='$fid'
 EOF
     if [[ $meta_data ]]; then
-        cat <<EOF | sudo tee -a /etc/sysconfig/m0d-$fid > /dev/null
+        cat <<EOF | sudo tee -a $sysconfig_dir/m0d-$fid > /dev/null
 MOTR_BE_SEG_PATH='$meta_data'
 EOF
     fi
@@ -206,7 +209,7 @@ append_s3_svc() {
     local first_profile_fid=$(
         consul kv get -keys 'm0conf/profiles/' | head -1 | cut -d/ -f3)
     [[ -n $first_profile_fid ]]  # assert
-    cat <<EOF | sudo tee /etc/sysconfig/s3server-$fid > /dev/null
+    cat <<EOF | sudo tee $sysconfig_dir/s3server-$fid > /dev/null
 MOTR_PROFILE_FID=$first_profile_fid
 MOTR_S3SERVER_EP='$ep'
 MOTR_HA_EP='$HAX_EP'
