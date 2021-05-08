@@ -17,37 +17,38 @@
 #
 
 import queue as q
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from queue import Queue
 from typing import Any, List, Optional
 
 from hax.types import Fid, HaNote, HAState, Uint128
-from queue import Queue
 
 
+@dataclass(unsafe_hash=True)
 class BaseMessage:
+    # The group id used internally by WorkPlanner
+    group: Optional[int] = field(default=None, init=False)
+
+
+@dataclass(unsafe_hash=True)
+class AnyEntrypointRequest(BaseMessage):
+    reply_context: Any
+    req_id: Uint128
+    remote_rpc_endpoint: str
+    process_fid: Fid
+    git_rev: str
+    pid: int
+    is_first_request: bool
+
+
+@dataclass(unsafe_hash=True)
+class EntrypointRequest(AnyEntrypointRequest):
     pass
 
 
 @dataclass
-class EntrypointRequest(BaseMessage):
-    reply_context: Any
-    req_id: Uint128
-    remote_rpc_endpoint: str
-    process_fid: Fid
-    git_rev: str
-    pid: int
-    is_first_request: bool
-
-
-@dataclass
-class FirstEntrypointRequest(BaseMessage):
-    reply_context: Any
-    req_id: Uint128
-    remote_rpc_endpoint: str
-    process_fid: Fid
-    git_rev: str
-    pid: int
-    is_first_request: bool
+class FirstEntrypointRequest(AnyEntrypointRequest):
+    pass
 
 
 @dataclass
@@ -113,13 +114,13 @@ class SnsDiskDetach(SnsOperation):
 
 
 @dataclass
-class SnsRepairStatus:
+class SnsRepairStatus(SnsOperation):
     fid: Fid
     reply_to: q.Queue
 
 
 @dataclass
-class SnsRebalanceStatus:
+class SnsRebalanceStatus(SnsOperation):
     fid: Fid
     reply_to: q.Queue
 
