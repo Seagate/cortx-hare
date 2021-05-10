@@ -110,11 +110,10 @@ class DeliveryHerald:
     def notify_delivered(self, message_id: MessageId):
         # [KN] This function is expected to be called from Motr.
         with self.lock:
-            LOG.log(TRACE, 'notify waiting clients %s',
-                    self.waiting_clients.items())
+            LOG.debug('received msg id %s, notify waiting clients %s',
+                      message_id, self.waiting_clients.items())
             for promise, client in self.waiting_clients.items():
-                LOG.log(TRACE, 'received msg id %s, waiting promise %s',
-                        message_id, promise)
+                LOG.debug('waiting promise %s', promise)
                 if message_id in promise:
                     LOG.log(TRACE, 'Found a waiting client for %s: %s',
                             message_id, promise)
@@ -124,3 +123,24 @@ class DeliveryHerald:
                     with client:
                         client.notify()
                     return
+            # If notify_delivered() was invoked before wait_for_all(), i.e.
+            # if the ha message is already delivered before the sender starts
+            # waiting on the same, append the delivered message to the list of
+            # recently_delivered, so that the delivery is found before
+            # wait_for_{all, any}() starts the conditional wait.
+            self.recently_delivered[HaLinkMessagePromise(
+                [message_id])] = [message_id]
+
+    # This function must be invoked with the self.lock held.
+    def check_if_delivered_locked(
+            self,
+            promise: HaLinkMessagePromise) -> HaLinkMessagePromise:
+        if not self.lock.locked():
+            raise RuntimeError('DeliveryHerald.lock not acquired')
+        if promise in self.recently_delivered:
+            confirmed_msgs = self.recently_delivered.pop(promise)
+            LOG.debug('Thread unblocked - %s just received',
+                      confirmed_msgs)
+            del self.waiting_clients[promise]
+            promise.exclude_ids(confirmed_msgs)
+        return promise
