@@ -19,7 +19,6 @@
 #
 
 import logging
-from queue import Queue
 from typing import List, NamedTuple
 
 from hax.filestats import FsStatsUpdater
@@ -28,6 +27,7 @@ from hax.log import setup_logging
 from hax.motr import Motr
 from hax.motr.delivery import DeliveryHerald
 from hax.motr.ffi import HaxFFI
+from hax.motr.planner import WorkPlanner
 from hax.motr.rconfc import RconfcStarter
 from hax.server import run_server
 from hax.types import Fid, Profile
@@ -36,15 +36,15 @@ from hax.util import ConsulUtil, repeat_if_fails
 __all__ = ['main']
 
 HL_Fids = NamedTuple('HL_Fids', [('hax_ep', str), ('hax_fid', Fid),
-                                 ('ha_fid', Fid),
-                                 ('profiles', List[Profile])])
+                                 ('ha_fid', Fid), ('profiles', List[Profile])])
 
 LOG = logging.getLogger('hax')
 
 
-def _run_qconsumer_thread(queue: Queue, motr: Motr, herald: DeliveryHerald,
+def _run_qconsumer_thread(planner: WorkPlanner, motr: Motr,
+                          herald: DeliveryHerald,
                           consul: ConsulUtil) -> ConsumerThread:
-    thread = ConsumerThread(queue, motr, herald, consul)
+    thread = ConsumerThread(planner, motr, herald, consul)
     thread.start()
     return thread
 
@@ -88,7 +88,7 @@ def main():
     # _run_qconsumer_thread function.
     #
     # [KN] Note: The server is launched in the main thread.
-    q: Queue = Queue(maxsize=8192)
+    planner = WorkPlanner()
 
     util: ConsulUtil = ConsulUtil()
     cfg: HL_Fids = _get_motr_fids(util)
@@ -100,15 +100,12 @@ def main():
 
     ffi = HaxFFI()
     herald = DeliveryHerald()
-    motr = Motr(queue=q,
-                ffi=ffi,
-                herald=herald,
-                consul_util=util)
+    motr = Motr(planner=planner, ffi=ffi, herald=herald, consul_util=util)
 
     # Note that consumer thread must be started before we invoke motr.start(..)
     # Reason: hax process will send entrypoint request and somebody needs
     # to reply it.
-    consumer = _run_qconsumer_thread(q, motr, herald, util)
+    consumer = _run_qconsumer_thread(planner, motr, herald, util)
 
     try:
         # [KN] We use just the first profile for Spiel API for now.
@@ -122,7 +119,7 @@ def main():
         stats_updater = _run_stats_updater_thread(motr, consul_util=util)
         # [KN] This is a blocking call. It will work until the program is
         # terminated by signal
-        run_server(q,
+        run_server(planner,
                    herald,
                    consul_util=util,
                    threads_to_wait=[consumer, stats_updater, rconfc_starter])
