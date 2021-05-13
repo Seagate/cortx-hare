@@ -5,6 +5,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from hax.message import BroadcastHAStates
 from hax.motr.delivery import DeliveryHerald
+from hax.motr.planner import WorkPlanner
 from hax.queue.confobjutil import ConfObjUtil
 from hax.types import (Fid, HaLinkMessagePromise, HAState, MessageId,
                        ServiceHealth)
@@ -18,9 +19,9 @@ class BQProcessor:
 
     This is the place where a real processing logic should be located.
     """
-    def __init__(self, queue: Queue, delivery_herald: DeliveryHerald,
+    def __init__(self, planner: WorkPlanner, delivery_herald: DeliveryHerald,
                  conf_obj_util: ConfObjUtil):
-        self.queue = queue
+        self.planner = planner
         self.confobjutil = conf_obj_util
         self.herald = delivery_herald
 
@@ -68,7 +69,8 @@ class BQProcessor:
         q: Queue = Queue(1)
         LOG.debug('HA broadcast, node: %s device: %s state: %s',
                   payload['node'], payload['device'], payload['state'])
-        self.queue.put(BroadcastHAStates(states=[hastate], reply_to=q))
+        self.planner.add_command(
+            BroadcastHAStates(states=[hastate], reply_to=q))
         ids: List[MessageId] = q.get()
         self.herald.wait_for_any(HaLinkMessagePromise(ids))
 
@@ -79,7 +81,7 @@ class BQProcessor:
             return
 
         q: Queue = Queue(1)
-        self.queue.put(
+        self.planner.add_command(
             BroadcastHAStates(
                 states=[HAState(fid,
                                 status=ServiceHealth.FAILED)], reply_to=q))
