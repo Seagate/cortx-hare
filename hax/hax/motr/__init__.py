@@ -26,6 +26,7 @@ from hax.message import (EntrypointRequest, FirstEntrypointRequest,
                          HaNvecGetEvent, ProcessEvent, StobIoqError)
 from hax.motr.delivery import DeliveryHerald
 from hax.motr.ffi import HaxFFI, make_array, make_c_str
+from hax.motr.planner import WorkPlanner
 from hax.types import (ConfHaProcess, Fid, FidStruct, FsStats,
                        HaLinkMessagePromise, HaNote, HaNoteStruct, HAState,
                        MessageId, ObjT, Profile, ReprebStatus, ServiceHealth,
@@ -48,7 +49,7 @@ def log_exception(fn):
 class Motr:
     def __init__(self,
                  ffi: HaxFFI,
-                 queue,
+                 planner: WorkPlanner,
                  herald: DeliveryHerald,
                  consul_util: ConsulUtil,
                  node_uuid: str = ''):
@@ -56,7 +57,7 @@ class Motr:
         # [KN] Note that node_uuid is currently ignored by the corresponding
         # hax.c function
         self._ha_ctx = self._ffi.init_motr_api(self, make_c_str(node_uuid))
-        self.queue = queue
+        self.planner = planner
         self.herald = herald
         self.consul_util = consul_util
         self.spiel_ready = False
@@ -148,7 +149,7 @@ class Motr:
                 # anyway detect the failure and report the same so we exclude
                 # reporting the same during their first entrypoint request.
                 # But we need to do it for motr server processes.
-                self.queue.put(
+                self.planner.add_command(
                     FirstEntrypointRequest(
                         reply_context=reply_context,
                         req_id=req_id,
@@ -293,7 +294,7 @@ class Motr:
 
     def _process_event_cb(self, fid, chp_event, chp_type, chp_pid):
         LOG.info('fid=%s, chp_event=%s', fid, chp_event)
-        self.queue.put(
+        self.planner.add_command(
             ProcessEvent(
                 ConfHaProcess(chp_event=chp_event,
                               chp_type=chp_type,
@@ -309,7 +310,7 @@ class Motr:
                            sie_opcode, sie_rc, sie_offset, sie_size,
                            sie_bshift):
         LOG.info('fid=%s, sie_conf_sdev=%s', fid, sie_conf_sdev)
-        self.queue.put(
+        self.planner.add_command(
             StobIoqError(fid, sie_conf_sdev, sie_stob_id, sie_fd, sie_opcode,
                          sie_rc, sie_offset, sie_size, sie_bshift))
 
@@ -332,7 +333,7 @@ class Motr:
     @log_exception
     def ha_nvec_get(self, hax_msg: int, nvec: List[HaNote]) -> None:
         LOG.debug('Got ha nvec of length %s from Motr land', len(nvec))
-        self.queue.put(HaNvecGetEvent(hax_msg, nvec))
+        self.planner.add_command(HaNvecGetEvent(hax_msg, nvec))
 
     @log_exception
     def ha_nvec_get_reply(self, event: HaNvecGetEvent) -> None:

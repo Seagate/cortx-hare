@@ -73,8 +73,11 @@ class WorkPlanner:
             return not self.backlog
 
     def add_command(self, command: BaseMessage) -> None:
+        LOG.log(TRACE, '[WP]Before add_command: %s', command)
         with self.b_lock:
             cmd = self._assign_group(command)
+            LOG.log(TRACE, '[WP]Cmd %s is added. Current state: %s', cmd,
+                    self.state)
             self.backlog.append(cmd)
             # Some threads may be waiting because of an empty backlog - let's
             # notify them
@@ -83,11 +86,14 @@ class WorkPlanner:
     def get_next_command(self) -> BaseMessage:
         # TODO think of is_stopped and shutdown procedure
         while True:
+            LOG.log(TRACE, '[WP]Trying to get new command')
             with self.b_lock:
                 if self.backlog:
                     cmd = self.backlog.popleft()
+                    LOG.log(TRACE, '[WP]Cmd %s taken!', cmd)
                     self.state.taken_commands.add(cmd)
                     return cmd
+                LOG.log(TRACE, '[WP]Blocking thread: no commands in backlog')
                 self.b_lock.wait()
 
     def ensure_allowed(self, command: BaseMessage) -> None:
@@ -101,13 +107,23 @@ class WorkPlanner:
                     state.taken_commands.remove(command)
                     state.active_commands.add(command)
                     return
+                LOG.log(TRACE, '[WP]Cmd %s not allowed for now.'
+                        ' Current state: %s', command, self.state)
                 self.b_lock.wait()
+
+    def _inc_group(self):
+        state = self.state
+        state.current_group_id += 1
+        if state.next_group_id < state.current_group_id:
+            state.next_group_id = state.current_group_id
+            state.next_group_commands = LinkedSet()
 
     def notify_finished(self, command: BaseMessage) -> None:
         with self.b_lock:
             state = self.state
             state.active_commands.remove(command)
-            LOG.log(TRACE, 'Cmd %s removed. Current state: %s', command, state)
+            LOG.log(TRACE, '[WP]Cmd %s removed. Current state: %s', command,
+                    state)
 
             if state.active_commands:
                 return
@@ -118,8 +134,8 @@ class WorkPlanner:
                 if c.group == state.current_group_id:
                     return
             # if we're here, command was the only one belonging to group
-            state.current_group_id += 1
-            LOG.log(TRACE, 'Active group changed to %s',
+            self._inc_group()
+            LOG.log(TRACE, '[WP]Active group changed to %s',
                     state.current_group_id)
             # The group changed, let's unblock those who are waiting for
             # this group
