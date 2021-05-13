@@ -21,7 +21,7 @@ from dataclasses import dataclass, field
 from queue import Queue
 from typing import Any, List, Optional
 
-from hax.types import Fid, HaNote, HAState, Uint128
+from hax.types import Fid, HaNote, HAState, StobId, Uint128
 
 
 @dataclass(unsafe_hash=True)
@@ -123,6 +123,19 @@ class SnsRepairStatus(SnsOperation):
 class SnsRebalanceStatus(SnsOperation):
     fid: Fid
     reply_to: q.Queue
+
+
+@dataclass
+class StobIoqError(BaseMessage):
+    fid: Fid
+    conf_sdev: Fid
+    stob_id: StobId
+    fd: int
+    opcode: int
+    rc: int
+    offset: int
+    size: int
+    bshift: int
 
 
 class Die(BaseMessage):
