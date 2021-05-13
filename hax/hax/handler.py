@@ -21,18 +21,19 @@ import time
 from queue import Empty, Queue
 from typing import List
 
-from hax.message import (BroadcastHAStates, FirstEntrypointRequest,
-                         EntrypointRequest, HaNvecGetEvent,
-                         ProcessEvent, SnsRebalancePause, SnsRebalanceResume,
+from hax.message import (BroadcastHAStates, EntrypointRequest,
+                         FirstEntrypointRequest, HaNvecGetEvent, ProcessEvent,
+                         SnsRebalancePause, SnsRebalanceResume,
                          SnsRebalanceStart, SnsRebalanceStatus,
                          SnsRebalanceStop, SnsRepairPause, SnsRepairResume,
-                         SnsRepairStart, SnsRepairStatus, SnsRepairStop)
+                         SnsRepairStart, SnsRepairStatus, SnsRepairStop,
+                         StobIoqError)
 from hax.motr import Motr
 from hax.motr.delivery import DeliveryHerald
 from hax.queue.publish import EQPublisher
-from hax.types import (ConfHaProcess, HAState, MessageId, StobIoqError,
-                       ServiceHealth, m0HaProcessEvent, m0HaProcessType,
-                       StoppableThread, HaLinkMessagePromise, ObjT)
+from hax.types import (ConfHaProcess, HaLinkMessagePromise, HAState, MessageId,
+                       ObjT, ServiceHealth, StoppableThread, m0HaProcessEvent,
+                       m0HaProcessType)
 from hax.util import ConsulUtil, dump_json, repeat_if_fails
 
 LOG = logging.getLogger('hax')
@@ -72,9 +73,9 @@ class ConsumerThread(StoppableThread):
         svc_status = m0HaProcessEvent.event_to_svchealth(event.chp_event)
         if event.chp_event in (m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED,
                                m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED):
-            motr.broadcast_ha_states([HAState(fid=event.fid,
-                                              status=svc_status)],
-                                     notify_devices=False)
+            motr.broadcast_ha_states(
+                [HAState(fid=event.fid, status=svc_status)],
+                notify_devices=False)
 
     @repeat_if_fails(wait_seconds=1)
     def update_process_failure(self, q: Queue,
@@ -84,15 +85,15 @@ class ConsumerThread(StoppableThread):
             # We are only concerned with process statuses.
             if state.fid.container == ObjT.PROCESS.value:
                 current_status = self.consul.get_process_current_status(
-                                     state.status, state.fid)
+                    state.status, state.fid)
                 if current_status == ServiceHealth.OK:
-                    if (self.consul.get_process_local_status(state.fid) ==
-                            'M0_CONF_HA_PROCESS_STARTED'):
+                    if (self.consul.get_process_local_status(
+                            state.fid) == 'M0_CONF_HA_PROCESS_STARTED'):
                         continue
                 if current_status in (ServiceHealth.FAILED,
                                       ServiceHealth.STOPPED):
-                    if (self.consul.get_process_local_status(state.fid) ==
-                            'M0_CONF_HA_PROCESS_STOPPED'):
+                    if (self.consul.get_process_local_status(
+                            state.fid) == 'M0_CONF_HA_PROCESS_STOPPED'):
                         # Consul may report failure of a process multiple
                         # times, so we don't want to send duplicate failure
                         # notifications, it may cause delay in cleanup
@@ -115,10 +116,11 @@ class ConsumerThread(StoppableThread):
                     # the real time status of the process before
                     # broadcasting failure.
                     current_status = ServiceHealth.UNKNOWN
-                    q.put(BroadcastHAStates(
-                          states=[HAState(fid=state.fid,
-                                          status=ServiceHealth.FAILED)],
-                          reply_to=None))
+                    q.put(
+                        BroadcastHAStates(states=[
+                            HAState(fid=state.fid, status=ServiceHealth.FAILED)
+                        ],
+                                          reply_to=None))
                 if current_status not in (ServiceHealth.UNKNOWN,
                                           ServiceHealth.OFFLINE):
                     # We also need to account and report the failure of remote
@@ -131,13 +133,14 @@ class ConsumerThread(StoppableThread):
                         event = m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED
                     else:
                         event = m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED
-                    self.consul.update_process_status(ConfHaProcess(
-                        chp_event=event,
-                        chp_type=m0HaProcessType.M0_CONF_HA_PROCESS_M0D,
-                        chp_pid=0,
-                        fid=state.fid))
-                new_ha_states.append(HAState(fid=state.fid,
-                                             status=current_status))
+                    self.consul.update_process_status(
+                        ConfHaProcess(
+                            chp_event=event,
+                            chp_type=m0HaProcessType.M0_CONF_HA_PROCESS_M0D,
+                            chp_pid=0,
+                            fid=state.fid))
+                new_ha_states.append(
+                    HAState(fid=state.fid, status=current_status))
             else:
                 new_ha_states.append(state)
         return new_ha_states
@@ -168,8 +171,10 @@ class ConsumerThread(StoppableThread):
                     if isinstance(item, FirstEntrypointRequest):
                         LOG.debug('first entrypoint request, broadcast FAILED')
                         ids: List[MessageId] = motr.broadcast_ha_states(
-                            [HAState(fid=item.process_fid,
-                                     status=ServiceHealth.FAILED)],
+                            [
+                                HAState(fid=item.process_fid,
+                                        status=ServiceHealth.FAILED)
+                            ],
                             notify_devices=False)
                         LOG.debug('waiting for broadcast of %s for ep: %s',
                                   ids, item.remote_rpc_endpoint)
