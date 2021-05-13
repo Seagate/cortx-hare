@@ -22,14 +22,14 @@ from errno import EAGAIN
 from typing import Any, List
 
 from hax.exception import ConfdQuorumException, RepairRebalanceException
-from hax.message import (EntrypointRequest,
-                         FirstEntrypointRequest, HaNvecGetEvent, ProcessEvent)
+from hax.message import (EntrypointRequest, FirstEntrypointRequest,
+                         HaNvecGetEvent, ProcessEvent, StobIoqError)
 from hax.motr.delivery import DeliveryHerald
 from hax.motr.ffi import HaxFFI, make_array, make_c_str
-from hax.types import (ConfHaProcess, Fid, FidStruct, FsStats, HaNote,
-                       HaNoteStruct, HAState, MessageId, ObjT, Profile,
-                       ReprebStatus, ServiceHealth, StobIoqError,
-                       m0HaProcessEvent, HaLinkMessagePromise)
+from hax.types import (ConfHaProcess, Fid, FidStruct, FsStats,
+                       HaLinkMessagePromise, HaNote, HaNoteStruct, HAState,
+                       MessageId, ObjT, Profile, ReprebStatus, ServiceHealth,
+                       m0HaProcessEvent)
 from hax.util import ConsulUtil, repeat_if_fails
 
 LOG = logging.getLogger('hax')
@@ -245,8 +245,7 @@ class Motr:
             self._ffi.entrypoint_reply(reply_context, req_id.to_c(), e_rc, 0,
                                        make_array(FidStruct, []),
                                        make_array(c.c_char_p, []), 0,
-                                       Fid(0, 0).to_c(),
-                                       None)
+                                       Fid(0, 0).to_c(), None)
             LOG.debug('Reply sent')
             return
 
@@ -259,11 +258,11 @@ class Motr:
                                    make_array(FidStruct, confd_fids),
                                    make_array(c.c_char_p,
                                               confd_eps), rc_quorum,
-                                   rm_fid.to_c(),
-                                   make_c_str(rm_eps))
+                                   rm_fid.to_c(), make_c_str(rm_eps))
         LOG.debug('Entrypoint request has been replied to')
 
-    def broadcast_ha_states(self, ha_states: List[HAState],
+    def broadcast_ha_states(self,
+                            ha_states: List[HAState],
                             notify_devices=True) -> List[MessageId]:
         LOG.debug('Broadcasting HA states %s over ha_link', ha_states)
 
@@ -277,8 +276,8 @@ class Motr:
                 continue
             note = HaNoteStruct(st.fid.to_c(), ha_obj_state(st))
             notes.append(note)
-            if (st.fid.container == ObjT.PROCESS.value and
-                    st.status == ServiceHealth.STOPPED):
+            if (st.fid.container == ObjT.PROCESS.value
+                    and st.status == ServiceHealth.STOPPED):
                 notify_devices = False
             notes += self._generate_sub_services(note, self.consul_util,
                                                  notify_devices)
@@ -350,7 +349,8 @@ class Motr:
         self._ffi.ha_nvec_reply(event.hax_msg, make_array(HaNoteStruct, notes),
                                 len(notes))
 
-    def _generate_sub_services(self, note: HaNoteStruct,
+    def _generate_sub_services(self,
+                               note: HaNoteStruct,
                                cns: ConsulUtil,
                                notify_devices=True) -> List[HaNoteStruct]:
         new_state = note.no_state
@@ -358,8 +358,10 @@ class Motr:
         service_list = cns.get_services_by_parent_process(fid)
         LOG.debug('Process fid=%s encloses %s services as follows: %s', fid,
                   len(service_list), service_list)
-        service_notes = [HaNoteStruct(no_id=x.fid.to_c(), no_state=new_state)
-                         for x in service_list]
+        service_notes = [
+            HaNoteStruct(no_id=x.fid.to_c(), no_state=new_state)
+            for x in service_list
+        ]
         if notify_devices:
             # For process failure, we report failure for the corresponding
             # node (enclosure) and CVGs.
@@ -368,8 +370,7 @@ class Motr:
 
         return service_notes
 
-    def _generate_sub_disks(self, note: HaNoteStruct,
-                            services: List,
+    def _generate_sub_disks(self, note: HaNoteStruct, services: List,
                             cns: ConsulUtil) -> List[HaNoteStruct]:
         disk_list = []
         new_state = note.no_state
@@ -379,8 +380,7 @@ class Motr:
         LOG.debug('proc fid=%s encloses %d disks with state %d as follows: %s',
                   proc_fid, len(disk_list), int(new_state), disk_list)
         return [
-            HaNoteStruct(no_id=x.to_c(), no_state=new_state)
-            for x in disk_list
+            HaNoteStruct(no_id=x.to_c(), no_state=new_state) for x in disk_list
         ]
 
     def notify_node_failure(self,

@@ -169,13 +169,6 @@ HaNote = NamedTuple('HaNote', [('obj_t', str), ('note', HaNoteStruct)])
 # struct m0_stob_id
 StobId = NamedTuple('StobId', [('domain_fid', Fid), ('fid', Fid)])
 
-# struct m0_stob_ioq_error
-StobIoqError = NamedTuple('StobIoqError', [('fid', Fid), ('conf_sdev', Fid),
-                                           ('stob_id', StobId), ('fd', int),
-                                           ('opcode', int), ('rc', int),
-                                           ('offset', int), ('size', int),
-                                           ('bshift', int)])
-
 # SnsRepairStatusItem = NamedTuple('SnsRepairStatusItem', [('fid', Fid),
 #                                                          ('status', str),
 #                                                          ('progress', int)])
