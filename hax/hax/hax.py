@@ -42,9 +42,9 @@ LOG = logging.getLogger('hax')
 
 
 def _run_qconsumer_thread(planner: WorkPlanner, motr: Motr,
-                          herald: DeliveryHerald,
-                          consul: ConsulUtil) -> ConsumerThread:
-    thread = ConsumerThread(planner, motr, herald, consul)
+                          herald: DeliveryHerald, consul: ConsulUtil,
+                          idx: int) -> ConsumerThread:
+    thread = ConsumerThread(planner, motr, herald, consul, idx)
     thread.start()
     return thread
 
@@ -105,7 +105,11 @@ def main():
     # Note that consumer thread must be started before we invoke motr.start(..)
     # Reason: hax process will send entrypoint request and somebody needs
     # to reply it.
-    consumer = _run_qconsumer_thread(planner, motr, herald, util)
+
+    # TODO make the number of threads configurable
+    consumer_threads = [
+        _run_qconsumer_thread(planner, motr, herald, util, i) for i in range(4)
+    ]
 
     try:
         # [KN] We use just the first profile for Spiel API for now.
@@ -119,11 +123,11 @@ def main():
         stats_updater = _run_stats_updater_thread(motr, consul_util=util)
         # [KN] This is a blocking call. It will work until the program is
         # terminated by signal
-        run_server(planner,
-                   herald,
-                   consul_util=util,
-                   threads_to_wait=[consumer, stats_updater, rconfc_starter])
-
+        run_server(
+            planner,
+            herald,
+            consul_util=util,
+            threads_to_wait=[*consumer_threads, stats_updater, rconfc_starter])
     except Exception:
         LOG.exception('Exiting due to an exception')
     finally:
