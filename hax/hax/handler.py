@@ -19,7 +19,7 @@
 import logging
 from typing import List
 
-from hax.message import (BroadcastHAStates, EntrypointRequest,
+from hax.message import (BroadcastHAStates, Die, EntrypointRequest,
                          FirstEntrypointRequest, HaNvecGetEvent, ProcessEvent,
                          SnsRebalancePause, SnsRebalanceResume,
                          SnsRebalanceStart, SnsRebalanceStatus,
@@ -156,7 +156,9 @@ class ConsumerThread(StoppableThread):
                     LOG.debug('Waiting for the next message')
 
                     item = planner.get_next_command()
-                    planner.ensure_allowed(item)
+                    # TODO maybe it makes sense to move ensure_allowed() into
+                    # get_next_command()?
+                    item = planner.ensure_allowed(item)
 
                     LOG.debug('Got %s message from planner', item)
                     if isinstance(item, FirstEntrypointRequest):
@@ -245,7 +247,8 @@ class ConsumerThread(StoppableThread):
                     elif isinstance(item, SnsRepairResume):
                         LOG.info('Requesting SNS repair resume')
                         motr.resume_repair(item.fid)
-
+                    elif isinstance(item, Die):
+                        raise StopIteration()
                     else:
                         LOG.warning('Unsupported event type received: %s',
                                     item)
