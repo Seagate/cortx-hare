@@ -48,9 +48,9 @@ class ConsumerThread(StoppableThread):
     it is a 'poison pill').
     """
     def __init__(self, planner: WorkPlanner, motr: Motr,
-                 herald: DeliveryHerald, consul: ConsulUtil):
+                 herald: DeliveryHerald, consul: ConsulUtil, idx: int):
         super().__init__(target=self._do_work,
-                         name='qconsumer',
+                         name=f'qconsumer-{idx}',
                          args=(planner, motr))
         self.is_stopped = False
         self.consul = consul
