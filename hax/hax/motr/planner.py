@@ -45,6 +45,7 @@ class State:
     active_commands: LinkedSet[BaseMessage]
     taken_commands: LinkedSet[BaseMessage]
     next_group_commands: LinkedSet[Type[BaseMessage]]
+    is_shutdown: bool
 
 
 class WorkPlanner:
@@ -64,11 +65,13 @@ class WorkPlanner:
                            active_commands=LinkedSet(),
                            taken_commands=LinkedSet(),
                            current_group_id=0,
-                           next_group_commands=LinkedSet())
+                           next_group_commands=LinkedSet(),
+                           is_shutdown=False)
         self.backlog: Deque[BaseMessage] = deque()
         self.b_lock = Condition()
 
     def is_empty(self) -> bool:
+        """Checks whether the backlog is empty. Blocking call."""
         with self.b_lock:
             return not self.backlog
 
@@ -83,11 +86,17 @@ class WorkPlanner:
             # notify them
             self.b_lock.notifyAll()
 
+    def _create_poison(self) -> BaseMessage:
+        cmd = Die()
+        cmd.group = self.state.current_group_id
+        return cmd
+
     def get_next_command(self) -> BaseMessage:
-        # TODO think of is_stopped and shutdown procedure
         while True:
             LOG.log(TRACE, '[WP]Trying to get new command')
             with self.b_lock:
+                if self.state.is_shutdown:
+                    return self._create_poison()
                 if self.backlog:
                     cmd = self.backlog.popleft()
                     LOG.log(TRACE, '[WP]Cmd %s taken!', cmd)
@@ -96,17 +105,25 @@ class WorkPlanner:
                 LOG.log(TRACE, '[WP]Blocking thread: no commands in backlog')
                 self.b_lock.wait()
 
-    def ensure_allowed(self, command: BaseMessage) -> None:
+    def shutdown(self):
+        with self.b_lock:
+            LOG.debug('WorkPlanner is shutting down')
+            self.state.is_shutdown = True
+            self.b_lock.notifyAll()
+
+    def ensure_allowed(self, command: BaseMessage) -> BaseMessage:
         def is_current(cmd: BaseMessage, st: State) -> bool:
             return cmd.group == st.current_group_id
 
         while True:
             with self.b_lock:
                 state = self.state
+                if state.is_shutdown:
+                    return self._create_poison()
                 if is_current(command, state):
                     state.taken_commands.remove(command)
                     state.active_commands.add(command)
-                    return
+                    return command
                 LOG.log(TRACE, '[WP]Cmd %s not allowed for now.'
                         ' Current state: %s', command, self.state)
                 self.b_lock.wait()
