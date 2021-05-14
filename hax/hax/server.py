@@ -226,7 +226,7 @@ def run_server(
         LOG.debug('Server stopped normally')
     finally:
         LOG.debug('Stopping the threads')
-        # [KN] FIXME Implement shutdown in WorkPlanner
+        planner.shutdown()
         for thread in threads_to_wait:
             thread.stop()
         for thread in threads_to_wait:
