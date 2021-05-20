@@ -589,6 +589,87 @@ class ConsulUtil:
             raise HAConsistencyException(
                 f'Failed to get {node} node health') from e
 
+    @repeat_if_fails()
+    def get_node_fid(self, node: str) -> Optional[Fid]:
+        """
+        Returns the fid of the given node.
+
+        Parameters:
+            node : hostname of the node.
+        """
+        # Example,
+        # m0conf/nodes/
+        # 0x6e00000000000001:0x3:{"name": "ssc-vm-1623.colo.seagate.com",
+        #                         "state": "M0_NC_UNKNOWN"}
+        node_items = self.kv.kv_get('m0conf/nodes', recurse=True)
+        for item in node_items:
+            item_value = json.loads(item['Value'])
+            if 'name' in item_value and item_value['name'] == node:
+                node_fid: str = str(item['Key'].split('/')[2])
+                return Fid.parse(node_fid)
+        return None
+
+    @repeat_if_fails()
+    def get_node_ctrl_fid(self, node: str) -> Optional[Fid]:
+        """
+        Returns the fid of the controller for the given node.
+
+        Parameters:
+            node : hostname of the node.
+        """
+        # Example,
+        # {
+        #    "key": "m0conf/sites/0x5300000000000001:0x1/
+        #            racks/0x6100000000000001:0x2/encls/
+        #            0x6500000000000001:0x4/ctrls/0x6300000000000001:0x5",
+        # },
+        encl_fid = self.get_node_encl_fid(node)
+        if not encl_fid:
+            return None
+        ctrl_items = self.kv.kv_get('m0conf/sites', recurse=True)
+        regex = re.compile(
+            f'^m0conf\\/.*\\/racks\\/.*\\/encls\\/{encl_fid}\\/ctrls\\/'
+            '([^/]+)$')
+        for ctrl in ctrl_items:
+            match_result = re.match(regex, ctrl['Key'])
+            if not match_result:
+                continue
+            ctrl_fid: str = match_result.group(1)
+            return Fid.parse(ctrl_fid)
+        return None
+
+    @repeat_if_fails()
+    def get_node_encl_fid(self, node: str) -> Optional[Fid]:
+        """
+        Returns the fid of the enclosure for the given node.
+
+        Parameters:
+            node : hostname of the node.
+        """
+        # Example,
+        # {
+        #    "key": "m0conf/sites/0x5300000000000001:0x1/
+        #            racks/0x6100000000000001:0x2/encls/
+        #            0x6500000000000001:0x4",
+        #    "value": "{\"node\": \"0x6e00000000000001:0x3\",
+        #               \"state\": \"M0_NC_UNKNOWN\"}"
+        # },
+        node_fid = self.get_node_fid(node)
+        if not node_fid:
+            return None
+        encl_items = self.kv.kv_get('m0conf/sites', recurse=True)
+        regex = re.compile(
+            '^m0conf\\/.*\\/racks\\/.*\\/encls\\/([^/]+)$')
+        for encl in encl_items:
+            match_result = re.match(regex, encl['Key'])
+            if not match_result:
+                continue
+            encl_value = json.loads(encl['Value'])
+            if 'node' in encl_value and encl_value['node'] == str(node_fid):
+                encl_fid: str = match_result.group(1)
+                return Fid.parse(encl_fid)
+        return None
+
     @staticmethod
     def _to_canonical_service_data(service: Dict[str, Any]) -> ServiceData:
         node = service['Node']
