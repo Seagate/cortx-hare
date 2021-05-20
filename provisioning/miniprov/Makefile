@@ -101,10 +101,11 @@ flake8:
 	@$(PY_VENV); flake8 hare_mp
 
 .PHONY: mypy
+override MYPY_OPTS += --config-file mypy.ini
 mypy:
 	@$(call _info,Checking files with mypy)
 	@$(PY_VENV); \
-	 set -eu -o pipefail; MYPYPATH=../../stubs mypy $(MYPY_OPTS) hare_mp
+ 	 set -eu -o pipefail; MYPYPATH=../../stubs:../../hax mypy $(MYPY_OPTS) hare_mp
 
 # Functions ------------------------------------------- {{{1
 #
