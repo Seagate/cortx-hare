@@ -36,6 +36,8 @@ from cortx.utils.product_features import unsupported_features
 from hare_mp.cdf import CdfGenerator
 from hare_mp.store import ConfStoreProvider
 from hare_mp.validator import Validator
+from hax.util import ConsulUtil
+from hax.types import KeyDelete
 
 
 def execute(cmd: List[str]) -> str:
@@ -201,6 +203,65 @@ def test(args):
         exit(-1)
 
 
+def reset(args):
+    try:
+        rc = 0
+        util: ConsulUtil = ConsulUtil()
+
+        keys: List[KeyDelete] = [KeyDelete(name='epoch', recurse=False),
+                                 KeyDelete(name='eq-epoch', recurse=False),
+                                 KeyDelete(name='last_fidk', recurse=False),
+                                 KeyDelete(name='leader', recurse=False),
+                                 KeyDelete(name='m0conf/', recurse=True),
+                                 KeyDelete(name='processes/', recurse=True),
+                                 KeyDelete(name='stats/', recurse=True)]
+
+        logging.info('Deleting Hare KV entries (%s)', keys)
+        if not util.kv.kv_delete_in_transaction(keys):
+            logging.error('Error during key delete in transaction')
+            rc = -1
+
+        exit(rc)
+    except Exception as error:
+        logging.error('Error during reset (%s)', error)
+        exit(-1)
+
+
+def cleanup(args):
+    try:
+        rc = -1
+
+        if config_cleanup() == 0 and logs_cleanup() == 0:
+            rc = 0
+
+        exit(rc)
+    except Exception as error:
+        logging.error('Error during cleanup (%s)', error)
+        exit(-1)
+
+
+def logs_cleanup():
+    try:
+        logging.info('Cleaning up hare log directory(/var/log/hare)')
+        os.system('rm -rf /var/log/hare')
+
+        return 0
+    except Exception as error:
+        logging.error('Error during logs cleanup (%s)', error)
+        return -1
+
+
+def config_cleanup():
+    try:
+        logging.info('Cleaning up hare config directory(/var/lib/hare)')
+        os.system('rm -rf /var/lib/hare/*')
+
+        return 0
+    except Exception as error:
+        logging.error('Error during config cleanup (%s)', error)
+        return -1
+
+
 def generate_support_bundle(args):
     try:
         # Default target directory is /tmp/hare
@@ -224,13 +285,11 @@ def checkRpm(rpm_name):
                                 stdin=subprocess.PIPE,
                                 stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE,
-                                env={},
                                 encoding='utf8')
     rpm_search = subprocess.Popen(["grep", "-q", rpm_name],
                                   stdin=rpm_list.stdout,
                                   stdout=subprocess.PIPE,
                                   stderr=subprocess.PIPE,
-                                  env={},
                                   encoding='utf8')
     out, err = rpm_search.communicate()
     logging.debug("Output: {}".format(out))
@@ -411,13 +470,13 @@ def main():
     add_subcommand(subparser,
                    'reset',
                    help_str='Resets temporary Hare data and configuration',
-                   handler_fn=noop, config_required=False)
+                   handler_fn=reset, config_required=False)
 
     add_subcommand(
         subparser,
         'cleanup',
         help_str='Resets Hare configuration, logs and formats Motr metadata',
-        handler_fn=noop, config_required=False)
+        handler_fn=cleanup, config_required=False)
 
     add_subcommand(subparser,
                    'prepare',

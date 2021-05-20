@@ -36,7 +36,7 @@ from urllib3.exceptions import HTTPError
 from hax.exception import HAConsistencyException, InterruptedException
 from hax.types import (ConfHaProcess, Fid, FsStatsWithTime,
                        ObjT, ServiceHealth, Profile, m0HaProcessEvent,
-                       m0HaProcessType, HaNoteStruct)
+                       m0HaProcessType, KeyDelete, HaNoteStruct)
 
 __all__ = ['ConsulUtil', 'create_process_fid', 'create_service_fid',
            'create_sdev_fid', 'create_drive_fid']
@@ -206,6 +206,26 @@ class ConsulKVBasic:
             return False
         except (ConsulException, HTTPError, RequestException) as e:
             raise HAConsistencyException('Failed to put value to KV') from e
+
+    @repeat_if_fails(max_retries=5)
+    def kv_delete_in_transaction(self, tx_payload: List[KeyDelete]) -> bool:
+        def to_payload(v: KeyDelete) -> Dict[str, Any]:
+            return {'KV': {'Key': v.name, 'Verb':
+                           'delete-tree' if v.recurse else 'delete'}}
+
+        try:
+            self.cns.txn.put([to_payload(i) for i in tx_payload])
+            return True
+        except ClientError:
+            # If a transaction fails, Consul returns HTTP 409 with the
+            # JSON payload describing the reason why the transaction
+            # was rejected.
+            # The library transforms HTTP 409 into generic ClientException.
+            # Unfortunately, we can't easily extract the payload from it.
+            return False
+        except (ConsulException, HTTPError, RequestException) as e:
+            raise HAConsistencyException(f'Failed to delete key(s)'
+                                         f' from KV, error: {e}')
 
 
 class ConsulUtil:
