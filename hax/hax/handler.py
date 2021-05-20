@@ -98,8 +98,6 @@ class ConsumerThread(StoppableThread):
                         # notifications, it may cause delay in cleanup
                         # activities.
                         continue
-                    else:
-                        current_status = ServiceHealth.STOPPED
                 if current_status == ServiceHealth.UNKNOWN:
                     # We got service status as UNKNOWN, that means hax was
                     # notified about process failure but hax couldn't
