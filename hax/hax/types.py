@@ -278,3 +278,6 @@ class Profile(NamedTuple):
     fid: Fid
     name: str
     pool_names: List[str]
+
+
+KeyDelete = NamedTuple('KeyDelete', [('name', str), ('recurse', bool)])
