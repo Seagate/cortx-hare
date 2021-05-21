@@ -20,7 +20,7 @@ import logging
 from collections import deque
 from dataclasses import dataclass
 from threading import Condition
-from typing import Deque, Type
+from typing import Callable, Deque, Optional, Type
 
 from hax.log import TRACE
 from hax.message import (AnyEntrypointRequest, BaseMessage, BroadcastHAStates,
@@ -28,6 +28,7 @@ from hax.message import (AnyEntrypointRequest, BaseMessage, BroadcastHAStates,
 from hax.motr.util import LinkedSet
 
 LOG = logging.getLogger('hax')
+MAX_GROUP_ID = 100000
 
 __all__ = ['WorkPlanner']
 
@@ -60,13 +61,11 @@ class WorkPlanner:
        in parallel to others, while some other not; the ConsumerThread's don't
        need to worry about that).
     """
-    def __init__(self):
-        self.state = State(next_group_id=0,
-                           active_commands=LinkedSet(),
-                           taken_commands=LinkedSet(),
-                           current_group_id=0,
-                           next_group_commands=LinkedSet(),
-                           is_shutdown=False)
+    def __init__(self,
+                 init_state_factory: Optional[Callable[[], State]] = None):
+        fn = init_state_factory or self._create_initial_state
+
+        self.state = fn()
         self.backlog: Deque[BaseMessage] = deque()
         self.b_lock = Condition()
 
@@ -85,6 +84,14 @@ class WorkPlanner:
             # Some threads may be waiting because of an empty backlog - let's
             # notify them
             self.b_lock.notifyAll()
+
+    def _create_initial_state(self) -> State:
+        return State(next_group_id=0,
+                     active_commands=LinkedSet(),
+                     taken_commands=LinkedSet(),
+                     current_group_id=0,
+                     next_group_commands=LinkedSet(),
+                     is_shutdown=False)
 
     def _create_poison(self) -> BaseMessage:
         cmd = Die()
@@ -128,10 +135,28 @@ class WorkPlanner:
                         ' Current state: %s', command, self.state)
                 self.b_lock.wait()
 
+    def _get_increased_group(self, current: int) -> int:
+        """ Returns the next valid group_id number by the given current value.
+            Performs no side effects.
+        """
+        new_value = current + 1
+        # In Python, every int uses an arbitrary-precision maths. In other
+        # words, if an int value becomes greater than 4 bytes can store, no
+        # overflow will happen. Instead, the variable will use more and more
+        # additional chunks of memory. That's why group id should be wrapped
+        # back to zero manually.
+        if new_value > MAX_GROUP_ID:
+            new_value = 0
+        return new_value
+
     def _inc_group(self):
         state = self.state
-        state.current_group_id += 1
-        if state.next_group_id < state.current_group_id:
+        cur_group_id = state.current_group_id
+        change_next_group = state.next_group_id == cur_group_id
+
+        state.current_group_id = self._get_increased_group(cur_group_id)
+
+        if change_next_group:
             state.next_group_id = state.current_group_id
             state.next_group_commands = LinkedSet()
 
@@ -194,14 +219,15 @@ class WorkPlanner:
             self.state.next_group_commands.add(type(cmd))
             return cmd
 
-        def inc_group() -> None:
+        def next_group() -> None:
             self.state.next_group_commands = LinkedSet()
-            self.state.next_group_id += 1
+            self.state.next_group_id = self._get_increased_group(
+                self.state.next_group_id)
 
         if isinstance(cmd, Die):
             return join_group(cmd)
 
         if self._should_increase_group(cmd):
-            inc_group()
+            next_group()
 
         return join_group(cmd)
