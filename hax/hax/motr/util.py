@@ -27,8 +27,7 @@ class Elem(Generic[A]):
     next_elem: 'Optional[Elem[A]]' = None
 
 
-class QueueIterator:
-    # TODO choose a proper name
+class LinkedListIterator:
     def __init__(self, q):
         self.cur = q.head
 
@@ -43,7 +42,11 @@ class QueueIterator:
         return ret.data
 
 
-class LinkedSet(Iterable[A]):
+class LinkedList(Iterable[A]):
+    ''' The class is used as a replacement for set() in cases when the stored
+    objects are not hashable and it is sufficient to compare them by 'identity'
+    (the equality of memory pointer).
+    '''
     head: Optional[Elem[A]]
 
     def __init__(self):
@@ -84,40 +87,9 @@ class LinkedSet(Iterable[A]):
         return bool(self.head)
 
     def __iter__(self):
-        return QueueIterator(self)
+        return LinkedListIterator(self)
 
     def __repr__(self):
         if not self.head:
             return '<empty>'
         return '(' + ', '.join(str(s) for s in self) + ')'
-
-
-class Queue(Iterable[A]):
-    head: Optional[Elem[A]]
-    tail: Optional[Elem[A]]
-
-    def __init__(self):
-        self.head = None
-        self.tail = None
-
-    def __iter__(self):
-        return QueueIterator(self)
-
-    def push(self, value: A) -> None:
-        elem = Elem(data=value)
-        if not self.tail:
-            self.tail = elem
-            self.head = elem
-            return
-        self.tail.next_elem = elem
-        self.tail = elem
-
-    def pop(self) -> A:
-        if not self.head:
-            raise ValueError('Queue is empty')
-        old_head = self.head
-        self.head = old_head.next_elem
-        return old_head.data
-
-    def is_empty(self) -> bool:
-        return not self.head
