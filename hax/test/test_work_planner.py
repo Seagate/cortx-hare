@@ -116,7 +116,7 @@ class TestMessageOrder(unittest.TestCase):
                      active_commands=LinkedList(),
                      taken_commands=LinkedList(),
                      current_group_id=99999,
-                     next_group_commands=LinkedSet(),
+                     next_group_commands=set(),
                      is_shutdown=False)
 
         planner = WorkPlanner(init_state_factory=my_state)
@@ -358,7 +358,7 @@ class TestWorkPlanner(unittest.TestCase):
                      active_commands=LinkedList(),
                      taken_commands=LinkedList(),
                      current_group_id=99999,
-                     next_group_commands=LinkedSet(),
+                     next_group_commands=set(),
                      is_shutdown=False)
 
         planner = WorkPlanner(init_state_factory=my_state)

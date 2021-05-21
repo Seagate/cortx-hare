@@ -20,7 +20,7 @@ import logging
 from collections import deque
 from dataclasses import dataclass
 from threading import Condition
-from typing import Callable, Deque, Optional, Type
+from typing import Callable, Deque, Optional, Set, Type
 
 from hax.log import TRACE
 from hax.message import (AnyEntrypointRequest, BaseMessage, BroadcastHAStates,
@@ -60,7 +60,7 @@ class State:
     # the command type being added and check which command types are already
     # there in the next_group_id group. If there is no logical conflict, the
     # next_group_id remains the same, otherwise a new group is formed.
-    next_group_commands: LinkedSet[Type[BaseMessage]]
+    next_group_commands: Set[Type[BaseMessage]]
     #
     # If WorkPlanner is in shutting down mode.
     # Shutting down mode is a special mode when WorkPlanner starts issuing
@@ -116,7 +116,7 @@ class WorkPlanner:
                      active_commands=LinkedList(),
                      taken_commands=LinkedList(),
                      current_group_id=0,
-                     next_group_commands=LinkedSet(),
+                     next_group_commands=set(),
                      is_shutdown=False)
 
     def _create_poison(self) -> BaseMessage:
@@ -222,7 +222,7 @@ class WorkPlanner:
 
         if change_next_group:
             state.next_group_id = state.current_group_id
-            state.next_group_commands = LinkedSet()
+            state.next_group_commands = set()
 
     def notify_finished(self, command: BaseMessage) -> None:
         ''' The method must be invoked by the worker thread when the command
@@ -307,7 +307,7 @@ class WorkPlanner:
             return cmd
 
         def next_group() -> None:
-            self.state.next_group_commands = LinkedSet()
+            self.state.next_group_commands = set()
             self.state.next_group_id = self._get_increased_group(
                 self.state.next_group_id)
 
