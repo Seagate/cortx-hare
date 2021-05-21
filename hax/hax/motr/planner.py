@@ -25,7 +25,7 @@ from typing import Callable, Deque, Optional, Type
 from hax.log import TRACE
 from hax.message import (AnyEntrypointRequest, BaseMessage, BroadcastHAStates,
                          Die, HaNvecGetEvent, SnsOperation)
-from hax.motr.util import LinkedSet
+from hax.motr.util import LinkedList
 
 LOG = logging.getLogger('hax')
 MAX_GROUP_ID = 100000
@@ -36,21 +36,43 @@ __all__ = ['WorkPlanner']
 @dataclass
 class State:
     #
-    # group being executed currently
+    # Group being executed currently
     current_group_id: int
     #
-    # group that is being populated by next add_command() invocation
+    # Group that is being populated by next add_command() invocation
     next_group_id: int
     #
-    # commands that are being processed now
-    active_commands: LinkedSet[BaseMessage]
-    taken_commands: LinkedSet[BaseMessage]
+    # Commands that are being processed now
+    active_commands: LinkedList[BaseMessage]
+    #
+    # The commands that have already been taken by the worker threads
+    # but not approved yet for execution (so either threads haven't invoked
+    # ensure_allowed() yet or ensure_allowed() has not succeded for them).
+    taken_commands: LinkedList[BaseMessage]
+    #
+    # Types of commands that have already been added to group number
+    # next_group_id.
+    #
+    # The idea is that WorkPlanner works like a queue: worker threads take the
+    # commands from current_group_id, while the newly added commands are put
+    # to the tail - to next_group_id. Sometimes WorkPlanner needs to increment
+    # next_group_id, in order to make such a decision WorkPlanner must consider
+    # the command type being added and check which command types are already
+    # there in the next_group_id group. If there is no logical conflict, the
+    # next_group_id remains the same, otherwise a new group is formed.
     next_group_commands: LinkedSet[Type[BaseMessage]]
+    #
+    # If WorkPlanner is in shutting down mode.
+    # Shutting down mode is a special mode when WorkPlanner starts issuing
+    # poison pills ('Die' commands) making sure that all the threads get such
+    # commands ASAP.
+    #
+    # The flag is set to true by invoking WorkPlanner.shutdown() method.
     is_shutdown: bool
 
 
 class WorkPlanner:
-    """
+    '''
     Thread synchronizing block that is used as a work planner for Motr-aware
     threads (see ConsumerThread). This synchronizing primitive guarantees that
 
@@ -60,7 +82,7 @@ class WorkPlanner:
     2. The parallelism doesn't break semantics (some messages can be processed
        in parallel to others, while some other not; the ConsumerThread's don't
        need to worry about that).
-    """
+    '''
     def __init__(self,
                  init_state_factory: Optional[Callable[[], State]] = None):
         fn = init_state_factory or self._create_initial_state
@@ -70,11 +92,12 @@ class WorkPlanner:
         self.b_lock = Condition()
 
     def is_empty(self) -> bool:
-        """Checks whether the backlog is empty. Blocking call."""
+        '''Checks whether the backlog is empty. Blocking call.'''
         with self.b_lock:
             return not self.backlog
 
     def add_command(self, command: BaseMessage) -> None:
+        '''Adds the given command to the execution plan. Blocking call.'''
         LOG.log(TRACE, '[WP]Before add_command: %s', command)
         with self.b_lock:
             cmd = self._assign_group(command)
@@ -86,15 +109,27 @@ class WorkPlanner:
             self.b_lock.notifyAll()
 
     def _create_initial_state(self) -> State:
+        '''Default factory method that returns initial state.
+           Invoked from WorkPlanner's __init__ method.
+        '''
         return State(next_group_id=0,
-                     active_commands=LinkedSet(),
-                     taken_commands=LinkedSet(),
+                     active_commands=LinkedList(),
+                     taken_commands=LinkedList(),
                      current_group_id=0,
                      next_group_commands=LinkedSet(),
                      is_shutdown=False)
 
     def _create_poison(self) -> BaseMessage:
+        '''Creates poison pill - Die command. Used in a special 'shutting down'
+           mode to stop worker threads gracefully.
+        '''
+
         cmd = Die()
+        # Since it is a special case, no _assign_group() will be invoked to
+        # find the proper group. In fact, we want to stop the threads as soon
+        # as possible, that's why it doesn't make sense to postpone the
+        # command. In other words, it must belong to the group which is
+        # currently active.
         cmd.group = self.state.current_group_id
         return cmd
 
@@ -113,12 +148,36 @@ class WorkPlanner:
                 self.b_lock.wait()
 
     def shutdown(self):
+        '''Put the WorkPlanner to 'shutting down' mode. After this function is
+        invoked WorkPlanner will issue Die commands only.'''
+
         with self.b_lock:
             LOG.debug('WorkPlanner is shutting down')
             self.state.is_shutdown = True
             self.b_lock.notifyAll()
 
     def ensure_allowed(self, command: BaseMessage) -> BaseMessage:
+        ''' The method which must be invoked by every worker thread before
+        starting the command execution. If WorkPlanner allows this command
+        to be executed right now then this method will return early.
+
+        The command is allowed for execution if and only if the command has
+        group_id equal to the currently active group (see
+        State.current_group_id). The command group ids are assigned just once
+        when the command is being added to the WorkPlanner via add_command()
+        method.
+
+        If the the given command doesn't belong to the currently active group,
+        this function blocks the current thread until the command becomes
+        eligible for execution. In other words, the caller can always assume
+        that once this function returns, the execution is allowed for sure.
+
+        Note: the method returns the command to be executed. The worker must
+        execute the command which is returned by this method!
+
+        In 'shutting down' mode WorkPlanner may return Die command instead of
+        the one provided as an argument.
+        '''
         def is_current(cmd: BaseMessage, st: State) -> bool:
             return cmd.group == st.current_group_id
 
@@ -136,9 +195,9 @@ class WorkPlanner:
                 self.b_lock.wait()
 
     def _get_increased_group(self, current: int) -> int:
-        """ Returns the next valid group_id number by the given current value.
+        ''' Returns the next valid group_id number by the given current value.
             Performs no side effects.
-        """
+        '''
         new_value = current + 1
         # In Python, every int uses an arbitrary-precision maths. In other
         # words, if an int value becomes greater than 4 bytes can store, no
@@ -150,6 +209,11 @@ class WorkPlanner:
         return new_value
 
     def _inc_group(self):
+        ''' Increases the currently active group. The method is invoked by
+            WorkPlanner when all the commands from the current group have
+            already been processed.
+            Assumes that b_lock is acquired already.
+        '''
         state = self.state
         cur_group_id = state.current_group_id
         change_next_group = state.next_group_id == cur_group_id
@@ -161,6 +225,10 @@ class WorkPlanner:
             state.next_group_commands = LinkedSet()
 
     def notify_finished(self, command: BaseMessage) -> None:
+        ''' The method must be invoked by the worker thread when the command
+            is executed.
+        '''
+
         with self.b_lock:
             state = self.state
             state.active_commands.remove(command)
@@ -184,6 +252,10 @@ class WorkPlanner:
             self.b_lock.notifyAll()
 
     def _should_increase_group(self, cmd: BaseMessage) -> bool:
+        ''' Predicate function. Returns True if and only if cmd command CANNOT
+            be added to group number next_group_id.
+            Assumes that b_lock is acquired already.
+        '''
         def has(cmd_type: Type[BaseMessage]) -> bool:
             ''' Checks if the group being currently formed (i.e. next_group)
                 contains a message of the given type.
@@ -211,8 +283,23 @@ class WorkPlanner:
         return False
 
     def _assign_group(self, cmd: BaseMessage) -> BaseMessage:
-        ''' Sets the correct group_id to the command.
-            Must be invoked with b_lock acquired.
+        ''' Sets the correct group_id to the command. Side effect: updates
+        self.state.
+        Must be invoked with b_lock acquired. The method is invoked from
+        add_command(cmd).
+
+        The given command gets either state.next_group_id value or
+        (state.next_group_id+1); in the latter case state is updated and we
+        can say that command cmd starts a new group. Effectively it looks
+        like this:
+        state.next_group_id := (state.next_group_id + 1) mod MAX_GROUP_ID.
+
+        Command cmd starts a new group if:
+        1. cmd is an entrypoint request AND next_group has BroadcastHAStates
+        2. cmd is BroadcastHAStates
+        3. cmd is an SNS operation AND next_group has SNS operation already
+        Otherwise command will join existing next_group.
+
         '''
         def join_group(cmd: BaseMessage) -> BaseMessage:
             cmd.group = self.state.next_group_id
