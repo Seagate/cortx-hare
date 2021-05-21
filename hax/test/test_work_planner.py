@@ -31,7 +31,8 @@ from hax.log import TRACE
 from hax.message import (BaseMessage, BroadcastHAStates, Die,
                          EntrypointRequest, FirstEntrypointRequest,
                          HaNvecGetEvent)
-from hax.motr.planner import WorkPlanner
+from hax.motr.planner import WorkPlanner, State
+from hax.motr.util import LinkedSet
 from hax.types import Fid, HaLinkMessagePromise, MessageId, Uint128
 
 LOG = logging.getLogger('hax')
@@ -108,6 +109,26 @@ class TestMessageOrder(unittest.TestCase):
             assign(entrypoint())
         ]
         self.assertEqual([0, 1, 2, 3], [m.group for m in msgs])
+
+    def test_group_id_cycled(self):
+        def my_state():
+            return State(next_group_id=99999,
+                     active_commands=LinkedSet(),
+                     taken_commands=LinkedSet(),
+                     current_group_id=99999,
+                     next_group_commands=LinkedSet(),
+                     is_shutdown=False)
+
+        planner = WorkPlanner(init_state_factory=my_state)
+        assign = planner._assign_group
+
+        msgs = [
+            assign(broadcast()),
+            assign(broadcast()),
+            assign(broadcast()),
+            assign(entrypoint())
+        ]
+        self.assertEqual([99999, 10**5, 0, 1], [m.group for m in msgs])
 
     def test_ha_nvec_get_shares_group_always(self):
         planner = WorkPlanner()
@@ -327,3 +348,65 @@ class TestWorkPlanner(unittest.TestCase):
             raise exc
         groups_processed = tracker.get_tracks()
         self.assertEqual([0, 1, 1, 2, 2, 3, 3, 4, 4, 5], groups_processed)
+
+    def test_no_hang_when_group_id_cycled(self):
+        planner = WorkPlanner()
+        group_idx = 0
+
+        def my_state():
+            return State(next_group_id=99999,
+                     active_commands=LinkedSet(),
+                     taken_commands=LinkedSet(),
+                     current_group_id=99999,
+                     next_group_commands=LinkedSet(),
+                     is_shutdown=False)
+
+        planner = WorkPlanner(init_state_factory=my_state)
+
+
+        tracker = GroupTracker()
+        thread_count = 4
+        for i in range(10):
+            planner.add_command(broadcast())
+
+        for j in range(thread_count):
+            planner.add_command(Die())
+
+        exc = None
+
+        def fn(planner: WorkPlanner):
+            try:
+                while True:
+                    LOG.log(TRACE, "Requesting for a work")
+                    cmd = planner.get_next_command()
+                    LOG.log(TRACE, "The command is received %s [group=%s]",
+                            type(cmd), cmd.group)
+
+                    planner.ensure_allowed(cmd)
+                    LOG.log(TRACE, "I'm allowed to work on it!")
+                    if isinstance(cmd, Die):
+                        LOG.log(TRACE,
+                                "Poison pill is received - exiting. Bye!")
+                        planner.notify_finished(cmd)
+                        break
+                    tracker.log(cmd)
+                    LOG.log(TRACE, "The job is done, notifying the planner")
+                    planner.notify_finished(cmd)
+                    LOG.log(TRACE, "Notified. ")
+
+            except Exception as e:
+                LOG.exception('*** ERROR ***')
+                exc = e
+
+        workers = [
+            Thread(target=fn, args=(planner, )) for t in range(thread_count)
+        ]
+        for t in workers:
+            t.start()
+
+        for t in workers:
+            t.join()
+        if exc:
+            raise exc
+        groups_processed = tracker.get_tracks()
+        self.assertEqual([99999, 10**5, 0, 1, 2, 3, 4, 5, 6, 7], groups_processed)
