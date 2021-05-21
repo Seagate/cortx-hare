@@ -32,7 +32,7 @@ from hax.message import (BaseMessage, BroadcastHAStates, Die,
                          EntrypointRequest, FirstEntrypointRequest,
                          HaNvecGetEvent)
 from hax.motr.planner import WorkPlanner, State
-from hax.motr.util import LinkedSet
+from hax.motr.util import LinkedList
 from hax.types import Fid, HaLinkMessagePromise, MessageId, Uint128
 
 LOG = logging.getLogger('hax')
@@ -113,8 +113,8 @@ class TestMessageOrder(unittest.TestCase):
     def test_group_id_cycled(self):
         def my_state():
             return State(next_group_id=99999,
-                     active_commands=LinkedSet(),
-                     taken_commands=LinkedSet(),
+                     active_commands=LinkedList(),
+                     taken_commands=LinkedList(),
                      current_group_id=99999,
                      next_group_commands=LinkedSet(),
                      is_shutdown=False)
@@ -355,8 +355,8 @@ class TestWorkPlanner(unittest.TestCase):
 
         def my_state():
             return State(next_group_id=99999,
-                     active_commands=LinkedSet(),
-                     taken_commands=LinkedSet(),
+                     active_commands=LinkedList(),
+                     taken_commands=LinkedList(),
                      current_group_id=99999,
                      next_group_commands=LinkedSet(),
                      is_shutdown=False)
