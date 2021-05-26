@@ -28,7 +28,7 @@ from typing import List, NamedTuple, Optional
 import simplejson
 from hax.types import ObjT
 
-from utils import get_local_nodename
+from utils import get_node_name
 
 Process = NamedTuple('Process', [('name', str), ('fid', str)])
 
@@ -108,7 +108,7 @@ def get_service_for_node(nodes: List[Node], node_name: str,
                          service: str) -> Optional[List[Process]]:
     # if node_name is not specified, then local node is used.
     if not node_name:
-        node_name = get_local_nodename()
+        node_name = get_node_name()
 
     # if service is not specified, return all the services for a node.
     if not service:

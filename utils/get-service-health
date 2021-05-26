@@ -21,6 +21,10 @@ set -eu -o pipefail
 
 PROG=${0##*/}
 
+get_node_name() {
+    /opt/seagate/cortx/hare/libexec/node-name
+}
+
 usage() {
     cat <<EOF
 Usage: $PROG ID
@@ -47,6 +51,6 @@ case $1 in
 esac
 
 id=$1
-curl -Gs localhost:8500/v1/health/node/$(node-name) \
+curl -Gs localhost:8500/v1/health/node/$(get_node_name) \
     --data-urlencode "filter=CheckID == \"service:$id\"" |
     jq -r '.[].Status'
