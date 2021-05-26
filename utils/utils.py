@@ -76,6 +76,9 @@ def processes_node(cns: Consul, node_name: str) -> Dict[str, List[Process]]:
     try:
         processes: Dict[str, List[Process]] = {}
         cns_util = ConsulUtil(raw_client=cns)
+
+        # TODO Can we replace cns_util.get_local_nodename()
+        # with get_node_name() function?
         is_local = node_name == cns_util.get_local_nodename()
 
         for node in cns.catalog.nodes()[1]:
@@ -159,13 +162,6 @@ def is_localhost(hostname: str) -> bool:
         return hostname in ('localhost', '127.0.0.1', name, f'{name}.local')
 
     return match_node_file() or match_localhost()
-
-
-def get_local_nodename() -> str:
-    process = subprocess.run("node-name", check=True,
-                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    node_name = process.stdout.strip()
-    return node_name.decode('utf-8')
 
 
 def is_fake_leader_name(leader: str) -> bool:
