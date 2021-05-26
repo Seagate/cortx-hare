@@ -55,6 +55,14 @@ def _get_processes_for_node() -> Dict[str, List[utils.Process]]:
     return processes
 
 
+@repeat_if_fails()
+def erase_rc_leader() -> None:
+    cns_util = ConsulUtil()
+    # fake leader value must match r'^elect[0-9]+$'
+    logging.info('Making sure that RC leader can be re-elected next time')
+    cns_util.kv.kv_put('leader', 'elect2805')
+
+
 def stop_all_with_consul(processes: Dict[str, List[utils.Process]],
                          leader_node: str):
     for svc in utils.shutdown_sequence:
@@ -89,6 +97,7 @@ def shutdown_cluster(skip_consul_stop: bool):
     (processes, leader_node) = _get_processes_for_cluster()
     stop_process(processes)
 
+    erase_rc_leader()
     if not skip_consul_stop:
         stop_all_with_consul(processes, leader_node)
 
