@@ -18,7 +18,6 @@
 
 # flake8: noqa
 import logging
-import sys
 import time
 import unittest
 from threading import Condition, Thread
@@ -26,14 +25,13 @@ from time import sleep
 from typing import List
 from unittest.mock import Mock
 
-from hax.exception import NotDelivered
 from hax.log import TRACE
 from hax.message import (BaseMessage, BroadcastHAStates, Die,
-                         EntrypointRequest, FirstEntrypointRequest,
+                         EntrypointRequest,
                          HaNvecGetEvent)
 from hax.motr.planner import WorkPlanner, State
 from hax.motr.util import LinkedList
-from hax.types import Fid, HaLinkMessagePromise, MessageId, Uint128
+from hax.types import Fid, Uint128
 
 LOG = logging.getLogger('hax')
 
@@ -113,11 +111,11 @@ class TestMessageOrder(unittest.TestCase):
     def test_group_id_cycled(self):
         def my_state():
             return State(next_group_id=99999,
-                     active_commands=LinkedList(),
-                     taken_commands=LinkedList(),
-                     current_group_id=99999,
-                     next_group_commands=set(),
-                     is_shutdown=False)
+                         active_commands=LinkedList(),
+                         taken_commands=LinkedList(),
+                         current_group_id=99999,
+                         next_group_commands=set(),
+                         is_shutdown=False)
 
         planner = WorkPlanner(init_state_factory=my_state)
         assign = planner._assign_group
@@ -178,6 +176,7 @@ class TestWorkPlanner(unittest.TestCase):
         exc = None
 
         def fn(planner: WorkPlanner):
+            nonlocal exc
             try:
                 while True:
                     LOG.log(TRACE, "Requesting for a work")
@@ -188,8 +187,6 @@ class TestWorkPlanner(unittest.TestCase):
                                 "Poison pill is received - exiting. Bye!")
                         break
 
-                    planner.ensure_allowed(cmd)
-                    LOG.log(TRACE, "I'm allowed to work on it!")
                     sleep(0.5)
                     LOG.log(TRACE, "The job is done, notifying the planner")
                     planner.notify_finished(cmd)
@@ -211,8 +208,8 @@ class TestWorkPlanner(unittest.TestCase):
         if exc:
             raise exc
         self.assertTrue(planner.is_empty(), 'Not all commands were read out')
-        # Every thread sleeps for 500ms. 40 commands * 0.5 gives 20 seconds if the
-        # commands executed sequentially
+        # Every thread sleeps for 500ms. 40 commands * 0.5 gives 20 seconds if
+        # the commands executed sequentially
         self.assertLess(time_2 - time_1, 19, 'Suspiciously slow')
 
     def test_groups_processed_sequentially_12_threads(self):
@@ -246,6 +243,7 @@ class TestWorkPlanner(unittest.TestCase):
         exc = None
 
         def fn(planner: WorkPlanner):
+            nonlocal exc
             try:
                 while True:
                     LOG.log(TRACE, "Requesting for a work")
@@ -253,8 +251,6 @@ class TestWorkPlanner(unittest.TestCase):
                     LOG.log(TRACE, "The command is received %s [group=%s]",
                             type(cmd), cmd.group)
 
-                    planner.ensure_allowed(cmd)
-                    LOG.log(TRACE, "I'm allowed to work on it!")
                     if isinstance(cmd, Die):
                         LOG.log(TRACE,
                                 "Poison pill is received - exiting. Bye!")
@@ -313,6 +309,7 @@ class TestWorkPlanner(unittest.TestCase):
         exc = None
 
         def fn(planner: WorkPlanner):
+            nonlocal exc
             try:
                 while True:
                     LOG.log(TRACE, "Requesting for a work")
@@ -320,8 +317,6 @@ class TestWorkPlanner(unittest.TestCase):
                     LOG.log(TRACE, "The command is received %s [group=%s]",
                             type(cmd), cmd.group)
 
-                    planner.ensure_allowed(cmd)
-                    LOG.log(TRACE, "I'm allowed to work on it!")
                     if isinstance(cmd, Die):
                         LOG.log(TRACE,
                                 "Poison pill is received - exiting. Bye!")
@@ -351,18 +346,16 @@ class TestWorkPlanner(unittest.TestCase):
 
     def test_no_hang_when_group_id_cycled(self):
         planner = WorkPlanner()
-        group_idx = 0
 
         def my_state():
             return State(next_group_id=99999,
-                     active_commands=LinkedList(),
-                     taken_commands=LinkedList(),
-                     current_group_id=99999,
-                     next_group_commands=set(),
-                     is_shutdown=False)
+                         active_commands=LinkedList(),
+                         taken_commands=LinkedList(),
+                         current_group_id=99999,
+                         next_group_commands=set(),
+                         is_shutdown=False)
 
         planner = WorkPlanner(init_state_factory=my_state)
-
 
         tracker = GroupTracker()
         thread_count = 4
@@ -375,6 +368,7 @@ class TestWorkPlanner(unittest.TestCase):
         exc = None
 
         def fn(planner: WorkPlanner):
+            nonlocal exc
             try:
                 while True:
                     LOG.log(TRACE, "Requesting for a work")
@@ -382,8 +376,6 @@ class TestWorkPlanner(unittest.TestCase):
                     LOG.log(TRACE, "The command is received %s [group=%s]",
                             type(cmd), cmd.group)
 
-                    planner.ensure_allowed(cmd)
-                    LOG.log(TRACE, "I'm allowed to work on it!")
                     if isinstance(cmd, Die):
                         LOG.log(TRACE,
                                 "Poison pill is received - exiting. Bye!")
@@ -409,4 +401,5 @@ class TestWorkPlanner(unittest.TestCase):
         if exc:
             raise exc
         groups_processed = tracker.get_tracks()
-        self.assertEqual([99999, 10**5, 0, 1, 2, 3, 4, 5, 6, 7], groups_processed)
+        self.assertEqual([99999, 10**5, 0, 1, 2, 3, 4,
+                          5, 6, 7], groups_processed)
