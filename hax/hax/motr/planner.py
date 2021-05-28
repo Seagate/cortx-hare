@@ -134,16 +134,31 @@ class WorkPlanner:
         return cmd
 
     def get_next_command(self) -> BaseMessage:
+        '''
+        Returns the command that the worker thread can start executing just
+        right away.
+
+        The function will block the invoking thread either if there are no
+        commands (backlog is empty) or the message belongs to a group from
+        the future. The invoking thread will be unblocked automatically
+        when the command becomes eligible.
+        '''
+        def next_cmd() -> Optional[BaseMessage]:
+            if self.state.is_shutdown:
+                return self._create_poison()
+            if self.backlog:
+                cmd = self.backlog.popleft()
+                LOG.log(TRACE, '[WP]Cmd %s taken!', cmd)
+                self.state.taken_commands.add(cmd)
+                return cmd
+            return None
+
         while True:
             LOG.log(TRACE, '[WP]Trying to get new command')
             with self.b_lock:
-                if self.state.is_shutdown:
-                    return self._create_poison()
-                if self.backlog:
-                    cmd = self.backlog.popleft()
-                    LOG.log(TRACE, '[WP]Cmd %s taken!', cmd)
-                    self.state.taken_commands.add(cmd)
-                    return cmd
+                cmd = next_cmd()
+                if cmd:
+                    return self._ensure_allowed(cmd)
                 LOG.log(TRACE, '[WP]Blocking thread: no commands in backlog')
                 self.b_lock.wait()
 
@@ -156,7 +171,7 @@ class WorkPlanner:
             self.state.is_shutdown = True
             self.b_lock.notifyAll()
 
-    def ensure_allowed(self, command: BaseMessage) -> BaseMessage:
+    def _ensure_allowed(self, command: BaseMessage) -> BaseMessage:
         ''' The method which must be invoked by every worker thread before
         starting the command execution. If WorkPlanner allows this command
         to be executed right now then this method will return early.
