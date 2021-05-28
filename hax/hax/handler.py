@@ -154,9 +154,6 @@ class ConsumerThread(StoppableThread):
                     LOG.debug('Waiting for the next message')
 
                     item = planner.get_next_command()
-                    # TODO maybe it makes sense to move ensure_allowed() into
-                    # get_next_command()?
-                    item = planner.ensure_allowed(item)
 
                     LOG.debug('Got %s message from planner', item)
                     if isinstance(item, FirstEntrypointRequest):
