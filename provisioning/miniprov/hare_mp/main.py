@@ -36,8 +36,9 @@ from cortx.utils.product_features import unsupported_features
 from hare_mp.cdf import CdfGenerator
 from hare_mp.store import ConfStoreProvider
 from hare_mp.validator import Validator
-from hax.util import ConsulUtil
+from hax.util import ConsulKVBasic, ConsulUtil, repeat_if_fails
 from hax.types import KeyDelete
+from time import sleep
 
 
 def execute(cmd: List[str]) -> str:
@@ -171,8 +172,10 @@ def init(args):
             path_to_cdf = args.file[0]
             if not is_cluster_running() and bootstrap_cluster(
                     path_to_cdf, True):
-                logging.error('Failed to bootstrap the custer')
+                logging.error('Failed to bootstrap the cluster')
                 rc = -1
+            if rc == 0:
+                wait_for_cluster_start(url)
             shutdown_cluster()
         exit(rc)
     except Exception as error:
@@ -192,6 +195,8 @@ def test(args):
                 logging.error('Failed to bootstrap the cluster')
                 rc = -1
             cluster_status = check_cluster_status(path_to_cdf)
+            if rc == 0:
+                wait_for_cluster_start(url)
             shutdown_cluster()
             if cluster_status:
                 logging.error('Cluster status reports failure')
@@ -302,11 +307,48 @@ def is_cluster_running() -> bool:
     return os.system('hctl status >/dev/null') == 0
 
 
+def nr_services() -> int:
+    cmd = ['hctl', 'status', '--json']
+    cluster_info = json.loads(execute(cmd))
+    # Don't include hax, count it just once later.
+    services = {'confd', 'ioservice', 's3server'}
+    svcs_nr = 0
+    for node in cluster_info['nodes']:
+        for svc in node['svcs']:
+            if svc['name'] in services:
+                svcs_nr += 1
+    return svcs_nr + 1
+
+
+@repeat_if_fails()
+def all_services_started(url: str, nr_svcs: int) -> bool:
+    conf = ConfStoreProvider(url)
+    hostname = conf.get_hostname()
+    kv = ConsulKVBasic()
+    status_data = kv.kv_get(f'{hostname}/processes', recurse=True)
+    statuses = []
+    for val in status_data:
+        state = val['Value']
+        statuses.append(json.loads(state.decode('utf8'))['state'])
+    started = [status == 'M0_CONF_HA_PROCESS_STARTED' for status in statuses]
+    if len(started) != nr_svcs:
+        return False
+    return all(started)
+
+
 def bootstrap_cluster(path_to_cdf: str, domkfs=False):
     if domkfs:
-        return os.system('hctl bootstrap --mkfs ' + path_to_cdf)
+        rc = os.system('hctl bootstrap --mkfs ' + path_to_cdf)
     else:
-        return os.system('hctl bootstrap ' + path_to_cdf)
+        rc = os.system('hctl bootstrap ' + path_to_cdf)
+    return rc
+
+
+def wait_for_cluster_start(url: str):
+    nr_svcs = nr_services()
+    while not all_services_started(url, nr_svcs):
+        logging.info('Waiting for all the processes to start..')
+        sleep(2)
 
 
 def shutdown_cluster():
