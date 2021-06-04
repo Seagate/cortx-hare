@@ -40,6 +40,11 @@ from hax.util import ConsulKVBasic, ConsulUtil, repeat_if_fails
 from hax.types import KeyDelete
 from time import sleep
 
+# Logger details
+LOG_DIR = "/var/log/seagate/hare/"
+LOG_FILE = 'setup.log'
+LOG_FILE_SIZE = 5 * 1024 * 1024
+
 
 def execute(cmd: List[str]) -> str:
     process = subprocess.Popen(cmd,
@@ -56,8 +61,28 @@ def execute(cmd: List[str]) -> str:
     return out
 
 
-def setup_logging():
-    logging.basicConfig(level=logging.INFO, format='%(message)s')
+def create_logger_directory():
+    """Create log directory if not exists."""
+    if not os.path.isdir(LOG_DIR):
+        try:
+            os.makedirs(LOG_DIR)
+        except Exception:
+            logging.exception(f"{LOG_DIR} Could not be created")
+            shutdown_cluster()
+            exit(-1)
+
+
+def setup_logging() -> None:
+    console = logging.StreamHandler(stream=sys.stderr)
+    fhandler = logging.handlers.RotatingFileHandler(LOG_FILE,
+                                                    maxBytes=LOG_FILE_SIZE,
+                                                    mode='a',
+                                                    backupCount=5,
+                                                    encoding=None,
+                                                    delay=False)
+    logging.basicConfig(level=logging.INFO,
+                        handlers=[console, fhandler],
+                        format='%(asctime)s [%(levelname)s] %(message)s')
 
 
 def get_data_from_provisioner_cli(method, output_format='json') -> str:
@@ -534,6 +559,7 @@ def main():
                    help_str='Performs the Hare rpm upgrade tasks',
                    handler_fn=noop)
 
+    create_logger_directory()
     setup_logging()
 
     parsed = p.parse_args(sys.argv[1:])
