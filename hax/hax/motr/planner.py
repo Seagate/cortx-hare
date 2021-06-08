@@ -24,7 +24,7 @@ from typing import Callable, Deque, Optional, Set, Type
 
 from hax.log import TRACE
 from hax.message import (AnyEntrypointRequest, BaseMessage, BroadcastHAStates,
-                         Die, HaNvecGetEvent, SnsOperation)
+                         Die, HaNvecGetEvent, ProcessEvent, SnsOperation)
 from hax.motr.util import LinkedList
 
 LOG = logging.getLogger('hax')
@@ -295,6 +295,12 @@ class WorkPlanner:
             # Start new group if there is another SNS operation within the
             # current group.
             return has(SnsOperation)
+        if isinstance(cmd, ProcessEvent):
+            # Two process events (like STARTING or STARTED) can't be performed
+            # in parallel.
+            # So if there is one ProcessEvent already in the group, then the
+            # new one should go to another group.
+            return has(ProcessEvent)
         return False
 
     def _assign_group(self, cmd: BaseMessage) -> BaseMessage:
