@@ -213,6 +213,10 @@ def reset(args):
         rc = 0
         util: ConsulUtil = ConsulUtil()
 
+        if is_cluster_running():
+            logging.info('Cluster is running, shutting down')
+            shutdown_cluster()
+
         keys: List[KeyDelete] = [KeyDelete(name='epoch', recurse=False),
                                  KeyDelete(name='eq-epoch', recurse=False),
                                  KeyDelete(name='last_fidk', recurse=False),
