@@ -3,13 +3,13 @@ import subprocess as S
 from dataclasses import dataclass
 from string import Template
 from typing import Any, Dict, List, Optional, Tuple
-
+from math import floor
 import pkg_resources
 
 from hare_mp.store import ValueProvider
 from hare_mp.types import (ClusterDesc, DiskRef, DList, Maybe, NodeDesc,
                            PoolDesc, PoolType, ProfileDesc, Protocol, Text,
-                           M0ServerDesc, DisksDesc)
+                           M0ServerDesc, DisksDesc, AllowedFailures)
 
 DHALL_PATH = '/opt/seagate/cortx/hare/share/cfgen/dhall'
 DHALL_EXE = '/opt/seagate/cortx/hare/bin/dhall'
@@ -141,6 +141,29 @@ class CdfGenerator:
         storage_set_name = conf.get(f'cluster>{cid}>storage_set[{i}]>name')
         pool_name = f'{storage_set_name}__{pool_type}'
 
+        ctrl_failure_allowed = layout.parity
+
+        machine_id = conf.get_machine_id()
+        node_count = len(conf.get_storage_set_nodes())
+        cvg_per_node = int(conf.get(
+            f'server_node>{machine_id}>storage>cvg_count'))
+
+        cvg_per_storage_set = cvg_per_node * node_count
+
+        if layout.data + layout.parity + layout.spare == 0:
+            raise RuntimeError('All layout parameters are 0')
+
+        ratio = floor(cvg_per_storage_set / (
+                      layout.data + layout.parity + layout.spare))
+
+        if ratio == 0:
+            ctrl_failure_allowed = 0
+        else:
+            ctrl_failure_allowed = layout.parity
+
+        enc_failure_allowed = floor((layout.parity * ratio) / (
+                                    cvg_per_node))
+
         out_list.append(
             PoolDesc(
                 name=Text(pool_name),
@@ -157,7 +180,14 @@ class CdfGenerator:
                 data_units=layout.data,
                 parity_units=layout.parity,
                 spare_units=Maybe(layout.spare, 'Natural'),
-                type=PoolType[pool_type]))
+                type=PoolType[pool_type],
+                allowed_failures=Maybe(AllowedFailures(
+                                       site=0,
+                                       rack=0,
+                                       encl=enc_failure_allowed,
+                                       ctrl=ctrl_failure_allowed,
+                                       disk=layout.parity),
+                                       'AllowedFailures')))
 
     def _create_pool_descriptions(self) -> List[PoolDesc]:
         pools: List[PoolDesc] = []
