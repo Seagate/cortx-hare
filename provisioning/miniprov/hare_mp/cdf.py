@@ -275,11 +275,13 @@ class CdfGenerator:
         # Adding a Motr confd entry per server node in CDF.
         # The `runs_confd` value (true/false) determines if Motr confd process
         # will be started on the node or not.
-        servers.value.append(M0ServerDesc(
-            io_disks=DisksDesc(
-                data=DList([], 'List Text'),
-                meta_data=Maybe(None, 'Text')),
-            runs_confd=Maybe(True, 'Bool')))
+        roles = store.get(f'server_node>{machine_id}>roles')
+        if 'consul_server' in roles:
+            servers.value.append(M0ServerDesc(
+                io_disks=DisksDesc(
+                    data=DList([], 'List Text'),
+                    meta_data=Maybe(None, 'Text')),
+                runs_confd=Maybe(True, 'Bool')))
 
         return NodeDesc(
             hostname=Text(hostname),
