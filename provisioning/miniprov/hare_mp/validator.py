@@ -35,7 +35,7 @@ class Validator:
     def is_first_node_in_storage_set(self) -> bool:
         machine_id = self._get_machine_id()
         cluster_id = self.provider.get_cluster_id()
-        storage_set_id = self.provider.get_storage_set_id()
+        storage_set_id = self.provider.get_storage_set_index()
         server_nodes_key: str = (f'cluster>{cluster_id}>'
                                  f'storage_set[{storage_set_id}]>server_nodes')
         server_nodes = self.provider.get(server_nodes_key)
