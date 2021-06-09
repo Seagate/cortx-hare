@@ -168,7 +168,6 @@ class CdfGenerator:
         pool_name = f'{storage_set_name}__{pool_type}'
 
         allowed_failure = self._calculate_allowed_failure(layout)
-
         out_list.append(
             PoolDesc(
                 name=Text(pool_name),
