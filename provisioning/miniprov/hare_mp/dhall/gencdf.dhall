@@ -18,6 +18,14 @@ let NodeInfo =
       , client_instances : Natural
       }
 
+let AllowedFailures =
+      { site : Natural
+      , rack : Natural
+      , encl : Natural
+      , ctrl : Natural
+      , disk : Natural
+      }
+
 let PoolInfo =
       { name : Text
       , disk_refs : Optional (List T.DiskRef)
@@ -25,6 +33,7 @@ let PoolInfo =
       , parity_units : Natural
       , spare_units : Optional Natural
       , type : T.PoolType
+      , allowed_failures: Optional AllowedFailures
       }
 
 let ProfileInfo =
@@ -57,14 +66,7 @@ let toPoolDesc
           , data_units = p.data_units
           , parity_units = p.parity_units
           , spare_units = p.spare_units
-          , allowed_failures =
-                    None
-                      { ctrl : Natural
-                      , disk : Natural
-                      , encl : Natural
-                      , rack : Natural
-                      , site : Natural
-                      }
+          , allowed_failures = p.allowed_failures
           }
 
 let genCdf
