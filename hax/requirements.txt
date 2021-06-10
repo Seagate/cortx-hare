@@ -1,4 +1,11 @@
 #:build-requirements:
+types-PyYAML
+types-chardet
+types-dataclasses
+types-requests
+types-simplejson
+types-pkg_resources
+types-toml
 flake8
 mypy
 pkgconfig
