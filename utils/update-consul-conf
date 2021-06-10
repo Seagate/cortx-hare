@@ -227,7 +227,7 @@ for id in $IOS_IDs; do
     append_ios_svc $id
 done
 
-s3port=28081
+s3port=28071
 for id in $S3_IDs; do
     append_s3_svc $id $s3port
     ((s3port++))
