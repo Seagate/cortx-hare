@@ -4,7 +4,7 @@ import abc
 import argparse
 import ast
 from enum import Enum, auto
-from functools import lru_cache
+from functools import lru_cache, wraps
 import itertools
 import json
 import os
@@ -17,9 +17,51 @@ import sys
 from typing import (Any, Callable, Dict, Iterable, Iterator, List, NamedTuple,
                     Optional, Set, Tuple)
 import yaml
+import logging
 
 
 __version__ = '0.14'
+
+LOG = logging.getLogger('cfgen')
+
+
+def repeat_on_cmd_timeout(max_retries=-1):
+    """
+    This is a decorator for command timeouts.
+
+    Ensures that the wrapped function gets re-invoked if the exception
+    subprocess.TimeoutExpired gets raised. In other words, this wrapper
+    makes the wrapped function repeatable on getting command timeout.
+
+    Parameters:
+    f - function to be decorated (repeated)
+    max_retries - how many attempts the wrapper will perform until finally
+         re-raising the exception. -1 means 'repeat forever'.
+    """
+    def callable(f):
+        @wraps(f)
+        def wrapper(*args, **kwds):
+            attempt_count = 0
+            while (True):
+                try:
+                    return f(*args, **kwds)
+
+                except subprocess.TimeoutExpired as e:
+                    attempt_count += 1
+                    if max_retries >= 0 and attempt_count > max_retries:
+                        LOG.warn(
+                            '\nFunction %s: Too many errors happened in a row'
+                            ' (max_retries = %d)', f.__name__, max_retries)
+                        raise e
+                    LOG.warn(f'\nGot {e.timeout} sec timeout '
+                             f'for function {f.__name__} '
+                             f'(attempt {attempt_count}). The attempt will '
+                             f'be repeated again.'
+                             f'\nProbable cause : degraded machine '
+                             f'performance or poor network.')
+        return wrapper
+
+    return callable
 
 
 def parse_opts(argv):
@@ -426,6 +468,7 @@ def is_localhost(hostname: str) -> bool:
                         socket.gethostname(), socket.getfqdn())
 
 
+@repeat_on_cmd_timeout(max_retries=-1)
 def run_command(hostname: str, *args: str) -> str:
     assert hostname
     return subprocess.check_output(args if is_localhost(hostname) else
