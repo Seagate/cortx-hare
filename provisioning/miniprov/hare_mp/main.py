@@ -529,6 +529,11 @@ def main():
                    help_str='Validates configuration pre-requisites',
                    handler_fn=noop)
 
+    add_subcommand(subparser,
+                   'upgrade',
+                   help_str='Performs the Hare rpm upgrade tasks',
+                   handler_fn=noop)
+
     setup_logging()
 
     parsed = p.parse_args(sys.argv[1:])
