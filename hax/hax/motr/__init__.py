@@ -282,7 +282,6 @@ class Motr:
                 notify_devices = False
             notes += self._generate_sub_services(note, self.consul_util,
                                                  notify_devices)
-
         if not notes:
             return []
         message_ids: List[MessageId] = self._ffi.ha_broadcast(
@@ -365,7 +364,10 @@ class Motr:
             for x in service_list
         ]
         if notify_devices:
+            # For process failure, we report failure for the corresponding
+            # node (enclosure) and CVGs.
             service_notes += self._generate_sub_disks(note, service_list, cns)
+            service_notes += self.notify_node_failure(note)
 
         return service_notes
 
@@ -381,6 +383,28 @@ class Motr:
         return [
             HaNoteStruct(no_id=x.to_c(), no_state=new_state) for x in disk_list
         ]
+
+    def notify_node_failure(self,
+                            proc_note: HaNoteStruct) -> List[HaNoteStruct]:
+        new_state = proc_note.no_state
+        proc_fid = Fid.from_struct(proc_note.no_id)
+        LOG.debug('Notifying node failure for process_fid=%s state=%s',
+                  proc_fid, new_state)
+
+        node = self.consul_util.get_process_node(proc_fid)
+
+        node_fid = self.consul_util.get_node_fid(node)
+        encl_fid = self.consul_util.get_node_encl_fid(node)
+        ctrl_fid = self.consul_util.get_node_ctrl_fid(node)
+        LOG.debug('node_fid: %s encl_fid: %s ctrl_fid: %s',
+                  node_fid, encl_fid, ctrl_fid)
+
+        notes = []
+        if node_fid and encl_fid and ctrl_fid:
+            notes = [HaNoteStruct(no_id=x.to_c(), no_state=new_state)
+                     for x in [node_fid, encl_fid, ctrl_fid]]
+
+        return notes
 
     def notify_hax_stop(self):
         LOG.debug('Notifying hax stop')
