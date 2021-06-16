@@ -37,6 +37,7 @@ Group: System Environment/Daemons
 Source: %{name}-%{h_version}.tar.gz
 
 BuildRequires: binutils-devel
+BuildRequires: gcc >= 4.8.5
 BuildRequires: git
 BuildRequires: cortx-motr
 BuildRequires: cortx-motr-devel
