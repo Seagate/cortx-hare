@@ -120,6 +120,7 @@ let root = types.Obj.Root
   , sites = [ids.site]
   , pools = [ids.pool_69, ids.pool_48, ids.pool_1]
   , profiles = [ids.profile]
+  , fdmi_flt_grps = [] : List types.Oid
   }
 
 let node = types.Obj.Node
