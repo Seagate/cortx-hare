@@ -51,8 +51,19 @@ in
     ]
 , pools =
     [ { name = "the pool"
-      , type = None types.PoolType
-      , disk_refs = None (List types.DiskRef)
+      , type = Some < dix | md | sns >.sns
+      , disk_refs = Some
+          [ { node = Some "localhost", path = "/dev/loop0" }
+          , { node = Some "localhost", path = "/dev/loop1" }
+          , { node = Some "localhost", path = "/dev/loop2" }
+          , { node = Some "localhost", path = "/dev/loop3" }
+          , { node = Some "localhost", path = "/dev/loop4" }
+          , { node = Some "localhost", path = "/dev/loop5" }
+          , { node = Some "localhost", path = "/dev/loop6" }
+          , { node = Some "localhost", path = "/dev/loop7" }
+          , { node = Some "localhost", path = "/dev/loop8" }
+          , { node = Some "localhost", path = "/dev/loop9" }
+          ]
       , data_units = 1
       , parity_units = 0
       , spare_units = Some 0
