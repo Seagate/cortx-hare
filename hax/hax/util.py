@@ -855,7 +855,7 @@ class ConsulUtil:
              'Unknown'): (ServiceHealth.UNKNOWN, ServiceHealth.UNKNOWN),
             ('warning',
              'M0_CONF_HA_PROCESS_STOPPING'): (ServiceHealth.OFFLINE,
-                                              ServiceHealth.FAILED),
+                                              ServiceHealth.STOPPED),
             ('warning',
              'M0_CONF_HA_PROCESS_STARTED'): (ServiceHealth.OFFLINE,
                                              ServiceHealth.FAILED),
@@ -891,12 +891,15 @@ class ConsulUtil:
                     else:
                         status = svc_health[1]
 
-                    # This is situation is not expected but we handle
-                    # that same.
+                    # This situation is not expected but we handle
+                    # the same. Hax may end up here if the process has stopped
+                    # already and its current status is also reported as
+                    # 'unknown' by Consul. Hax will do nothing in this case
+                    # and will report OFFLINE for that process.
                     if (item['Status'] == 'warning' and
                             svc_consul_status == 'Unknown' and
                             status == ServiceHealth.UNKNOWN):
-                        status = ServiceHealth.FAILED
+                        status = ServiceHealth.OFFLINE
 
                     return status
         except (ConsulException, HTTPError, RequestException) as e:
