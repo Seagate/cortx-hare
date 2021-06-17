@@ -197,6 +197,24 @@ profiles:  # This section is optional.  If it is missing, a single "default"
            # profile referring to all pools will be created.
   - name: <str>
     pools: [ <str> ]
+
+# FDMI filter defines if an FDMI record would be sent from FDMI source to FDMI
+# plugin. Only M0_FDMI_FILTER_TYPE_KV_SUBSTRING filters are supported.
+#
+fdmi_filters:  # This section is optional.  If it is missing, no fdmi filters
+               # would be defined
+  - name: <str>  # Human-readable name of the filter
+    node: <str>  # Hostname of the node that hosts FDMI plugin
+                 # that would receive every FDMI record this filter matches
+    client_index: <int>  # 0-based index of the client that would be
+                         # the FDMI plugin. Only "other" clients could be FDMI
+                         # plugins. "s3" clients are not used to for this
+                         # index.
+                         # The client has to be defined in m0_clients section
+                         # already.
+    substrings: [ <str> ]  # List of strings for FDMI plugin to match
+                           # See m0_conf_fdmi_filter::ff_substrings
+                           # for the reference. May be empty or absent.
 ...  # end of the document (optional)""")
         sys.exit()
 
@@ -343,6 +361,8 @@ def validate_cluster_desc(desc: Dict[str, Any]) -> None:
     validate_pools_desc(desc['pools'])
     if 'profiles' in desc:
         validate_profiles_desc(desc['profiles'], desc['pools'])
+    if 'fdmi_filters' in desc and desc['fdmi_filters'] is not None:
+        validate_fdmi_filters_desc(desc['fdmi_filters'], desc['nodes'])
 
 
 def validate_nodes_desc(nodes_desc: List[Dict[str, Any]]) -> None:
@@ -504,6 +524,33 @@ def validate_profiles_desc(profiles_desc: List[Dict[str, Any]],
                     ', '.join(bad))
         assert all_unique(pools), \
             f'Profile {name!r} has non-unique pool references'
+
+
+def validate_fdmi_filters_desc(fdmi_filters_desc: List[Dict[str, Any]],
+                               nodes_desc: List[Dict[str, Any]]) \
+        -> None:
+    assert all_unique(x['name'] for x in fdmi_filters_desc), \
+        'FDMI filter names are not unique:\n' + \
+        '\n'.join('  ' + x['name'] for x in fdmi_filters_desc)
+    assert all(x['name'] for x in fdmi_filters_desc), \
+        'FDMI filter name must not be empty'
+
+    Node = NamedTuple('Node', [('name', str), ('clients_nr', int)])
+    nodes = [Node(name=x['hostname'], clients_nr=x['m0_clients']['other'])
+             for x in nodes_desc]
+
+    for fdmi_filter_desc in fdmi_filters_desc:
+        node = fdmi_filter_desc['node']
+        client_index = fdmi_filter_desc['client_index']
+        assert node, f"FDMI filter {fdmi_filter_desc} " \
+            "doesn't refer to any node"
+        matching_nodes = [n for n in nodes if n.name == node]
+        assert len(matching_nodes) == 1, \
+            (f"FDMI filter have exactly one node: {fdmi_filter_desc}",
+             matching_nodes)
+        assert client_index < matching_nodes[0].clients_nr, \
+            "FDMI filter m0_clients index is out of bound: " \
+            f"client_index={client_index}, node={matching_nodes[0]}"
 
 
 @lru_cache(maxsize=1)
@@ -784,15 +831,18 @@ class ConfRoot(ToDhall):
     _downlinks = {Downlink('nodes', ObjT.node),
                   Downlink('sites', ObjT.site),
                   Downlink('pools', ObjT.pool),
-                  Downlink('profiles', ObjT.profile)}  # XXX + fdmi_flt_grps
+                  Downlink('profiles', ObjT.profile),
+                  Downlink('fdmi_flt_grps', ObjT.fdmi_flt_grp)}
 
     def __init__(self, nodes: List[Oid], sites: List[Oid], pools: List[Oid],
-                 profiles: List[Oid], mdpool: Oid = None,
+                 profiles: List[Oid],
+                 fdmi_flt_grps: List[Oid], mdpool: Oid = None,
                  mdredundancy: int = 0, imeta_pver: Oid = None):
         assert all(x.type is ObjT.node for x in nodes)
         assert all(x.type is ObjT.site for x in sites)
         assert all(x.type is ObjT.pool for x in pools)
         assert all(x.type is ObjT.profile for x in profiles)
+        assert all(x.type is ObjT.fdmi_flt_grp for x in fdmi_flt_grps)
         assert mdpool is None or mdpool.type is ObjT.pool
         assert imeta_pver is None or imeta_pver.type is ObjT.pver
 
@@ -800,6 +850,7 @@ class ConfRoot(ToDhall):
         self.sites = sites
         self.pools = pools
         self.profiles = profiles
+        self.fdmi_flt_grps = fdmi_flt_grps
         self.mdpool = mdpool
         self.mdredundancy = mdredundancy
         self.imeta_pver = imeta_pver
@@ -809,6 +860,7 @@ class ConfRoot(ToDhall):
                           f'sites={self.sites}',
                           f'pools={self.pools}',
                           f'profiles={self.profiles}',
+                          f'fdmi_flt_grps={self.fdmi_flt_grps}',
                           f'mdpool={self.mdpool}',
                           f'mdredundancy={self.mdredundancy}',
                           f'imeta_pver={self.imeta_pver}'])
@@ -826,14 +878,15 @@ class ConfRoot(ToDhall):
             f'nodes = {oids_to_dhall(self.nodes)}',
             f'sites = {oids_to_dhall(self.sites)}',
             f'pools = {oids_to_dhall(self.pools)}',
-            f'profiles = {oids_to_dhall(self.profiles)}'
-        ])
+            f'profiles = {oids_to_dhall(self.profiles)}',
+            f'fdmi_flt_grps = {oids_to_dhall(self.fdmi_flt_grps)}'])
         return '{ %s }' % args
 
     @classmethod
     def build(cls, m0conf: Dict[Oid, Any]) -> Oid:
         root_id = new_oid(ObjT.root)
-        m0conf[root_id] = cls(nodes=[], sites=[], pools=[], profiles=[])
+        m0conf[root_id] = cls(nodes=[], sites=[], pools=[], profiles=[],
+                              fdmi_flt_grps=[])
         return root_id
 
 
@@ -1840,6 +1893,93 @@ class ConfProfile(ToDhall):
         return prof_id
 
 
+class ConfFdmiFltGrp(ToDhall):
+    _objt = ObjT.fdmi_flt_grp
+    _downlinks: Set[Downlink] = set()
+
+    def __init__(self, rec_type: int, fdmi_filters: List[Oid]):
+        assert all(x.type is ObjT.fdmi_filter for x in fdmi_filters)
+        self.rec_type = rec_type
+        self.fdmi_filters = fdmi_filters
+
+    def __repr__(self):
+        args = ', '.join([f'rec_type={self.rec_type}',
+                          f'fdmi_filters={self.fdmi_filters!r}'])
+        return f'{self.__class__.__name__}({args})'
+
+    def to_dhall(self, oid: Oid) -> str:
+        assert oid.type is ObjT.fdmi_flt_grp
+        args = ', '.join([f'id = {oid_to_dhall(oid)}',
+                          f'rec_type = {self.rec_type}',
+                          f'filters = {oids_to_dhall(self.fdmi_filters)}'])
+        return f'{{ {args} }}'
+
+    @classmethod
+    def build(cls, m0conf: Dict[Oid, Any], parent: Oid,
+              fdmi_filter_desc: Dict[str, Any],
+              other_clients: Dict[str, List[Tuple[Oid, Oid]]]) -> Oid:
+        assert parent.type is ObjT.root
+
+        fdmi_flt_grp_id = new_oid(ObjT.fdmi_flt_grp)
+        fdmi_filter_oid = ConfFdmiFilter.build(
+            m0conf, parent, fdmi_flt_grp_id, fdmi_filter_desc, other_clients)
+        # rec_type=0x1000 is M0_FDMI_REC_TYPE_FOL
+        m0conf[fdmi_flt_grp_id] = cls(rec_type=0x1000,
+                                      fdmi_filters=[fdmi_filter_oid])
+        m0conf[parent].fdmi_flt_grps.append(fdmi_flt_grp_id)
+        return fdmi_flt_grp_id
+
+
+class ConfFdmiFilter(ToDhall):
+    _objt = ObjT.fdmi_filter
+    _downlinks: Set[Downlink] = set()
+
+    def __init__(self, dix_pver: Oid, node: Oid,
+                 substrings: List[str], endpoint: str):
+        self.dix_pver = dix_pver
+        self.node = node
+        self.substrings = substrings
+        self.endpoint = endpoint
+
+    def __repr__(self):
+        args = ', '.join([f'dix_pver={self.dix_pver}',
+                          f'substrings={self.substrings}]',
+                          f'endpoint={self.endpoint}'])
+        return f'{self.__class__.__name__}({args})'
+
+    def to_dhall(self, oid: Oid) -> str:
+        assert oid.type is ObjT.fdmi_filter
+
+        substrings = '[' + ', '.join([f'"{s}"' for s in self.substrings]) + ']'
+        args = ', '.join([f'id = {oid_to_dhall(oid)}',
+                          # 2 is M0_FDMI_FILTER_TYPE_KV_SUBSTRING
+                          'filter_type = 2',
+                          f'filter_id = {oid_to_dhall(oid)}',
+                          'filter_root = ""',
+                          f'node = {oid_to_dhall(self.node)}',
+                          f'dix_pver = {oid_to_dhall(self.dix_pver)}',
+                          f'substrings = {substrings} : List Text',
+                          f'endpoints = ["{self.endpoint}"]'])
+        return f'{{ {args} }}'
+
+    @classmethod
+    def build(cls, m0conf: Dict[Oid, Any], root: Oid, parent: Oid,
+              fdmi_filter_desc: Dict[str, Any],
+              other_clients: Dict[str, List[Tuple[Oid, Oid]]]) -> Oid:
+        assert parent.type is ObjT.fdmi_flt_grp
+
+        fdmi_filter_oid = new_oid(ObjT.fdmi_filter)
+        node_oid, process_oid = other_clients[
+            fdmi_filter_desc['node']][int(fdmi_filter_desc['client_index'])]
+        process = m0conf[process_oid]
+        m0conf[fdmi_filter_oid] = cls(
+            dix_pver=m0conf[root].imeta_pver,
+            node=node_oid,
+            substrings=fdmi_filter_desc['substrings'],
+            endpoint=str(process.endpoint))
+        return fdmi_filter_oid
+
+
 ConsulAgent = NamedTuple('ConsulAgent', [('node_name', str), ('ipaddr', str)])
 
 Cluster = NamedTuple('Cluster', [('m0conf', Dict[Oid, Any]),
@@ -2178,6 +2318,8 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
 
     rack_id = ConfRack.build(conf, ConfSite.build(conf, root_id))
 
+    other_clients: Dict[str, List[Tuple[Oid, Oid]]] = {}
+
     for node in cluster_desc['nodes']:
         node_id = ConfNode.build(conf, root_id, node)
         encl_id = ConfEnclosure.build(conf, rack_id, node_id)
@@ -2210,6 +2352,10 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
             for _ in range(node['m0_clients'][client_t]):
                 proc_id = ConfProcess.build(conf, node_id, node, proc_t)
                 cluster.m0_clients[proc_id] = new_oid(ObjT.service)
+                if client_t == 'other':
+                    if node['hostname'] not in other_clients:
+                        other_clients[node['hostname']] = []
+                    other_clients[node['hostname']].append((node_id, proc_id))
 
     create_aux_val = cluster_desc.get('create_aux')
     if not create_aux_val:
@@ -2260,6 +2406,10 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
                               for pool_name in prof['pools']
                               for aux_pool in aux_pools.get(pool_name, [])]
             ConfProfile.build(conf, root_id, prof)
+
+    if 'fdmi_filters' in cluster_desc:
+        for fdmi_filter in cluster_desc['fdmi_filters']:
+            ConfFdmiFltGrp.build(conf, root_id, fdmi_filter, other_clients)
 
     validate_m0conf(conf)
     assert cluster.consul_servers

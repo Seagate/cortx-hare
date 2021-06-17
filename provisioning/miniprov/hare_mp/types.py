@@ -12,7 +12,7 @@ class Maybe(Generic[A]):
 
     def __str__(self):
         if self.value is None:
-            return f'None {self.comment}'
+            return f'None ({self.comment})'
 
         return f'Some ({self.value})'
 
@@ -155,11 +155,20 @@ class ProfileDesc(DhallTuple):
 
 
 @dataclass(repr=False)
+class FdmiFilterDesc(DhallTuple):
+    client_index: int
+    name: Text
+    node: Text
+    substrings: DList[Text]
+
+
+@dataclass(repr=False)
 class ClusterDesc(DhallTuple):
     create_aux: Maybe[bool]
     node_info: DList[NodeDesc]
     pool_info: DList[PoolDesc]
     profile_info: DList[ProfileDesc]
+    fdmi_filter_info: Maybe[List[FdmiFilterDesc]]
 
 
 @dataclass(repr=False)

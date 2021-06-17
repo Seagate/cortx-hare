@@ -72,4 +72,5 @@ in
       }
     ]
 , profiles = None (List types.PoolsRef)
+, fdmi_filters = None (List types.FdmiFilterDesc)
 } : types.ClusterDesc

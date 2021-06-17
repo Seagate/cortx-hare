@@ -18,16 +18,8 @@
 
 -}
 
-let M0Server = ./M0ServerDesc.dhall
-
-let Node = ./NodeDesc.dhall
-
-let Pool = ./PoolDesc.dhall
-
-in
-{ create_aux : Optional Bool
-, nodes : List Node
-, pools : List Pool
-, profiles : Optional (List ./PoolsRef.dhall)
-, fdmi_filters: Optional (List ./FdmiFilterDesc.dhall)
+{ name : Text
+, node : Text
+, client_index : Natural
+, substrings : List Text
 }
