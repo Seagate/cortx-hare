@@ -26,4 +26,5 @@ in
 , type : ./SvcT.dhall
 , endpoint : ./LibfabricEndpoint.dhall
 , sdevs : List Oid
+, params : List Text
 }
