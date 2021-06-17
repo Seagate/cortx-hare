@@ -69,6 +69,8 @@ and health-checking mechanisms.
      export M0_SRC_DIR=$PWD
      cd -
      ```
+* Install py-utils.
+  *  Follow the instructions [here](https://github.com/Seagate/cortx-utils/tree/main/py-utils)
 
 * Build and install `hare`.
   ```sh
