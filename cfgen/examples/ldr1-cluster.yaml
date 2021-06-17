@@ -37,6 +37,15 @@ nodes:
         other: 2
 pools:
   - name: the pool
+    disk_refs:
+      - { path: /dev/sdd, node: pod_c1 }
+      - { path: /dev/sde, node: pod_c1 }
+      - { path: /dev/sdf, node: pod_c1 }
+      - { path: /dev/sdg, node: pod_c1 }
+      - { path: /dev/sdh, node: pod_c2 }
+      - { path: /dev/sdi, node: pod_c2 }
+      - { path: /dev/sdj, node: pod_c2 }
+      - { path: /dev/sdk, node: pod_c2 }
     #type: sns  # optional; supported values: "sns" (default), "dix", "md"
     data_units: 1
     parity_units: 0

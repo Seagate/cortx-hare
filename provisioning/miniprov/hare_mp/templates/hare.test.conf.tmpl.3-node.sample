@@ -11,6 +11,11 @@
               "data": "4",
               "parity": "2",
               "spare": "2"
+            },
+            "dix": {
+              "data": "1",
+              "parity": "2",
+              "spare": "0"
             }
           },
           "name": "storage1",
@@ -52,6 +57,7 @@
         }
       },
       "storage": {
+        "cvg_count": "2",
         "cvg": [
           {
             "data_devices": [
@@ -90,6 +96,7 @@
         }
       },
       "storage": {
+        "cvg_count": "2",
         "cvg": [
           {
             "data_devices": [
@@ -128,6 +135,7 @@
         }
       },
       "storage": {
+        "cvg_count": "2",
         "cvg": [
           {
             "data_devices": [
