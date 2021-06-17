@@ -32,6 +32,29 @@ faultToleranceInfo = NamedTuple('faultToleranceInfo', [
                             ('min_drives_per_node', int)])
 
 
+# Global variable aux_pools is used for storing aux pools list
+# Example of aux pool variable info :
+# {'the pool':
+#   [
+#     {
+#       'name': 'the pool-aux001',
+#       'data_units': 2,
+#       'parity_units': 2,
+#       'spare_units': 0,
+#       'disk_refs': [
+#         {'path': '/dev/sdb', 'node': 'ssc-vm-6327.colo.seagate.com'},
+#         {'path': '/dev/sdc', 'node': 'ssc-vm-6327.colo.seagate.com'},
+#         {'path': '/dev/sdb', 'node': 'ssc-vm-2493.colo.seagate.com'},
+#         {'path': '/dev/sdc', 'node': 'ssc-vm-2493.colo.seagate.com'}
+#       ]
+#     },
+#     { .. Similarly for 'the pool-aux002' and so on.
+#     }
+#   ]
+# }
+aux_pools: Dict[str, List[Dict[str, List[Dict[str, Any]]]]] = {}
+
+
 def repeat_on_cmd_timeout(max_retries=-1):
     """
     This is a decorator for command timeouts.
@@ -1216,14 +1239,6 @@ def pool_drives(m0conf: Dict[Oid, Any],
     for drive_id, node_id in drives:
         if m0conf[drive_id].pvers:  # already assigned to some pool
             over_referenced.setdefault(node_id, []).append(drive_id)
-    if over_referenced:
-        err = '{} referred to by several pools:'.format(
-            'This disk is' if len(over_referenced) == 1 else 'These disks are')
-        for node_id in sorted(over_referenced):
-            err += '\n  ' + m0conf[node_id].name
-            for drive_id in sorted(over_referenced[node_id]):
-                err += '\n   \\_ ' + m0conf[m0conf[drive_id].sdev].filename
-        raise AssertionError(err)
 
     return [drive_id for drive_id, _ in drives]
 
@@ -1914,6 +1929,113 @@ def validate_m0conf(m0conf: Dict[Oid, Any]) -> None:
                for _rel, children in rel_children.items())
 
 
+# AUX Pools :
+# This feature is developed considering the node (enclosure) failure
+# case. If a node in the cluster fails, it means that all the disks
+# in that node become inaccessible. As this feature considers only
+# node failures, it keeps the spare pools ready considering the
+# other alive nodes from the cluster.
+# The feature works using the mathematical combinations formula
+# C(n, r) = (n! / (r!(n-r)!)).
+# It basically creates combinations of all the nodes in case of
+# failures of nodes from 1 to the allowed number of nodes to be
+# failed, by allowance vector.
+# For each and every such generated combinations of (alive) nodes,
+# it creates the sets of the disks and assigns a pool to each of
+# them. Such spare pools created considering allowed node failures
+# are called as aux pools.
+
+# Function : aux_pool_list() :
+# Description : Generate the aux pools sets
+# Inputs :
+# pool_desc : Pools in the cluster description
+# m0conf : Configuration
+# Outputs : None
+# Saves generated aux pools list in aux_pools[]
+
+def aux_pool_list(pool_desc: Dict[str, Any], m0conf: Dict[Oid, Any]) -> None:
+    pool = pool_desc
+
+    # Example of encl_ref_combination :
+    # [
+    #   ['ssc-vm-6327.colo.seagate.com', 'ssc-vm-2493.colo.seagate.com'],
+    #   ['ssc-vm-6327.colo.seagate.com', 'ssc-vm-6328.colo.seagate.com'],
+    #   ['ssc-vm-2493.colo.seagate.com', 'ssc-vm-6328.colo.seagate.com']
+    # ]
+    encl_ref_combination: List[List[str]] = []
+
+    # Example of disk_ref_combinations :
+    # [
+    #   [
+    #     {'path': '/dev/sdb', 'node': 'ssc-vm-6327.colo.seagate.com'},
+    #     {'path': '/dev/sdc', 'node': 'ssc-vm-6327.colo.seagate.com'},
+    #     {'path': '/dev/sdb', 'node': 'ssc-vm-2493.colo.seagate.com'},
+    #     {'path': '/dev/sdc', 'node': 'ssc-vm-2493.colo.seagate.com'}
+    #   ],
+    #   [ ... Similarly for other sets.
+    #   ]
+    # ]
+    disk_ref_combinations: List[List[Dict[str, Any]]] = []
+
+    # Example of pool_nodes :
+    # [
+    #  'ssc-vm-6327.colo.seagate.com',
+    #  'ssc-vm-2493.colo.seagate.com',
+    #  'ssc-vm-6328.colo.seagate.com'
+    # ]
+    pool_nodes: List[str] = []
+
+    tolerance: Failures
+    pool_t = pool_type(pool)
+
+    # Currently assumption is that, aux pools will be generated for
+    # SNS pools only
+    assert pool_t == PoolT.sns
+
+    # Calculate and create aux pool disk combinations
+    # only for SNS pool type
+    d = pool.get('allowed_failures')
+    # Calculate the tolerance in case of SNS pools
+    if d:
+        tolerance = Failures(d['site'], d['rack'], d['encl'],
+                             d['ctrl'], d['disk'])
+    else:
+        tolerance = ConfPool.gen_sns_tolerance(m0conf, pool)
+    # Generate the node combinations considering node failures as
+    # allowed by node tolerance values
+    temp_pool_nodes = []
+    for nodes in pool['disk_refs']:
+        temp_pool_nodes += [
+            nodes['node']]
+    pool_nodes = list(set(temp_pool_nodes))
+    for encl_failures in range(tolerance.enclosure, 0, -1):
+        encl_ref_combination += [
+            list(x) for x in itertools.combinations(
+                pool_nodes,
+                (len(pool_nodes) - encl_failures))
+        ]
+
+    # Create the disk references for the generated
+    # node combinations
+    for encl in encl_ref_combination:
+        single_aux_comb = []
+        for encl_x in encl:
+            for dr in pool['disk_refs']:
+                if dr['node'] == encl_x:
+                    single_aux_comb += [dr]
+        disk_ref_combinations += [single_aux_comb]
+
+    # Create list of auxilary pools
+    aux_pools[pool['name']] = [
+        {'name':         pool['name'] + f'-aux{i:003}',
+         'data_units':   pool['data_units'] - pool['parity_units'],
+         'parity_units': pool['parity_units'],
+         'spare_units':  pool['spare_units'],
+         'disk_refs':    comb}
+        for i, comb in enumerate(disk_ref_combinations, start=1)
+    ]
+
+
 def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
     cluster = Cluster(m0conf={}, consul_servers=[], consul_clients=[],
                       m0_clients={})
@@ -1957,7 +2079,18 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
                 cluster.m0_clients[proc_id] = new_oid(ObjT.service)
 
     for pool in cluster_desc['pools']:
-        ConfPool.build(conf, root_id, pool)
+        pool_t = pool_type(pool)
+        if pool_t == PoolT.sns:
+            # For SNS pools create the aux pool list
+            aux_pool_list(pool, conf)
+        else:
+            ConfPool.build(conf, root_id, pool)
+
+    for pool in itertools.chain(cluster_desc['pools'],
+                                *aux_pools.values()):
+        pool_t = pool_type(pool)
+        if pool_t == PoolT.sns:
+            ConfPool.build(conf, root_id, pool)
 
     if conf[root_id].imeta_pver is None:  # no DIX pool defined in the CDF
         ConfPool.build(conf, root_id, {'type': 'dix'})
@@ -1966,6 +2099,9 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
         ConfPool.build(conf, root_id, {'type': 'md'})
 
     for prof in cluster_desc['profiles']:
+        prof['pools'] += [aux_pool['name']
+                          for pool_name in prof['pools']
+                          for aux_pool in aux_pools.get(pool_name, [])]
         ConfProfile.build(conf, root_id, prof)
 
     validate_m0conf(conf)
