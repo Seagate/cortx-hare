@@ -47,7 +47,9 @@ ObjT = Enum(
         ('CONTROLLER', 0x6300000000000001),
         ('ROOT', 0x7400000000000001),
         ('POOL', 0x6f00000000000001),
-        ('PVER', 0x7600000000000001)
+        ('PVER', 0x7600000000000001),
+        ('FDMI_FILTER', 0x6c00000000000001),
+        ('FDMI_FLT_GRP', 0x6700000000000001),
     ])
 ObjT.__doc__ = 'Motr conf object types and their m0_fid.f_container values'
 
