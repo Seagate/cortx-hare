@@ -9,8 +9,8 @@ import pkg_resources
 from hare_mp.store import ValueProvider
 from hare_mp.types import (ClusterDesc, DiskRef, DList, Maybe, NodeDesc,
                            PoolDesc, PoolType, ProfileDesc, Protocol, Text,
-                           M0ServerDesc, DisksDesc, AllowedFailures,
-                           Layout)
+                           M0ServerDesc, DisksDesc, AllowedFailures, Layout,
+                           FdmiFilterDesc)
 from hare_mp.utils import Utils
 
 DHALL_PATH = '/opt/seagate/cortx/hare/share/cfgen/dhall'
@@ -235,12 +235,17 @@ class CdfGenerator:
 
         return profiles
 
+    def _create_fdmi_filter_descriptions(
+            self, nodes: List[NodeDesc]) -> Maybe[List[FdmiFilterDesc]]:
+        return Maybe(None, 'List T.FdmiFilterDesc')
+
     def _get_cdf_dhall(self) -> str:
         dhall_path = self._get_dhall_path()
         conf = self.provider
         nodes = self._create_node_descriptions()
         pools = self._create_pool_descriptions()
         profiles = self._create_profile_descriptions(pools)
+        fdmi_filters = self._create_fdmi_filter_descriptions(nodes)
         create_aux = conf.get('cluster>create_aux',
                               allow_null=True)
         if create_aux is None:
@@ -250,7 +255,9 @@ class CdfGenerator:
             ClusterDesc(create_aux=Maybe(create_aux, 'Bool'),
                         node_info=DList(nodes, 'List NodeInfo'),
                         pool_info=DList(pools, 'List PoolInfo'),
-                        profile_info=DList(profiles, 'List ProfileInfo')))
+                        profile_info=DList(profiles, 'List ProfileInfo'),
+                        fdmi_filter_info=fdmi_filters))
+                   
         gencdf = Template(self._gencdf()).substitute(path=dhall_path,
                                                      params=params_text)
         return gencdf

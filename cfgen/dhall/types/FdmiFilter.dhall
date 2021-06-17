@@ -23,8 +23,11 @@ let Oid = ./Oid.dhall
 in
 -- m0_confx_fdmi_filter
 { id : Oid
+, filter_type : Natural
 , filter_id : Oid  -- XXX s/Oid/Fid/
 , filter_root : Text
 , node : Oid  -- XXX s/Oid/Fid/
+, dix_pver : Oid  -- XXX s/Oid/Fid/
+, substrings : List Text
 , endpoints : List Text
 }

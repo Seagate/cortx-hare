@@ -50,6 +50,7 @@
 , FailVec      = ./types/FailVec.dhall
 , PoolType     = ./types/PoolType.dhall
 , PoolsRef     = ./types/PoolsRef.dhall
+, FdmiFilterDesc = ./types/FdmiFilterDesc.dhall
 
 , Obj         = ./types/Obj.dhall
 , ObjT        = ./types/ObjT.dhall

@@ -48,3 +48,8 @@ pools:
 #profiles:
 #  - name: default
 #    pools: [ the pool ]
+#fdmi_filters:
+#  - name: test
+#    node: localhost
+#    client_index: 1
+#    substrings: ["Bucket-Name", "Object-Name", "Object-URI"]
