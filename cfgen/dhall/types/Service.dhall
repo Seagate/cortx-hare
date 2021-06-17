@@ -26,4 +26,5 @@ in
 , type : ./SvcT.dhall
 , endpoint : ./Endpoint.dhall
 , sdevs : List Oid
+, params : List Text
 }

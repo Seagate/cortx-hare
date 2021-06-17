@@ -803,8 +803,15 @@ class ConfProcess(ToDhall):
                               services=[])
         m0conf[parent].processes.append(proc_id)
 
+        if proc_t is ProcT.m0_client_other:
+            params = ["origin:in-volatile"]
+        if proc_t is ProcT.m0_server:
+            params = ["origin:in-persistent"]
+
         for stype in service_types(proc_t, proc_desc):
-            svc_id = ConfService.build(m0conf, proc_id, stype, ep)
+            sparams = params if stype is SvcT.M0_CST_DTM0 else []
+            svc_id = ConfService.build(m0conf, proc_id, stype, ep,
+                                       params=sparams)
             if stype is SvcT.M0_CST_IOS:  # XXX What about M0_CST_CAS?
                 assert proc_desc is not None and ctrl is not None
                 for disk in proc_desc['_io_disks']:
@@ -838,6 +845,7 @@ class SvcT(Enum):
     M0_CST_M0T1FS = auto()
     M0_CST_CLIENT = auto()
     M0_CST_ISCS = auto()
+    M0_CST_DTM0 = auto()
 
     def to_dhall(self) -> str:
         return f'types.{self}'
@@ -849,6 +857,8 @@ def service_types(proc_t: ProcT,
     if proc_t is ProcT.hax:
         ts.append(SvcT.M0_CST_HA)
     ts.append(SvcT.M0_CST_RMS)
+    if proc_t is ProcT.m0_client_other:
+        ts.append(SvcT.M0_CST_DTM0)
     if proc_t is ProcT.m0_server:
         assert proc_desc is not None
         if proc_desc.get('runs_confd'):
@@ -860,7 +870,8 @@ def service_types(proc_t: ProcT,
                        SvcT.M0_CST_ADDB2,
                        SvcT.M0_CST_CAS,
                        SvcT.M0_CST_ISCS,
-                       SvcT.M0_CST_FDMI])
+                       SvcT.M0_CST_FDMI,
+                       SvcT.M0_CST_DTM0])
     return ts
 
 
@@ -868,11 +879,13 @@ class ConfService(ToDhall):
     _objt = ObjT.service
     _downlinks = {Downlink('sdevs', ObjT.sdev)}
 
-    def __init__(self, stype: SvcT, endpoint: Endpoint, sdevs: List[Oid]):
+    def __init__(self, stype: SvcT, endpoint: Endpoint, sdevs: List[Oid],
+                 params: List[str]):
         self.type = stype
         self.endpoint = endpoint
         assert all(x.type is ObjT.sdev for x in sdevs)
         self.sdevs = sdevs
+        self.params = params
 
     def __repr__(self):
         args = ', '.join([f'stype={self.type}',
@@ -882,18 +895,24 @@ class ConfService(ToDhall):
 
     def to_dhall(self, oid: Oid) -> str:
         assert oid.type is ObjT.service
+        if self.params:
+            origin = self.params[0]
+            params = '["%s"]' % (origin, )
+        else:
+            params = "[] : List Text"
         args = ', '.join([f'id = {oid_to_dhall(oid)}',
                           f'type = {self.type.to_dhall()}',
                           f'endpoint = {self.endpoint.to_dhall()}',
-                          f'sdevs = {oids_to_dhall(self.sdevs)}'])
+                          f'sdevs = {oids_to_dhall(self.sdevs)}',
+                          f'params = {params}'])
         return '{ %s }' % args
 
     @classmethod
     def build(cls, m0conf: Dict[Oid, Any], parent: Oid,
-              stype: SvcT, endpoint: Endpoint) -> Oid:
+              stype: SvcT, endpoint: Endpoint, params: List[str]) -> Oid:
         assert parent.type is ObjT.process
         svc_id = new_oid(ObjT.service)
-        m0conf[svc_id] = cls(stype, endpoint, sdevs=[])
+        m0conf[svc_id] = cls(stype, endpoint, sdevs=[], params=params)
         m0conf[parent].services.append(svc_id)
         return svc_id
 
