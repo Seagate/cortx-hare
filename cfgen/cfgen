@@ -1411,7 +1411,7 @@ class ConfService(ToDhall):
         args = ', '.join([f'id = {oid_to_dhall(oid)}',
                           f'type = {self.type.to_dhall()}',
                           f'endpoint = "{self.endpoint}"',
-                          f'sdevs = {oids_to_dhall(self.sdevs)}'])
+                          f'sdevs = {oids_to_dhall(self.sdevs)}',
                           f'params = {params}'])
         return '{ %s }' % args
 
