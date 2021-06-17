@@ -28,4 +28,5 @@ in
 { nodes : List Node
 , pools : List Pool
 , profiles : Optional (List ./PoolsRef.dhall)
+, fdmi_filters: Optional (List ./FdmiFilterDesc.dhall)
 }

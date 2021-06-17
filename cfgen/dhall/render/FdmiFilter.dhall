@@ -30,8 +30,11 @@ in
  ++ Prelude.Text.concatSep " "
       [ ./Oid.dhall x.id
       , named.Oid "id" x.filter_id
+      , named.Natural "type" x.filter_type
       , named.Text "root" x.filter_root
       , named.Oid "node" x.node
+      , named.Oid "dix_pver" x.dix_pver
+      , named.Texts "substrings" x.substrings
       , named.Texts "endpoints" x.endpoints
       ]
  ++ ")"

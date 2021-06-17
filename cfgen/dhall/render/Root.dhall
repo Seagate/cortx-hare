@@ -41,6 +41,6 @@ in
       , named.Oids "sites" x.sites
       , named.Oids "pools" x.pools
       , named.Oids "profiles" x.profiles
-      , "fdmi_flt_grps=[]"
+      , named.Oids "fdmi_flt_grps" x.fdmi_flt_grps
       ]
  ++ ")"
