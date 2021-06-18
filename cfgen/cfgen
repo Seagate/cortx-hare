@@ -803,6 +803,7 @@ class ConfProcess(ToDhall):
                               services=[])
         m0conf[parent].processes.append(proc_id)
 
+        params = []
         if proc_t is ProcT.m0_client_other:
             params = ["origin:in-volatile"]
         if proc_t is ProcT.m0_server:
@@ -897,7 +898,7 @@ class ConfService(ToDhall):
         assert oid.type is ObjT.service
         if self.params:
             origin = self.params[0]
-            params = '["%s"]' % (origin, )
+            params = f'["{origin}"]'
         else:
             params = "[] : List Text"
         args = ', '.join([f'id = {oid_to_dhall(oid)}',
