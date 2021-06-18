@@ -124,7 +124,7 @@ setup(
     name='hax',
     version=get_hax_version(),
     packages=find_packages(),
-    setup_requires=['flake8', 'mypy', 'pkgconfig'],
+    setup_requires=['flake8==3.9.2', 'mypy==0.812', 'pkgconfig'],
     install_requires=[
         'python-consul>=1.1.0', 'simplejson', 'aiohttp', 'click', 'dataclasses'
     ],

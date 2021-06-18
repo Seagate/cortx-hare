@@ -1,6 +1,6 @@
 #:build-requirements:
-flake8
-mypy
+flake8==3.9.2
+mypy==0.812
 pkgconfig
 setuptools
 wheel
