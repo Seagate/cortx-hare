@@ -39,11 +39,20 @@ from hare_mp.validator import Validator
 from hax.util import ConsulKVBasic, ConsulUtil, repeat_if_fails
 from hax.types import KeyDelete
 from time import sleep
+from enum import Enum
 
 # Logger details
 LOG_DIR = "/var/log/seagate/hare/"
 LOG_FILE = "/var/log/seagate/hare/setup.log"
 LOG_FILE_SIZE = 5 * 1024 * 1024
+
+
+class Plan(Enum):
+    Sanity = 'sanity'
+    Regression = 'regression'
+    Full = 'full'
+    Performance = 'performance'
+    Scalability = 'scalability'
 
 
 def execute(cmd: List[str]) -> str:
@@ -230,6 +239,29 @@ def test(args):
     except Exception as error:
         logging.error('Error while checking cluster status (%s)', error)
         shutdown_cluster()
+        exit(-1)
+
+
+def test_IVT(args):
+    try:
+        rc = 0
+        path_to_cdf = args.file[0]
+
+        logging.info('Running test plan: ' + str(args.plan[0].value))
+        # TODO We need to handle plan type and execute test cases accordingly
+        if not is_cluster_running():
+            logging.error('Cluster is not running. Cluster must be running '
+                          'for executing tests')
+            exit(-1)
+        cluster_status = check_cluster_status(path_to_cdf)
+        if cluster_status:
+            logging.error('Cluster status reports failure')
+            rc = -1
+
+        logging.info('Tests executed successfully')
+        exit(rc)
+    except Exception as error:
+        logging.error('Error while running Hare tests (%s)', error)
         exit(-1)
 
 
@@ -488,6 +520,26 @@ def add_file_argument(parser):
     return parser
 
 
+def add_plan_argument(parser):
+    parser.add_argument('--plan',
+                        help='Testing plan to be executed. Supported '
+                        'values:' + str([e.value for e in Plan]),
+                        required=True,
+                        nargs=1,
+                        type=Plan,
+                        action='store')
+    return parser
+
+
+def add_param_argument(parser):
+    parser.add_argument('--param',
+                        help='Test input URL.',
+                        nargs=1,
+                        type=str,
+                        action='store')
+    return parser
+
+
 def main():
     p = argparse.ArgumentParser(description='Configure hare settings')
     subparser = p.add_subparsers()
@@ -516,11 +568,13 @@ def main():
                        help_str='Initializes Hare',
                        handler_fn=init))
 
-    add_file_argument(
-        add_subcommand(subparser,
-                       'test',
-                       help_str='Tests Hare sanity',
-                       handler_fn=test))
+    add_param_argument(
+        add_plan_argument(
+            add_file_argument(
+                add_subcommand(subparser,
+                               'test',
+                               help_str='Tests Hare component',
+                               handler_fn=test_IVT))))
 
     sb_sub_parser = add_subcommand(subparser,
                                    'support_bundle',
