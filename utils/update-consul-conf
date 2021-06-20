@@ -93,9 +93,9 @@ fi
 # --------------------------------------------------------------------
 
 if [[ $CONFD_IDs ]]; then
-    CONF_FILE=/var/lib/hare/consul-server-conf/consul-server-conf.json
+    CONF_FILE=/var/lib/hare/consul-server-conf/consul-hare-server-conf.json
 else
-    CONF_FILE=/var/lib/hare/consul-client-conf/consul-client-conf.json
+    CONF_FILE=/var/lib/hare/consul-client-conf/consul-hare-client-conf.json
 fi
 
 SVCS_CONF=''
@@ -240,5 +240,7 @@ sudo cp $tmpfile $CONF_FILE
 
 sudo sed -r "s;(http://)localhost;\1$(get_service_ip_addr $HAX_EP);" \
          -i $CONF_FILE
+
+sudo cp $CONF_FILE /etc/consul.d
 
 consul reload > /dev/null

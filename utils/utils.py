@@ -175,6 +175,7 @@ def ssh_prefix(hostname: str) -> str:
 
 def consul_is_active_at(hostname: str) -> bool:
     cmd = ssh_prefix(hostname) + \
+        'sudo systemctl is-active --quiet consul || ' + \
         'sudo systemctl is-active --quiet hare-consul-agent'
     return subprocess.call(cmd, shell=True) == 0
 

@@ -293,40 +293,33 @@ EOF
     exit 1
 fi
 
-if sudo systemctl --quiet is-active hare-consul-agent; then
-    say 'Stopping Consul on this node...'
-    sudo systemctl stop hare-consul-agent
-    echo ' OK'
-
-    say 'Stopping Consul on other nodes...'
-    pids=()
-    while read node bind_ip; do
-        ssh_error_info "$node" "sudo systemctl stop hare-consul-agent" &
-        pids+=($!)
-    done < <(get_server_nodes | grep -vw $(node-name) || true)
-
-    while read node bind_ip; do
-        ssh_error_info "$node" "sudo systemctl stop hare-consul-agent" &
-        pids+=($!)
-    done < <(get_client_nodes)
-    wait4 ${pids[@]-}
-    echo ' OK'
+say 'Checking Consul server on this node...'
+if ! sudo systemctl list-unit-files consul.service | \
+                          grep consul > /dev/null || \
+   ! sudo systemctl --quiet is-active consul.service; then
+    die "Consul is either not installed or not running"
 fi
-
-say 'Starting Consul server on this node...'
 join_peers_opt="${join_peers:+--join $join_peers}"
 # $join_ip is our bind_ip address
 mk-consul-env --mode server --bind $join_ip $join_peers_opt \
-              --extra-options '-ui -bootstrap-expect 1'
+               --extra-options '-ui -bootstrap-expect 1'
+echo ' OK'
 
-sudo systemctl start hare-consul-agent
 
-# Wait for Consul's internal leader to be ready.
-# (Until then the KV store won't be accessible.)
-while ! consul info 2>/dev/null | grep -q 'leader.*true'; do
+say "Waiting for Consul's internal leader to be ready..."
+while read node _; do
+    if is_localhost $node; then
+        cmd="consul info | grep -q 'leader.*true'"
+    else
+        cmd="ssh_error_info $node consul info | grep -q 'leader.*true'"
+    fi
+
+    if $cmd > /dev/null; then
+        break
+    fi
     sleep 1
     echo -n '.'
-done
+done < <(get_server_nodes || true)
 echo ' OK'
 
 say 'Importing configuration into the KV store...'
@@ -334,21 +327,19 @@ jq '[.[] | {key, value: (.value | @base64)}]' < $conf_dir/consul-kv.json |
     consul kv import - > /dev/null
 echo ' OK'
 
-say 'Starting Consul on other nodes...'
 pids=()
+say 'Checking Consul on other nodes...'
 while read node bind_ip; do
+    if ! ssh $node "sudo systemctl list-unit-files consul.service | \
+                        grep consul > /dev/null" || \
+       ! ssh $node "sudo systemctl --quiet is-active consul.service"; then
+        die "Consul is either not installed or not running $node"
+    fi
     ssh_error_info "$node" "PATH=$PATH $(which mk-consul-env) \
-                          --mode server --bind $bind_ip --join $join_ip &&
-               sudo systemctl start hare-consul-agent" &
+                          --mode server --bind $bind_ip --join $join_ip" &
     pids+=($!)
 done < <(get_server_nodes | grep -vw $(node-name) || true)
 
-while read node bind_ip; do
-    ssh_error_info "$node" "PATH=$PATH $(which mk-consul-env) \
-                          --mode client --bind $bind_ip --join $join_ip &&
-               sudo systemctl start hare-consul-agent" &
-    pids+=($!)
-done < <(get_client_nodes)
 wait4 ${pids[@]-}
 agents_nr=$(( ${#pids[@]} + 1 ))
 

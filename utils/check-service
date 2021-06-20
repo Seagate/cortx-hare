@@ -84,6 +84,11 @@ fid2id() {
     echo $((16#${fid/*:0x/}))
 }
 
+_get_service_health() {
+    id=$1
+    /opt/seagate/cortx/hare/libexec/get-service-health $id
+}
+
 # During bootstrap with m0mkfs we need to report passing and
 # warning (offline) status for m0mkfs process to make sure
 # its ha_link is destroyed before m0d process is started.
@@ -97,7 +102,7 @@ if [[ $service =~ m0d ]]; then
         exit ${status[passing]}
     elif [[ -f $fail ]]; then
         id=$(fid2id $fid)
-        if [[ $(get-service-health $id) != 'passing' ]]; then
+        if [[ $(_get_service_health $id) != 'passing' ]]; then
             # The passing/online state is still not synchronized among
             # Consul servers, don't change it just yet...
             exit ${status[passing]}

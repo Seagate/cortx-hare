@@ -1,7 +1,7 @@
 [Unit]
 Description=HAX daemon for Hare
-Requires=hare-consul-agent.service motr-kernel.service
-After=hare-consul-agent.service motr-kernel.service
+Requires=consul.service motr-kernel.service
+After=motr-kernel.service
 
 [Service]
 # TODO: '/opt/seagate/cortx/hare' prefix can be different, e.g. '/usr'

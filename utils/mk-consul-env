@@ -93,6 +93,7 @@ fi
 sudo rm -rf /var/lib/hare/consul-data-$bind_addr
 
 conf_dir=consul-$mode-conf
+conf_file=consul-hare-$mode-conf
 sudo mkdir -p /var/lib/hare/$conf_dir
-sudo cp $HARE_DIR/share/consul/$conf_dir.json.in \
-     /var/lib/hare/$conf_dir/$conf_dir.json
+sudo cp $HARE_DIR/share/consul/$conf_file.json.in \
+     /var/lib/hare/$conf_dir/$conf_file.json
