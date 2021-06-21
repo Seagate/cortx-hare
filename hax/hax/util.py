@@ -90,6 +90,10 @@ def create_drive_fid(key: int) -> Fid:
     return mk_fid(ObjT.DRIVE, key)
 
 
+def create_profile_fid(key: int) -> Fid:
+    return mk_fid(ObjT.PROFILE, key)
+
+
 # See enum m0_conf_ha_process_event in Motr source code.
 ha_process_events = ('M0_CONF_HA_PROCESS_STARTING',
                      'M0_CONF_HA_PROCESS_STARTED',
@@ -258,6 +262,7 @@ class CatalogAdapter:
         Return service(s) registered in Consul by the given name.
         """
         try:
+            # TODO refactor catalog operations into a separate class
             return self.cns.catalog.service(service=svc_name)[1]
         except (ConsulException, HTTPError, RequestException) as e:
             raise HAConsistencyException(

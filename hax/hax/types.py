@@ -38,6 +38,7 @@ ObjT = Enum(
         ('SERVICE', 0x7300000000000001),
         ('SDEV', 0x6400000000000001),
         ('DRIVE', 0x6b00000000000001),
+        ('PROFILE', 0x7000000000000001),
     ])
 ObjT.__doc__ = 'Motr conf object types and their m0_fid.f_container values'
 
