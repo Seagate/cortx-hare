@@ -99,7 +99,7 @@ and health-checking mechanisms.
     cd cortx-motr
 
     scripts/m0 make rpms
-    sudo rpm -ivh ~/rpmbuild/RPMS/x86_64/cortx-motr-*.rpm
+    sudo rpm -ivh ~/rpmbuild/RPMS/x86_64/cortx-motr-2*.rpm
     ```
 
 * Build `hare` RPMs
