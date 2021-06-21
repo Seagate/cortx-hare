@@ -80,7 +80,11 @@ and health-checking mechanisms.
   make
   sudo make install
   ```
-
+* Create `hare` group.
+  ```sh
+  sudo groupadd --force hare
+  ```
+  
 * Add current user to `hare` group.
   ```sh
   sudo usermod --append --groups hare $USER
