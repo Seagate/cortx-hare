@@ -11,6 +11,9 @@ mypy==0.910
 pkgconfig==1.5.4
 setuptools==57.1.0
 wheel==0.36.2
+pytest==6.2.4
+pytest-aiohttp==0.3.0
+pytest-mock==3.6.1
 
 #:runtime-requirements:
 idna==2.10
