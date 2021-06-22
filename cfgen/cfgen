@@ -1210,6 +1210,12 @@ class ConfProcess(ToDhall):
         m0conf[parent].processes.append(proc_id)
 
         params = []
+        """
+        Parameters below relate to DTM0 log. There are two types
+        of DTM0 log: persistent (on the disk) and volatile (in-memory).
+        Currently client stores volatile DTM0 log, server stores
+        persistent DTM0 log.
+        """
         if proc_t is ProcT.m0_client_other:
             params = ["origin:in-volatile"]
         if proc_t is ProcT.m0_server:
