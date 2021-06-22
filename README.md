@@ -61,7 +61,7 @@ and health-checking mechanisms.
 
 * Install py-utils.
 
-https://github.com/Seagate/cortx-utils/blob/main/py-utils/README.md
+   Please refer to [the instruction](https://github.com/Seagate/cortx-utils/blob/main/py-utils/README.md) to install corxt-py-utils from sources.
 
 
 * Build and Install Motr.
