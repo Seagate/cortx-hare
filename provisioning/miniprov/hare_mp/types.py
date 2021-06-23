@@ -109,6 +109,7 @@ class NodeDesc(DhallTuple):
     data_iface_type: Maybe[Protocol]
     m0_servers: Maybe[DList[M0ServerDesc]]
     s3_instances: int
+    client_instances: int
 
 
 @dataclass(repr=False)
