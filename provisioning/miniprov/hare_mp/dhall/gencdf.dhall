@@ -26,14 +26,6 @@ let AllowedFailures =
       , disk : Natural
       }
 
-let AllowedFailures =
-      { site : Natural
-      , rack : Natural
-      , encl : Natural
-      , ctrl : Natural
-      , disk : Natural
-      }
-
 let PoolInfo =
       { name : Text
       , disk_refs : Optional (List T.DiskRef)
