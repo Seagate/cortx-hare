@@ -15,6 +15,7 @@ let NodeInfo =
       , data_iface_type : Optional T.Protocol
       , m0_servers : Optional  (List M0dProcess)
       , s3_instances : Natural
+      , client_instances : Natural
       }
 
 let PoolInfo =
@@ -43,7 +44,7 @@ let toNodeDesc
       ->  { hostname = n.hostname
           , data_iface = n.data_iface
           , data_iface_type = n.data_iface_type
-          , m0_clients = { other = 3, s3 = n.s3_instances }
+          , m0_clients = { other = n.client_instances, s3 = n.s3_instances }
           , m0_servers = n.m0_servers
           }
 
