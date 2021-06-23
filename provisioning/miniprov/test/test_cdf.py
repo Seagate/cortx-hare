@@ -132,7 +132,6 @@ class TestCDF(unittest.TestCase):
                 1,
                 'cortx>software>motr>service>client_instances':
                 2,
-                'server_node>MACH_ID>storage>cvg_count': 1,
                 'cluster>CLUSTER_ID>site>storage_set_count':
                 1,
                 'cluster>CLUSTER_ID>storage_set>server_node_count':
