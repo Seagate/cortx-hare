@@ -37,8 +37,8 @@ from hare_mp.types import (DisksDesc, DList, M0Clients, M0ServerDesc, Maybe,
 
 class TestTypes(unittest.TestCase):
     def test_m0clients(self):
-        val = M0Clients(s3=5, other=1)
-        self.assertEqual('{ s3 = 5, other = 1 }', str(val))
+        val = M0Clients(s3=5, other=2)
+        self.assertEqual('{ s3 = 5, other = 2 }', str(val))
 
     def test_protocol(self):
         self.assertEqual('P.tcp', str(Protocol.tcp))
@@ -128,6 +128,8 @@ class TestCDF(unittest.TestCase):
                 ['/dev/meta1'],
                 'server_node>MACH_ID>s3_instances':
                 1,
+                'cortx>software>motr>service>client_instances':
+                2,
                 'cluster>CLUSTER_ID>site>storage_set_count':
                 1,
                 'cluster>CLUSTER_ID>storage_set>server_node_count':
@@ -183,6 +185,7 @@ class TestCDF(unittest.TestCase):
                 'server_node>MACH_ID>network>data>interface_type':                'o2ib',
                 'server_node>MACH_ID>network>data>private_interfaces':                ['eth1', 'eno2'],
                 'server_node>MACH_ID>s3_instances':                1,
+                'cortx>software>motr>service>client_instances':                2,
             }
             return data.get(value)
 
@@ -194,6 +197,7 @@ class TestCDF(unittest.TestCase):
         self.assertEqual(Text('myhost'), ret[0].hostname)
         self.assertEqual(Text('eth1'), ret[0].data_iface)
         self.assertEqual(1, ret[0].s3_instances)
+        self.assertEqual(2, ret[0].client_instances)
 
         ret = CdfGenerator(provider=store)._create_pool_descriptions()
         self.assertIsInstance(ret, list)
@@ -248,6 +252,8 @@ class TestCDF(unittest.TestCase):
                 1,
                 'server_node>srvnode_1>storage>cvg_count':
                 2,
+                'cortx>software>motr>service>client_instances':
+                2,
                 'server_node>srvnode_1>storage>cvg':
                 [{'data_devices': ['/dev/sdb', '/dev/sdc'], 'metadata_devices': ['/dev/meta', '/dev/meta1']}],
                 'server_node>srvnode_1>storage>cvg[0]>data_devices':
@@ -299,6 +305,8 @@ class TestCDF(unittest.TestCase):
                 1,
                 'server_node>MACH_ID>storage>cvg_count':
                 2,
+                'cortx>software>motr>service>client_instances':
+                2,
                 'server_node>MACH_ID>storage>cvg[0]>data_devices':
                 ['/dev/sdb'],
                 'server_node>MACH_ID>storage>cvg[0]>metadata_devices':
@@ -349,6 +357,8 @@ class TestCDF(unittest.TestCase):
                 ['eth1', 'eno2'],
                 'server_node>MACH_ID>s3_instances':
                 1,
+                'cortx>software>motr>service>client_instances':
+                2,
                 'server_node>MACH_ID>storage>cvg[0]>data_devices':
                 ['/dev/sdb'],
                 'server_node>MACH_ID>storage>cvg[0]>metadata_devices':
@@ -394,6 +404,8 @@ class TestCDF(unittest.TestCase):
                 'server_node>MACH_ID>s3_instances':
                 1,
                 'server_node>MACH_ID>storage>cvg_count':
+                2,
+                'cortx>software>motr>service>client_instances':
                 2,
                 'server_node>MACH_ID>storage>cvg[0]>data_devices':
                 ['/dev/sdb'],
@@ -452,6 +464,8 @@ class TestCDF(unittest.TestCase):
                 1,
                 'server_node>MACH_ID>storage>cvg_count':
                 2,
+                'cortx>software>motr>service>client_instances':
+                2,
                 'server_node>MACH_ID>storage>cvg[0]>data_devices':
                 ['/dev/sda', '/dev/sdb'],
                 'server_node>MACH_ID>storage>cvg[0]>metadata_devices':
@@ -496,6 +510,8 @@ class TestCDF(unittest.TestCase):
                 ['eth1', 'eno2'],
                 'server_node>MACH_ID>s3_instances':
                 1,
+                'cortx>software>motr>service>client_instances':
+                2,
                 'server_node>MACH_ID>network>data>interface_type':
                 'o2ib'
             }
@@ -536,6 +552,8 @@ class TestCDF(unittest.TestCase):
                 ['eth1'],
                 'server_node>MACH_ID>s3_instances':
                 1,
+                'cortx>software>motr>service>client_instances':
+                2,
                 'server_node>MACH_ID>storage>cvg':
                 [{'data_devices': ['/dev/sdb'], 'metadata_devices': ['/dev/meta']}],
                 'server_node>MACH_ID>storage>cvg[0]>data_devices':
@@ -548,6 +566,7 @@ class TestCDF(unittest.TestCase):
                 'server_node>MACH_2_ID>network>data>private_interfaces':
                 ['eno1'],
                 'server_node>MACH_2_ID>s3_instances':                5,
+                'cortx>software>motr>service>client_instances':                2,
                 'server_node>MACH_2_ID>storage>cvg':
                 [{'data_devices': ['/dev/sdb'], 'metadata_devices': ['/dev/meta']}],
                 'server_node>MACH_2_ID>storage>cvg[0]>data_devices':
@@ -565,9 +584,11 @@ class TestCDF(unittest.TestCase):
         self.assertEqual(Text('myhost'), ret[0].hostname)
         self.assertEqual(Text('eth1'), ret[0].data_iface)
         self.assertEqual(1, ret[0].s3_instances)
+        self.assertEqual(2, ret[0].client_instances)
         self.assertEqual(Text('host-2'), ret[1].hostname)
         self.assertEqual(Text('eno1'), ret[1].data_iface)
         self.assertEqual(5, ret[1].s3_instances)
+        self.assertEqual(2, ret[1].client_instances)
         self.assertEqual('Some (P.o2ib)', str(ret[0].data_iface_type))
         self.assertEqual('Some (P.tcp)', str(ret[1].data_iface_type))
 
@@ -590,6 +611,8 @@ class TestCDF(unittest.TestCase):
                 None,
                 'server_node>MACH_ID>s3_instances':
                 1,
+                'cortx>software>motr>service>client_instances':
+                2,
                 'server_node>MACH_ID>network>data>private_interfaces':
                 ['eth1', 'eno2']
             }
