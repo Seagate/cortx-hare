@@ -263,6 +263,12 @@ class CdfGenerator:
         hostname = store.get(f'server_node>{machine_id}>hostname')
         name = store.get(f'server_node>{machine_id}>name')
         iface = self._get_iface(machine_id)
+        try:
+            no_m0clients = int(store.get(
+                'cortx>software>motr>service>client_instances',
+                allow_null=True))
+        except TypeError:
+            no_m0clients = 2
         # We will create 1 IO service entry in CDF per cvg.
         # An IO service entry will use data devices from corresponding cvg.
         # meta data device is currently hardcoded.
@@ -296,4 +302,5 @@ class CdfGenerator:
             # TODO in the future the value must be taken from a correct
             # ConfStore key (it doesn't exist now).
             s3_instances=int(
-                store.get(f'server_node>{machine_id}>s3_instances')))
+                store.get(f'server_node>{machine_id}>s3_instances')),
+            client_instances=no_m0clients)
