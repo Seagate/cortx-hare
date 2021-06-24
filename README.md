@@ -99,6 +99,7 @@ and health-checking mechanisms.
     cd cortx-motr
 
     scripts/m0 make rpms
+    rm ~/rpmbuild/RPMS/x86_64/cortx-motr-test*.rpm
     sudo rpm -ivh ~/rpmbuild/RPMS/x86_64/cortx-motr-*.rpm
     ```
 
