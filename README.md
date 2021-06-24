@@ -62,7 +62,8 @@ and health-checking mechanisms.
 * Install py-utils.
 
    Please refer to [the instruction](https://github.com/Seagate/cortx-utils/blob/main/py-utils/README.md) to install corxt-py-utils from sources.
-
+   
+   Note: `Hare` needs `pip` and `RPM` packages, so please [build](https://github.com/Seagate/cortx-utils/blob/main/py-utils/README.md#build) both packages. Then [install](https://github.com/Seagate/cortx-utils/blob/main/py-utils/README.md#installation) both of them using `pip3 install` and `yum install` respectively. 
 
 * Build and Install Motr.
 
