@@ -557,8 +557,10 @@ __rpm_pre: dist
 	@mkdir -v -p $(RPMSOURCES_DIR) $(RPMSPECS_DIR)
 	@mv -v $(DIST_FILE) $(RPMSOURCES_DIR)
 	@cp -v hare.spec $(RPMSPECS_DIR)
+	@cp -v hare_test.spec $(RPMSPECS_DIR)
 	@chown $$(id -u):$$(id -g) $(RPMSOURCES_DIR)/$(DIST_FILE)
 	@chown $$(id -u):$$(id -g) $(RPMSPECS_DIR)/hare.spec
+	@chown $$(id -u):$$(id -g) $(RPMSPECS_DIR)/hare_test.spec
 
 .PHONY: __rpm
 __rpm:
@@ -568,15 +570,26 @@ __rpm:
 	          --define "h_version $(VERSION)" \
 	          --define "h_gitrev $(GITREV)" \
 	          $(RPMBUILD_FLAGS)
+	@rpmbuild -ba $(RPMSPECS_DIR)/hare_test.spec \
+	          --define "_topdir $(RPMBUILD_TOPDIR)" \
+	          --define "h_version $(VERSION)" \
+	          --define "h_gitrev $(GITREV)" \
+	          $(RPMBUILD_FLAGS)
 
 .PHONY: __rpm_post
 __rpm_post:
 	@rm -f $(RPMSOURCES_DIR)/$(DIST_FILE) $(RPMSPECS_DIR)/hare.spec
+	@rm -f $(RPMSPECS_DIR)/hare_test.spec
 
 .PHONY: __rpm_srpm
 __rpm_srpm:
 	@$(call _info,Building source rpm packages)
 	@rpmbuild -bs $(RPMSPECS_DIR)/hare.spec \
+	          --define "_topdir $(RPMBUILD_TOPDIR)" \
+	          --define "h_version $(VERSION)" \
+	          --define "h_gitrev $(GITREV)" \
+	          $(RPMBUILD_FLAGS)
+	@rpmbuild -bs $(RPMSPECS_DIR)/hare_test.spec \
 	          --define "_topdir $(RPMBUILD_TOPDIR)" \
 	          --define "h_version $(VERSION)" \
 	          --define "h_gitrev $(GITREV)" \
