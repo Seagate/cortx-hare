@@ -47,6 +47,7 @@ class ConsumerThread(StoppableThread):
     The thread exits gracefully when it receives message of type Die (i.e.
     it is a 'poison pill').
     """
+
     def __init__(self, planner: WorkPlanner, motr: Motr,
                  herald: DeliveryHerald, consul: ConsulUtil, idx: int):
         super().__init__(target=self._do_work,
@@ -74,7 +75,8 @@ class ConsumerThread(StoppableThread):
                                m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED):
             motr.broadcast_ha_states(
                 [HAState(fid=event.fid, status=svc_status)],
-                notify_devices=False)
+                notify_devices=True if event.chp_event ==
+                m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED else False)
 
     @repeat_if_fails(wait_seconds=1)
     def update_process_failure(self, planner: WorkPlanner,
@@ -119,7 +121,7 @@ class ConsumerThread(StoppableThread):
                         BroadcastHAStates(states=[
                             HAState(fid=state.fid, status=ServiceHealth.FAILED)
                         ],
-                                          reply_to=None))
+                            reply_to=None))
                 if current_status not in (ServiceHealth.UNKNOWN,
                                           ServiceHealth.OFFLINE):
                     # We also need to account and report the failure of remote

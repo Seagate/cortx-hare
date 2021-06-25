@@ -282,6 +282,13 @@ class Motr:
                 notify_devices = False
             notes += self._generate_sub_services(note, self.consul_util,
                                                  notify_devices)
+            # For process failure, we report failure for the corresponding
+            # node (enclosure) and CVGs.
+            if (st.fid.container == ObjT.PROCESS.value
+                    and st.status in (ServiceHealth.FAILED, ServiceHealth.OK)):
+                notes += self.notify_node_status(note)
+            if st.fid.container == ObjT.DRIVE.value:
+                self.consul_util.update_drive_state([st.fid], st.status)
         if not notes:
             return []
         message_ids: List[MessageId] = self._ffi.ha_broadcast(
@@ -364,11 +371,7 @@ class Motr:
             for x in service_list
         ]
         if notify_devices:
-            # For process failure, we report failure for the corresponding
-            # node (enclosure) and CVGs.
             service_notes += self._generate_sub_disks(note, service_list, cns)
-            service_notes += self.notify_node_failure(note)
-
         return service_notes
 
     def _generate_sub_disks(self, note: HaNoteStruct, services: List,
@@ -380,15 +383,23 @@ class Motr:
             disk_list += cns.get_disks_by_parent_process(proc_fid, svc.fid)
         LOG.debug('proc fid=%s encloses %d disks with state %d as follows: %s',
                   proc_fid, len(disk_list), int(new_state), disk_list)
+        if disk_list:
+            state = (ServiceHealth.OK if new_state ==
+                     HaNoteStruct.M0_NC_ONLINE else ServiceHealth.FAILED)
+            # XXX: Need to check the current state of the device, transition
+            # to ONLINE only in case of an explicit request or iff the prior
+            # state of the device is UNKNOWN/OFFLINE.
+            cns.update_drive_state(disk_list, state, device_event=False)
         return [
             HaNoteStruct(no_id=x.to_c(), no_state=new_state) for x in disk_list
         ]
 
-    def notify_node_failure(self,
-                            proc_note: HaNoteStruct) -> List[HaNoteStruct]:
+    def notify_node_status(self,
+                           proc_note: HaNoteStruct) -> List[HaNoteStruct]:
         new_state = proc_note.no_state
         proc_fid = Fid.from_struct(proc_note.no_id)
-        LOG.debug('Notifying node failure for process_fid=%s state=%s',
+        assert ObjT.PROCESS.value == proc_fid.container
+        LOG.debug('Notifying node status for process_fid=%s state=%s',
                   proc_fid, new_state)
 
         node = self.consul_util.get_process_node(proc_fid)
@@ -396,8 +407,8 @@ class Motr:
         node_fid = self.consul_util.get_node_fid(node)
         encl_fid = self.consul_util.get_node_encl_fid(node)
         ctrl_fid = self.consul_util.get_node_ctrl_fid(node)
-        LOG.debug('node_fid: %s encl_fid: %s ctrl_fid: %s',
-                  node_fid, encl_fid, ctrl_fid)
+        LOG.debug('node_fid: %s encl_fid: %s ctrl_fid: %s with state: %s',
+                  node_fid, encl_fid, ctrl_fid, new_state)
 
         notes = []
         if node_fid and encl_fid and ctrl_fid:
