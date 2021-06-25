@@ -42,7 +42,7 @@ from time import sleep
 
 # Logger details
 LOG_DIR = "/var/log/seagate/hare/"
-LOG_FILE = 'setup.log'
+LOG_FILE = "/var/log/seagate/hare/setup.log"
 LOG_FILE_SIZE = 5 * 1024 * 1024
 
 
