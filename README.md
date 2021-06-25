@@ -94,12 +94,15 @@ and health-checking mechanisms.
 * Build Motr RPMs
 
   * From sources
+    **NOTE:** Installing motr RPMs other than "cortx-motr-test*.rpm"
     ```sh
     git clone --recursive https://github.com/Seagate/cortx-motr.git
     cd cortx-motr
 
     scripts/m0 make rpms
-    sudo rpm -ivh ~/rpmbuild/RPMS/x86_64/cortx-motr-*.rpm
+    cd ~/rpmbuild/RPMS/x86_64/
+    sudo rpm -ivh $(ls | grep  "cortx-motr-" | grep -v "cortx-motr-tests")
+    cd -
     ```
 
 * Build `hare` RPMs
