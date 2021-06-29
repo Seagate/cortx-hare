@@ -1224,7 +1224,7 @@ class ConfProcess(ToDhall):
         for stype in service_types(proc_t, proc_desc):
             sparams = params if stype is SvcT.M0_CST_DTM0 else []
             svc_id = ConfService.build(m0conf, proc_id, stype, ep,
-                                       params=sparams, ctrl)
+                                       params=sparams, ctrl=ctrl)
             if stype is SvcT.M0_CST_IOS:
                 assert proc_desc is not None
                 for disk in proc_desc['_io_disks']:
@@ -1323,6 +1323,7 @@ class ConfService(ToDhall):
         self.sdevs = sdevs
         self.ctrl_id = ctrl_id
         self.params = params
+        self.ctrl_id = ctrl_id
 
     def __repr__(self):
         args = ', '.join([f'stype={self.type}',
