@@ -1186,6 +1186,7 @@ class ConfService(ToDhall):
         self.sdevs = sdevs
         self.ctrl_id = ctrl_id
         self.params = params
+        self.ctrl_id = ctrl_id
 
     def __repr__(self):
         args = ', '.join([f'stype={self.type}',
