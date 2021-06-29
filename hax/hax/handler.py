@@ -70,14 +70,25 @@ class ConsumerThread(StoppableThread):
         #
         # This thread will become blocked until that
         # intermittent error gets resolved.
+        motr_to_svc_status = {
+            (m0HaProcessType.M0_CONF_HA_PROCESS_M0MKFS.value,
+                m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED.value): (
+                    ServiceHealth.OK),
+            (m0HaProcessType.M0_CONF_HA_PROCESS_M0MKFS.value,
+                m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED.value): (
+                    ServiceHealth.STOPPED),
+            (m0HaProcessType.M0_CONF_HA_PROCESS_M0D.value,
+                m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED.value): (
+                    ServiceHealth.OK),
+            (m0HaProcessType.M0_CONF_HA_PROCESS_M0D.value,
+                m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED.value): (
+                    ServiceHealth.FAILED)}
         self.consul.update_process_status(event)
-        svc_status = m0HaProcessEvent.event_to_svchealth(event.chp_event)
         if event.chp_event in (m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED,
                                m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED):
+            svc_status = motr_to_svc_status[(event.chp_type, event.chp_event)]
             motr.broadcast_ha_states(
-                [HAState(fid=event.fid, status=svc_status)],
-                notify_devices=True if event.chp_event ==
-                m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED else False)
+                [HAState(fid=event.fid, status=svc_status)])
 
     @repeat_if_fails(wait_seconds=1)
     def update_process_failure(self, planner: WorkPlanner,
