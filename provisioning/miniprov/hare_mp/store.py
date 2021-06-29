@@ -18,7 +18,7 @@
 
 from typing import Any
 
-from cortx.utils.conf_store import ConfStore
+from cortx.utils.conf_store import Conf
 
 from hare_mp.types import MissingKeyError
 
@@ -46,8 +46,22 @@ class ValueProvider:
 class ConfStoreProvider(ValueProvider):
     def __init__(self, url: str):
         self.url = url
-        conf = ConfStore()
-        conf.load('hare', url)
+        # Note that we don't instantiate Conf class on purpose.
+        #
+        # Conf is a 'singleton' (as it is understood by its authors).
+        # In fact it is a class with static methods only.
+        #
+        # fail_reload flag is required to be False otherwise the error as
+        # follows will be thrown when ConfStoreProvider is instantiated not for
+        # the first time in the current address space:
+        #
+        # ConfError: error(22): conf index hare already exists
+        #
+        # Reason: although Conf has static methods only, it does have a state.
+        # That state is also static...
+
+        conf = Conf
+        conf.load('hare', url, fail_reload=False)
         self.conf = conf
 
     def _raw_get(self, key: str) -> str:
