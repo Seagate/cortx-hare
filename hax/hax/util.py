@@ -88,6 +88,11 @@ ha_process_events = ('M0_CONF_HA_PROCESS_STARTING',
                      'M0_CONF_HA_PROCESS_STOPPING',
                      'M0_CONF_HA_PROCESS_STOPPED')
 
+motr_event_types = ('M0_CONF_HA_PROCESS_OTHER',
+                    'M0_CONF_HA_PROCESS_KERNEL',
+                    'M0_CONF_HA_PROCESS_M0MKFS',
+                    'M0_CONF_HA_PROCESS_M0D')
+
 ha_conf_obj_states = ('M0_NC_UNKNOWN',
                       'M0_NC_ONLINE',
                       'M0_NC_FAILED',
@@ -372,7 +377,7 @@ class ConsulUtil:
 
     def get_svc_status(self, srv_fid: Fid) -> str:
         try:
-            return self.get_process_status(srv_fid)
+            return self.get_process_status(srv_fid)[0]
         except Exception:
             return 'Unknown'
 
@@ -512,10 +517,10 @@ class ConsulUtil:
             pfid = self.get_service_process_fid(svc_fid)
         else:
             pfid = create_process_fid(fidk)
-        if (self.get_process_status(pfid) in ('M0_CONF_HA_PROCESS_STARTING',
-                                              'M0_CONF_HA_PROCESS_STARTED',
-                                              'M0_CONF_HA_PROCESS_STOPPING',
-                                              'Unknown')):
+        if (self.get_process_status(pfid)[0] in ('M0_CONF_HA_PROCESS_STARTING',
+                                                 'M0_CONF_HA_PROCESS_STARTED',
+                                                 'M0_CONF_HA_PROCESS_STOPPING',
+                                                 'Unknown')):
             return HaNoteStruct.M0_NC_ONLINE
         else:
             return HaNoteStruct.M0_NC_FAILED
@@ -693,7 +698,8 @@ class ConsulUtil:
         assert 0 <= event.chp_event < len(ha_process_events), \
             f'Invalid event type: {event.chp_event}'
         local_node = self.get_local_nodename()
-        data = json.dumps({'state': ha_process_events[event.chp_event]})
+        data = json.dumps({'state': ha_process_events[event.chp_event],
+                           'type': motr_event_types[event.chp_type]})
         # Maintain statuses for all the motr processes in the cluster
         # for every node so that in case of 1 or more node failures,
         # as every node will receive the node failure event, the failed
@@ -824,14 +830,15 @@ class ConsulUtil:
         return self.sdev_to_drive_fid(sdev_fid)
 
     # Returns status of process from its local node.
-    def get_process_status(self, fid: Fid) -> str:
+    def get_process_status(self, fid: Fid) -> Tuple[str, str]:
         proc_node = self.get_process_node(fid)
         key = f'{proc_node}/processes/{fid}'
         status = self.kv.kv_get(key)
         if status:
-            return str(json.loads(status['Value'])['state'])
+            return (str(json.loads(status['Value'])['state']),
+                    str(json.loads(status['Value'])['type']))
         else:
-            return 'Unknown'
+            return ('Unknown', 'Unknown')
 
     def get_process_local_status(self, fid: Fid) -> str:
         local_node = self.get_local_nodename()
@@ -919,7 +926,7 @@ class ConsulUtil:
                                              ServiceHealth.FAILED),
             ('warning',
              'M0_CONF_HA_PROCESS_STOPPED'): (ServiceHealth.STOPPED,
-                                             ServiceHealth.STOPPED),
+                                             ServiceHealth.FAILED),
             ('warning',
              'M0_CONF_HA_PROCESS_STARTING'): (ServiceHealth.OFFLINE,
                                               ServiceHealth.OFFLINE),
@@ -939,15 +946,20 @@ class ConsulUtil:
                     if item['Status'] == 'critical':
                         return ServiceHealth.FAILED
                     pfid = create_process_fid(svc_id)
-                    svc_consul_status = self.get_svc_status(pfid)
+                    cns_status = self.get_process_status(pfid)
                     svc_health = svc_to_motr_status_map[(item['Status'],
-                                                         svc_consul_status)]
+                                                         cns_status[0])]
+                    LOG.debug('consul.status %s svc_health: %s',
+                              str(cns_status), str(svc_health))
                     local_node = self.get_local_nodename()
                     proc_node = self.get_process_node(pfid)
                     if proc_node == local_node:
                         status = svc_health[0]
                     else:
                         status = svc_health[1]
+                    if (status == ServiceHealth.FAILED and
+                            cns_status[1] == 'M0_CONF_HA_PROCESS_M0MKFS'):
+                        status = ServiceHealth.STOPPED
 
                     # This situation is not expected but we handle
                     # the same. Hax may end up here if the process has stopped
@@ -955,7 +967,7 @@ class ConsulUtil:
                     # 'unknown' by Consul. Hax will do nothing in this case
                     # and will report OFFLINE for that process.
                     if (item['Status'] == 'warning' and
-                            svc_consul_status == 'Unknown' and
+                            cns_status[0] == 'Unknown' and
                             status == ServiceHealth.UNKNOWN):
                         status = ServiceHealth.OFFLINE
 
@@ -1055,7 +1067,7 @@ class ConsulUtil:
         self.update_process_status(ev)
 
     def is_confd_failed(self, proc_fid: Fid) -> bool:
-        status = self.get_process_status(proc_fid)
+        status = self.get_process_status(proc_fid)[0]
         return status in ('M0_CONF_HA_PROCESS_STOPPING',
                           'M0_CONF_HA_PROCESS_STOPPED',
                           'M0_CONF_HA_PROCESS_STARTING')
