@@ -3,7 +3,7 @@ import logging
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
-from hax.util import ConsulKVBasic, repeat_if_fails
+from hax.util import KVAdapter, repeat_if_fails
 
 LOG = logging.getLogger('hax')
 
@@ -20,9 +20,9 @@ class OffsetStorage:
     def __init__(self,
                  node_name: str,
                  key_prefix: str = '',
-                 kv: Optional[ConsulKVBasic] = None):
+                 kv: Optional[KVAdapter] = None):
         self.node_name = node_name
-        self.kv = kv or ConsulKVBasic()
+        self.kv = kv or KVAdapter()
         self.key_prefix = key_prefix
 
     @repeat_if_fails()

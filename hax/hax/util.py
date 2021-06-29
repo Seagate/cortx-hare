@@ -158,7 +158,7 @@ def wait_for_event(event: Event, interval_sec) -> None:
         raise InterruptedException()
 
 
-class ConsulKVBasic:
+class KVAdapter:
     def __init__(self, cns: Optional[Consul] = None):
         self.cns = cns or Consul()
 
@@ -237,12 +237,11 @@ class ConsulKVBasic:
                                          f' from KV, error: {e}')
 
 
-class ConsulUtil:
-    def __init__(self, raw_client: Optional[Consul] = None):
-        self.cns: Consul = raw_client or Consul()
-        self.kv = ConsulKVBasic(cns=self.cns)
+class CatalogAdapter:
+    def __init__(self, cns: Optional[Consul] = None):
+        self.cns: Consul = cns or Consul()
 
-    def _catalog_service_names(self) -> List[str]:
+    def get_service_names(self) -> List[str]:
         """
         Return full list of service names currently registered in Consul
         server.
@@ -254,15 +253,26 @@ class ConsulUtil:
             raise HAConsistencyException(
                 'Cannot access Consul catalog') from e
 
-    def _catalog_service_get(self, svc_name: str) -> List[Dict[str, Any]]:
+    def get_services(self, svc_name: str) -> List[Dict[str, Any]]:
+        """
+        Return service(s) registered in Consul by the given name.
+        """
         try:
             return self.cns.catalog.service(service=svc_name)[1]
         except (ConsulException, HTTPError, RequestException) as e:
             raise HAConsistencyException(
                 'Could not access Consul Catalog') from e
 
+
+class ConsulUtil:
+    def __init__(self, raw_client: Optional[Consul] = None):
+        self.cns: Consul = raw_client or Consul()
+        self.kv = KVAdapter(cns=self.cns)
+        self.catalog = CatalogAdapter(cns=self.cns)
+
     def _service_by_name(self, hostname: str, svc_name: str) -> Dict[str, Any]:
-        for svc in self._catalog_service_get(svc_name):
+        cat = self.catalog
+        for svc in cat.get_services(svc_name):
             if svc['Node'] == hostname:
                 return svc
         raise HAConsistencyException(
@@ -292,7 +302,7 @@ class ConsulUtil:
 
     def _service_data(self) -> ServiceData:
         my_fidk = self.get_hax_fid().key
-        services = self._catalog_service_get('hax')
+        services = self.catalog.get_services('hax')
         for svc in services:
             if int(svc['ServiceID']) == my_fidk:
                 return mkServiceData(svc)
@@ -392,7 +402,7 @@ class ConsulUtil:
         """
         m0d_services = set(['ios', 'confd'])
         result = []
-        for service_name in self._catalog_service_names():
+        for service_name in self.catalog.get_service_names():
             if service_name not in m0d_services:
                 continue
             data = self.get_service_data_by_name(service_name)
@@ -400,9 +410,9 @@ class ConsulUtil:
         return result
 
     def get_service_data_by_name(self, name: str) -> List[ServiceData]:
-        services = self._catalog_service_get(name)
+        services = self.catalog.get_services(name)
         LOG.log(TRACE, 'Services "%s" received: %s', name, services)
-        return list(map(mkServiceData, services))
+        return [mkServiceData(i) for i in services]
 
     def get_confd_list(self) -> List[ServiceData]:
         return self.get_service_data_by_name('confd')

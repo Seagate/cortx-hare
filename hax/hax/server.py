@@ -218,7 +218,9 @@ class ServerRunner:
         # Note that bq-delivered mechanism must use a unique node name rather
         # than broad '0.0.0.0' that doesn't identify the node from outside.
         inbox_filter = InboxFilter(
-            OffsetStorage(node_address, key_prefix='bq-delivered'))
+            OffsetStorage(node_address,
+                          key_prefix='bq-delivered',
+                          kv=self.consul_util.kv))
 
         conf_obj = ConfObjUtil(self.consul_util)
         planner = self.planner

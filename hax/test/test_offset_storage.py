@@ -22,7 +22,7 @@ import unittest
 from time import sleep
 
 from hax.queue.offset import OffsetStorage
-from hax.util import ConsulKVBasic
+from hax.util import KVAdapter
 from unittest.mock import Mock, MagicMock
 
 
@@ -34,7 +34,7 @@ class TestOffsetStorage(unittest.TestCase):
             format='%(asctime)s {%(threadName)s} [%(levelname)s] %(message)s')
 
     def test_key_prefix_correct(self):
-        kv = ConsulKVBasic()
+        kv = KVAdapter()
         kv.kv_put = MagicMock()
 
         storage = OffsetStorage('my-node' , key_prefix='bq-delivered', kv=kv)
@@ -43,7 +43,7 @@ class TestOffsetStorage(unittest.TestCase):
         kv.kv_put.assert_called_with('bq-delivered/my-node', '150')
 
     def test_key_prefix_used_everywhere(self):
-        kv = ConsulKVBasic()
+        kv = KVAdapter()
         kv.kv_put = MagicMock()
         kv.kv_get = MagicMock(side_effect=[{'Value': '120'}])
 
