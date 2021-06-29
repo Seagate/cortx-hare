@@ -137,7 +137,8 @@ class ConsumerThread(StoppableThread):
                     self.consul.update_process_status(
                         ConfHaProcess(
                             chp_event=event,
-                            chp_type=m0HaProcessType.M0_CONF_HA_PROCESS_M0D,
+                            chp_type=(
+                                m0HaProcessType.M0_CONF_HA_PROCESS_M0D.value),
                             chp_pid=0,
                             fid=state.fid))
                 new_ha_states.append(
