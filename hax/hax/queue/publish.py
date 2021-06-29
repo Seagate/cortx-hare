@@ -1,7 +1,7 @@
 from typing import Any, Dict, NamedTuple, Optional
 
 import simplejson
-from hax.util import ConsulKVBasic, TxPutKV, repeat_if_fails
+from hax.util import KVAdapter, TxPutKV, repeat_if_fails
 
 # XXX do we want to make payload definition more strict?
 # E.g. there could be a type hierarchy for payload objects that depends
@@ -15,10 +15,10 @@ class Publisher:
 
     def __init__(self,
                  queue_prefix: str,
-                 kv: Optional[ConsulKVBasic] = None,
+                 kv: Optional[KVAdapter] = None,
                  epoch_key: str = 'epoch'):
         self.queue_prefix = queue_prefix
-        self.kv = kv or ConsulKVBasic()
+        self.kv = kv or KVAdapter()
         self.epoch_key = epoch_key
 
     @repeat_if_fails(wait_seconds=0.1)

@@ -41,6 +41,10 @@ from hare_mp.cdf import CdfGenerator
 from hare_mp.store import ConfStoreProvider
 from hare_mp.systemd import HaxUnitTransformer
 from hare_mp.validator import Validator
+from hax.util import KVAdapter, ConsulUtil, repeat_if_fails
+from hax.types import KeyDelete
+from time import sleep
+from enum import Enum
 
 # Logger details
 LOG_DIR = "/var/log/seagate/hare/"
@@ -387,7 +391,7 @@ def nr_services() -> int:
 def all_services_started(url: str, nr_svcs: int) -> bool:
     conf = ConfStoreProvider(url)
     hostname = conf.get_hostname()
-    kv = ConsulKVBasic()
+    kv = KVAdapter()
     status_data = kv.kv_get(f'{hostname}/processes', recurse=True)
     statuses = []
     for val in status_data:
