@@ -781,7 +781,7 @@ class ConfProcess(ToDhall):
               node_desc: Dict[str, Any],
               proc_t: ProcT,
               proc_desc: Dict[str, Any] = None,
-              ctrl: Oid = None) -> Oid:
+              ctrl: Optional[Oid] = None) -> Oid:
         assert parent.type is ObjT.node
         assert ctrl is None or ctrl.type is ObjT.controller
 
@@ -804,10 +804,11 @@ class ConfProcess(ToDhall):
         m0conf[parent].processes.append(proc_id)
 
         for stype in service_types(proc_t, proc_desc):
-            svc_id = ConfService.build(m0conf, proc_id, stype, ep)
+            svc_id = ConfService.build(m0conf, proc_id, stype, ep, ctrl)
             if stype is SvcT.M0_CST_IOS:  # XXX What about M0_CST_CAS?
-                assert proc_desc is not None and ctrl is not None
+                assert proc_desc is not None
                 for disk in proc_desc['_io_disks']:
+                    assert ctrl is not None
                     ConfDrive.build(m0conf, ctrl,
                                     ConfSdev.build(m0conf, svc_id, disk))
         return proc_id
@@ -868,11 +869,13 @@ class ConfService(ToDhall):
     _objt = ObjT.service
     _downlinks = {Downlink('sdevs', ObjT.sdev)}
 
-    def __init__(self, stype: SvcT, endpoint: Endpoint, sdevs: List[Oid]):
+    def __init__(self, stype: SvcT, endpoint: Endpoint, sdevs: List[Oid],
+                 ctrl_id: Oid = None):
         self.type = stype
         self.endpoint = endpoint
         assert all(x.type is ObjT.sdev for x in sdevs)
         self.sdevs = sdevs
+        self.ctrl_id = ctrl_id
 
     def __repr__(self):
         args = ', '.join([f'stype={self.type}',
@@ -890,10 +893,11 @@ class ConfService(ToDhall):
 
     @classmethod
     def build(cls, m0conf: Dict[Oid, Any], parent: Oid,
-              stype: SvcT, endpoint: Endpoint) -> Oid:
+              stype: SvcT, endpoint: Endpoint,
+              ctrl: Optional[Oid] = None) -> Oid:
         assert parent.type is ObjT.process
         svc_id = new_oid(ObjT.service)
-        m0conf[svc_id] = cls(stype, endpoint, sdevs=[])
+        m0conf[svc_id] = cls(stype, endpoint, sdevs=[], ctrl_id=ctrl)
         m0conf[parent].services.append(svc_id)
         return svc_id
 
@@ -1125,12 +1129,15 @@ def pool_drives(m0conf: Dict[Oid, Any],
     ptype = pool_type(pool_desc)
 
     if ptype is PoolT.dix:
-        cas = [(svc_id, ctrl_id)
-               for encl_id in m0conf if encl_id.type is ObjT.enclosure
-               for ctrl_id in m0conf[encl_id].ctrls
-               for proc_id in m0conf[m0conf[encl_id].node].processes
-               for svc_id in m0conf[proc_id].services
-               if m0conf[svc_id].type is SvcT.M0_CST_CAS]
+        cas = []
+        for item in m0conf:
+            if item.type is ObjT.enclosure:
+                encl_id = item
+                for proc_id in m0conf[m0conf[encl_id].node].processes:
+                    for svc_id in m0conf[proc_id].services:
+                        if m0conf[svc_id].type is SvcT.M0_CST_CAS:
+                            cas.append((svc_id, m0conf[svc_id].ctrl_id))
+
         return [ConfDrive.build(m0conf, ctrl_id,
                                 ConfSdev.build(m0conf, svc_id,
                                                Disk(path='/dev/null',
@@ -1185,6 +1192,14 @@ def pool_drives(m0conf: Dict[Oid, Any],
         raise AssertionError(err)
 
     return [drive_id for drive_id, _ in drives]
+
+
+def cluster_encls(m0conf: Dict[Oid, Any]) -> List[Oid]:
+    encls: List[Oid] = []
+    for item in m0conf:
+        if item.type is ObjT.enclosure:
+            encls.append(item)
+    return encls
 
 
 Failures = NamedTuple('Failures', [('site', int),
@@ -1264,12 +1279,21 @@ class ConfPool(ToDhall):
                 # indivisible pieces of data, the whole CAS record is
                 # always stored on one node.
                 data_units = 1
+                parity_units = len(cluster_encls(m0conf)) - 1
             else:
                 assert t is PoolT.md
-                data_units = len(drives)
+                data_units = 1  # len(drives)
+                parity_units = len(cluster_encls(m0conf)) - 1
             pd_attrs = PDClustAttrs0(
-                data_units=data_units, parity_units=0, spare_units=0)
-        tolerance = None if t is PoolT.sns else Failures(0, 0, 0, 1, 0)
+                data_units=data_units, parity_units=parity_units,
+                spare_units=0)
+        d = pool_desc.get('allowed_failures')
+        if t in (PoolT.sns, PoolT.dix) and d:
+            tolerance = Failures(d['site'], d['rack'], d['encl'], d['ctrl'],
+                                 d['disk'])
+        else:
+            tolerance = Failures(0, 0, 0, 1, 2)
+
         pver = ConfPver.build(m0conf, pool_id, pd_attrs, drives, tolerance)
         if t is PoolT.dix:
             assert m0conf[parent].imeta_pver is None
@@ -1796,18 +1820,22 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
 
     for node in cluster_desc['nodes']:
         node_id = ConfNode.build(conf, root_id, node)
-        ctrl_id = None
+        encl_id = ConfEnclosure.build(conf, rack_id, node_id)
+        ctrl_ids: List[Tuple[Optional[Oid], Any]] = []
         m0ds = node.get('m0_servers', [])
-        if any(m0d['_io_disks'] for m0d in m0ds):
-            ctrl_id = ConfController.build(conf,
-                                           ConfEnclosure.build(conf, rack_id,
-                                                               node_id))
+        for m0d in m0ds:
+            if m0d['_io_disks']:
+                ctrl_ids.append((ConfController.build(conf, encl_id), m0d))
+            else:
+                ctrl_ids.append((None, m0d))
         ConfProcess.build(conf, node_id, node, ProcT.hax)
 
         confd_p = False
-        for m0d in m0ds:
+        for ctrl_id in ctrl_ids:
+            m0d = ctrl_id[1]
+            conf_ctrl_id: Optional[Oid] = ctrl_id[0]
             ConfProcess.build(conf, node_id, node, ProcT.m0_server, m0d,
-                              ctrl_id)
+                              conf_ctrl_id)
             if m0d['runs_confd']:
                 confd_p = True
 
