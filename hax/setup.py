@@ -18,10 +18,11 @@
 
 import os
 import os.path as P
+import re
 from distutils.cmd import Command
 from distutils.errors import DistutilsError
 from distutils.log import ERROR, INFO
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 
 import pkgconfig
 from mypy import api
@@ -53,9 +54,18 @@ class MypyCmd(Command):
                 f'Mypy returned {exit_code}. Exiting with FAILURE status')
 
 
+def get_abs_path(fname: str):
+    return os.path.join(os.path.dirname(__file__), fname)
+
+
 def read(fname):
-    return open(os.path.join(os.path.dirname(__file__), fname)) \
+    return open(get_abs_path(fname)) \
         .read().rstrip('\n')
+
+
+def read_lines(fname):
+    with open(get_abs_path(fname)) as f:
+        return f.readlines()
 
 
 def get_hax_version():
@@ -119,16 +129,39 @@ def get_motr_cflags():
     ]
 
 
+def get_requirements():
+    result: Dict[str, List[str]] = {'build': [], 'runtime': []}
+    key = 'build'
+
+    def is_comment(line: str) -> bool:
+        return re.match(r'^\s*#', line) is not None
+
+    def is_empty(line: str) -> bool:
+        return line.strip() == ''
+
+    def is_runtime_comment(line: str) -> bool:
+        return re.match(r'^\s*#:runtime-requirements:', line) is not None
+
+    for line in read_lines('requirements.txt'):
+        if is_runtime_comment(line):
+            key = 'runtime'
+            continue
+        if is_comment(line) or is_empty(line):
+            continue
+        result[key].append(line.strip())
+
+    return result
+
+
+reqs = get_requirements()
+
 setup(
     cmdclass={'mypy': MypyCmd},
     name='hax',
     version=get_hax_version(),
     packages=find_packages(),
-    setup_requires=['flake8', 'mypy', 'pkgconfig'],
-    install_requires=[
-        'python-consul>=1.1.0', 'simplejson', 'aiohttp', 'click',
-        'dataclasses', 'idna<3,>=2.5'
-    ],
+    setup_requires=reqs['build'],
+    install_requires=reqs['runtime'],
     entry_points={
         'console_scripts': ['hax=hax.hax:main', 'q=hax.queue.cli:main']
     },

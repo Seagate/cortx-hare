@@ -494,12 +494,21 @@ check-cfgen: $(PY_VENV_DIR)
 	@$(call _info,Checking cfgen)
 	@$(PY_VENV); $(MAKE) --quiet -C cfgen flake8 typecheck
 
-.PHONY: check-hax
-check-hax: $(PY_VENV_DIR)
-	@$(call _info,Checking hax)
+.PHONY: test-hax
+test-hax: $(PY_VENV_DIR)
+	@$(call _info,Running hax autotests)
 	@cd hax &&\
 	  $(PY_VENV) &&\
-	  MYPYPATH=../stubs $(PYTHON) setup.py flake8 mypy test
+	  pytest -v test/
+
+.PHONY: lint-hax
+lint-hax: $(PY_VENV_DIR)
+	@cd hax &&\
+	  $(PY_VENV) &&\
+	  MYPYPATH=../stubs $(PYTHON) setup.py flake8 mypy
+
+.PHONY: check-hax
+check-hax: $(PY_VENV_DIR) lint-hax test-hax
 
 .PHONY: check-miniprov
 check-miniprov:
