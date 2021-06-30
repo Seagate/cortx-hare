@@ -35,16 +35,12 @@ from typing import Any, Callable, Dict, List
 import yaml
 from cortx.utils.product_features import unsupported_features
 from hax.types import KeyDelete
-from hax.util import ConsulKVBasic, ConsulUtil, repeat_if_fails
+from hax.util import ConsulUtil, repeat_if_fails, KVAdapter
 
 from hare_mp.cdf import CdfGenerator
 from hare_mp.store import ConfStoreProvider
 from hare_mp.systemd import HaxUnitTransformer
 from hare_mp.validator import Validator
-from hax.util import KVAdapter, ConsulUtil, repeat_if_fails
-from hax.types import KeyDelete
-from time import sleep
-from enum import Enum
 
 # Logger details
 LOG_DIR = "/var/log/seagate/hare/"
