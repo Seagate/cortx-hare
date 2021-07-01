@@ -420,11 +420,8 @@ class Motr:
     def notify_hax_stop(self):
         LOG.debug('Notifying hax stop')
         hax_fid = self.consul_util.get_hax_fid()
-        profile_fid = self._profile.fid
         hax_endpoint = self.consul_util.get_hax_endpoint()
-        self._ffi.hax_stop(self._ha_ctx, hax_fid.to_c(),
-                           make_c_str(hax_endpoint))
-        ids = self._ffi.hax_stop(self._ha_ctx, profile_fid.to_c(),
+        ids = self._ffi.hax_stop(self._ha_ctx, hax_fid.to_c(),
                                  make_c_str(hax_endpoint))
         self.herald.wait_for_all(HaLinkMessagePromise(ids))
 
