@@ -80,6 +80,11 @@ Try reinstalling Hare on the above mentioned node.";
 }
 
 get_server_nodes() {
+    # Produces the output like this:
+    #
+    # localhost 10.230.240.139
+    # localhost2 10.230.240.140
+    #
     jq -r '.servers[] | "\(.node_name) \(.ipaddr)"' \
        $conf_dir/consul-agents.json
 }
@@ -281,7 +286,14 @@ fi
 abort_if_RC_leader_election_is_impossible
 
 read _ join_ip <<< $(get_server_nodes | grep -w $(node-name))
-read _ join_peers <<< $(get_server_nodes | grep -vw $(node-name))
+
+# get_server_nodes will produce multiple lines. We'll join them with space.
+# Note: in case when get_server_nodes is empty list, consequent awk and tr
+# will exit with non-zero code.
+# In order to swallow this error, `|| true` is needed.
+
+join_peers_opt=$(get_server_nodes | grep -vw "$(node-name)" | awk '{print "--join " $2}' | \
+              tr '\n' ' ' || true)
 
 if [[ -z $join_ip ]]; then
     cat <<'EOF' >&2
@@ -314,7 +326,7 @@ if sudo systemctl --quiet is-active hare-consul-agent; then
 fi
 
 say 'Starting Consul server on this node...'
-join_peers_opt="${join_peers:+--join $join_peers}"
+
 # $join_ip is our bind_ip address
 mk-consul-env --mode server --bind $join_ip $join_peers_opt \
               --extra-options '-ui -bootstrap-expect 1'
