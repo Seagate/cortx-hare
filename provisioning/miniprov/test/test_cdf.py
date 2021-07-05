@@ -114,12 +114,18 @@ class TestCDF(unittest.TestCase):
                 'tcp',
                 'server_node>MACH_ID>storage>cvg[0]>data_devices':
                 ['/dev/sdb'],
+                'server_node>MACH_ID>storage>cvg[1]>data_devices':
+                ['/dev/sdc'],
                 'server_node>MACH_ID>network>data>private_interfaces':
                 ['eth1', 'eno2'],
+                'server_node>MACH_ID>storage>cvg_count':
+                2,
                 'server_node>MACH_ID>storage>cvg':
-                [{'data_devices': ['/dev/sdb'], 'metadata_devices': ['/dev/meta']}],
+                [{'data_devices': ['/dev/sdb', '/dev/sdc'], 'metadata_devices': ['/dev/meta', '/dev/meta1']}],
                 'server_node>MACH_ID>storage>cvg[0]>metadata_devices':
                 ['/dev/meta'],
+                'server_node>MACH_ID>storage>cvg[1]>metadata_devices':
+                ['/dev/meta1'],
                 'server_node>MACH_ID>s3_instances':
                 1,
                 'cluster>CLUSTER_ID>site>storage_set_count':
@@ -165,10 +171,13 @@ class TestCDF(unittest.TestCase):
                 'cluster>cluster_id': 'CLUSTER_ID',
                 'server_node': {'MACH_ID': {'cluster_id': 'CLUSTER_ID'}},
                 'server_node>MACH_ID>cluster_id': 'CLUSTER_ID',
+                'server_node>MACH_ID>storage>cvg_count': 2,
                 'server_node>MACH_ID>storage>cvg':
-                [{'data_devices': ['/dev/sdb'], 'metadata_devices': ['/dev/meta']}],
+                [{'data_devices': ['/dev/sdb', '/dev/sdc'], 'metadata_devices': ['/dev/meta', '/dev/meta1']}],
                 'server_node>MACH_ID>storage>cvg[0]>data_devices': ['/dev/sdb'],
                 'server_node>MACH_ID>storage>cvg[0]>metadata_devices': ['/dev/meta'],
+                'server_node>MACH_ID>storage>cvg[1]>data_devices': ['/dev/sdc'],
+                'server_node>MACH_ID>storage>cvg[1]>metadata_devices': ['/dev/meta1'],
                 'server_node>MACH_ID>hostname':                'myhost',
                 'server_node>MACH_ID>name': 'mynodename',
                 'server_node>MACH_ID>network>data>interface_type':                'o2ib',
@@ -237,10 +246,14 @@ class TestCDF(unittest.TestCase):
                 ['eth1', 'eno2'],
                 'server_node>srvnode_1>s3_instances':
                 1,
+                'server_node>srvnode_1>storage>cvg_count':
+                2,
                 'server_node>srvnode_1>storage>cvg':
-                [{'data_devices': ['/dev/sdb'], 'metadata_devices': ['/dev/meta']}],
+                [{'data_devices': ['/dev/sdb', '/dev/sdc'], 'metadata_devices': ['/dev/meta', '/dev/meta1']}],
                 'server_node>srvnode_1>storage>cvg[0]>data_devices':
                 ['/dev/sdb'],
+                'server_node>srvnode_1>storage>cvg[1]>data_devices':
+                ['/dev/sdc'],
             }
             return data.get(value)
 
@@ -261,7 +274,7 @@ class TestCDF(unittest.TestCase):
                 'cluster>CLUSTER_ID>storage_set>server_node_count':
                 1,
                 'cluster>CLUSTER_ID>storage_set[0]>durability>sns': {'stub': 1},
-                'cluster>CLUSTER_ID>storage_set[0]>durability>sns>data': 2,
+                'cluster>CLUSTER_ID>storage_set[0]>durability>sns>data': 4,
                 'cluster>CLUSTER_ID>storage_set[0]>durability>sns>parity': 0,
                 'cluster>CLUSTER_ID>storage_set[0]>durability>sns>spare': 0,
                 'cluster>CLUSTER_ID>storage_set[0]>name':
@@ -284,10 +297,16 @@ class TestCDF(unittest.TestCase):
                 ['eth1', 'eno2'],
                 'server_node>MACH_ID>s3_instances':
                 1,
+                'server_node>MACH_ID>storage>cvg_count':
+                2,
                 'server_node>MACH_ID>storage>cvg[0]>data_devices':
                 ['/dev/sdb'],
                 'server_node>MACH_ID>storage>cvg[0]>metadata_devices':
                 ['/dev/meta'],
+                'server_node>MACH_ID>storage>cvg[1]>data_devices':
+                ['/dev/sdc'],
+                'server_node>MACH_ID>storage>cvg[1]>metadata_devices':
+                ['/dev/meta1'],
             }
             return data.get(value)
 
@@ -374,10 +393,16 @@ class TestCDF(unittest.TestCase):
                 ['eth1', 'eno2'],
                 'server_node>MACH_ID>s3_instances':
                 1,
+                'server_node>MACH_ID>storage>cvg_count':
+                2,
                 'server_node>MACH_ID>storage>cvg[0]>data_devices':
                 ['/dev/sdb'],
                 'server_node>MACH_ID>storage>cvg[0]>metadata_devices':
                 ['/dev/meta'],
+                'server_node>MACH_ID>storage>cvg[1]>data_devices':
+                ['/dev/sdc'],
+                'server_node>MACH_ID>storage>cvg[1]>metadata_devices':
+                ['/dev/meta1'],
             }
             return data.get(value)
 
@@ -385,7 +410,7 @@ class TestCDF(unittest.TestCase):
         ret = CdfGenerator(provider=store)._create_pool_descriptions()
         self.assertEqual(1, len(ret))
         diskrefs = ret[0].disk_refs.get()
-        self.assertEqual(1, len(diskrefs))
+        self.assertEqual(2, len(diskrefs))
         self.assertEqual(Text('/dev/meta'), diskrefs[0].path)
 
     def test_both_dix_and_sns_pools_can_exist(self):
@@ -425,10 +450,16 @@ class TestCDF(unittest.TestCase):
                 ['eth1', 'eno2'],
                 'server_node>MACH_ID>s3_instances':
                 1,
+                'server_node>MACH_ID>storage>cvg_count':
+                2,
                 'server_node>MACH_ID>storage>cvg[0]>data_devices':
                 ['/dev/sda', '/dev/sdb'],
                 'server_node>MACH_ID>storage>cvg[0]>metadata_devices':
                 ['/dev/meta'],
+                'server_node>MACH_ID>storage>cvg[1]>data_devices':
+                ['/dev/sdc', '/dev/sdd'],
+                'server_node>MACH_ID>storage>cvg[1]>metadata_devices':
+                ['/dev/meta1'],
             }
             return data.get(value)
 
@@ -439,11 +470,11 @@ class TestCDF(unittest.TestCase):
                          [t.name.s for t in ret])
 
         diskrefs_sns = ret[0].disk_refs.get()
-        self.assertEqual([Text('/dev/sda'), Text('/dev/sdb')],
+        self.assertEqual([Text('/dev/sda'), Text('/dev/sdb'), Text('/dev/sdc'), Text('/dev/sdd')],
                          [t.path for t in diskrefs_sns])
 
         diskrefs_dix = ret[1].disk_refs.get()
-        self.assertEqual(1, len(diskrefs_dix))
+        self.assertEqual(2, len(diskrefs_dix))
         self.assertEqual(Text('/dev/meta'), diskrefs_dix[0].path)
 
     def test_metadata_is_hardcoded(self):
