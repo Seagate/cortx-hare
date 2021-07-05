@@ -98,9 +98,14 @@ class CdfGenerator:
         conf = self.provider
         pool_type = pool.pool_type
         prop_name = 'data_devices'
+        cvg_num = int(conf.get(f'server_node>{node}>storage>cvg_count'))
+        all_cvg_devices = []
         if pool_type == 'dix':
             prop_name = 'metadata_devices'
-        return conf.get(f'server_node>{node}>storage>cvg[0]>{prop_name}')
+        for i in range(cvg_num):
+            all_cvg_devices += conf.get(
+                f'server_node>{node}>storage>cvg[{i}]>{prop_name}')
+        return all_cvg_devices
 
     def _get_server_nodes(self, pool: PoolHandle) -> List[str]:
         cid = pool.cluster_id
