@@ -39,6 +39,7 @@
       },
       "s3_instances": "1",
       "storage": {
+        "cvg_count": "1",
         "cvg": [
           {
             "data_devices": [
@@ -78,6 +79,7 @@
       },
       "s3_instances": "1",
       "storage": {
+        "cvg_count": "1",
         "cvg": [
           {
             "data_devices": [
@@ -117,6 +119,7 @@
       },
       "s3_instances": "1",
       "storage": {
+        "cvg_count": "1",
         "cvg": [
           {
             "data_devices": [
