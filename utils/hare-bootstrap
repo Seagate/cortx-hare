@@ -204,6 +204,17 @@ is_localhost() {
     [[ -e $path && $(cat $path) == $node ]] && return 0 || return 1
 }
 
+check_consul_failure() {
+    while read node bind_ip; do
+        if ssh -n $node "sudo systemctl --quiet --state=failed is-failed hare-consul-agent"; then
+            echo 'Failed to start agent on '$node: >&2
+            true; return
+        fi
+    done < <(get_all_nodes)
+
+    false; return
+}
+
 # --------------------------------------------------------------------
 # main
 
@@ -363,22 +374,29 @@ while read node bind_ip; do
 done < <(get_client_nodes)
 wait4 ${pids[@]-}
 agents_nr=$(( ${#pids[@]} + 1 ))
+count=1
 
 # Waiting for the Consul agents to get ready...
-count=1
 while (( $(get_ready_agents_nr) != $agents_nr )); do
     if (( $count > 5 )); then
-        echo 'Some agent(s) failed to start in due time:' >&2
-        diff <(get_ready_agents | sort) \
-             <(get_all_nodes | awk '{print $1}' | sort) | sed 1d >&2
-        echo 'Check connectivity and firewall (Consul ports must be opened)' >&2
-        exit 1
+        echo 'Consul not ready on node :'
+        comm -13 <(get_ready_agents | sort) \
+                 <(get_all_nodes | awk '{print $1}' | sort) >&1
+        count=1
+
+        if check_consul_failure; then
+            echo 'Some agent(s) failed to start:' >&2
+            comm -13 <(get_ready_agents | sort) \
+                     <(get_all_nodes | awk '{print $1}' | sort) >&2
+            echo 'Check connectivity and firewall (Consul ports must be opened)' >&2
+            exit 1
+        fi
     fi
-    echo -n '.'
-    sleep 1
     (( count++ ))
+    
+    sleep 1
 done
-echo ' OK'
+echo 'Consul ready on all nodes'
 
 say 'Updating Consul configuraton from the KV store...'
 update-consul-conf &
