@@ -60,9 +60,9 @@ and health-checking mechanisms.
   ```
 
 * Install py-utils.
-  ```sh
-  sudo yum -y install cortx-py-utils
-  ```
+
+   Please refer to [the instruction](https://github.com/Seagate/cortx-utils/blob/main/py-utils/README.md) to install corxt-py-utils from sources.
+
 
 * Build and Install Motr.
 
@@ -81,7 +81,11 @@ and health-checking mechanisms.
   sudo make install
   sudo chown -R $USER .
   ```
-
+* Create `hare` group.
+  ```sh
+  sudo groupadd --force hare
+  ```
+  
 * Add current user to `hare` group.
   ```sh
   sudo usermod --append --groups hare $USER
@@ -92,17 +96,9 @@ and health-checking mechanisms.
 
 **NOTE: If you have built Motr and HARE from sources you need not generate RPM packages as below, however, it might be more convenient to build and install rpms on a multinode setup sometimes**
 
-* Build Motr RPMs
-
-  * From sources
-    ```sh
-    git clone --recursive https://github.com/Seagate/cortx-motr.git
-    cd cortx-motr
-
-    scripts/m0 make rpms
-    sudo rpm -ivh ~/rpmbuild/RPMS/x86_64/cortx-motr-*.rpm
-    ```
-
+* Build & Install Motr RPMs
+  *  Follow [Motr quick start guide](https://github.com/Seagate/cortx-motr/blob/main/doc/Quick-Start-Guide.rst) to install Motr.
+  
 * Build `hare` RPMs
 
   * Download `hare` source as mentioned above

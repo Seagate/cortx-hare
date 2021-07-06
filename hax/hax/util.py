@@ -704,6 +704,64 @@ class ConsulUtil:
         LOG.debug('Setting process status in KV: %s:%s', key, data)
         self.kv.kv_put(key, data)
 
+    def update_drive_state(self,
+                           drive_fids: List[Fid],
+                           status: ServiceHealth,
+                           device_event=True) -> None:
+        device_state_map = {
+            ServiceHealth.OK: 'online',
+            ServiceHealth.FAILED: 'failed',
+            ServiceHealth.OFFLINE: 'offline',
+        }
+        for drive in drive_fids:
+            sdev_fid = self.drive_to_sdev_fid(drive)
+            self.set_sdev_state(sdev_fid, device_state_map[status],
+                                device_event)
+
+    @repeat_if_fails()
+    def set_sdev_state(self,
+                       sdev_fid: Fid,
+                       state: str,
+                       device_event=True) -> None:
+        LOG.debug('Setting sdev=%s in KV with state=%s', sdev_fid, state)
+        sdev_items = self.kv.kv_get('m0conf/nodes', recurse=True)
+        regex = re.compile(
+            f'^m0conf\\/.*\\/sdevs\\/{sdev_fid}$')
+        for sdev in sdev_items:
+            match_result = re.match(regex, sdev['Key'])
+            if not match_result:
+                continue
+            value = json.loads(sdev['Value'])
+            if not device_event and value['state'] == 'failed':
+                continue
+            value['state'] = state
+            self.kv.kv_put(sdev['Key'], json.dumps(value))
+
+    @repeat_if_fails()
+    def drive_to_sdev_fid(self, drive_fid: Fid) -> Fid:
+        # We extract the sdev fid as follows,
+        # e.g. drive_fid=0x6400000000000001:0x2d
+        # 1. m0conf/sites/0x5300000000000001:0x1/racks/0x6100000000000001:0x2/
+        #    encls/0x6500000000000001:0x21/ctrls/0x6300000000000001:0x22/
+        #    drives/0x6b00000000000001:0x2d:{"sdev": "0x6400000000000001:0x2c",
+        #    "state": "M0_NC_UNKNOWN"}
+        # 2. Fetch Consul kv for sdev fid
+        # 3. Extract sdev fid key from the sdev fid.
+        # 4. Create sdev fid from fid key.
+        sdev_fid: Fid = Fid(0, 0)
+        sdev_items = self.kv.kv_get('m0conf/sites', recurse=True)
+        regex = re.compile(
+            f'^m0conf\\/.*\\/drives/{drive_fid}$')
+        for x in sdev_items:
+            match_result = re.match(regex, x['Key'])
+            if not match_result:
+                continue
+            sdev_fid_item = json.loads(x['Value'])['sdev']
+            sdev_fidk = Fid.parse(sdev_fid_item).key
+            sdev_fid = create_sdev_fid(sdev_fidk)
+            break
+        return sdev_fid
+
     @repeat_if_fails()
     def sdev_to_drive_fid(self, sdev_fid: Fid):
         # We extract the drive fid as follows,
