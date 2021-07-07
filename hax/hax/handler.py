@@ -57,6 +57,7 @@ class ConsumerThread(StoppableThread):
         self.consul = consul
         self.eq_publisher = EQPublisher()
         self.herald = herald
+        self.idx = idx
 
     def stop(self) -> None:
         self.is_stopped = True
@@ -258,7 +259,8 @@ class ConsumerThread(StoppableThread):
                     planner.notify_finished(item)
         except StopIteration:
             LOG.info('Consumer Stopped')
-            motr.stop()
+            if self.idx == 0:
+                motr.stop()
             motr.shun_motr_thread()
         finally:
             LOG.info('Handler thread has exited')
