@@ -250,7 +250,7 @@ class m0HaProcessEvent(IntEnum):
         return m0ProcessEvToSvcHealth[self]
 
 
-class m0HaProcessType(Enum):
+class m0HaProcessType(IntEnum):
     M0_CONF_HA_PROCESS_OTHER = 0
     M0_CONF_HA_PROCESS_KERNEL = 1
     M0_CONF_HA_PROCESS_M0MKFS = 2
