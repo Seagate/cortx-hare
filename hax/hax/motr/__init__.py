@@ -103,7 +103,8 @@ class Motr:
         LOG.info('Stopping motr')
         self.is_stopping = True
         self.notify_hax_stop()
-        self.stop_rconfc()
+        if self.is_spiel_ready():
+            self.stop_rconfc()
         self._ffi.motr_stop(self._ha_ctx)
 
     def fini(self):
