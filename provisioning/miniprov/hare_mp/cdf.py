@@ -3,24 +3,17 @@ import subprocess as S
 from dataclasses import dataclass
 from string import Template
 from typing import Any, Dict, List, Optional, Tuple
-from math import floor
+from math import floor, ceil
 import pkg_resources
 
 from hare_mp.store import ValueProvider
 from hare_mp.types import (ClusterDesc, DiskRef, DList, Maybe, NodeDesc,
                            PoolDesc, PoolType, ProfileDesc, Protocol, Text,
-                           M0ServerDesc, DisksDesc, AllowedFailures)
+                           M0ServerDesc, DisksDesc, AllowedFailures, Layout)
 
 DHALL_PATH = '/opt/seagate/cortx/hare/share/cfgen/dhall'
 DHALL_EXE = '/opt/seagate/cortx/hare/bin/dhall'
 DHALL_TO_YAML_EXE = '/opt/seagate/cortx/hare/bin/dhall-to-yaml'
-
-
-@dataclass
-class Layout:
-    data: int
-    parity: int
-    spare: int
 
 
 @dataclass
@@ -137,6 +130,34 @@ class CdfGenerator:
                 f'device count ({data_devices_count}) must be not '
                 f'less than N+K+S ({min_width})')
 
+    # Current formula is as follows
+    # Disk or device failure = K(parity)
+    # Node failures = floor(K/ceil((N+K+S)/ number of nodes))
+    # Controller or CVG failure = min(K, cvg per node * Node failures)
+    def _calculate_allowed_failure(self, layout: Layout) -> AllowedFailures:
+        conf = self.provider
+
+        machine_id = conf.get_machine_id()
+        node_count = len(conf.get_storage_set_nodes())
+        cvg_per_node = int(conf.get(
+            f'server_node>{machine_id}>storage>cvg_count'))
+
+        total_unit = layout.data + layout.parity + layout.spare
+        if total_unit == 0:
+            raise RuntimeError('All layout parameters are 0')
+
+        enc_failure_allowed_FP = layout.parity / ceil(total_unit / node_count)
+        enc_failure_allowed = floor(enc_failure_allowed_FP)
+
+        temp = cvg_per_node * enc_failure_allowed
+        ctrl_failure_allowed = min(temp, layout.parity)
+
+        return AllowedFailures(site=0,
+                               rack=0,
+                               encl=enc_failure_allowed,
+                               ctrl=ctrl_failure_allowed,
+                               disk=layout.parity)
+
     def _add_pool(self, pool: PoolHandle, out_list: List[PoolDesc]) -> None:
         conf = self.provider
         layout = self._get_layout(pool)
@@ -146,28 +167,7 @@ class CdfGenerator:
         storage_set_name = conf.get(f'cluster>{cid}>storage_set[{i}]>name')
         pool_name = f'{storage_set_name}__{pool_type}'
 
-        ctrl_failure_allowed = layout.parity
-
-        machine_id = conf.get_machine_id()
-        node_count = len(conf.get_storage_set_nodes())
-        cvg_per_node = int(conf.get(
-            f'server_node>{machine_id}>storage>cvg_count'))
-
-        cvg_per_storage_set = cvg_per_node * node_count
-
-        if layout.data + layout.parity + layout.spare == 0:
-            raise RuntimeError('All layout parameters are 0')
-
-        ratio = floor(cvg_per_storage_set / (
-                      layout.data + layout.parity + layout.spare))
-
-        if ratio == 0:
-            ctrl_failure_allowed = 0
-        else:
-            ctrl_failure_allowed = layout.parity
-
-        enc_failure_allowed = floor((layout.parity * ratio) / (
-                                    cvg_per_node))
+        allowed_failure = self._calculate_allowed_failure(layout)
 
         out_list.append(
             PoolDesc(
@@ -186,13 +186,7 @@ class CdfGenerator:
                 parity_units=layout.parity,
                 spare_units=Maybe(layout.spare, 'Natural'),
                 type=PoolType[pool_type],
-                allowed_failures=Maybe(AllowedFailures(
-                                       site=0,
-                                       rack=0,
-                                       encl=enc_failure_allowed,
-                                       ctrl=ctrl_failure_allowed,
-                                       disk=layout.parity),
-                                       'AllowedFailures')))
+                allowed_failures=Maybe(allowed_failure, 'AllowedFailures')))
 
     def _create_pool_descriptions(self) -> List[PoolDesc]:
         pools: List[PoolDesc] = []
