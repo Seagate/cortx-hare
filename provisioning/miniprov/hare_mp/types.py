@@ -157,3 +157,10 @@ class MissingKeyError(Exception):
 
     def __str__(self):
         return f"Required key '{self.key}' not found"
+
+
+@dataclass(repr=False)
+class Layout:
+    data: int
+    parity: int
+    spare: int
