@@ -501,7 +501,16 @@ def add_subcommand(subparser,
     parser = subparser.add_parser(command, help=help_str)
     parser.set_defaults(func=handler_fn)
 
-    parser.add_argument('--config',
+    if config_required:
+        requiredArg = parser.add_argument_group('required argument')
+        requiredArg.add_argument('--config',
+                        help='Conf Store URL with cluster info',
+                        required=config_required,
+                        nargs=1,
+                        type=str,
+                        action='store')
+    else:
+        parser.add_argument('--config',
                         help='Conf Store URL with cluster info',
                         required=config_required,
                         nargs=1,
@@ -521,7 +530,9 @@ def add_file_argument(parser):
 
 
 def add_plan_argument(parser):
-    parser.add_argument('--plan',
+    requiredArg = parser.add_argument_group('required argument')
+
+    requiredArg.add_argument('--plan',
                         help='Testing plan to be executed. Supported '
                         'values:' + str([e.value for e in Plan]),
                         required=True,
