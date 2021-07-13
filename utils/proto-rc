@@ -37,7 +37,7 @@ export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
 #
 
 # Redirect all printouts to the log file with the timestamp prefix:
-LOGFILE="/var/log/hare/consul-${0##*/}.log"
+LOGFILE="/var/log/seagate/hare/consul-${0##*/}.log"
 exec &>> ${LOGFILE}
 exec &> >(stdbuf --output=L gawk '{ print strftime("%Y-%m-%d %H:%M:%S"), $0 }')
 
