@@ -259,7 +259,7 @@ install-dirs:
 		  $(HARE_RULES) \
 		  $(ETC_CRON_DIR) \
 		  $(DESTDIR)/run/cortx \
-		  $(DESTDIR)/var/log/hare \
+		  $(DESTDIR)/var/log/seagate/hare \
 		  $(DESTDIR)/etc/logrotate.d \
 		  $(DESTDIR)/var/motr/hax; \
 	 do \
@@ -472,7 +472,7 @@ uninstall:
 	          $(DESTDIR)/$(PREFIX) \
 	          $(DESTDIR)/usr/bin/hctl \
 	          $(DESTDIR)/var/lib/hare \
-	          $(DESTDIR)/var/log/hare \
+	          $(DESTDIR)/var/log/seagate/hare \
 	          $(DESTDIR)/var/motr/hax; \
 	 do \
 	     if [[ -e $$d ]]; then \

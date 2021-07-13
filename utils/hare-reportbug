@@ -112,7 +112,7 @@ done
 
 cp --parents /var/lib/hare/* . 2>/dev/null || true
 cp -r --parents /var/lib/hare/consul-{env,server,client}-* . 2>/dev/null || true
-cp -r --parents /var/log/hare/ . 2>/dev/null || true
+cp -r --parents /var/log/seagate/hare/ . 2>/dev/null || true
 cp -r --parents /var/log/cluster/ . 2>/dev/null || true
 
 cd ..

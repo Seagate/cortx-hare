@@ -310,8 +310,8 @@ def cleanup(args):
 
 def logs_cleanup():
     try:
-        logging.info('Cleaning up hare log directory(/var/log/hare)')
-        os.system('rm -rf /var/log/hare')
+        logging.info('Cleaning up hare log directory(/var/log/seagate/hare)')
+        os.system('rm -rf /var/log/seagate/hare')
 
         return 0
     except Exception as error:
