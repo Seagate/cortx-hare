@@ -386,7 +386,7 @@ class Motr:
                   proc_fid, len(disk_list), int(new_state), disk_list)
         if disk_list:
             state = (ServiceHealth.OK if new_state ==
-                     HaNoteStruct.M0_NC_ONLINE else ServiceHealth.FAILED)
+                     HaNoteStruct.M0_NC_ONLINE else ServiceHealth.OFFLINE)
             # XXX: Need to check the current state of the device, transition
             # to ONLINE only in case of an explicit request or iff the prior
             # state of the device is UNKNOWN/OFFLINE.
