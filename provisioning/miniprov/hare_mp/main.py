@@ -197,11 +197,22 @@ def post_install(args):
         exit(-1)
 
 
+def enable_hare_consul_agent() -> None:
+    cmd = ['systemctl', 'enable', 'hare-consul-agent']
+    execute(cmd)
+
+
+def disable_hare_consul_agent() -> None:
+    cmd = ['systemctl', 'disable', 'hare-consul-agent']
+    execute(cmd)
+
+
 def init(args):
     try:
         rc = 0
         url = args.config[0]
         validator = Validator(ConfStoreProvider(url))
+        disable_hare_consul_agent()
         if validator.is_first_node_in_cluster():
             path_to_cdf = args.file[0]
             if not is_cluster_running() and bootstrap_cluster(
@@ -211,6 +222,7 @@ def init(args):
             if rc == 0:
                 wait_for_cluster_start(url)
             shutdown_cluster()
+        enable_hare_consul_agent()
         exit(rc)
     except Exception as error:
         logging.error('Error while initializing the cluster (%s)', error)
