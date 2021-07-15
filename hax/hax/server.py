@@ -32,9 +32,10 @@ from hax.message import (BaseMessage, BroadcastHAStates, SnsDiskAttach,
                          SnsRebalanceStop, SnsRepairPause, SnsRepairResume,
                          SnsRepairStart, SnsRepairStatus, SnsRepairStop)
 from hax.motr.delivery import DeliveryHerald
+from hax.motr.planner import WorkPlanner
 from hax.queue import BQProcessor
-from hax.queue.offset import InboxFilter, OffsetStorage
 from hax.queue.confobjutil import ConfObjUtil
+from hax.queue.offset import InboxFilter, OffsetStorage
 from hax.types import Fid, HAState, ServiceHealth, StoppableThread
 from hax.util import ConsulUtil, create_process_fid, dump_json
 
@@ -65,14 +66,14 @@ def to_ha_states(data: Any, consul_util: ConsulUtil) -> List[HAState]:
     ]
 
 
-def process_ha_states(queue: Queue, consul_util: ConsulUtil):
+def process_ha_states(planner: WorkPlanner, consul_util: ConsulUtil):
     async def _process(request):
         data = await request.json()
 
         loop = asyncio.get_event_loop()
-        # Note that queue.put is potentially a blocking call
+        # Note that planner.add_command is potentially a blocking call
         await loop.run_in_executor(
-            None, lambda: queue.put(
+            None, lambda: planner.add_command(
                 BroadcastHAStates(states=to_ha_states(data, consul_util),
                                   reply_to=None)))
         return web.Response()
@@ -80,7 +81,7 @@ def process_ha_states(queue: Queue, consul_util: ConsulUtil):
     return _process
 
 
-def process_sns_operation(queue: Queue):
+def process_sns_operation(planner: WorkPlanner):
     async def _process(request):
         op_name = request.match_info.get('operation')
 
@@ -113,18 +114,18 @@ def process_sns_operation(queue: Queue):
         message = msg_factory[op_name](data)
 
         loop = asyncio.get_event_loop()
-        await loop.run_in_executor(None, lambda: queue.put(message))
+        await loop.run_in_executor(None, lambda: planner.add_command(message))
         return web.Response()
 
     return _process
 
 
-def get_sns_status(motr_queue: Queue,
+def get_sns_status(planner: WorkPlanner,
                    status_type: Union[Type[SnsRepairStatus],
                                       Type[SnsRebalanceStatus]]):
     def fn(request):
         queue: Queue = Queue(1)
-        motr_queue.put(
+        planner.add_command(
             status_type(reply_to=queue,
                         fid=Fid.parse(request.query['pool_fid'])))
         return queue.get(timeout=10)
@@ -185,7 +186,7 @@ async def encode_exception(request, handler):
 
 
 def run_server(
-    queue: Queue,
+    planner: WorkPlanner,
     herald: DeliveryHerald,
     consul_util: ConsulUtil,
     threads_to_wait: List[StoppableThread] = [],
@@ -208,16 +209,16 @@ def run_server(
     app = web.Application(middlewares=[encode_exception])
     app.add_routes([
         web.get('/', hello_reply),
-        web.post('/', process_ha_states(queue, consul_util)),
+        web.post('/', process_ha_states(planner, consul_util)),
         web.post(
             '/watcher/bq',
             process_bq_update(inbox_filter,
-                              BQProcessor(queue, herald, conf_obj))),
-        web.post('/api/v1/sns/{operation}', process_sns_operation(queue)),
+                              BQProcessor(planner, herald, conf_obj))),
+        web.post('/api/v1/sns/{operation}', process_sns_operation(planner)),
         web.get('/api/v1/sns/repair-status',
-                get_sns_status(queue, SnsRepairStatus)),
+                get_sns_status(planner, SnsRepairStatus)),
         web.get('/api/v1/sns/rebalance-status',
-                get_sns_status(queue, SnsRebalanceStatus)),
+                get_sns_status(planner, SnsRebalanceStatus)),
     ])
     LOG.info(f'Starting HTTP server at {web_address}:{port} ...')
     try:
@@ -225,6 +226,7 @@ def run_server(
         LOG.debug('Server stopped normally')
     finally:
         LOG.debug('Stopping the threads')
+        planner.shutdown()
         for thread in threads_to_wait:
             thread.stop()
         for thread in threads_to_wait:

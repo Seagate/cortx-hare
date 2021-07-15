@@ -32,8 +32,8 @@
         "data": {
           "interface_type": "TMPL_DATA_INTERFACE_TYPE",
           "private_interfaces": [
-            "TMPL_DATA_PRIVATE_INTERFACE_1",
-            "TMPL_DATA_PRIVATE_INTERFACE_2"
+            "TMPL_PRIVATE_DATA_INTERFACE_1",
+            "TMPL_PRIVATE_DATA_INTERFACE_2"
           ]
         }
       },
@@ -42,11 +42,20 @@
         "cvg": [
           {
             "data_devices": [
-              "TMPL_DATA_DEVICE_1",
-              "TMPL_DATA_DEVICE_2"
+              "TMPL_DATA_DEVICE_11",
+              "TMPL_DATA_DEVICE_12"
             ],
             "metadata_devices": [
-              "TMPL_METADATA_DEVICE"
+              "TMPL_METADATA_DEVICE_1"
+            ]
+          },
+          {
+            "data_devices": [
+              "TMPL_DATA_DEVICE_21",
+              "TMPL_DATA_DEVICE_22"
+            ],
+            "metadata_devices": [
+              "TMPL_METADATA_DEVICE_2"
             ]
           }
         ]
@@ -70,11 +79,20 @@
         "cvg": [
           {
             "data_devices": [
-              "TMPL_DATA_DEVICE_1",
-              "TMPL_DATA_DEVICE_2"
+              "TMPL_DATA_DEVICE_11",
+              "TMPL_DATA_DEVICE_12"
             ],
             "metadata_devices": [
-              "TMPL_METADATA_DEVICE"
+              "TMPL_METADATA_DEVICE_1"
+            ]
+          },
+          {
+            "data_devices": [
+              "TMPL_DATA_DEVICE_21",
+              "TMPL_DATA_DEVICE_22"
+            ],
+            "metadata_devices": [
+              "TMPL_METADATA_DEVICE_2"
             ]
           }
         ]
@@ -86,7 +104,7 @@
       "name": "TMPL_SERVER_NODE_NAME",
       "network": {
         "data": {
-          "interface_type": "TEMPL_DATA_INTERFACE_TYPE",
+          "interface_type": "TMPL_DATA_INTERFACE_TYPE",
           "private_interfaces": [
             "TMPL_PRIVATE_DATA_INTERFACE_1",
             "TMPL_PRIVATE_DATA_INTERFACE_2"
@@ -98,11 +116,20 @@
         "cvg": [
           {
             "data_devices": [
-              "TMPL_DATA_DEVICE_1",
-              "TMPL_DATA_DEVICE_2"
+              "TMPL_DATA_DEVICE_11",
+              "TMPL_DATA_DEVICE_12"
             ],
             "metadata_devices": [
-              "TMPL_METADATA_DEVICE"
+              "TMPL_METADATA_DEVICE_1"
+            ]
+          },
+          {
+            "data_devices": [
+              "TMPL_DATA_DEVICE_21",
+              "TMPL_DATA_DEVICE_22"
+            ],
+            "metadata_devices": [
+              "TMPL_METADATA_DEVICE_2"
             ]
           }
         ]

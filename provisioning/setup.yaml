@@ -10,10 +10,7 @@ hare:
     args: --config $URL --file '/var/lib/hare/cluster.yaml'
   test:
     cmd: /opt/seagate/cortx/hare/bin/hare_setup test
-    args: --config $URL
-  support_bundle:
-    cmd: /opt/seagate/cortx/hare/bin/hare_setup support_bundle
-    args: --config $URL
+    args: --config $URL --plan $TYPE
   reset:
     cmd: /opt/seagate/cortx/hare/bin/hare_setup reset
     args: --config $URL
@@ -23,3 +20,8 @@ hare:
   prepare:
     cmd: /opt/seagate/cortx/hare/bin/hare_setup prepare
     args: --config $URL
+  upgrade:
+    cmd: /opt/seagate/cortx/hare/bin/hare_setup upgrade
+    args: --config $URL
+support_bundle:
+  - /opt/seagate/cortx/hare/bin/hare_setup support_bundle

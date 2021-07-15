@@ -169,13 +169,6 @@ HaNote = NamedTuple('HaNote', [('obj_t', str), ('note', HaNoteStruct)])
 # struct m0_stob_id
 StobId = NamedTuple('StobId', [('domain_fid', Fid), ('fid', Fid)])
 
-# struct m0_stob_ioq_error
-StobIoqError = NamedTuple('StobIoqError', [('fid', Fid), ('conf_sdev', Fid),
-                                           ('stob_id', StobId), ('fd', int),
-                                           ('opcode', int), ('rc', int),
-                                           ('offset', int), ('size', int),
-                                           ('bshift', int)])
-
 # SnsRepairStatusItem = NamedTuple('SnsRepairStatusItem', [('fid', Fid),
 #                                                          ('status', str),
 #                                                          ('progress', int)])
@@ -217,6 +210,7 @@ class ServiceHealth(Enum):
     OK = 1
     UNKNOWN = 2
     OFFLINE = 3
+    STOPPED = 4
 
     def __repr__(self):
         """Return human-readable constant name (useful in log output)."""
@@ -256,7 +250,7 @@ class m0HaProcessEvent(IntEnum):
         return m0ProcessEvToSvcHealth[self]
 
 
-class m0HaProcessType(Enum):
+class m0HaProcessType(IntEnum):
     M0_CONF_HA_PROCESS_OTHER = 0
     M0_CONF_HA_PROCESS_KERNEL = 1
     M0_CONF_HA_PROCESS_M0MKFS = 2
@@ -277,3 +271,6 @@ class Profile(NamedTuple):
     fid: Fid
     name: str
     pool_names: List[str]
+
+
+KeyDelete = NamedTuple('KeyDelete', [('name', str), ('recurse', bool)])

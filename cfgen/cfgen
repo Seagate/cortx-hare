@@ -4,7 +4,7 @@ import abc
 import argparse
 import ast
 from enum import Enum, auto
-from functools import lru_cache
+from functools import lru_cache, wraps
 import itertools
 import json
 import os
@@ -17,9 +17,51 @@ import sys
 from typing import (Any, Callable, Dict, Iterable, Iterator, List, NamedTuple,
                     Optional, Set, Tuple)
 import yaml
+import logging
 
 
 __version__ = '0.14'
+
+LOG = logging.getLogger('cfgen')
+
+
+def repeat_on_cmd_timeout(max_retries=-1):
+    """
+    This is a decorator for command timeouts.
+
+    Ensures that the wrapped function gets re-invoked if the exception
+    subprocess.TimeoutExpired gets raised. In other words, this wrapper
+    makes the wrapped function repeatable on getting command timeout.
+
+    Parameters:
+    f - function to be decorated (repeated)
+    max_retries - how many attempts the wrapper will perform until finally
+         re-raising the exception. -1 means 'repeat forever'.
+    """
+    def callable(f):
+        @wraps(f)
+        def wrapper(*args, **kwds):
+            attempt_count = 0
+            while (True):
+                try:
+                    return f(*args, **kwds)
+
+                except subprocess.TimeoutExpired as e:
+                    attempt_count += 1
+                    if max_retries >= 0 and attempt_count > max_retries:
+                        LOG.warn(
+                            '\nFunction %s: Too many errors happened in a row'
+                            ' (max_retries = %d)', f.__name__, max_retries)
+                        raise e
+                    LOG.warn(f'\nGot {e.timeout} sec timeout '
+                             f'for function {f.__name__} '
+                             f'(attempt {attempt_count}). The attempt will '
+                             f'be repeated again.'
+                             f'\nProbable cause : degraded machine '
+                             f'performance or poor network.')
+        return wrapper
+
+    return callable
 
 
 def parse_opts(argv):
@@ -95,6 +137,7 @@ pools:
         node: <str>  # optional; 'hostname' of the corresponding node
     data_units: <int>
     parity_units: <int>
+    spare_units: <int>
     allowed_failures:  # optional section; no failures will be allowed
                        # if this section is missing or all of its elements
                        # are zeroes
@@ -231,6 +274,9 @@ def enrich_cluster_desc(desc: Dict[str, Any], mock_p: bool) -> None:
 
         for m0d in node['m0_servers']:
             m0d.setdefault('runs_confd', False)
+            if 'meta_data' in m0d['io_disks']:
+                if m0d['io_disks']['meta_data'] is None:
+                    del m0d['io_disks']['meta_data']
             m0d['_io_disks'] = get_disks(node['hostname'], mock_p,
                                          m0d['io_disks']['data'])
 
@@ -328,6 +374,10 @@ def validate_pools_desc(pools_desc: List[Dict[str, Any]]) -> None:
         t = pool_type(pool)
         if t is PoolT.sns:
             d = pool.get('allowed_failures')
+            spare_units = pool.get('spare_units')
+            assert spare_units is None\
+                or spare_units == 0\
+                or spare_units == pool['parity_units']
             assert d is None or d['disk'] <= pool['parity_units'], """\
 {}: Cannot allow that many disk failures ({})
 The number of allowed disk failures must not exceed the number of spare disks\
@@ -418,6 +468,7 @@ def is_localhost(hostname: str) -> bool:
                         socket.gethostname(), socket.getfqdn())
 
 
+@repeat_on_cmd_timeout(max_retries=-1)
 def run_command(hostname: str, *args: str) -> str:
     assert hostname
     return subprocess.check_output(args if is_localhost(hostname) else
@@ -730,7 +781,7 @@ class ConfProcess(ToDhall):
               node_desc: Dict[str, Any],
               proc_t: ProcT,
               proc_desc: Dict[str, Any] = None,
-              ctrl: Oid = None) -> Oid:
+              ctrl: Optional[Oid] = None) -> Oid:
         assert parent.type is ObjT.node
         assert ctrl is None or ctrl.type is ObjT.controller
 
@@ -753,10 +804,11 @@ class ConfProcess(ToDhall):
         m0conf[parent].processes.append(proc_id)
 
         for stype in service_types(proc_t, proc_desc):
-            svc_id = ConfService.build(m0conf, proc_id, stype, ep)
+            svc_id = ConfService.build(m0conf, proc_id, stype, ep, ctrl)
             if stype is SvcT.M0_CST_IOS:  # XXX What about M0_CST_CAS?
-                assert proc_desc is not None and ctrl is not None
+                assert proc_desc is not None
                 for disk in proc_desc['_io_disks']:
+                    assert ctrl is not None
                     ConfDrive.build(m0conf, ctrl,
                                     ConfSdev.build(m0conf, svc_id, disk))
         return proc_id
@@ -817,11 +869,13 @@ class ConfService(ToDhall):
     _objt = ObjT.service
     _downlinks = {Downlink('sdevs', ObjT.sdev)}
 
-    def __init__(self, stype: SvcT, endpoint: Endpoint, sdevs: List[Oid]):
+    def __init__(self, stype: SvcT, endpoint: Endpoint, sdevs: List[Oid],
+                 ctrl_id: Oid = None):
         self.type = stype
         self.endpoint = endpoint
         assert all(x.type is ObjT.sdev for x in sdevs)
         self.sdevs = sdevs
+        self.ctrl_id = ctrl_id
 
     def __repr__(self):
         args = ', '.join([f'stype={self.type}',
@@ -839,10 +893,11 @@ class ConfService(ToDhall):
 
     @classmethod
     def build(cls, m0conf: Dict[Oid, Any], parent: Oid,
-              stype: SvcT, endpoint: Endpoint) -> Oid:
+              stype: SvcT, endpoint: Endpoint,
+              ctrl: Optional[Oid] = None) -> Oid:
         assert parent.type is ObjT.process
         svc_id = new_oid(ObjT.service)
-        m0conf[svc_id] = cls(stype, endpoint, sdevs=[])
+        m0conf[svc_id] = cls(stype, endpoint, sdevs=[], ctrl_id=ctrl)
         m0conf[parent].services.append(svc_id)
         return svc_id
 
@@ -961,29 +1016,35 @@ class ConfEnclosure(ToDhall):
     _objt = ObjT.enclosure
     _downlinks = {Downlink('ctrls', ObjT.controller)}
 
-    def __init__(self, ctrls: List[Oid], pvers: List[Oid]):
+    def __init__(self, node: Oid, ctrls: List[Oid], pvers: List[Oid]):
+        assert node.type is ObjT.node
+        self.node = node
         assert all(x.type is ObjT.controller for x in ctrls)
         self.ctrls = ctrls
         assert all(x.type is ObjT.pver for x in pvers)
         self.pvers = pvers
 
     def __repr__(self):
-        args = ', '.join([f'ctrls={self.ctrls}',
+        args = ', '.join([f'node={self.node}',
+                          f'ctrls={self.ctrls}',
                           f'pvers={self.pvers}'])
         return f'{self.__class__.__name__}({args})'
 
     def to_dhall(self, oid: Oid) -> str:
         assert oid.type is ObjT.enclosure
         args = ', '.join([f'id = {oid_to_dhall(oid)}',
+                          f'node = {oid_to_dhall(self.node)}',
                           f'ctrls = {oids_to_dhall(self.ctrls)}',
                           f'pvers = {oids_to_dhall(self.pvers)}'])
         return '{ %s }' % args
 
     @classmethod
-    def build(cls, m0conf: Dict[Oid, Any], parent: Oid) -> Oid:
+    def build(cls, m0conf: Dict[Oid, Any], parent: Oid, node: Oid) -> Oid:
         assert parent.type is ObjT.rack
+        assert node.type is ObjT.node
+
         encl_id = new_oid(ObjT.enclosure)
-        m0conf[encl_id] = cls(ctrls=[], pvers=[])
+        m0conf[encl_id] = cls(node, ctrls=[], pvers=[])
         m0conf[encl_id]._parent = parent
         m0conf[parent].encls.append(encl_id)
         return encl_id
@@ -993,35 +1054,30 @@ class ConfController(ToDhall):
     _objt = ObjT.controller
     _downlinks = {Downlink('drives', ObjT.drive)}
 
-    def __init__(self, node: Oid, drives: List[Oid], pvers: List[Oid]):
-        assert node.type is ObjT.node
-        self.node = node
+    def __init__(self, drives: List[Oid], pvers: List[Oid]):
         assert all(x.type is ObjT.drive for x in drives)
         self.drives = drives
         assert all(x.type is ObjT.pver for x in pvers)
         self.pvers = pvers
 
     def __repr__(self):
-        args = ', '.join([f'node={self.node}',
-                          f'drives={self.drives}',
+        args = ', '.join([f'drives={self.drives}',
                           f'pvers={self.pvers}'])
         return f'{self.__class__.__name__}({args})'
 
     def to_dhall(self, oid: Oid) -> str:
         assert oid.type is ObjT.controller
         args = ', '.join([f'id = {oid_to_dhall(oid)}',
-                          f'node = {oid_to_dhall(self.node)}',
                           f'drives = {oids_to_dhall(self.drives)}',
                           f'pvers = {oids_to_dhall(self.pvers)}'])
         return '{ %s }' % args
 
     @classmethod
-    def build(cls, m0conf: Dict[Oid, Any], parent: Oid, node: Oid) -> Oid:
+    def build(cls, m0conf: Dict[Oid, Any], parent: Oid) -> Oid:
         assert parent.type is ObjT.enclosure
-        assert node.type is ObjT.node
 
         ctrl_id = new_oid(ObjT.controller)
-        m0conf[ctrl_id] = cls(node, drives=[], pvers=[])
+        m0conf[ctrl_id] = cls(drives=[], pvers=[])
         m0conf[ctrl_id]._parent = parent
         m0conf[parent].ctrls.append(ctrl_id)
         return ctrl_id
@@ -1073,11 +1129,15 @@ def pool_drives(m0conf: Dict[Oid, Any],
     ptype = pool_type(pool_desc)
 
     if ptype is PoolT.dix:
-        cas = [(svc_id, ctrl_id)
-               for ctrl_id in m0conf if ctrl_id.type is ObjT.controller
-               for proc_id in m0conf[m0conf[ctrl_id].node].processes
-               for svc_id in m0conf[proc_id].services
-               if m0conf[svc_id].type is SvcT.M0_CST_CAS]
+        cas = []
+        for item in m0conf:
+            if item.type is ObjT.enclosure:
+                encl_id = item
+                for proc_id in m0conf[m0conf[encl_id].node].processes:
+                    for svc_id in m0conf[proc_id].services:
+                        if m0conf[svc_id].type is SvcT.M0_CST_CAS:
+                            cas.append((svc_id, m0conf[svc_id].ctrl_id))
+
         return [ConfDrive.build(m0conf, ctrl_id,
                                 ConfSdev.build(m0conf, svc_id,
                                                Disk(path='/dev/null',
@@ -1091,8 +1151,9 @@ def pool_drives(m0conf: Dict[Oid, Any],
 
     assert ptype is PoolT.sns
     all_drives: List[Tuple[Oid, Oid]] = [
-        (drive_id, m0conf[ctrl_id].node)
-        for ctrl_id in m0conf if ctrl_id.type is ObjT.controller
+        (drive_id, m0conf[encl_id].node)
+        for encl_id in m0conf if encl_id.type is ObjT.enclosure
+        for ctrl_id in m0conf[encl_id].ctrls
         for drive_id in m0conf[ctrl_id].drives
     ]
     assert all_drives
@@ -1131,6 +1192,14 @@ def pool_drives(m0conf: Dict[Oid, Any],
         raise AssertionError(err)
 
     return [drive_id for drive_id, _ in drives]
+
+
+def cluster_encls(m0conf: Dict[Oid, Any]) -> List[Oid]:
+    encls: List[Oid] = []
+    for item in m0conf:
+        if item.type is ObjT.enclosure:
+            encls.append(item)
+    return encls
 
 
 Failures = NamedTuple('Failures', [('site', int),
@@ -1187,23 +1256,46 @@ class ConfPool(ToDhall):
         m0conf[pool_id] = cls(pvers=[], name=pool_desc.get('name'))
         m0conf[parent].pools.append(pool_id)
 
+        spare_units = pool_desc.get('spare_units')
+        assert spare_units is None\
+            or spare_units == 0\
+            or spare_units == pool_desc['parity_units']
+
+        if spare_units is None:
+            spare_units = pool_desc.get('parity_units')
+
         drives = pool_drives(m0conf, pool_desc)
         t = pool_type(pool_desc)
         assert ('data_units' in pool_desc) == ('parity_units' in pool_desc)
         if 'data_units' in pool_desc:
+            if spare_units is None:
+                spare_units = pool_desc['parity_units']
             pd_attrs = PDClustAttrs0(pool_desc['data_units'],
-                                     pool_desc['parity_units'])
+                                     pool_desc['parity_units'],
+                                     spare_units)
         else:
             if t is PoolT.dix:
                 # For CAS service N must be equal to 1.  CAS records are
                 # indivisible pieces of data, the whole CAS record is
                 # always stored on one node.
                 data_units = 1
+                parity_units = len(cluster_encls(m0conf)) - 1
             else:
                 assert t is PoolT.md
-                data_units = len(drives)
-            pd_attrs = PDClustAttrs0(data_units=data_units, parity_units=0)
-        tolerance = None if t is PoolT.sns else Failures(0, 0, 0, 1, 0)
+                data_units = 1  # len(drives)
+                parity_units = len(cluster_encls(m0conf)) - 1
+            pd_attrs = PDClustAttrs0(
+                data_units=data_units, parity_units=parity_units,
+                spare_units=0)
+        d = pool_desc.get('allowed_failures')
+        if t in (PoolT.sns, PoolT.dix) and d:
+            tolerance = Failures(d['site'], d['rack'], d['encl'], d['ctrl'],
+                                 d['disk'])
+        else:
+            md_allowed_failures = len(cluster_encls(m0conf)) - 1
+            tolerance = Failures(0, 0, 0, min(1, md_allowed_failures),
+                                 md_allowed_failures)
+
         pver = ConfPver.build(m0conf, pool_id, pd_attrs, drives, tolerance)
         if t is PoolT.dix:
             assert m0conf[parent].imeta_pver is None
@@ -1247,7 +1339,8 @@ def gen_allowances(allowed: Failures) -> List[Failures]:
 # m0_pdclust_attr
 PDClustAttrs0 = NamedTuple('PDClustAttrs0',
                            # XXX What about `unit_size` and `seed`?
-                           [('data_units', int), ('parity_units', int)])
+                           [('data_units', int), ('parity_units', int),\
+                            ('spare_units', int)])
 PDClustAttrs0.__doc__ = 'Motr parity de-clustering layout attributes'
 
 
@@ -1255,10 +1348,13 @@ def tolerated_failures(m0conf: Dict[Oid, Any], pd_attrs: PDClustAttrs0,
                        drives: List[Oid]) -> Failures:
     assert pd_attrs.data_units > 0
     assert pd_attrs.parity_units >= 0
+    assert pd_attrs.spare_units is None\
+        or pd_attrs.spare_units == 0\
+        or pd_attrs.spare_units == pd_attrs.parity_units
     assert drives and all(x.type is ObjT.drive for x in drives)
     assert all_unique(drives)
 
-    n, k = pd_attrs
+    n, k, s = pd_attrs
 
     nr_ctrls = 0
     for ctrl_id, ctrl in m0conf.items():
@@ -1268,7 +1364,7 @@ def tolerated_failures(m0conf: Dict[Oid, Any], pd_attrs: PDClustAttrs0,
             nr_ctrls += 1
     assert nr_ctrls > 0
 
-    q, r = divmod(n + 2*k, nr_ctrls)
+    q, r = divmod(n + k + s, nr_ctrls)
     # There are `r` controllers with `q+1` units and
     # `(nr_ctrls - r)` controllers with `q` units.
     #
@@ -1303,10 +1399,13 @@ class ConfPver(ToDhall):
     _objt = ObjT.pver
     _downlinks = {Downlink('sitevs', ObjT.objv)}
 
-    def __init__(self, data_units: int, parity_units: int, pool_width: int,
-                 tolerance: List[int], sitevs: List[Oid]):
+    def __init__(self, data_units: int, parity_units: int, spare_units: int,
+                 pool_width: int, tolerance: List[int], sitevs: List[Oid]):
         assert data_units > 0
         assert parity_units >= 0
+        assert spare_units is None\
+            or spare_units == 0\
+            or spare_units == parity_units
         assert pool_width > 0
         assert len(tolerance) == len(pver_levels)
         assert all(n >= 0 for n in tolerance)
@@ -1314,6 +1413,7 @@ class ConfPver(ToDhall):
 
         self.data_units = data_units
         self.parity_units = parity_units
+        self.spare_units = spare_units
         self.pool_width = pool_width
         self.tolerance = tolerance
         self.sitevs = sitevs
@@ -1321,6 +1421,7 @@ class ConfPver(ToDhall):
     def __repr__(self):
         args = ', '.join([f'data_units={self.data_units}',
                           f'parity_units={self.parity_units}',
+                          f'spare_units={self.spare_units}',
                           f'pool_width={self.pool_width}',
                           f'tolerance={self.tolerance}',
                           f'sitevs={self.sitevs}'])
@@ -1331,6 +1432,7 @@ class ConfPver(ToDhall):
         args = ', '.join([f'id = {oid_to_dhall(oid)}',
                           f'data_units = {self.data_units}',
                           f'parity_units = {self.parity_units}',
+                          f'spare_units = {self.spare_units}',
                           f'pool_width = {self.pool_width}',
                           f'tolerance = {self.tolerance}',
                           f'sitevs = {oids_to_dhall(self.sitevs)}'])
@@ -1348,6 +1450,7 @@ class ConfPver(ToDhall):
         m0conf[pver_id] = cls(
             data_units=pd_attrs.data_units,
             parity_units=pd_attrs.parity_units,
+            spare_units=pd_attrs.spare_units,
             pool_width=len(drives),
             tolerance=list(tolerated_failures(m0conf, pd_attrs, drives)
                            if tolerance is None else tolerance),
@@ -1541,14 +1644,14 @@ def consul_kv_drives(m0conf: Dict[Oid, Any]) -> Dict[str, str]:
             for encl_id in m0conf[rack_id].encls:
                 assert encl_id.type is ObjT.enclosure
                 encl_key = f'{rack_key}/encls/' + oid_to_fidstr(encl_id)
-                d[encl_key] = state_unknown
+                d[encl_key] = json.dumps(
+                    {'node': oid_to_fidstr(m0conf[encl_id].node),
+                     'state': 'M0_NC_UNKNOWN'})
                 for ctrl_id in m0conf[encl_id].ctrls:
                     assert ctrl_id.type is ObjT.controller
                     ctrl_key = f'{encl_key}/ctrls/' + \
                         oid_to_fidstr(ctrl_id)
-                    d[ctrl_key] = json.dumps(
-                        {'node': oid_to_fidstr(m0conf[ctrl_id].node),
-                         'state': 'M0_NC_UNKNOWN'})
+                    d[ctrl_key] = state_unknown
                     for drive_id in m0conf[ctrl_id].drives:
                         assert drive_id.type is ObjT.drive
                         drive_key = f'{ctrl_key}/drives/' + \
@@ -1661,7 +1764,7 @@ def generate_consul_kv(cluster: Cluster, dhall_dir: str) -> str:
           for x in processes()],
         *consul_kv_sdevs(m0conf).items(),
         *consul_kv_drives(m0conf).items())],
-                      indent=2) + '\n'
+        indent=2) + '\n'
 
 
 def generate_confd(m0conf: Dict[Oid, ToDhall], dhall_dir: str) -> str:
@@ -1719,19 +1822,22 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
 
     for node in cluster_desc['nodes']:
         node_id = ConfNode.build(conf, root_id, node)
-        ctrl_id = None
+        encl_id = ConfEnclosure.build(conf, rack_id, node_id)
+        ctrl_ids: List[Tuple[Optional[Oid], Any]] = []
         m0ds = node.get('m0_servers', [])
-        if any(m0d['_io_disks'] for m0d in m0ds):
-            ctrl_id = ConfController.build(conf,
-                                           ConfEnclosure.build(conf, rack_id),
-                                           node_id)
-
+        for m0d in m0ds:
+            if m0d['_io_disks']:
+                ctrl_ids.append((ConfController.build(conf, encl_id), m0d))
+            else:
+                ctrl_ids.append((None, m0d))
         ConfProcess.build(conf, node_id, node, ProcT.hax)
 
         confd_p = False
-        for m0d in m0ds:
+        for ctrl_id in ctrl_ids:
+            m0d = ctrl_id[1]
+            conf_ctrl_id: Optional[Oid] = ctrl_id[0]
             ConfProcess.build(conf, node_id, node, ProcT.m0_server, m0d,
-                              ctrl_id)
+                              conf_ctrl_id)
             if m0d['runs_confd']:
                 confd_p = True
 

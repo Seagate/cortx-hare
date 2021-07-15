@@ -30,10 +30,10 @@ Key | Value | Description
 `m0conf/profiles/<profile_fid>` | `{ "name": "<profile_name>", "pools": [ "<pool_name>" ] }` | "pools" - names of the _SNS_ pools associated with this profile.  `<profile_name>` and `<pool_name>`s are specified in the CDF.
 `m0conf/sites/<site_fid>` | `{ "state": "<HA state>" }` | [HA state](#ha-state) of this site.
 `m0conf/sites/<site_fid>/racks/<rack_fid>` | `{ "state": "<HA state>" }` | [HA state](#ha-state) of this rack.
-`m0conf/sites/<site_fid>/racks/<rack_fid>/encls/<encl_fid>` | `{ "state": "<HA state>" }` | [HA state](#ha-state) of this enclosure.
-`m0conf/sites/<site_fid>/racks/<rack_fid>/encls/<encl_fid>/ctrls/<ctrl_fid>` | `{ "node": "<node_fid>", "state": "<HA state>" }` | Fid of the corresponding node and [HA state](#ha-state) of this controller.
+`m0conf/sites/<site_fid>/racks/<rack_fid>/encls/<encl_fid>` | `{ "node": "<node_fid>", "state": "<HA state>" }` | Fid of the corresponding node and [HA state](#ha-state) of this enclosure.
+`m0conf/sites/<site_fid>/racks/<rack_fid>/encls/<encl_fid>/ctrls/<ctrl_fid>` | `{ "state": "<HA state>" }` | [HA state](#ha-state) of this controller.
 `m0conf/sites/<site_fid>/racks/<rack_fid>/encls/<encl_fid>/ctrls/<ctrl_fid>/drives/<drive_fid>` | `{ "dev": "<sdev_fid>", "state": "<HA state>" }` | Fid of the corresponding storage device and [HA state](#ha-state) of this drive.
-`processes/<fid>` | `{ "state": "<HA state>" }` | The items are created and updated by `hax` processes.  Supported values of \<HA state\>: `M0_CONF_HA_PROCESS_STARTING`, `M0_CONF_HA_PROCESS_STARTED`, `M0_CONF_HA_PROCESS_STOPPING`, `M0_CONF_HA_PROCESS_STOPPED`.
+`processes/<fid>` | `{ "state": "<HA state>", "type": "<Motr process type>" }` | The items are created and updated by `hax` processes.  Supported values of \<HA state\>: `M0_CONF_HA_PROCESS_STARTING`, `M0_CONF_HA_PROCESS_STARTED`, `M0_CONF_HA_PROCESS_STOPPING`, `M0_CONF_HA_PROCESS_STOPPED`. Supported values of Motr process types: `M0_CONF_HA_PROCESS_OTHER`, `M0_CONF_HA_PROCESS_KERNEL`, `M0_CONF_HA_PROCESS_M0MKFS`, `M0_CONF_HA_PROCESS_M0D`.
 `sspl.SYSTEM_INFORMATION.log_level` | | This key is used by SSPL.
 `stats/filesystem` | JSON object | See ['stats/filesystem' value](#statsfilesystem-value) below.
 `timeout` | YYYYmmddHHMM.SS | This value is used by the RC timeout mechanism.

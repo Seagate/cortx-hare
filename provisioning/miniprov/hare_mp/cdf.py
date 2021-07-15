@@ -3,23 +3,17 @@ import subprocess as S
 from dataclasses import dataclass
 from string import Template
 from typing import Any, Dict, List, Optional, Tuple
-
+from math import floor, ceil
 import pkg_resources
 
 from hare_mp.store import ValueProvider
 from hare_mp.types import (ClusterDesc, DiskRef, DList, Maybe, NodeDesc,
-                           PoolDesc, PoolType, ProfileDesc, Protocol, Text)
+                           PoolDesc, PoolType, ProfileDesc, Protocol, Text,
+                           M0ServerDesc, DisksDesc, AllowedFailures, Layout)
 
 DHALL_PATH = '/opt/seagate/cortx/hare/share/cfgen/dhall'
 DHALL_EXE = '/opt/seagate/cortx/hare/bin/dhall'
 DHALL_TO_YAML_EXE = '/opt/seagate/cortx/hare/bin/dhall-to-yaml'
-
-
-@dataclass
-class Layout:
-    data: int
-    parity: int
-    spare: int
 
 
 @dataclass
@@ -97,9 +91,14 @@ class CdfGenerator:
         conf = self.provider
         pool_type = pool.pool_type
         prop_name = 'data_devices'
+        cvg_num = int(conf.get(f'server_node>{node}>storage>cvg_count'))
+        all_cvg_devices = []
         if pool_type == 'dix':
             prop_name = 'metadata_devices'
-        return conf.get(f'server_node>{node}>storage>cvg[0]>{prop_name}')
+        for i in range(cvg_num):
+            all_cvg_devices += conf.get(
+                f'server_node>{node}>storage>cvg[{i}]>{prop_name}')
+        return all_cvg_devices
 
     def _get_server_nodes(self, pool: PoolHandle) -> List[str]:
         cid = pool.cluster_id
@@ -131,6 +130,34 @@ class CdfGenerator:
                 f'device count ({data_devices_count}) must be not '
                 f'less than N+K+S ({min_width})')
 
+    # Current formula is as follows
+    # Disk or device failure = K(parity)
+    # Node failures = floor(K/ceil((N+K+S)/ number of nodes))
+    # Controller or CVG failure = min(K, cvg per node * Node failures)
+    def _calculate_allowed_failure(self, layout: Layout) -> AllowedFailures:
+        conf = self.provider
+
+        machine_id = conf.get_machine_id()
+        node_count = len(conf.get_storage_set_nodes())
+        cvg_per_node = int(conf.get(
+            f'server_node>{machine_id}>storage>cvg_count'))
+
+        total_unit = layout.data + layout.parity + layout.spare
+        if total_unit == 0:
+            raise RuntimeError('All layout parameters are 0')
+
+        enc_failure_allowed_FP = layout.parity / ceil(total_unit / node_count)
+        enc_failure_allowed = floor(enc_failure_allowed_FP)
+
+        temp = cvg_per_node * enc_failure_allowed
+        ctrl_failure_allowed = min(temp, layout.parity)
+
+        return AllowedFailures(site=0,
+                               rack=0,
+                               encl=enc_failure_allowed,
+                               ctrl=ctrl_failure_allowed,
+                               disk=layout.parity)
+
     def _add_pool(self, pool: PoolHandle, out_list: List[PoolDesc]) -> None:
         conf = self.provider
         layout = self._get_layout(pool)
@@ -140,6 +167,7 @@ class CdfGenerator:
         storage_set_name = conf.get(f'cluster>{cid}>storage_set[{i}]>name')
         pool_name = f'{storage_set_name}__{pool_type}'
 
+        allowed_failure = self._calculate_allowed_failure(layout)
         out_list.append(
             PoolDesc(
                 name=Text(pool_name),
@@ -155,7 +183,9 @@ class CdfGenerator:
                     ], 'List DiskRef'), 'List DiskRef'),
                 data_units=layout.data,
                 parity_units=layout.parity,
-                type=PoolType[pool_type]))
+                spare_units=Maybe(layout.spare, 'Natural'),
+                type=PoolType[pool_type],
+                allowed_failures=Maybe(allowed_failure, 'AllowedFailures')))
 
     def _create_pool_descriptions(self) -> List[PoolDesc]:
         pools: List[PoolDesc] = []
@@ -238,24 +268,62 @@ class CdfGenerator:
             return None
         return Protocol[iface]
 
+    def _get_data_devices(self, machine_id: str, cvg: int) -> DList[Text]:
+        store = self.provider
+        data_devices = DList(
+            [Text(device) for device in store.get(
+                f'server_node>{machine_id}>'
+                f'storage>cvg[{cvg}]>data_devices')], 'List Text')
+        return data_devices
+
+    def _get_metadata_device(self, name: str, cvg: int) -> Text:
+        metadata_device = Text(f'/dev/vg_{name}_md{cvg+1}'
+                               f'/lv_raw_md{cvg+1}')
+        return metadata_device
+
     def _create_node(self, machine_id: str) -> NodeDesc:
         store = self.provider
         hostname = store.get(f'server_node>{machine_id}>hostname')
         name = store.get(f'server_node>{machine_id}>name')
         iface = self._get_iface(machine_id)
+        try:
+            no_m0clients = int(store.get(
+                'cortx>software>motr>service>client_instances',
+                allow_null=True))
+        except TypeError:
+            no_m0clients = 2
+        # We will create 1 IO service entry in CDF per cvg.
+        # An IO service entry will use data devices from corresponding cvg.
+        # meta data device is currently hardcoded.
+        servers = DList([
+            M0ServerDesc(
+                io_disks=DisksDesc(
+                    data=self._get_data_devices(machine_id, i),
+                    meta_data=Maybe(
+                        self._get_metadata_device(name, i), 'Text')),
+                runs_confd=Maybe(False, 'Bool'))
+            for i in range(len(store.get(
+                f'server_node>{machine_id}>storage>cvg')))
+        ], 'List M0ServerDesc')
+
+        # Adding a Motr confd entry per server node in CDF.
+        # The `runs_confd` value (true/false) determines if Motr confd process
+        # will be started on the node or not.
+        servers.value.append(M0ServerDesc(
+            io_disks=DisksDesc(
+                data=DList([], 'List Text'),
+                meta_data=Maybe(None, 'Text')),
+            runs_confd=Maybe(True, 'Bool')))
+
         return NodeDesc(
             hostname=Text(hostname),
             data_iface=Text(iface),
             data_iface_type=Maybe(self._get_iface_type(machine_id), 'P'),
-            io_disks=DList([
-                Text(device) for device in store.get(
-                    f'server_node>{machine_id}>storage>cvg[0]>data_devices')
-            ], 'List Text'),
+            m0_servers=Maybe(servers, 'List M0ServerDesc'),
             #
             # [KN] This is a hotfix for singlenode deployment
             # TODO in the future the value must be taken from a correct
             # ConfStore key (it doesn't exist now).
-            meta_data1=Text(f'/dev/vg_{name}_md1/lv_raw_md1'),
-            meta_data2=Text(f'/dev/vg_{name}_md2/lv_raw_md2'),
             s3_instances=int(
-                store.get(f'server_node>{machine_id}>s3_instances')))
+                store.get(f'server_node>{machine_id}>s3_instances')),
+            client_instances=no_m0clients)

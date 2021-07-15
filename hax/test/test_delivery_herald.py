@@ -20,13 +20,40 @@
 import logging
 import sys
 import unittest
-from threading import Thread
-from time import sleep
+from threading import Condition, Thread
+from time import sleep, time
 
 from hax.exception import NotDelivered
 from hax.log import TRACE
 from hax.motr.delivery import DeliveryHerald
 from hax.types import HaLinkMessagePromise, MessageId
+
+LOG = logging.getLogger('hax')
+
+
+class CountDownLatch:
+    """ Home-made implementation of CountDownLatch from Java world.
+        Unblocks a single thread when all N threads have invoked count_down()
+        from their sides.
+    """
+    def __init__(self, value: int):
+        self.lock = Condition()
+        self.value = value
+
+    def count_down(self):
+        with self.lock:
+            if self.value == 0:
+                raise RuntimeError("Already zero, nothing to count down")
+            self.value -= 1
+            if self.value == 0:
+                self.lock.notifyAll()
+
+    def await(self):
+        while True:
+            with self.lock:
+                if not self.value:
+                    return
+                self.lock.wait()
 
 
 class TestDeliveryHeraldAny(unittest.TestCase):
@@ -121,6 +148,136 @@ class TestDeliveryHeraldAny(unittest.TestCase):
                 t.join()
         self.assertTrue(notified_ok,
                         'Unexpected exception appeared in notifier thread')
+
+    def test_if_delivered_earlier_than_awaited_wait_works(self):
+        herald = DeliveryHerald()
+        notified_ok = True
+        thread_count = 1
+        latch = CountDownLatch(thread_count)
+
+        def fn(msg: MessageId):
+            try:
+                LOG.debug('Thread started')
+                herald.notify_delivered(msg)
+                LOG.debug('Notified delivery %s', msg)
+                latch.count_down()
+                LOG.debug('Main thread unblocked')
+
+            except:
+                logging.exception('*** ERROR ***')
+                notified_ok = False
+
+        threads = [
+            Thread(target=fn, args=(MessageId(100, i + 1), ))
+            for i in range(thread_count)
+        ]
+
+        for t in threads:
+            t.start()
+        # Block until all the threads come to latch.count_down() and thus
+        # the message is notified for sure
+        latch.await()
+
+        def m(x):
+            return MessageId(halink_ctx=100, tag=x)
+
+        try:
+            herald.wait_for_any(HaLinkMessagePromise([m(1)]), timeout_sec=2)
+        finally:
+            for t in threads:
+                t.join()
+        self.assertTrue(notified_ok,
+                        'Unexpected exception appeared in notifier thread')
+        self.assertEqual(0, len(herald.unsorted_deliveries.keys()))
+
+    def test_if_delivered_earlier_than_awaited_works_immediately(self):
+        herald = DeliveryHerald()
+        notified_ok = True
+        thread_count = 1
+        latch = CountDownLatch(thread_count)
+
+        def fn(msg: MessageId):
+            try:
+                LOG.debug('Thread started')
+                herald.notify_delivered(msg)
+                LOG.debug('Notified delivery %s', msg)
+                latch.count_down()
+                LOG.debug('Main thread unblocked')
+
+            except:
+                logging.exception('*** ERROR ***')
+                notified_ok = False
+
+        threads = [
+            Thread(target=fn, args=(MessageId(100, i + 1), ))
+            for i in range(thread_count)
+        ]
+
+        for t in threads:
+            t.start()
+        # Block until all the threads come to latch.count_down() and thus
+        # the message is notified for sure
+        latch.await()
+
+        def m(x):
+            return MessageId(halink_ctx=100, tag=x)
+
+        try:
+            started = time()
+            herald.wait_for_any(HaLinkMessagePromise([m(1)]), timeout_sec=5)
+            finished = time()
+        finally:
+            for t in threads:
+                t.join()
+        self.assertTrue(notified_ok,
+                        'Unexpected exception appeared in notifier thread')
+        self.assertLess(
+            finished - started, 5,
+            'Awaiting thread was unblocked only by a timeout. It means '
+            'that unsorted_deliveries was analyzed too late.'
+        )
+
+    def test_if_delivered_earlier_than_awaited_wait_many(self):
+        herald = DeliveryHerald()
+        notified_ok = True
+        thread_count = 6
+        latch = CountDownLatch(thread_count)
+
+        def fn(msg: MessageId):
+            try:
+                LOG.debug('Thread started')
+                herald.notify_delivered(msg)
+                LOG.debug('Notified delivery %s', msg)
+                latch.count_down()
+                LOG.debug('Main thread unblocked')
+
+            except:
+                logging.exception('*** ERROR ***')
+                notified_ok = False
+
+        threads = [
+            Thread(target=fn, args=(MessageId(100, i + 1), ))
+            for i in range(thread_count)
+        ]
+
+        for t in threads:
+            t.start()
+        # Block until all the threads come to latch.count_down() and thus
+        # the message is notified for sure
+        latch.await()
+
+        def m(x):
+            return MessageId(halink_ctx=100, tag=x)
+
+        try:
+            herald.wait_for_any(HaLinkMessagePromise([m(1), m(5)]),
+                                timeout_sec=2)
+        finally:
+            for t in threads:
+                t.join()
+        self.assertTrue(notified_ok,
+                        'Unexpected exception appeared in notifier thread')
+        self.assertEqual(4, len(herald.unsorted_deliveries.keys()))
 
 
 class TestDeliveryHeraldAll(unittest.TestCase):
@@ -239,3 +396,134 @@ class TestDeliveryHeraldAll(unittest.TestCase):
                 t.join()
         self.assertTrue(notified_ok,
                         'Unexpected exception appeared in notifier thread')
+
+    def test_if_delivered_earlier_than_awaited_wait_works(self):
+        herald = DeliveryHerald()
+        notified_ok = True
+        thread_count = 1
+        latch = CountDownLatch(thread_count)
+
+        def fn(msg: MessageId):
+            try:
+                LOG.debug('Thread started')
+                herald.notify_delivered(msg)
+                LOG.debug('Notified delivery %s', msg)
+                latch.count_down()
+                LOG.debug('Main thread unblocked')
+
+            except:
+                logging.exception('*** ERROR ***')
+                notified_ok = False
+
+        threads = [
+            Thread(target=fn, args=(MessageId(100, i + 1), ))
+            for i in range(thread_count)
+        ]
+
+        for t in threads:
+            t.start()
+        # Block until all the threads come to latch.count_down() and thus
+        # the message is notified for sure
+        latch.await()
+
+        def m(x):
+            return MessageId(halink_ctx=100, tag=x)
+
+        try:
+            herald.wait_for_all(HaLinkMessagePromise([m(1)]), timeout_sec=2)
+        finally:
+            for t in threads:
+                t.join()
+        self.assertTrue(notified_ok,
+                        'Unexpected exception appeared in notifier thread')
+        self.assertEqual(0, len(herald.unsorted_deliveries.keys()))
+
+    def test_if_delivered_earlier_than_awaited_wait_many(self):
+        herald = DeliveryHerald()
+        notified_ok = True
+        thread_count = 6
+        latch = CountDownLatch(thread_count)
+
+        def fn(msg: MessageId):
+            try:
+                LOG.debug('Thread started')
+                herald.notify_delivered(msg)
+                LOG.debug('Notified delivery %s', msg)
+                latch.count_down()
+                LOG.debug('Main thread unblocked')
+
+            except:
+                logging.exception('*** ERROR ***')
+                notified_ok = False
+
+        threads = [
+            Thread(target=fn, args=(MessageId(100, i + 1), ))
+            for i in range(thread_count)
+        ]
+
+        for t in threads:
+            t.start()
+        # Block until all the threads come to latch.count_down() and thus
+        # the message is notified for sure
+        latch.await()
+
+        def m(x):
+            return MessageId(halink_ctx=100, tag=x)
+
+        try:
+            herald.wait_for_all(HaLinkMessagePromise([m(1), m(5)]),
+                                timeout_sec=2)
+        finally:
+            for t in threads:
+                t.join()
+        self.assertTrue(notified_ok,
+                        'Unexpected exception appeared in notifier thread')
+        self.assertEqual(4, len(herald.unsorted_deliveries.keys()))
+
+    def test_if_delivered_earlier_than_awaited_notified_immediately(self):
+        herald = DeliveryHerald()
+        notified_ok = True
+        thread_count = 1
+        latch = CountDownLatch(thread_count)
+
+        def fn(msg: MessageId):
+            try:
+                LOG.debug('Thread started')
+                herald.notify_delivered(msg)
+                LOG.debug('Notified delivery %s', msg)
+                latch.count_down()
+                LOG.debug('Main thread unblocked')
+
+            except:
+                logging.exception('*** ERROR ***')
+                notified_ok = False
+
+        threads = [
+            Thread(target=fn, args=(MessageId(100, i + 1), ))
+            for i in range(thread_count)
+        ]
+
+        for t in threads:
+            t.start()
+        # Block until all the threads come to latch.count_down() and thus
+        # the message is notified for sure
+        latch.await()
+
+        def m(x):
+            return MessageId(halink_ctx=100, tag=x)
+
+        try:
+            started = time()
+            herald.wait_for_all(HaLinkMessagePromise([m(1)]),
+                                timeout_sec=2)
+            finished = time()
+        finally:
+            for t in threads:
+                t.join()
+        self.assertTrue(notified_ok,
+                        'Unexpected exception appeared in notifier thread')
+        self.assertLess(
+            finished - started, 5,
+            'Awaiting thread was unblocked only by a timeout. It means '
+            'that unsorted_deliveries was analyzed too late.'
+        )

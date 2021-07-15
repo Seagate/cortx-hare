@@ -1,5 +1,3 @@
-#!/usr/bin/env bash
-#
 # Copyright (c) 2020 Seagate Technology LLC and/or its Affiliates
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,41 +14,25 @@
 #
 # For any questions about this software or licensing,
 # please email opensource@seagate.com or cortx-questions@seagate.com.
+#
 
-set -eu -o pipefail
+import re
+from typing import List
 
-PROG=${0##*/}
 
-get_node_name() {
-    /opt/seagate/cortx/hare/libexec/node-name
-}
+class HaxUnitTransformer:
+    def transform(self, contents: List[str]) -> List[str]:
+        result = []
+        # Note that more matchers may be required in the future.
+        # E.g. when HA starts controlling motr-kernel, we may want to disable
+        # 'After' dependency.
+        matchers = [
+            r'^[\s]*Restart=',
+        ]
+        for line in contents:
+            out = line
+            if any(re.match(i, line) for i in matchers):
+                out = f'# {line} # - Added by Hare Mini Provisioner'
+            result.append(out)
 
-usage() {
-    cat <<EOF
-Usage: $PROG ID
-
-Get service health status from Consul catalogue.
-
-Options:
-  -h, --help    Show this help and exit.
-
-Examples:
-
-    \$ $PROG 9
-    passed
-EOF
-}
-
-if (($# != 1)); then
-    usage >&2
-    exit 1
-fi
-
-case $1 in
-    -h|--help) usage; exit;;
-esac
-
-id=$1
-curl -Gs localhost:8500/v1/health/node/$(get_node_name) \
-    --data-urlencode "filter=CheckID == \"service:$id\"" |
-    jq -r '.[].Status'
+        return result
