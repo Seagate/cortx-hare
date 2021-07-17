@@ -1293,7 +1293,8 @@ class ConfPool(ToDhall):
                                  d['disk'])
         else:
             md_allowed_failures = len(cluster_encls(m0conf)) - 1
-            tolerance = Failures(0, 0, 0, min(1, md_allowed_failures),
+            tolerance = Failures(0, 0, min(1, md_allowed_failures),
+                                 min(1, md_allowed_failures),
                                  md_allowed_failures)
 
         pver = ConfPver.build(m0conf, pool_id, pd_attrs, drives, tolerance)
