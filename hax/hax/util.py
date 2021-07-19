@@ -512,25 +512,31 @@ class ConsulUtil:
 
     @repeat_if_fails()
     def get_conf_obj_status(self, obj_t: ObjT, fidk: int) -> int:
-        # 'node/<node_name>/process/<process_fidk>/service/type'
-        node_items = self.kv.kv_get('m0conf/nodes', recurse=True)
-        # TODO [KN] This code is too cryptic. To be refactored.
-        keys = getattr(self,
-                       'get_{}_keys'.format(obj_t.name.lower()))(node_items,
-                                                                 fidk)
-        assert len(keys) == 1
-        key = keys[0].split('/')
-        node_key = ('/'.join(key[:3]))
-        node_val = self.kv.kv_get(node_key)
-        data = node_val['Value']
-        node_name: str = json.loads(data)['name']
-        # XXX Until device status are not updated in Consul KV, return
-        # M0_NC_ONLINE for all non process and service configuration
-        # objects.
-        if obj_t.name not in (ObjT.PROCESS.name, ObjT.SERVICE.name):
-            return HaNoteStruct.M0_NC_ONLINE
-        if (self.get_node_health(node_name) != 'passing'):
-            return HaNoteStruct.M0_NC_FAILED
+        obj_state: int = HaNoteStruct.M0_NC_ONLINE
+        if obj_t.name in (ObjT.PROCESS.name, ObjT.SERVICE.name):
+            # 'node/<node_name>/process/<process_fidk>/service/type'
+            node_items = self.kv.kv_get('m0conf/nodes', recurse=True)
+            # TODO [KN] This code is too cryptic. To be refactored.
+            keys = getattr(self,
+                           'get_{}_keys'.format(
+                                obj_t.name.lower()))(node_items, fidk)
+            assert len(keys) == 1
+            key = keys[0].split('/')
+            node_key = ('/'.join(key[:3]))
+            node_val = self.kv.kv_get(node_key)
+            data = node_val['Value']
+            node_name: str = json.loads(data)['name']
+            if (self.get_node_health(node_name) != 'passing'):
+                obj_state = HaNoteStruct.M0_NC_FAILED
+
+        if obj_t.name in (ObjT.PROCESS.name, ObjT.SERVICE.name):
+            obj_state = self.get_proc_svc_conf_obj_status(obj_t, fidk)
+        elif obj_t.name in (ObjT.SDEV.name, ObjT.DRIVE.name):
+            obj_state = self.get_sdev_state(obj_t, fidk)
+
+        return obj_state
+
+    def get_proc_svc_conf_obj_status(self, obj_t: ObjT, fidk: int) -> int:
         if ObjT.SERVICE.name == obj_t.name:
             svc_fid = create_service_fid(fidk)
             pfid = self.get_service_process_fid(svc_fid)
@@ -760,6 +766,29 @@ class ConsulUtil:
                 continue
             value['state'] = state
             self.kv.kv_put(sdev['Key'], json.dumps(value))
+
+    @repeat_if_fails()
+    def get_sdev_state(self, obj_t: ObjT, fidk: int) -> int:
+        if obj_t.name == ObjT.DRIVE.name:
+            drive_fid = create_drive_fid(fidk)
+            sdev_fid = self.drive_to_sdev_fid(drive_fid)
+        else:
+            sdev_fid = create_sdev_fid(fidk)
+        sdev_items = self.kv.kv_get('m0conf/nodes', recurse=True)
+        regex = re.compile(
+            f'^m0conf\\/.*\\/sdevs\\/{sdev_fid}$')
+        for sdev in sdev_items:
+            match_result = re.match(regex, sdev['Key'])
+            if not match_result:
+                continue
+            val = json.loads(sdev['Value'])
+            LOG.debug('Sdev=%s state=%s', str(sdev_fid), val['state'])
+            if str(val['state']).lower() in ('unknown', 'offline', 'failed'):
+                return HaNoteStruct.M0_NC_FAILED
+            else:
+                return HaNoteStruct.M0_NC_ONLINE
+
+        return HaNoteStruct.M0_NC_ONLINE
 
     @repeat_if_fails()
     def drive_to_sdev_fid(self, drive_fid: Fid) -> Fid:

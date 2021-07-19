@@ -71,17 +71,23 @@ class ConsumerThread(StoppableThread):
         # This thread will become blocked until that
         # intermittent error gets resolved.
         motr_to_svc_status = {
-            (m0HaProcessType.M0_CONF_HA_PROCESS_M0MKFS.value,
-                m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED.value): (
+            (m0HaProcessType.M0_CONF_HA_PROCESS_M0MKFS,
+                m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED): (
                     ServiceHealth.OK),
-            (m0HaProcessType.M0_CONF_HA_PROCESS_M0MKFS.value,
-                m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED.value): (
+            (m0HaProcessType.M0_CONF_HA_PROCESS_M0MKFS,
+                m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED): (
                     ServiceHealth.STOPPED),
-            (m0HaProcessType.M0_CONF_HA_PROCESS_M0D.value,
-                m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED.value): (
+            (m0HaProcessType.M0_CONF_HA_PROCESS_M0D,
+                m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED): (
                     ServiceHealth.OK),
-            (m0HaProcessType.M0_CONF_HA_PROCESS_M0D.value,
-                m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED.value): (
+            (m0HaProcessType.M0_CONF_HA_PROCESS_M0D,
+                m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED): (
+                    ServiceHealth.FAILED),
+            (m0HaProcessType.M0_CONF_HA_PROCESS_OTHER,
+                m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED): (
+                    ServiceHealth.OK),
+            (m0HaProcessType.M0_CONF_HA_PROCESS_OTHER,
+                m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED): (
                     ServiceHealth.FAILED)}
         self.consul.update_process_status(event)
         if event.chp_event in (m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED,
