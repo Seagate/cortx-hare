@@ -16,9 +16,6 @@
 # please email opensource@seagate.com or cortx-questions@seagate.com.
 #
 
-# Setup utility for Hare to configure Hare related settings, e.g. logrotate,
-# report unsupported features, etc.
-
 # flake8: noqa
 #
 import os
@@ -32,13 +29,14 @@ import pkg_resources
 from hare_mp.cdf import CdfGenerator
 from hare_mp.store import ConfStoreProvider, ValueProvider
 from hare_mp.types import (DisksDesc, DList, M0Clients, M0ServerDesc, Maybe,
-                           MissingKeyError, PoolDesc, PoolType, Protocol, Text)
+                           MissingKeyError, PoolDesc, PoolType, Protocol, Text,
+                           AllowedFailures, Layout)
 
 
 class TestTypes(unittest.TestCase):
     def test_m0clients(self):
-        val = M0Clients(s3=5, other=1)
-        self.assertEqual('{ s3 = 5, other = 1 }', str(val))
+        val = M0Clients(s3=5, other=2)
+        self.assertEqual('{ s3 = 5, other = 2 }', str(val))
 
     def test_protocol(self):
         self.assertEqual('P.tcp', str(Protocol.tcp))
@@ -62,10 +60,13 @@ class TestTypes(unittest.TestCase):
                        disk_refs=Maybe(DList([], 'List DiskRef'), []),
                        data_units=0,
                        parity_units=0,
-                       type=PoolType.sns)
+                       spare_units=Maybe(0, 'Natural'),
+                       type=PoolType.sns,
+                       allowed_failures=Maybe(None, 'AllowedFailures'))
         self.assertEqual(
             '{ name = "storage_set_name", disk_refs = Some ([] : List DiskRef), '
-            'data_units = 0, parity_units = 0, type = T.PoolType.sns }',
+            'data_units = 0, parity_units = 0, spare_units = Some (0), type = T.PoolType.sns, '
+            'allowed_failures = None AllowedFailures }',
             str(val))
 
     def test_m0server_with_disks(self):
@@ -91,7 +92,9 @@ class TestCDF(unittest.TestCase):
         try:
             with open(path, 'w') as f:
                 f.write(self._get_confstore_template())
+
             store = ConfStoreProvider(f'json://{path}')
+            store.get_machine_id = Mock(return_value='1114a50a6bf6f9c93ebd3c49d07d3fd4')
             #
             # the method will raise an exception if either
             # Dhall is unhappy or some values are not found in ConfStore
@@ -113,12 +116,23 @@ class TestCDF(unittest.TestCase):
                 'tcp',
                 'server_node>MACH_ID>storage>cvg[0]>data_devices':
                 ['/dev/sdb'],
+                'server_node>MACH_ID>storage>cvg[1]>data_devices':
+                ['/dev/sdc'],
                 'server_node>MACH_ID>network>data>private_interfaces':
                 ['eth1', 'eno2'],
+                'server_node>MACH_ID>storage>cvg_count':
+                2,
+                'server_node>MACH_ID>storage>cvg':
+                [{'data_devices': ['/dev/sdb', '/dev/sdc'], 'metadata_devices': ['/dev/meta', '/dev/meta1']}],
                 'server_node>MACH_ID>storage>cvg[0]>metadata_devices':
                 ['/dev/meta'],
+                'server_node>MACH_ID>storage>cvg[1]>metadata_devices':
+                ['/dev/meta1'],
                 'server_node>MACH_ID>s3_instances':
                 1,
+                'cortx>software>motr>service>client_instances':
+                2,
+                'server_node>MACH_ID>storage>cvg_count': 1,
                 'cluster>CLUSTER_ID>site>storage_set_count':
                 1,
                 'cluster>CLUSTER_ID>storage_set>server_node_count':
@@ -141,6 +155,8 @@ class TestCDF(unittest.TestCase):
             return data.get(value)
 
         store._raw_get = Mock(side_effect=ret_values)
+        store.get_machine_id = Mock(return_value='MACH_ID')
+        store.get_storage_set_nodes = Mock(return_value=['MACH_ID'])
 
         CdfGenerator(provider=store).generate()
 
@@ -162,17 +178,25 @@ class TestCDF(unittest.TestCase):
                 'cluster>cluster_id': 'CLUSTER_ID',
                 'server_node': {'MACH_ID': {'cluster_id': 'CLUSTER_ID'}},
                 'server_node>MACH_ID>cluster_id': 'CLUSTER_ID',
+                'server_node>MACH_ID>storage>cvg_count': 2,
+                'server_node>MACH_ID>storage>cvg':
+                [{'data_devices': ['/dev/sdb', '/dev/sdc'], 'metadata_devices': ['/dev/meta', '/dev/meta1']}],
                 'server_node>MACH_ID>storage>cvg[0]>data_devices': ['/dev/sdb'],
                 'server_node>MACH_ID>storage>cvg[0]>metadata_devices': ['/dev/meta'],
+                'server_node>MACH_ID>storage>cvg[1]>data_devices': ['/dev/sdc'],
+                'server_node>MACH_ID>storage>cvg[1]>metadata_devices': ['/dev/meta1'],
                 'server_node>MACH_ID>hostname':                'myhost',
                 'server_node>MACH_ID>name': 'mynodename',
                 'server_node>MACH_ID>network>data>interface_type':                'o2ib',
                 'server_node>MACH_ID>network>data>private_interfaces':                ['eth1', 'eno2'],
                 'server_node>MACH_ID>s3_instances':                1,
+                'cortx>software>motr>service>client_instances':                2,
             }
             return data.get(value)
 
         store._raw_get = Mock(side_effect=ret_values)
+        store.get_machine_id = Mock(return_value='MACH_ID')
+        store.get_storage_set_nodes = Mock(return_value=['MACH_ID'])
 
         ret = CdfGenerator(provider=store)._create_node_descriptions()
         self.assertIsInstance(ret, list)
@@ -180,6 +204,7 @@ class TestCDF(unittest.TestCase):
         self.assertEqual(Text('myhost'), ret[0].hostname)
         self.assertEqual(Text('eth1'), ret[0].data_iface)
         self.assertEqual(1, ret[0].s3_instances)
+        self.assertEqual(2, ret[0].client_instances)
 
         ret = CdfGenerator(provider=store)._create_pool_descriptions()
         self.assertIsInstance(ret, list)
@@ -188,9 +213,15 @@ class TestCDF(unittest.TestCase):
         self.assertEqual(PoolType.sns, ret[0].type)
         self.assertEqual(1, ret[0].data_units)
         self.assertEqual(0, ret[0].parity_units)
+        self.assertEqual(0, ret[0].spare_units.get())
         disk_refs = ret[0].disk_refs.value
         self.assertEqual(Text('myhost'), disk_refs.value[0].node.value)
         self.assertEqual(Text('/dev/sdb'), disk_refs.value[0].path)
+        self.assertEqual(0, ret[0].allowed_failures.value.site)
+        self.assertEqual(0, ret[0].allowed_failures.value.rack)
+        self.assertEqual(0, ret[0].allowed_failures.value.encl)
+        self.assertEqual(0, ret[0].allowed_failures.value.ctrl)
+        self.assertEqual(0, ret[0].allowed_failures.value.disk)
 
         ret = CdfGenerator(provider=store)._create_profile_descriptions(ret)
         self.assertIsInstance(ret, list)
@@ -199,11 +230,110 @@ class TestCDF(unittest.TestCase):
         self.assertEqual(1, len(ret[0].pools.value))
         self.assertEqual(Text('StorageSet-1__sns'), ret[0].pools.value[0])
 
+    def test_allowed_failure_generation(self):
+        layout_4_2_0 = Layout(data=4, parity=2,spare=0)
+        ret = self.allowed_failure_generation(layout_4_2_0)
+
+        self.assertEqual(1, len(ret))
+        self.assertEqual(layout_4_2_0.data, ret[0].data_units)
+        self.assertEqual(layout_4_2_0.parity, ret[0].parity_units)
+        self.assertEqual(layout_4_2_0.spare, ret[0].spare_units.get())
+        self.assertEqual(0, ret[0].allowed_failures.value.site)
+        self.assertEqual(0, ret[0].allowed_failures.value.rack)
+        self.assertEqual(1, ret[0].allowed_failures.value.encl)
+        self.assertEqual(2, ret[0].allowed_failures.value.ctrl)
+        self.assertEqual(2, ret[0].allowed_failures.value.disk)
+
+        layout_4_2_2 = Layout(data=4, parity=2,spare=2)
+        ret = self.allowed_failure_generation(layout_4_2_2)
+
+        self.assertEqual(1, len(ret))
+        self.assertEqual(layout_4_2_2.data, ret[0].data_units)
+        self.assertEqual(layout_4_2_2.parity, ret[0].parity_units)
+        self.assertEqual(layout_4_2_2.spare, ret[0].spare_units.get())
+        self.assertEqual(0, ret[0].allowed_failures.value.site)
+        self.assertEqual(0, ret[0].allowed_failures.value.rack)
+        self.assertEqual(0, ret[0].allowed_failures.value.encl)
+        self.assertEqual(0, ret[0].allowed_failures.value.ctrl)
+        self.assertEqual(2, ret[0].allowed_failures.value.disk)
+
+
+    # Currently only Layout is provided as input, in future we can add more
+    def allowed_failure_generation(self, layout: Layout):
+        store = ValueProvider()
+
+        def ret_values(value: str) -> Any:
+            data = {
+                'cluster>CLUSTER_ID>site>storage_set_count': 1,
+                'cluster>CLUSTER_ID>storage_set[0]>name': 'StorageSet-1',
+                'cluster>CLUSTER_ID>storage_set[0]>durability>sns':
+                {'data': 4, 'parity' : 2, 'spare' : 0},
+                'cluster>CLUSTER_ID>storage_set[0]>durability>sns>data': layout.data,
+                'cluster>CLUSTER_ID>storage_set[0]>durability>sns>parity': layout.parity,
+                'cluster>CLUSTER_ID>storage_set[0]>durability>sns>spare': layout.spare,
+                'cluster>CLUSTER_ID>storage_set[0]>server_nodes': ['MACH_ID1', 'MACH_ID2', 'MACH_ID3'],
+                'cluster>CLUSTER_ID>storage_set>server_node_count': 3,
+                'cluster>cluster_id': 'CLUSTER_ID',
+                'server_node': {'MACH_ID1': {'cluster_id': 'CLUSTER_ID'}},
+                'server_node>MACH_ID1>cluster_id': 'CLUSTER_ID',
+                'server_node>MACH_ID2>cluster_id': 'CLUSTER_ID',
+                'server_node>MACH_ID3>cluster_id': 'CLUSTER_ID',
+                'server_node>MACH_ID1>storage>cvg':
+                [{'data_devices': ['/dev/sda', '/dev/sdb', '/dev/sdc', '/dev/sdd'], 'metadata_devices': ['/dev/meta1']},
+                 {'data_devices': ['/dev/sde', '/dev/sdf', '/dev/sdg', '/dev/sdh'], 'metadata_devices': ['/dev/meta2']}],
+                'server_node>MACH_ID2>storage>cvg':
+                [{'data_devices': ['/dev/sda', '/dev/sdb', '/dev/sdc', '/dev/sdd'], 'metadata_devices': ['/dev/meta1']},
+                 {'data_devices': ['/dev/sde', '/dev/sdf', '/dev/sdg', '/dev/sdh'], 'metadata_devices': ['/dev/meta2']}],
+                'server_node>MACH_ID3>storage>cvg':
+                [{'data_devices': ['/dev/sda', '/dev/sdb', '/dev/sdc', '/dev/sdd'], 'metadata_devices': ['/dev/meta1']},
+                 {'data_devices': ['/dev/sde', '/dev/sdf', '/dev/sdg', '/dev/sdh'], 'metadata_devices': ['/dev/meta2']}],
+                'server_node>MACH_ID1>storage>cvg_count': '2',
+                'server_node>MACH_ID1>storage>cvg[0]>data_devices': ['/dev/sda', '/dev/sdb', '/dev/sdc', '/dev/sdd'],
+                'server_node>MACH_ID1>storage>cvg[1]>data_devices': ['/dev/sde', '/dev/sdf', '/dev/sdg', '/dev/sdh'],
+                'server_node>MACH_ID1>storage>cvg[0]>metadata_devices': ['/dev/meta1'],
+                'server_node>MACH_ID1>storage>cvg[1]>metadata_devices': ['/dev/meta2'],
+                'server_node>MACH_ID1>hostname':                'myhost',
+                'server_node>MACH_ID1>name': 'mynodename',
+                'server_node>MACH_ID1>network>data>interface_type':                'o2ib',
+                'server_node>MACH_ID1>network>data>private_interfaces':                ['eth1', 'eno2'],
+                'server_node>MACH_ID1>s3_instances':                1,
+                'server_node>MACH_ID2>storage>cvg_count': '2',
+                'server_node>MACH_ID2>storage>cvg[0]>data_devices': ['/dev/sda', '/dev/sdb', '/dev/sdc', '/dev/sdd'],
+                'server_node>MACH_ID2>storage>cvg[1]>data_devices': ['/dev/sde', '/dev/sdf', '/dev/sdg', '/dev/sdh'],
+                'server_node>MACH_ID2>storage>cvg[0]>metadata_devices': ['/dev/meta1'],
+                'server_node>MACH_ID2>storage>cvg[1]>metadata_devices': ['/dev/meta2'],
+                'server_node>MACH_ID2>hostname':                'myhost',
+                'server_node>MACH_ID2>name': 'mynodename',
+                'server_node>MACH_ID2>network>data>interface_type':                'o2ib',
+                'server_node>MACH_ID2>network>data>private_interfaces':                ['eth1', 'eno2'],
+                'server_node>MACH_ID2>s3_instances':                1,
+                'server_node>MACH_ID3>storage>cvg_count': '2',
+                'server_node>MACH_ID3>storage>cvg[0]>data_devices': ['/dev/sda', '/dev/sdb', '/dev/sdc', '/dev/sdd'],
+                'server_node>MACH_ID3>storage>cvg[1]>data_devices': ['/dev/sde', '/dev/sdf', '/dev/sdg', '/dev/sdh'],
+                'server_node>MACH_ID3>storage>cvg[0]>metadata_devices': ['/dev/meta1'],
+                'server_node>MACH_ID3>storage>cvg[1]>metadata_devices': ['/dev/meta2'],
+                'server_node>MACH_ID3>hostname':                'myhost',
+                'server_node>MACH_ID3>name': 'mynodename',
+                'server_node>MACH_ID3>network>data>interface_type':                'o2ib',
+                'server_node>MACH_ID3>network>data>private_interfaces':                ['eth1', 'eno2'],
+                'server_node>MACH_ID3>s3_instances':                1,
+            }
+            return data.get(value)
+
+        store._raw_get = Mock(side_effect=ret_values)
+        store.get_machine_id = Mock(return_value='MACH_ID1')
+        store.get_storage_set_nodes = Mock(return_value=['MACH_ID1', 'MACH_ID2', 'MACH_ID3'])
+
+        ret = CdfGenerator(provider=store)._create_pool_descriptions()
+        self.assertIsInstance(ret, list)
+        return ret
+
     def test_disk_refs_can_be_empty(self):
         store = ValueProvider()
 
         def ret_values(value: str) -> Any:
             data = {
+                'server_node>MACH_ID>storage>cvg_count': 1,
                 'cluster>CLUSTER_ID>site>storage_set_count': 1,
                 'cluster>CLUSTER_ID>storage_set>server_node_count': 1,
                 'cluster>CLUSTER_ID>storage_set[0]>name': 'StorageSet-1',
@@ -231,12 +361,22 @@ class TestCDF(unittest.TestCase):
                 ['eth1', 'eno2'],
                 'server_node>srvnode_1>s3_instances':
                 1,
+                'server_node>srvnode_1>storage>cvg_count':
+                2,
+                'cortx>software>motr>service>client_instances':
+                2,
+                'server_node>srvnode_1>storage>cvg':
+                [{'data_devices': ['/dev/sdb', '/dev/sdc'], 'metadata_devices': ['/dev/meta', '/dev/meta1']}],
                 'server_node>srvnode_1>storage>cvg[0]>data_devices':
                 ['/dev/sdb'],
+                'server_node>srvnode_1>storage>cvg[1]>data_devices':
+                ['/dev/sdc'],
             }
             return data.get(value)
 
         store._raw_get = Mock(side_effect=ret_values)
+        store.get_machine_id = Mock(return_value='MACH_ID')
+        store.get_storage_set_nodes = Mock(return_value=['MACH_ID'])
         ret = CdfGenerator(provider=store).generate()
 
     def test_invalid_storage_set_configuration_rejected(self):
@@ -253,7 +393,7 @@ class TestCDF(unittest.TestCase):
                 'cluster>CLUSTER_ID>storage_set>server_node_count':
                 1,
                 'cluster>CLUSTER_ID>storage_set[0]>durability>sns': {'stub': 1},
-                'cluster>CLUSTER_ID>storage_set[0]>durability>sns>data': 2,
+                'cluster>CLUSTER_ID>storage_set[0]>durability>sns>data': 4,
                 'cluster>CLUSTER_ID>storage_set[0]>durability>sns>parity': 0,
                 'cluster>CLUSTER_ID>storage_set[0]>durability>sns>spare': 0,
                 'cluster>CLUSTER_ID>storage_set[0]>name':
@@ -276,10 +416,18 @@ class TestCDF(unittest.TestCase):
                 ['eth1', 'eno2'],
                 'server_node>MACH_ID>s3_instances':
                 1,
+                'server_node>MACH_ID>storage>cvg_count':
+                2,
+                'cortx>software>motr>service>client_instances':
+                2,
                 'server_node>MACH_ID>storage>cvg[0]>data_devices':
                 ['/dev/sdb'],
                 'server_node>MACH_ID>storage>cvg[0]>metadata_devices':
                 ['/dev/meta'],
+                'server_node>MACH_ID>storage>cvg[1]>data_devices':
+                ['/dev/sdc'],
+                'server_node>MACH_ID>storage>cvg[1]>metadata_devices':
+                ['/dev/meta1'],
             }
             return data.get(value)
 
@@ -322,6 +470,8 @@ class TestCDF(unittest.TestCase):
                 ['eth1', 'eno2'],
                 'server_node>MACH_ID>s3_instances':
                 1,
+                'cortx>software>motr>service>client_instances':
+                2,
                 'server_node>MACH_ID>storage>cvg[0]>data_devices':
                 ['/dev/sdb'],
                 'server_node>MACH_ID>storage>cvg[0]>metadata_devices':
@@ -338,6 +488,7 @@ class TestCDF(unittest.TestCase):
 
         def ret_values(value: str) -> Any:
             data = {
+                'server_node>MACH_ID>storage>cvg_count': 1,
                 'cluster>CLUSTER_ID>site>storage_set_count':
                 1,
                 'cluster>CLUSTER_ID>storage_set>server_node_count':
@@ -366,18 +517,28 @@ class TestCDF(unittest.TestCase):
                 ['eth1', 'eno2'],
                 'server_node>MACH_ID>s3_instances':
                 1,
+                'server_node>MACH_ID>storage>cvg_count':
+                2,
+                'cortx>software>motr>service>client_instances':
+                2,
                 'server_node>MACH_ID>storage>cvg[0]>data_devices':
                 ['/dev/sdb'],
                 'server_node>MACH_ID>storage>cvg[0]>metadata_devices':
                 ['/dev/meta'],
+                'server_node>MACH_ID>storage>cvg[1]>data_devices':
+                ['/dev/sdc'],
+                'server_node>MACH_ID>storage>cvg[1]>metadata_devices':
+                ['/dev/meta1'],
             }
             return data.get(value)
 
         store._raw_get = Mock(side_effect=ret_values)
+        store.get_machine_id = Mock(return_value='MACH_ID')
+        store.get_storage_set_nodes = Mock(return_value=['MACH_ID'])
         ret = CdfGenerator(provider=store)._create_pool_descriptions()
         self.assertEqual(1, len(ret))
         diskrefs = ret[0].disk_refs.get()
-        self.assertEqual(1, len(diskrefs))
+        self.assertEqual(2, len(diskrefs))
         self.assertEqual(Text('/dev/meta'), diskrefs[0].path)
 
     def test_both_dix_and_sns_pools_can_exist(self):
@@ -385,6 +546,7 @@ class TestCDF(unittest.TestCase):
 
         def ret_values(value: str) -> Any:
             data = {
+                'server_node>MACH_ID>storage>cvg_count': 1,
                 'cluster>CLUSTER_ID>site>storage_set_count':
                 1,
                 'cluster>CLUSTER_ID>storage_set>server_node_count':
@@ -417,25 +579,35 @@ class TestCDF(unittest.TestCase):
                 ['eth1', 'eno2'],
                 'server_node>MACH_ID>s3_instances':
                 1,
+                'server_node>MACH_ID>storage>cvg_count':
+                2,
+                'cortx>software>motr>service>client_instances':
+                2,
                 'server_node>MACH_ID>storage>cvg[0]>data_devices':
                 ['/dev/sda', '/dev/sdb'],
                 'server_node>MACH_ID>storage>cvg[0]>metadata_devices':
                 ['/dev/meta'],
+                'server_node>MACH_ID>storage>cvg[1]>data_devices':
+                ['/dev/sdc', '/dev/sdd'],
+                'server_node>MACH_ID>storage>cvg[1]>metadata_devices':
+                ['/dev/meta1'],
             }
             return data.get(value)
 
         store._raw_get = Mock(side_effect=ret_values)
+        store.get_machine_id = Mock(return_value='MACH_ID')
+        store.get_storage_set_nodes = Mock(return_value=['MACH_ID'])
         ret = CdfGenerator(provider=store)._create_pool_descriptions()
         self.assertEqual(['sns', 'dix'], [t.type.name for t in ret])
         self.assertEqual(['StorageSet-1__sns', 'StorageSet-1__dix'],
                          [t.name.s for t in ret])
 
         diskrefs_sns = ret[0].disk_refs.get()
-        self.assertEqual([Text('/dev/sda'), Text('/dev/sdb')],
+        self.assertEqual([Text('/dev/sda'), Text('/dev/sdb'), Text('/dev/sdc'), Text('/dev/sdd')],
                          [t.path for t in diskrefs_sns])
 
         diskrefs_dix = ret[1].disk_refs.get()
-        self.assertEqual(1, len(diskrefs_dix))
+        self.assertEqual(2, len(diskrefs_dix))
         self.assertEqual(Text('/dev/meta'), diskrefs_dix[0].path)
 
     def test_metadata_is_hardcoded(self):
@@ -449,12 +621,16 @@ class TestCDF(unittest.TestCase):
                 'server_node>MACH_ID>hostname':
                 'myhost',
                 'server_node>MACH_ID>name': 'mynodename',
+                'server_node>MACH_ID>storage>cvg':
+                [{'data_devices': ['/dev/sdb'], 'metadata_devices': ['/dev/meta']}],
                 'server_node>MACH_ID>storage>cvg[0]>data_devices':
                 ['/dev/sdb'],
                 'server_node>MACH_ID>network>data>private_interfaces':
                 ['eth1', 'eno2'],
                 'server_node>MACH_ID>s3_instances':
                 1,
+                'cortx>software>motr>service>client_instances':
+                2,
                 'server_node>MACH_ID>network>data>interface_type':
                 'o2ib'
             }
@@ -466,9 +642,8 @@ class TestCDF(unittest.TestCase):
         self.assertIsInstance(ret, list)
         self.assertEqual(1, len(ret))
         self.assertEqual(Text('/dev/vg_mynodename_md1/lv_raw_md1'),
-                         ret[0].meta_data1)
-        self.assertEqual(Text('/dev/vg_mynodename_md2/lv_raw_md2'),
-                         ret[0].meta_data2)
+                         (ret[0].m0_servers.value.value)[0].io_disks.meta_data.value)
+
 
     def test_multiple_nodes_supported(self):
         store = ValueProvider()
@@ -496,6 +671,10 @@ class TestCDF(unittest.TestCase):
                 ['eth1'],
                 'server_node>MACH_ID>s3_instances':
                 1,
+                'cortx>software>motr>service>client_instances':
+                2,
+                'server_node>MACH_ID>storage>cvg':
+                [{'data_devices': ['/dev/sdb'], 'metadata_devices': ['/dev/meta']}],
                 'server_node>MACH_ID>storage>cvg[0]>data_devices':
                 ['/dev/sdb'],
                 'server_node>MACH_ID>storage>cvg[0]>metadata_devices':
@@ -506,6 +685,9 @@ class TestCDF(unittest.TestCase):
                 'server_node>MACH_2_ID>network>data>private_interfaces':
                 ['eno1'],
                 'server_node>MACH_2_ID>s3_instances':                5,
+                'cortx>software>motr>service>client_instances':                2,
+                'server_node>MACH_2_ID>storage>cvg':
+                [{'data_devices': ['/dev/sdb'], 'metadata_devices': ['/dev/meta']}],
                 'server_node>MACH_2_ID>storage>cvg[0]>data_devices':
                 ['/dev/sdb'],
                 'server_node>MACH_2_ID>storage>cvg[0]>metadata_devices':
@@ -521,9 +703,11 @@ class TestCDF(unittest.TestCase):
         self.assertEqual(Text('myhost'), ret[0].hostname)
         self.assertEqual(Text('eth1'), ret[0].data_iface)
         self.assertEqual(1, ret[0].s3_instances)
+        self.assertEqual(2, ret[0].client_instances)
         self.assertEqual(Text('host-2'), ret[1].hostname)
         self.assertEqual(Text('eno1'), ret[1].data_iface)
         self.assertEqual(5, ret[1].s3_instances)
+        self.assertEqual(2, ret[1].client_instances)
         self.assertEqual('Some (P.o2ib)', str(ret[0].data_iface_type))
         self.assertEqual('Some (P.tcp)', str(ret[1].data_iface_type))
 
@@ -538,12 +722,16 @@ class TestCDF(unittest.TestCase):
                 'server_node>MACH_ID>name': 'mynodename',
                 'server_node>MACH_ID>hostname':
                 'myhost',
+                'server_node>MACH_ID>storage>cvg':
+                [{'data_devices': ['/dev/sdb'], 'metadata_devices': ['/dev/meta']}],
                 'server_node>MACH_ID>storage>cvg[0]>data_devices':
                 ['/dev/sdb'],
                 'server_node>MACH_ID>network>data>interface_type':
                 None,
                 'server_node>MACH_ID>s3_instances':
                 1,
+                'cortx>software>motr>service>client_instances':
+                2,
                 'server_node>MACH_ID>network>data>private_interfaces':
                 ['eth1', 'eno2']
             }

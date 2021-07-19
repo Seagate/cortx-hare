@@ -40,7 +40,7 @@ and health-checking mechanisms.
 
 ### Building from source
 
-* Download Hare.
+* Download `hare`.
   ```sh
   git clone https://github.com/Seagate/cortx-hare.git hare
   cd hare
@@ -59,62 +59,53 @@ and health-checking mechanisms.
   sudo yum -y install consul-1.9.1
   ```
 
-* Install Motr.
+* Install py-utils.
 
-  * .. from RPMs
-    ```sh
-    sudo yum -y install cortx-motr cortx-motr-devel
-    ```
+   Please refer to [the instruction](https://github.com/Seagate/cortx-utils/blob/main/py-utils/README.md) to install corxt-py-utils from sources.
 
-  * .. or from [sources](https://github.com/Seagate/cortx-motr/blob/main/doc/Quick-Start-Guide.rst) use this link to build Motr from source. Once you built Motr continue with the steps listed below.
-    
-    ```sh
-    sudo scripts/install-motr-service --link
 
-    export M0_SRC_DIR=$PWD
-    cd -
-    ```
+* Build and Install Motr.
+
+  *  Follow [Motr quick start guide](https://github.com/Seagate/cortx-motr/blob/main/doc/Quick-Start-Guide.rst) to build Motr from source. After compiling Motr sources, please continue with the below steps to build Hare using Motr sources.
+
+     ```sh
+     sudo scripts/install-motr-service --link
+ 
+     export M0_SRC_DIR=$PWD
+     cd -
+     ```
 
 * Build and install Hare.
   ```sh
   make
   sudo make install
   ```
-
+* Create `hare` group.
+  ```sh
+  sudo groupadd --force hare
+  ```
+  
 * Add current user to `hare` group.
   ```sh
   sudo usermod --append --groups hare $USER
   ```
   Log out and log back in.
 
+### Build and install rpms from source
 
-### Build and install `hare` rpm from source.
-**NOTE: If you have built Motr and HARE from source you will not need to generate RPM packages below**
-* Install Motr.
+**NOTE: If you have built Motr and HARE from sources you need not generate RPM packages as below, however, it might be more convenient to build and install rpms on a multinode setup sometimes**
 
-  * .. from RPMS
+* Build & Install Motr RPMs
+  *  Follow [Motr quick start guide](https://github.com/Seagate/cortx-motr/blob/main/doc/Quick-Start-Guide.rst) to install Motr.
+  
+* Build `hare` RPMs
+
+  * Download `hare` source as mentioned above
     ```sh
-    sudo yum -y install cortx-motr cortx-motr-devel
+    cd hare
+    make rpm
+    sudo rpm -ivh ~/rpmbuild/RPMS/x86_64/cortx-hare-*.rpm
     ```
-
-  * .. or
-    ```sh
-    git clone --recursive https://github.com/Seagate/cortx-motr.git
-    cd cortx-motr
-
-    scripts/m0 make rpms
-    sudo rpm -ivh ~/rpmbuild/RPMS/x86_64/cortx-motr-*.rpm
-    ```
-
-* Build `hare` rpm.
-
-  Download hare source as mentioned above.
-  ```sh
-  cd hare
-
-  make rpm
-  sudo rpm -ivh ~/rpmbuild/RPMS/x86_64/cortx-hare-*.rpm
-  ```
 
 
 <!------------------------------------------------------------------->
@@ -280,6 +271,24 @@ hctl shutdown
 sudo systemctl reset-failed hare-hax
 ```
 and bootstrap again.
+
+### `make install` fails because of mypy issues
+
+Symptoms:
+1. `make` or `make install` or `make devinstall` command fails
+2. The command output contains the output like this (perhaps this is not the latest lines in the output):
+    ```
+    19:58:19  running mypy
+    19:58:20  hare_mp/store.py:21: error: Cannot find implementation or library stub for module named 'cortx.utils.conf_store'
+    19:58:20  Success: no issues found in 1 source file
+    19:58:20  make[4]: Leaving directory `/root/rpmbuild/BUILD/cortx-hare/cfgen'
+    19:58:21  hare_mp/main.py:34: error: Cannot find implementation or library stub for module named 'cortx.utils.product_features'
+    19:58:21  hare_mp/main.py:34: note: See https://mypy.readthedocs.io/en/latest/running_mypy.html#missing-imports
+    19:58:21  Found 2 errors in 2 files (checked 8 source files)
+    19:58:21  make[4]: *** [mypy] Error 1
+    ```
+
+Solution: install cortx-py-utils RPM and retry.
 
 <!------------------------------------------------------------------->
 ## See also

@@ -27,15 +27,33 @@ import os
 import shutil
 import subprocess
 import sys
-from typing import Dict, List, Any, Callable
+from enum import Enum
 from sys import exit
+from time import sleep
+from typing import Any, Callable, Dict, List
 
 import yaml
 from cortx.utils.product_features import unsupported_features
+from hax.types import KeyDelete
+from hax.util import ConsulUtil, repeat_if_fails, KVAdapter
 
 from hare_mp.cdf import CdfGenerator
 from hare_mp.store import ConfStoreProvider
+from hare_mp.systemd import HaxUnitTransformer
 from hare_mp.validator import Validator
+
+# Logger details
+LOG_DIR = "/var/log/seagate/hare/"
+LOG_FILE = "/var/log/seagate/hare/setup.log"
+LOG_FILE_SIZE = 5 * 1024 * 1024
+
+
+class Plan(Enum):
+    Sanity = 'sanity'
+    Regression = 'regression'
+    Full = 'full'
+    Performance = 'performance'
+    Scalability = 'scalability'
 
 
 def execute(cmd: List[str]) -> str:
@@ -53,8 +71,28 @@ def execute(cmd: List[str]) -> str:
     return out
 
 
-def setup_logging():
-    logging.basicConfig(level=logging.INFO, format='%(message)s')
+def create_logger_directory():
+    """Create log directory if not exists."""
+    if not os.path.isdir(LOG_DIR):
+        try:
+            os.makedirs(LOG_DIR)
+        except Exception:
+            logging.exception(f"{LOG_DIR} Could not be created")
+            shutdown_cluster()
+            exit(-1)
+
+
+def setup_logging() -> None:
+    console = logging.StreamHandler(stream=sys.stderr)
+    fhandler = logging.handlers.RotatingFileHandler(LOG_FILE,
+                                                    maxBytes=LOG_FILE_SIZE,
+                                                    mode='a',
+                                                    backupCount=5,
+                                                    encoding=None,
+                                                    delay=False)
+    logging.basicConfig(level=logging.INFO,
+                        handlers=[console, fhandler],
+                        format='%(asctime)s [%(levelname)s] %(message)s')
 
 
 def get_data_from_provisioner_cli(method, output_format='json') -> str:
@@ -87,8 +125,7 @@ def get_server_type(url: str) -> str:
     try:
         provider = ConfStoreProvider(url)
         machine_id = provider.get_machine_id()
-        server_type = provider.get(
-            f'server_node>{machine_id}>type')
+        server_type = provider.get(f'server_node>{machine_id}>type')
 
         if server_type == 'VM':
             return 'virtual'
@@ -169,8 +206,10 @@ def init(args):
             path_to_cdf = args.file[0]
             if not is_cluster_running() and bootstrap_cluster(
                     path_to_cdf, True):
-                logging.error('Failed to bootstrap the custer')
+                logging.error('Failed to bootstrap the cluster')
                 rc = -1
+            if rc == 0:
+                wait_for_cluster_start(url)
             shutdown_cluster()
         exit(rc)
     except Exception as error:
@@ -190,6 +229,8 @@ def test(args):
                 logging.error('Failed to bootstrap the cluster')
                 rc = -1
             cluster_status = check_cluster_status(path_to_cdf)
+            if rc == 0:
+                wait_for_cluster_start(url)
             shutdown_cluster()
             if cluster_status:
                 logging.error('Cluster status reports failure')
@@ -199,6 +240,94 @@ def test(args):
         logging.error('Error while checking cluster status (%s)', error)
         shutdown_cluster()
         exit(-1)
+
+
+def test_IVT(args):
+    try:
+        rc = 0
+        path_to_cdf = args.file[0]
+
+        logging.info('Running test plan: ' + str(args.plan[0].value))
+        # TODO We need to handle plan type and execute test cases accordingly
+        if not is_cluster_running():
+            logging.error('Cluster is not running. Cluster must be running '
+                          'for executing tests')
+            exit(-1)
+        cluster_status = check_cluster_status(path_to_cdf)
+        if cluster_status:
+            logging.error('Cluster status reports failure')
+            rc = -1
+
+        logging.info('Tests executed successfully')
+        exit(rc)
+    except Exception as error:
+        logging.error('Error while running Hare tests (%s)', error)
+        exit(-1)
+
+
+def reset(args):
+    try:
+        rc = 0
+        util: ConsulUtil = ConsulUtil()
+
+        if is_cluster_running():
+            logging.info('Cluster is running, shutting down')
+            shutdown_cluster()
+
+        keys: List[KeyDelete] = [
+            KeyDelete(name='epoch', recurse=False),
+            KeyDelete(name='eq-epoch', recurse=False),
+            KeyDelete(name='last_fidk', recurse=False),
+            KeyDelete(name='leader', recurse=False),
+            KeyDelete(name='m0conf/', recurse=True),
+            KeyDelete(name='processes/', recurse=True),
+            KeyDelete(name='stats/', recurse=True)
+        ]
+
+        logging.info('Deleting Hare KV entries (%s)', keys)
+        if not util.kv.kv_delete_in_transaction(keys):
+            logging.error('Error during key delete in transaction')
+            rc = -1
+
+        exit(rc)
+    except Exception as error:
+        logging.error('Error during reset (%s)', error)
+        exit(-1)
+
+
+def cleanup(args):
+    try:
+        rc = -1
+
+        if config_cleanup() == 0 and logs_cleanup() == 0:
+            rc = 0
+
+        exit(rc)
+    except Exception as error:
+        logging.error('Error during cleanup (%s)', error)
+        exit(-1)
+
+
+def logs_cleanup():
+    try:
+        logging.info('Cleaning up hare log directory(/var/log/hare)')
+        os.system('rm -rf /var/log/hare')
+
+        return 0
+    except Exception as error:
+        logging.error('Error during logs cleanup (%s)', error)
+        return -1
+
+
+def config_cleanup():
+    try:
+        logging.info('Cleaning up hare config directory(/var/lib/hare)')
+        os.system('rm -rf /var/lib/hare/*')
+
+        return 0
+    except Exception as error:
+        logging.error('Error during config cleanup (%s)', error)
+        return -1
 
 
 def generate_support_bundle(args):
@@ -224,13 +353,11 @@ def checkRpm(rpm_name):
                                 stdin=subprocess.PIPE,
                                 stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE,
-                                env={},
                                 encoding='utf8')
     rpm_search = subprocess.Popen(["grep", "-q", rpm_name],
                                   stdin=rpm_list.stdout,
                                   stdout=subprocess.PIPE,
                                   stderr=subprocess.PIPE,
-                                  env={},
                                   encoding='utf8')
     out, err = rpm_search.communicate()
     logging.debug("Output: {}".format(out))
@@ -243,11 +370,48 @@ def is_cluster_running() -> bool:
     return os.system('hctl status >/dev/null') == 0
 
 
+def nr_services() -> int:
+    cmd = ['hctl', 'status', '--json']
+    cluster_info = json.loads(execute(cmd))
+    # Don't include hax, count it just once later.
+    services = {'confd', 'ioservice', 's3server'}
+    svcs_nr = 0
+    for node in cluster_info['nodes']:
+        for svc in node['svcs']:
+            if svc['name'] in services:
+                svcs_nr += 1
+    return svcs_nr + 1
+
+
+@repeat_if_fails()
+def all_services_started(url: str, nr_svcs: int) -> bool:
+    conf = ConfStoreProvider(url)
+    hostname = conf.get_hostname()
+    kv = KVAdapter()
+    status_data = kv.kv_get(f'{hostname}/processes', recurse=True)
+    statuses = []
+    for val in status_data:
+        state = val['Value']
+        statuses.append(json.loads(state.decode('utf8'))['state'])
+    started = [status == 'M0_CONF_HA_PROCESS_STARTED' for status in statuses]
+    if len(started) != nr_svcs:
+        return False
+    return all(started)
+
+
 def bootstrap_cluster(path_to_cdf: str, domkfs=False):
     if domkfs:
-        return os.system('hctl bootstrap --mkfs ' + path_to_cdf)
+        rc = os.system('hctl bootstrap --mkfs ' + path_to_cdf)
     else:
-        return os.system('hctl bootstrap ' + path_to_cdf)
+        rc = os.system('hctl bootstrap ' + path_to_cdf)
+    return rc
+
+
+def wait_for_cluster_start(url: str):
+    nr_svcs = nr_services()
+    while not all_services_started(url, nr_svcs):
+        logging.info('Waiting for all the processes to start..')
+        sleep(2)
 
 
 def shutdown_cluster():
@@ -320,11 +484,22 @@ def generate_config(url: str, path_to_cdf: str) -> None:
     save(f'{conf_dir}/node-name', hostname)
 
 
+def update_hax_unit(filename: str) -> None:
+    try:
+        with open(filename) as f:
+            contents = f.readlines()
+        new_contents = HaxUnitTransformer().transform(contents)
+        save(filename, '\n'.join(new_contents))
+    except Exception as e:
+        raise RuntimeError('Failed to update hax systemd unit: ' + str(e))
+
+
 def config(args):
     try:
         url = args.config[0]
         filename = args.file[0] or '/var/lib/hare/cluster.yaml'
         save(filename, generate_cdf(url))
+        update_hax_unit('/usr/lib/systemd/system/hare-hax.service')
         generate_config(url, filename)
     except Exception as error:
         logging.error('Error performing configuration (%s)', error)
@@ -358,6 +533,26 @@ def add_file_argument(parser):
     return parser
 
 
+def add_plan_argument(parser):
+    parser.add_argument('--plan',
+                        help='Testing plan to be executed. Supported '
+                        'values:' + str([e.value for e in Plan]),
+                        required=True,
+                        nargs=1,
+                        type=Plan,
+                        action='store')
+    return parser
+
+
+def add_param_argument(parser):
+    parser.add_argument('--param',
+                        help='Test input URL.',
+                        nargs=1,
+                        type=str,
+                        action='store')
+    return parser
+
+
 def main():
     p = argparse.ArgumentParser(description='Configure hare settings')
     subparser = p.add_subparsers()
@@ -386,11 +581,13 @@ def main():
                        help_str='Initializes Hare',
                        handler_fn=init))
 
-    add_file_argument(
-        add_subcommand(subparser,
-                       'test',
-                       help_str='Tests Hare sanity',
-                       handler_fn=test))
+    add_param_argument(
+        add_plan_argument(
+            add_file_argument(
+                add_subcommand(subparser,
+                               'test',
+                               help_str='Tests Hare component',
+                               handler_fn=test_IVT))))
 
     sb_sub_parser = add_subcommand(subparser,
                                    'support_bundle',
@@ -399,31 +596,42 @@ def main():
                                    config_required=False)
 
     sb_sub_parser.add_argument(
-        'bundleid', metavar='bundle-id', type=str,
+        'bundleid',
+        metavar='bundle-id',
+        type=str,
         nargs='?',
         help='Support bundle ID; defaults to the local host name.')
 
-    sb_sub_parser.add_argument(
-        'destdir', metavar='dest-dir', type=str,
-        nargs='?',
-        help='Target directory; defaults to /tmp/hare.')
+    sb_sub_parser.add_argument('destdir',
+                               metavar='dest-dir',
+                               type=str,
+                               nargs='?',
+                               help='Target directory; defaults to /tmp/hare.')
 
     add_subcommand(subparser,
                    'reset',
                    help_str='Resets temporary Hare data and configuration',
-                   handler_fn=noop, config_required=False)
+                   handler_fn=reset,
+                   config_required=False)
 
     add_subcommand(
         subparser,
         'cleanup',
         help_str='Resets Hare configuration, logs and formats Motr metadata',
-        handler_fn=noop, config_required=False)
+        handler_fn=cleanup,
+        config_required=False)
 
     add_subcommand(subparser,
                    'prepare',
                    help_str='Validates configuration pre-requisites',
                    handler_fn=noop)
 
+    add_subcommand(subparser,
+                   'upgrade',
+                   help_str='Performs the Hare rpm upgrade tasks',
+                   handler_fn=noop)
+
+    create_logger_directory()
     setup_logging()
 
     parsed = p.parse_args(sys.argv[1:])
@@ -432,7 +640,13 @@ def main():
         logging.error('Error: No valid command passed. Please check "--help"')
         exit(1)
 
-    parsed.func(parsed)
+    try:
+        parsed.func(parsed)
+    except Exception as e:
+        # TODO refactor all other code to raise exception rather than exitin.
+        logging.error(str(e))
+        logging.debug('Exiting with FAILED result', exc_info=True)
+        exit(1)
 
 
 if __name__ == '__main__':

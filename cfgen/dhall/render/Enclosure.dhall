@@ -29,6 +29,7 @@ in
     "("
  ++ Prelude.Text.concatSep " "
       [ ./Oid.dhall x.id
+      , named.Oid "node" x.node
       , named.Oids "ctrls" x.ctrls
       , named.Oids "pvers" x.pvers
       ]

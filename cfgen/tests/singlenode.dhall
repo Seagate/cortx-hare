@@ -55,6 +55,7 @@ in
       , disk_refs = None (List types.DiskRef)
       , data_units = 1
       , parity_units = 0
+      , spare_units = Some 0
       , allowed_failures = None types.FailVec
       }
     ]

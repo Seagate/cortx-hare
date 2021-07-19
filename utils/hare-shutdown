@@ -19,9 +19,8 @@
 
 # :help: stop the cluster or local node
 
-import getopt
 import logging
-import sys
+import argparse
 from typing import Dict, List, Tuple
 
 from consul import Consul
@@ -53,6 +52,14 @@ def _get_processes_for_node() -> Dict[str, List[utils.Process]]:
     node = cns_util.get_local_nodename()
     processes = utils.processes_node(cns, node)
     return processes
+
+
+@repeat_if_fails()
+def erase_rc_leader() -> None:
+    cns_util = ConsulUtil()
+    # fake leader value must match r'^elect[0-9]+$'
+    logging.info('Making sure that RC leader can be re-elected next time')
+    cns_util.kv.kv_put('leader', 'elect2805')
 
 
 def stop_all_with_consul(processes: Dict[str, List[utils.Process]],
@@ -89,6 +96,7 @@ def shutdown_cluster(skip_consul_stop: bool):
     (processes, leader_node) = _get_processes_for_cluster()
     stop_process(processes)
 
+    erase_rc_leader()
     if not skip_consul_stop:
         stop_all_with_consul(processes, leader_node)
 
@@ -100,23 +108,38 @@ def node_shutdown():
 
 
 def main() -> None:
-    try:
-        opts, args = getopt.getopt(sys.argv[1:], "v",
-                                   ["verbose", "node", "skip-consul-stop"])
-    except getopt.GetoptError as err:
-        sys.exit(err)
 
-    logging.basicConfig(level=logging.INFO, format='%(message)s')
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-v", "--verbose",
+                        help="Increase output verbosity",
+                        action="store_true")
+    parser.add_argument("--skip-consul-stop",
+                        help="Skip consul service stop",
+                        action="store_true")
+    parser.add_argument("--node",
+                        help="Node shutdown",
+                        action="store_true")
 
-    skip_consul_stop = False
-    for (opt, value) in opts:
-        if opt in ['-v', '--verbose']:
-            logging.basicConfig(level=logging.DEBUG, format='%(message)s')
-        if opt in ['--skip-consul-stop']:
-            skip_consul_stop = True
-        if opt in ['--node']:
-            node_shutdown()
-            return
+    args = parser.parse_args()
+    # Levels of log messages are in following order(decreasing priority)
+    # ERROR -> WARN -> INFO -> DEBUG
+    # We have 'verbose' option available for user which will decide
+    # if DEBUG messsages should be printed or not
+    #
+    # If user provides 'verbose' option then DEBUG messages will be
+    # included otherwise messages with priority more than or
+    # equal to 'Info' will only be included
+    if args.verbose:
+        logging.basicConfig(level=logging.DEBUG, format='%(message)s')
+    else:
+        logging.basicConfig(level=logging.INFO, format='%(message)s')
+
+    skip_consul_stop = bool(args.skip_consul_stop)
+
+    if args.node:
+        logging.debug('Performing node shutdown')
+        node_shutdown()
+        return
 
     shutdown_cluster(skip_consul_stop)
 

@@ -1,10 +1,17 @@
 #:build-requirements:
-flake8
-mypy
-pkgconfig
-setuptools
-wheel
+types-PyYAML==5.4.3
+types-chardet==0.1.3
+types-dataclasses==0.1.5
+types-requests==2.25.0
+types-simplejson==0.1.4
+types-pkg_resources==0.1.3
+types-toml==0.1.3
+flake8==3.9.2
+mypy==0.910
+pkgconfig==1.5.4
+setuptools==57.1.0
+wheel==0.36.2
 
 #:runtime-requirements:
-setuptools
-dataclasses
+setuptools==57.1.0
+dataclasses==0.8

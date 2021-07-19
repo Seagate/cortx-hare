@@ -53,7 +53,38 @@ say() {
     echo -n "$(date '+%F %T'): $*"
 }
 
+ssh_error_info() {
+    local hostname=$1
+    shift
+    ssh -n $hostname "$@" ||
+    {
+        echo "Error at $hostname with command $@";
+        exit 1
+    }
+}
+
+conf_dir_perm_check() {
+    ssh -n $node """
+    if ! [[ -d $conf_dir ]]; then
+        echo "$conf_dir directory does not exist on $node \
+Try reinstalling Hare on the above mentioned node.";
+        exit 1
+    fi
+
+    if ! [[ -w $conf_dir ]]; then
+        echo "Cannot write to $conf_dir directory of $node";
+        exit 1
+    fi
+    echo $node > $conf_dir/node-name;
+"""
+}
+
 get_server_nodes() {
+    # Produces the output like this:
+    #
+    # localhost 10.230.240.139
+    # localhost2 10.230.240.140
+    #
     jq -r '.servers[] | "\(.node_name) \(.ipaddr)"' \
        $conf_dir/consul-agents.json
 }
@@ -117,7 +148,7 @@ abort_if_RC_leader_election_is_impossible() {
         if [[ $node == $(node-name) ]]; then
             ssh=
         else
-            ssh="ssh $node"
+            ssh="ssh_error_info $node"
         fi
 
         for svc in hare-hax $confd_id; do
@@ -171,6 +202,17 @@ is_localhost() {
     esac
     local path=/etc/salt/minion_id
     [[ -e $path && $(cat $path) == $node ]] && return 0 || return 1
+}
+
+check_consul_failure() {
+    while read node bind_ip; do
+        if ssh -n $node "sudo systemctl --quiet --state=failed is-failed hare-consul-agent"; then
+            echo 'Failed to start agent on '$node: >&2
+            true; return
+        fi
+    done < <(get_all_nodes)
+
+    false; return
 }
 
 # --------------------------------------------------------------------
@@ -245,7 +287,7 @@ EOF
         else
             # Redirect stdin to /dev/null (`-n`) to prevent
             # accidental stealing of `get_all_nodes` output.
-	    ssh -n $node "echo $node > $conf_dir/node-name"
+            conf_dir_perm_check
         fi
     done < <(get_all_nodes)
 
@@ -255,7 +297,14 @@ fi
 abort_if_RC_leader_election_is_impossible
 
 read _ join_ip <<< $(get_server_nodes | grep -w $(node-name))
-read _ join_peers <<< $(get_server_nodes | grep -vw $(node-name))
+
+# get_server_nodes will produce multiple lines. We'll join them with space.
+# Note: in case when get_server_nodes is empty list, consequent awk and tr
+# will exit with non-zero code.
+# In order to swallow this error, `|| true` is needed.
+
+join_peers_opt=$(get_server_nodes | grep -vw "$(node-name)" | awk '{print "--join " $2}' | \
+              tr '\n' ' ' || true)
 
 if [[ -z $join_ip ]]; then
     cat <<'EOF' >&2
@@ -275,12 +324,12 @@ if sudo systemctl --quiet is-active hare-consul-agent; then
     say 'Stopping Consul on other nodes...'
     pids=()
     while read node bind_ip; do
-        ssh $node "sudo systemctl stop hare-consul-agent" &
+        ssh_error_info "$node" "sudo systemctl stop hare-consul-agent" &
         pids+=($!)
     done < <(get_server_nodes | grep -vw $(node-name) || true)
 
     while read node bind_ip; do
-        ssh $node "sudo systemctl stop hare-consul-agent" &
+        ssh_error_info "$node" "sudo systemctl stop hare-consul-agent" &
         pids+=($!)
     done < <(get_client_nodes)
     wait4 ${pids[@]-}
@@ -288,7 +337,7 @@ if sudo systemctl --quiet is-active hare-consul-agent; then
 fi
 
 say 'Starting Consul server on this node...'
-join_peers_opt="${join_peers:+--join $join_peers}"
+
 # $join_ip is our bind_ip address
 mk-consul-env --mode server --bind $join_ip $join_peers_opt \
               --extra-options '-ui -bootstrap-expect 1'
@@ -311,42 +360,49 @@ echo ' OK'
 say 'Starting Consul on other nodes...'
 pids=()
 while read node bind_ip; do
-    ssh $node "PATH=$PATH $(which mk-consul-env) \
+    ssh_error_info "$node" "PATH=$PATH $(which mk-consul-env) \
                           --mode server --bind $bind_ip --join $join_ip &&
                sudo systemctl start hare-consul-agent" &
     pids+=($!)
 done < <(get_server_nodes | grep -vw $(node-name) || true)
 
 while read node bind_ip; do
-    ssh $node "PATH=$PATH $(which mk-consul-env) \
+    ssh_error_info "$node" "PATH=$PATH $(which mk-consul-env) \
                           --mode client --bind $bind_ip --join $join_ip &&
                sudo systemctl start hare-consul-agent" &
     pids+=($!)
 done < <(get_client_nodes)
 wait4 ${pids[@]-}
 agents_nr=$(( ${#pids[@]} + 1 ))
+count=1
 
 # Waiting for the Consul agents to get ready...
-count=1
 while (( $(get_ready_agents_nr) != $agents_nr )); do
     if (( $count > 5 )); then
-        echo 'Some agent(s) failed to start in due time:' >&2
-        diff <(get_ready_agents | sort) \
-             <(get_all_nodes | awk '{print $1}' | sort) | sed 1d >&2
-        echo 'Check connectivity and firewall (Consul ports must be opened)' >&2
-        exit 1
+        echo 'Consul not ready on node :'
+        comm -13 <(get_ready_agents | sort) \
+                 <(get_all_nodes | awk '{print $1}' | sort) >&1
+        count=1
+
+        if check_consul_failure; then
+            echo 'Some agent(s) failed to start:' >&2
+            comm -13 <(get_ready_agents | sort) \
+                     <(get_all_nodes | awk '{print $1}' | sort) >&2
+            echo 'Check connectivity and firewall (Consul ports must be opened)' >&2
+            exit 1
+        fi
     fi
-    echo -n '.'
-    sleep 1
     (( count++ ))
+    
+    sleep 1
 done
-echo ' OK'
+echo 'Consul ready on all nodes'
 
 say 'Updating Consul configuraton from the KV store...'
 update-consul-conf &
 pids=($!)
 while read node _; do
-    ssh $node "PATH=$PATH $(which update-consul-conf)" &
+    ssh_error_info "$node" "PATH=$PATH $(which update-consul-conf)" &
     pids+=($!)
 done < <(get_all_nodes | grep -vw $(node-name) || true)
 wait4 ${pids[@]}
@@ -392,7 +448,7 @@ start_motr() {
     pids=($!)
 
     while read node _; do
-        ssh $node "PATH=$PATH $(which bootstrap-node) $op --phase $phase" &
+        ssh_error_info "$node" "PATH=$PATH $(which bootstrap-node) $op --phase $phase" &
         pids+=($!)
     done < <(get_nodes $phase | grep -vw $(node-name) || true)
     wait4 ${pids[@]}
@@ -423,7 +479,7 @@ if [[ -n $S3_IDs ]]; then
     pids=($!)
 
     while read node _; do
-        ssh $node "PATH=$PATH $(which bootstrap-node) --phase phase3" &
+        ssh_error_info "$node" "PATH=$PATH $(which bootstrap-node) --phase phase3" &
         pids+=($!)
     done < <(get_all_nodes | grep -vw $(node-name) || true)
     wait4 ${pids[@]}

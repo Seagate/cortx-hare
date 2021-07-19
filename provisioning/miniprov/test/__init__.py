@@ -15,6 +15,3 @@
 # For any questions about this software or licensing,
 # please email opensource@seagate.com or cortx-questions@seagate.com.
 #
-
-# Setup utility for Hare to configure Hare related settings, e.g. logrotate,
-# report unsupported features, etc.

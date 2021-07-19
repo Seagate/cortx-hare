@@ -472,6 +472,7 @@ let pver_63 = types.Obj.Pver
   { id = ids.pver_63
   , data_units = 1
   , parity_units = 0
+  , spare_units = 0
   , pool_width = 1
   , tolerance = [0, 0, 0, 1, 0]
   , sitevs = [ids.objv_68]
@@ -481,6 +482,7 @@ let pver_49 = types.Obj.Pver
   { id = ids.pver_49
   , data_units = 2
   , parity_units = 1
+  , spare_units = 1
   , pool_width = 8
   , tolerance = [0, 0, 0, 0, 1]
   , sitevs = [ids.objv_54]
@@ -490,6 +492,7 @@ let pver_2 = types.Obj.Pver
   { id = ids.pver_2
   , data_units = 1
   , parity_units = 0
+  , spare_units = 0
   , pool_width = 1
   , tolerance = [0, 0, 0, 1, 0]
   , sitevs = [ids.objv_76]
@@ -625,7 +628,6 @@ let service_26 = types.Obj.Service
 
 let controller = types.Obj.Controller
   { id = ids.controller
-  , node = ids.node
   , drives = [ ids.drive_17, ids.drive_19, ids.drive_21, ids.drive_71
              , ids.drive_23, ids.drive_9, ids.drive_11, ids.drive_13
              , ids.drive_15 ]
@@ -634,6 +636,7 @@ let controller = types.Obj.Controller
 
 let enclosure = types.Obj.Enclosure
   { id = ids.enclosure
+  , node = ids.node
   , ctrls = [ids.controller]
   , pvers = [ids.pver_2, ids.pver_49, ids.pver_63]
   }

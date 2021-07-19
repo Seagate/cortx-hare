@@ -61,7 +61,7 @@ while true; do
         -h|--help)           usage; exit ;;
         -m|--mode)           mode=$2; shift 2 ;;
         -b|--bind)           bind_addr=$2; shift 2 ;;
-        -j|--join)           join_addr=$2; shift 2 ;;
+        -j|--join)           join_addr="$join_addr $2"; shift 2 ;;
         -e|--extra-options)  extra_opts=$2; shift 2 ;;
         --)                  shift; break ;;
         *)                   echo 'getopt: internal error...'; exit 1 ;;
@@ -81,8 +81,15 @@ sed -r -e "s/^(NODE=).*/\1$(node-name)/" \
     sudo tee $ENV_FILE >/dev/null
 
 if [[ -n $join_addr ]]; then
-    sudo sed -r -e "s/^(JOIN=).*/\1${join_addr:+-retry-join $join_addr}/" \
-             -i $ENV_FILE
+    # join_addr is not empty and it contains one or more ip addresses separated
+    # by space.
+    # Multiple server addresses must turn into multiple '-retry-join ipN'.
+    # For instance:
+    # '127.0.0.1 192.168.0.1' => '-retry-join 127.0.0.1 -retry-join 192.168.0.1'
+
+    retry_str="$(echo "$join_addr" | \
+                 awk '{for (i=1; i <= NF; ++i) printf " -retry-join "$i }')"
+    sudo sed -r -e "s/^(JOIN=).*/\1$retry_str/" -i $ENV_FILE
 fi
 
 if [[ -n $extra_opts ]]; then

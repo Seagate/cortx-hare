@@ -22,14 +22,15 @@ from errno import EAGAIN
 from typing import Any, List
 
 from hax.exception import ConfdQuorumException, RepairRebalanceException
-from hax.message import (BroadcastHAStates, EntrypointRequest,
-                         FirstEntrypointRequest, HaNvecGetEvent, ProcessEvent)
+from hax.message import (EntrypointRequest, FirstEntrypointRequest,
+                         HaNvecGetEvent, ProcessEvent, StobIoqError)
 from hax.motr.delivery import DeliveryHerald
 from hax.motr.ffi import HaxFFI, make_array, make_c_str
-from hax.types import (ConfHaProcess, Fid, FidStruct, FsStats, HaNote,
-                       HaNoteStruct, HAState, MessageId, ObjT, Profile,
-                       ReprebStatus, ServiceHealth, StobIoqError,
-                       m0HaProcessEvent, m0HaProcessType)
+from hax.motr.planner import WorkPlanner
+from hax.types import (ConfHaProcess, Fid, FidStruct, FsStats,
+                       HaLinkMessagePromise, HaNote, HaNoteStruct, HAState,
+                       MessageId, ObjT, Profile, ReprebStatus, ServiceHealth,
+                       m0HaProcessEvent)
 from hax.util import ConsulUtil, repeat_if_fails
 
 LOG = logging.getLogger('hax')
@@ -48,7 +49,7 @@ def log_exception(fn):
 class Motr:
     def __init__(self,
                  ffi: HaxFFI,
-                 queue,
+                 planner: WorkPlanner,
                  herald: DeliveryHerald,
                  consul_util: ConsulUtil,
                  node_uuid: str = ''):
@@ -56,10 +57,11 @@ class Motr:
         # [KN] Note that node_uuid is currently ignored by the corresponding
         # hax.c function
         self._ha_ctx = self._ffi.init_motr_api(self, make_c_str(node_uuid))
-        self.queue = queue
+        self.planner = planner
         self.herald = herald
         self.consul_util = consul_util
         self.spiel_ready = False
+        self.is_stopping = False
 
         if not self._ha_ctx:
             LOG.error('Cannot initialize Motr API. m0_halon_interface_init'
@@ -96,6 +98,20 @@ class Motr:
                                ' Please check Motr logs for more details.')
         LOG.debug('rconfc started')
         return result
+
+    def stop(self):
+        LOG.info('Stopping motr')
+        self.is_stopping = True
+        self.notify_hax_stop()
+        if self.is_spiel_ready():
+            self.stop_rconfc()
+        self._ffi.motr_stop(self._ha_ctx)
+
+    def fini(self):
+        LOG.info('Finalizing motr')
+        self._ffi.motr_fini(self._ha_ctx)
+        self._ha_ctx = 0
+        LOG.debug('Motr API context is down. Bye!')
 
     def stop_rconfc(self) -> int:
         LOG.debug('Stopping rconfc')
@@ -134,7 +150,7 @@ class Motr:
                 # anyway detect the failure and report the same so we exclude
                 # reporting the same during their first entrypoint request.
                 # But we need to do it for motr server processes.
-                self.queue.put(
+                self.planner.add_command(
                     FirstEntrypointRequest(
                         reply_context=reply_context,
                         req_id=req_id,
@@ -148,20 +164,27 @@ class Motr:
             LOG.exception('Failed to notify failure for %s', process_fid)
 
         LOG.debug('enqueue entrypoint request for %s', remote_rpc_endpoint)
-        self.queue.put(
-            EntrypointRequest(reply_context=reply_context,
-                              req_id=req_id,
-                              remote_rpc_endpoint=remote_rpc_endpoint,
-                              process_fid=process_fid,
-                              git_rev=git_rev,
-                              pid=pid,
-                              is_first_request=is_first_request))
+        entrypoint_req: EntrypointRequest = EntrypointRequest(
+            reply_context=reply_context,
+            req_id=req_id,
+            remote_rpc_endpoint=remote_rpc_endpoint,
+            process_fid=process_fid,
+            git_rev=git_rev,
+            pid=pid,
+            is_first_request=is_first_request)
+
+        # If rconfc from motr land sends an entrypoint request when
+        # the hax consumer thread is already stopping, there's no
+        # point in en-queueing the request as there's no one to process
+        # the same. Thus, invoke send_entrypoint_reply directly.
+        self.send_entrypoint_request_reply(entrypoint_req)
 
     def send_entrypoint_request_reply(self, message: EntrypointRequest):
         reply_context = message.reply_context
         req_id = message.req_id
         remote_rpc_endpoint = message.remote_rpc_endpoint
         process_fid = message.process_fid
+        e_rc = EAGAIN
 
         LOG.debug('Processing entrypoint request from remote endpoint'
                   " '{}', process fid {}".format(remote_rpc_endpoint,
@@ -169,30 +192,64 @@ class Motr:
         sess = principal_rm = confds = None
         try:
             util = self.consul_util
-            sess = util.get_leader_session_no_wait()
-            principal_rm = util.get_session_node(sess)
-            confds = util.get_confd_list()
-            rm_fid = util.get_rm_fid()
+            # When stopping, there's a possibility that hax may receive
+            # an entrypoint request from motr land. In order to unblock
+            # motr land, reply with entrypoint request with no confds
+            # and RM endpoints as the processes might have already
+            # stopped.
+            rc_quorum = 0
+            rm_fid = Fid(0, 0)
+            if self.is_stopping:
+                confds = []
+            else:
+                sess = util.get_leader_session_no_wait()
+                principal_rm = util.get_session_node(sess)
+                confds = util.get_confd_list()
+
+            # Hax may receive entrypoint requests multiple times during its
+            # lifetime. Hax starts motr rconfc to invoke spiel commands. Motr
+            # rconfc establishes connection with principal RM, in case of
+            # principal RM failure, rconfc invalidates its confc and again
+            # requests entrypoint in a hope that there will be another confd
+            # and principal RM elected so that rconfc can resume its
+            # functionality. During shutdown, when each motr process stops,
+            # including confds, hax broadcasts M0_NC_FAILED event for every
+            # STOPPED or FAILED motr process. Motr rconfc on receiving the
+            # failed events for confds, goes re-requests entrypoint information
+            # and this goes on in a loop. In order to break this loop, the
+            # the entrypoint reply must only report alive confds and rm
+            # endpoints. While doing this we need to handle the bootstrapping
+            # case, so we wait until bootstrapping is done that is all the
+            # motr services are up, we check the confd status and exclude
+            # corresponding confd from the entrypoint reply.
+            active_confds = []
+            if self.spiel_ready:
+                for confd in confds:
+                    if not util.is_confd_failed(confd.fid):
+                        active_confds.append(confd)
+                confds = active_confds
+
+            if confds:
+                rm_fid = util.get_rm_fid()
+                rc_quorum = int(len(confds) / 2 + 1)
+            rm_eps = None
+            for svc in confds:
+                if svc.node == principal_rm:
+                    rm_eps = svc.address
+                    break
+            if confds and (not self.is_stopping) and (not rm_eps):
+                if util.m0ds_stopping():
+                    e_rc = 0
+                raise RuntimeError('No RM node found in Consul')
         except Exception:
             LOG.exception('Failed to get the data from Consul.'
                           ' Replying with EAGAIN error code.')
-            self._ffi.entrypoint_reply(reply_context, req_id.to_c(), EAGAIN, 0,
+            self._ffi.entrypoint_reply(reply_context, req_id.to_c(), e_rc, 0,
                                        make_array(FidStruct, []),
                                        make_array(c.c_char_p, []), 0,
-                                       Fid(0, 0).to_c(),
-                                       None)
+                                       Fid(0, 0).to_c(), None)
             LOG.debug('Reply sent')
             return
-
-        rc_quorum = int(len(confds) / 2 + 1)
-
-        rm_eps = None
-        for svc in confds:
-            if svc.node == principal_rm:
-                rm_eps = svc.address
-                break
-        if not rm_eps:
-            raise RuntimeError('No RM node found in Consul')
 
         confd_fids = [x.fid.to_c() for x in confds]
         confd_eps = [make_c_str(x.address) for x in confds]
@@ -203,11 +260,12 @@ class Motr:
                                    make_array(FidStruct, confd_fids),
                                    make_array(c.c_char_p,
                                               confd_eps), rc_quorum,
-                                   rm_fid.to_c(),
-                                   make_c_str(rm_eps))
+                                   rm_fid.to_c(), make_c_str(rm_eps))
         LOG.debug('Entrypoint request has been replied to')
 
-    def broadcast_ha_states(self, ha_states: List[HAState]) -> List[MessageId]:
+    def broadcast_ha_states(self,
+                            ha_states: List[HAState],
+                            notify_devices=True) -> List[MessageId]:
         LOG.debug('Broadcasting HA states %s over ha_link', ha_states)
 
         def ha_obj_state(st):
@@ -220,8 +278,18 @@ class Motr:
                 continue
             note = HaNoteStruct(st.fid.to_c(), ha_obj_state(st))
             notes.append(note)
-            notes += self._generate_sub_services(note, self.consul_util)
-
+            if (st.fid.container == ObjT.PROCESS.value
+                    and st.status == ServiceHealth.STOPPED):
+                notify_devices = False
+            notes += self._generate_sub_services(note, self.consul_util,
+                                                 notify_devices)
+            # For process failure, we report failure for the corresponding
+            # node (enclosure) and CVGs.
+            if (st.fid.container == ObjT.PROCESS.value
+                    and st.status in (ServiceHealth.FAILED, ServiceHealth.OK)):
+                notes += self.notify_node_status(note)
+            if st.fid.container == ObjT.DRIVE.value:
+                self.consul_util.update_drive_state([st.fid], st.status)
         if not notes:
             return []
         message_ids: List[MessageId] = self._ffi.ha_broadcast(
@@ -233,25 +301,23 @@ class Motr:
 
     def _process_event_cb(self, fid, chp_event, chp_type, chp_pid):
         LOG.info('fid=%s, chp_event=%s', fid, chp_event)
-        self.queue.put(
+        self.planner.add_command(
             ProcessEvent(
                 ConfHaProcess(chp_event=chp_event,
                               chp_type=chp_type,
                               chp_pid=chp_pid,
                               fid=fid)))
 
-        if chp_type == m0HaProcessType.M0_CONF_HA_PROCESS_M0D:
-            if chp_event == m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED:
-                self.queue.put(
-                    BroadcastHAStates(
-                        states=[HAState(fid=fid, status=ServiceHealth.OK)],
-                        reply_to=None))
+        if chp_event == m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED:
+            proc_ep = self.consul_util.fid_to_endpoint(fid)
+            if proc_ep:
+                self._ffi.hax_link_stopped(self._ha_ctx, make_c_str(proc_ep))
 
     def _stob_ioq_event_cb(self, fid, sie_conf_sdev, sie_stob_id, sie_fd,
                            sie_opcode, sie_rc, sie_offset, sie_size,
                            sie_bshift):
         LOG.info('fid=%s, sie_conf_sdev=%s', fid, sie_conf_sdev)
-        self.queue.put(
+        self.planner.add_command(
             StobIoqError(fid, sie_conf_sdev, sie_stob_id, sie_fd, sie_opcode,
                          sie_rc, sie_offset, sie_size, sie_bshift))
 
@@ -274,7 +340,7 @@ class Motr:
     @log_exception
     def ha_nvec_get(self, hax_msg: int, nvec: List[HaNote]) -> None:
         LOG.debug('Got ha nvec of length %s from Motr land', len(nvec))
-        self.queue.put(HaNvecGetEvent(hax_msg, nvec))
+        self.planner.add_command(HaNvecGetEvent(hax_msg, nvec))
 
     @log_exception
     def ha_nvec_get_reply(self, event: HaNvecGetEvent) -> None:
@@ -283,31 +349,33 @@ class Motr:
         notes: List[HaNoteStruct] = []
         for n in event.nvec:
             n.note.no_state = HaNoteStruct.M0_NC_ONLINE
-            if (n.obj_t in (ObjT.PROCESS.name, ObjT.SERVICE.name)
-                    and self.consul_util.get_conf_obj_status(
-                        ObjT[n.obj_t], n.note.no_id.f_key) != 'passing'):
-                n.note.no_state = HaNoteStruct.M0_NC_FAILED
+            if (n.obj_t in (ObjT.PROCESS.name, ObjT.SERVICE.name)):
+                n.note.no_state = self.consul_util.get_conf_obj_status(
+                    ObjT[n.obj_t], n.note.no_id.f_key)
             notes.append(n.note)
 
         LOG.debug('Replying ha nvec of length ' + str(len(event.nvec)))
         self._ffi.ha_nvec_reply(event.hax_msg, make_array(HaNoteStruct, notes),
                                 len(notes))
 
-    def _generate_sub_services(self, note: HaNoteStruct,
-                               cns: ConsulUtil) -> List[HaNoteStruct]:
+    def _generate_sub_services(self,
+                               note: HaNoteStruct,
+                               cns: ConsulUtil,
+                               notify_devices=True) -> List[HaNoteStruct]:
         new_state = note.no_state
         fid = Fid.from_struct(note.no_id)
         service_list = cns.get_services_by_parent_process(fid)
         LOG.debug('Process fid=%s encloses %s services as follows: %s', fid,
                   len(service_list), service_list)
-        service_notes = [HaNoteStruct(no_id=x.fid.to_c(), no_state=new_state)
-                         for x in service_list]
-        service_notes += self._generate_sub_disks(note, service_list, cns)
-
+        service_notes = [
+            HaNoteStruct(no_id=x.fid.to_c(), no_state=new_state)
+            for x in service_list
+        ]
+        if notify_devices:
+            service_notes += self._generate_sub_disks(note, service_list, cns)
         return service_notes
 
-    def _generate_sub_disks(self, note: HaNoteStruct,
-                            services: List,
+    def _generate_sub_disks(self, note: HaNoteStruct, services: List,
                             cns: ConsulUtil) -> List[HaNoteStruct]:
         disk_list = []
         new_state = note.no_state
@@ -316,24 +384,54 @@ class Motr:
             disk_list += cns.get_disks_by_parent_process(proc_fid, svc.fid)
         LOG.debug('proc fid=%s encloses %d disks with state %d as follows: %s',
                   proc_fid, len(disk_list), int(new_state), disk_list)
+        if disk_list:
+            state = (ServiceHealth.OK if new_state ==
+                     HaNoteStruct.M0_NC_ONLINE else ServiceHealth.OFFLINE)
+            # XXX: Need to check the current state of the device, transition
+            # to ONLINE only in case of an explicit request or iff the prior
+            # state of the device is UNKNOWN/OFFLINE.
+            cns.update_drive_state(disk_list, state, device_event=False)
         return [
-            HaNoteStruct(no_id=x.to_c(), no_state=new_state)
-            for x in disk_list
+            HaNoteStruct(no_id=x.to_c(), no_state=new_state) for x in disk_list
         ]
 
-    def close(self):
-        LOG.debug('Stopping rconfc')
-        self.stop_rconfc()
-        LOG.debug('Shutting down Motr API')
-        self._ffi.destroy(self._ha_ctx)
-        self._ha_ctx = 0
-        LOG.debug('Motr API context is down. Bye!')
+    def notify_node_status(self,
+                           proc_note: HaNoteStruct) -> List[HaNoteStruct]:
+        new_state = proc_note.no_state
+        proc_fid = Fid.from_struct(proc_note.no_id)
+        assert ObjT.PROCESS.value == proc_fid.container
+        LOG.debug('Notifying node status for process_fid=%s state=%s',
+                  proc_fid, new_state)
+
+        node = self.consul_util.get_process_node(proc_fid)
+
+        node_fid = self.consul_util.get_node_fid(node)
+        encl_fid = self.consul_util.get_node_encl_fid(node)
+        ctrl_fid = self.consul_util.get_node_ctrl_fid(node)
+        LOG.debug('node_fid: %s encl_fid: %s ctrl_fid: %s with state: %s',
+                  node_fid, encl_fid, ctrl_fid, new_state)
+
+        notes = []
+        if node_fid and encl_fid and ctrl_fid:
+            notes = [HaNoteStruct(no_id=x.to_c(), no_state=new_state)
+                     for x in [node_fid, encl_fid, ctrl_fid]]
+
+        return notes
+
+    def notify_hax_stop(self):
+        LOG.debug('Notifying hax stop')
+        hax_fid = self.consul_util.get_hax_fid()
+        hax_endpoint = self.consul_util.get_hax_endpoint()
+        ids = self._ffi.hax_stop(self._ha_ctx, hax_fid.to_c(),
+                                 make_c_str(hax_endpoint))
+        self.herald.wait_for_all(HaLinkMessagePromise(ids))
 
     def adopt_motr_thread(self):
         LOG.debug('Adopting Motr thread')
-        self._ffi.adopt_motr_thread()
+        self._ffi.adopt_motr_thread(self._ha_ctx)
 
     def shun_motr_thread(self):
+        LOG.debug('Shunning Motr thread')
         self._ffi.shun_motr_thread()
 
     def get_filesystem_stats(self) -> FsStats:

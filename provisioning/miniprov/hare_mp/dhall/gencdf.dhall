@@ -4,14 +4,26 @@ let T = $path/types.dhall
 let P = T.Protocol
 let DiskRef = T.DiskRef
 
+let M0dProcess =
+      { runs_confd : Optional Bool
+      , io_disks : { meta_data : Optional Text, data : List Text }
+      }
+
 let NodeInfo =
       { hostname : Text
       , data_iface : Text
       , data_iface_type : Optional T.Protocol
-      , io_disks : List Text
-      , meta_data1 : Text
-      , meta_data2 : Text
+      , m0_servers : Optional  (List M0dProcess)
       , s3_instances : Natural
+      , client_instances : Natural
+      }
+
+let AllowedFailures =
+      { site : Natural
+      , rack : Natural
+      , encl : Natural
+      , ctrl : Natural
+      , disk : Natural
       }
 
 let PoolInfo =
@@ -19,7 +31,9 @@ let PoolInfo =
       , disk_refs : Optional (List T.DiskRef)
       , data_units : Natural
       , parity_units : Natural
+      , spare_units : Optional Natural
       , type : T.PoolType
+      , allowed_failures: Optional AllowedFailures
       }
 
 let ProfileInfo =
@@ -39,16 +53,8 @@ let toNodeDesc
       ->  { hostname = n.hostname
           , data_iface = n.data_iface
           , data_iface_type = n.data_iface_type
-          , m0_clients = { other = 3, s3 = n.s3_instances }
-          , m0_servers =
-              Some
-              [ { io_disks = { data = [] : List Text, meta_data = Some n.meta_data1 }
-                , runs_confd = Some True
-                }
-              , { io_disks = { data = n.io_disks, meta_data = Some n.meta_data2 }
-                , runs_confd = None Bool
-                }
-              ]
+          , m0_clients = { other = n.client_instances, s3 = n.s3_instances }
+          , m0_servers = n.m0_servers
           }
 
 let toPoolDesc
@@ -56,17 +62,11 @@ let toPoolDesc
     =     \(p : PoolInfo)
       ->  { name = p.name
           , type = Some p.type
-          , data_units = p.data_units
           , disk_refs = p.disk_refs
+          , data_units = p.data_units
           , parity_units = p.parity_units
-          , allowed_failures =
-                    None
-                      { ctrl : Natural
-                      , disk : Natural
-                      , encl : Natural
-                      , rack : Natural
-                      , site : Natural
-                      }
+          , spare_units = p.spare_units
+          , allowed_failures = p.allowed_failures
           }
 
 let genCdf
