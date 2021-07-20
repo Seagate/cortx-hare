@@ -639,7 +639,12 @@ def main():
                    handler_fn=noop)
 
     add_subcommand(subparser,
-                   'upgrade',
+                   'pre-upgrade',
+                   help_str='Performs the Hare rpm upgrade tasks',
+                   handler_fn=noop)
+
+    add_subcommand(subparser,
+                   'post-upgrade',
                    help_str='Performs the Hare rpm upgrade tasks',
                    handler_fn=noop)
 
