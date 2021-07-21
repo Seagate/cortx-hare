@@ -119,6 +119,15 @@ class DiskRef(DhallTuple):
 
 
 @dataclass(repr=False)
+class AllowedFailures(DhallTuple):
+    site: int
+    rack: int
+    encl: int
+    ctrl: int
+    disk: int
+
+
+@dataclass(repr=False)
 class PoolDesc(DhallTuple):
     name: Text
     disk_refs: Maybe[DList[DiskRef]]
@@ -126,6 +135,7 @@ class PoolDesc(DhallTuple):
     parity_units: int
     spare_units: Maybe[int]
     type: PoolType
+    allowed_failures: Maybe[AllowedFailures]
 
 
 @dataclass(repr=False)
@@ -147,3 +157,10 @@ class MissingKeyError(Exception):
 
     def __str__(self):
         return f"Required key '{self.key}' not found"
+
+
+@dataclass(repr=False)
+class Layout:
+    data: int
+    parity: int
+    spare: int

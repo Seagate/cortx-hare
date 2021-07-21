@@ -29,7 +29,7 @@ from hax.motr.delivery import DeliveryHerald
 from hax.motr.ffi import HaxFFI
 from hax.motr.planner import WorkPlanner
 from hax.motr.rconfc import RconfcStarter
-from hax.server import run_server
+from hax.server import ServerRunner
 from hax.types import Fid, Profile
 from hax.util import ConsulUtil, repeat_if_fails
 
@@ -123,10 +123,9 @@ def main():
         stats_updater = _run_stats_updater_thread(motr, consul_util=util)
         # [KN] This is a blocking call. It will work until the program is
         # terminated by signal
-        run_server(
-            planner,
-            herald,
-            consul_util=util,
+
+        server = ServerRunner(planner, herald, consul_util=util)
+        server.run(
             threads_to_wait=[*consumer_threads, stats_updater, rconfc_starter])
     except Exception:
         LOG.exception('Exiting due to an exception')

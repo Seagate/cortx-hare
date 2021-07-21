@@ -50,6 +50,14 @@ ServiceData = NamedTuple('ServiceData', [('node', str), ('fid', Fid),
 
 FidWithType = NamedTuple('FidWithType', [('fid', Fid), ('service_type', str)])
 
+MotrConsulProcStatus = NamedTuple('MotrConsulProcStatus', [(
+                                        'consul_svc_status', str),
+                                        ('consul_motr_proc_status', str)])
+
+MotrProcStatusLocalRemote = NamedTuple('MotrProcStatusLocalRemote', [(
+                                'motr_proc_status_local', ServiceHealth),
+                                ('motr_proc_status_remote', ServiceHealth)])
+
 
 def mkServiceData(service: Dict[str, Any]) -> ServiceData:
     return ServiceData(
@@ -82,11 +90,16 @@ def create_drive_fid(key: int) -> Fid:
     return mk_fid(ObjT.DRIVE, key)
 
 
+def create_profile_fid(key: int) -> Fid:
+    return mk_fid(ObjT.PROFILE, key)
+
+
 # See enum m0_conf_ha_process_event in Motr source code.
 ha_process_events = ('M0_CONF_HA_PROCESS_STARTING',
                      'M0_CONF_HA_PROCESS_STARTED',
                      'M0_CONF_HA_PROCESS_STOPPING',
                      'M0_CONF_HA_PROCESS_STOPPED')
+
 
 ha_conf_obj_states = ('M0_NC_UNKNOWN',
                       'M0_NC_ONLINE',
@@ -149,7 +162,7 @@ def wait_for_event(event: Event, interval_sec) -> None:
         raise InterruptedException()
 
 
-class ConsulKVBasic:
+class KVAdapter:
     def __init__(self, cns: Optional[Consul] = None):
         self.cns = cns or Consul()
 
@@ -228,12 +241,11 @@ class ConsulKVBasic:
                                          f' from KV, error: {e}')
 
 
-class ConsulUtil:
-    def __init__(self, raw_client: Optional[Consul] = None):
-        self.cns: Consul = raw_client or Consul()
-        self.kv = ConsulKVBasic(cns=self.cns)
+class CatalogAdapter:
+    def __init__(self, cns: Optional[Consul] = None):
+        self.cns: Consul = cns or Consul()
 
-    def _catalog_service_names(self) -> List[str]:
+    def get_service_names(self) -> List[str]:
         """
         Return full list of service names currently registered in Consul
         server.
@@ -245,15 +257,27 @@ class ConsulUtil:
             raise HAConsistencyException(
                 'Cannot access Consul catalog') from e
 
-    def _catalog_service_get(self, svc_name: str) -> List[Dict[str, Any]]:
+    def get_services(self, svc_name: str) -> List[Dict[str, Any]]:
+        """
+        Return service(s) registered in Consul by the given name.
+        """
         try:
+            # TODO refactor catalog operations into a separate class
             return self.cns.catalog.service(service=svc_name)[1]
         except (ConsulException, HTTPError, RequestException) as e:
             raise HAConsistencyException(
                 'Could not access Consul Catalog') from e
 
+
+class ConsulUtil:
+    def __init__(self, raw_client: Optional[Consul] = None):
+        self.cns: Consul = raw_client or Consul()
+        self.kv = KVAdapter(cns=self.cns)
+        self.catalog = CatalogAdapter(cns=self.cns)
+
     def _service_by_name(self, hostname: str, svc_name: str) -> Dict[str, Any]:
-        for svc in self._catalog_service_get(svc_name):
+        cat = self.catalog
+        for svc in cat.get_services(svc_name):
             if svc['Node'] == hostname:
                 return svc
         raise HAConsistencyException(
@@ -283,7 +307,7 @@ class ConsulUtil:
 
     def _service_data(self) -> ServiceData:
         my_fidk = self.get_hax_fid().key
-        services = self._catalog_service_get('hax')
+        services = self.catalog.get_services('hax')
         for svc in services:
             if int(svc['ServiceID']) == my_fidk:
                 return mkServiceData(svc)
@@ -372,7 +396,7 @@ class ConsulUtil:
 
     def get_svc_status(self, srv_fid: Fid) -> str:
         try:
-            return self.get_process_status(srv_fid)
+            return self.get_process_status(srv_fid).consul_svc_status
         except Exception:
             return 'Unknown'
 
@@ -383,7 +407,7 @@ class ConsulUtil:
         """
         m0d_services = set(['ios', 'confd'])
         result = []
-        for service_name in self._catalog_service_names():
+        for service_name in self.catalog.get_service_names():
             if service_name not in m0d_services:
                 continue
             data = self.get_service_data_by_name(service_name)
@@ -391,9 +415,9 @@ class ConsulUtil:
         return result
 
     def get_service_data_by_name(self, name: str) -> List[ServiceData]:
-        services = self._catalog_service_get(name)
+        services = self.catalog.get_services(name)
         LOG.log(TRACE, 'Services "%s" received: %s', name, services)
-        return list(map(mkServiceData, services))
+        return [mkServiceData(i) for i in services]
 
     def get_confd_list(self) -> List[ServiceData]:
         return self.get_service_data_by_name('confd')
@@ -512,10 +536,9 @@ class ConsulUtil:
             pfid = self.get_service_process_fid(svc_fid)
         else:
             pfid = create_process_fid(fidk)
-        if (self.get_process_status(pfid) in ('M0_CONF_HA_PROCESS_STARTING',
-                                              'M0_CONF_HA_PROCESS_STARTED',
-                                              'M0_CONF_HA_PROCESS_STOPPING',
-                                              'Unknown')):
+        if self.get_process_status(pfid).consul_svc_status in (
+                'M0_CONF_HA_PROCESS_STARTING', 'M0_CONF_HA_PROCESS_STARTED',
+                'M0_CONF_HA_PROCESS_STOPPING', 'Unknown'):
             return HaNoteStruct.M0_NC_ONLINE
         else:
             return HaNoteStruct.M0_NC_FAILED
@@ -693,7 +716,8 @@ class ConsulUtil:
         assert 0 <= event.chp_event < len(ha_process_events), \
             f'Invalid event type: {event.chp_event}'
         local_node = self.get_local_nodename()
-        data = json.dumps({'state': ha_process_events[event.chp_event]})
+        data = json.dumps({'state': ha_process_events[event.chp_event],
+                           'type': m0HaProcessType(event.chp_type).name})
         # Maintain statuses for all the motr processes in the cluster
         # for every node so that in case of 1 or more node failures,
         # as every node will receive the node failure event, the failed
@@ -824,14 +848,15 @@ class ConsulUtil:
         return self.sdev_to_drive_fid(sdev_fid)
 
     # Returns status of process from its local node.
-    def get_process_status(self, fid: Fid) -> str:
+    def get_process_status(self, fid: Fid) -> MotrConsulProcStatus:
         proc_node = self.get_process_node(fid)
         key = f'{proc_node}/processes/{fid}'
         status = self.kv.kv_get(key)
         if status:
-            return str(json.loads(status['Value'])['state'])
+            val = json.loads(status['Value'])
+            return MotrConsulProcStatus(val['state'], val['type'])
         else:
-            return 'Unknown'
+            return MotrConsulProcStatus('Unknown', 'Unknown')
 
     def get_process_local_status(self, fid: Fid) -> str:
         local_node = self.get_local_nodename()
@@ -896,35 +921,41 @@ class ConsulUtil:
         # Respective values are for local and remote nodes.
         # {(consul_svc_status, motr_process_status):(local_node_ha_status,
         #                                            remote_node_ha_status)}
+
+        cur_consul_status = MotrConsulProcStatus
+        local_remote_health_ret = MotrProcStatusLocalRemote
+
         svc_to_motr_status_map = {
-            ('passing',
-             'M0_CONF_HA_PROCESS_STARTING'): (ServiceHealth.OFFLINE,
-                                              ServiceHealth.OK),
-            ('passing',
-             'M0_CONF_HA_PROCESS_STOPPING'): (ServiceHealth.OFFLINE,
-                                              ServiceHealth.UNKNOWN),
-            ('passing',
-             'M0_CONF_HA_PROCESS_STARTED'): (ServiceHealth.OK,
-                                             ServiceHealth.OK),
-            ('passing',
-             'M0_CONF_HA_PROCESS_STOPPED'): (ServiceHealth.OFFLINE,
-                                             ServiceHealth.UNKNOWN),
-            ('passing',
-             'Unknown'): (ServiceHealth.UNKNOWN, ServiceHealth.UNKNOWN),
-            ('warning',
-             'M0_CONF_HA_PROCESS_STOPPING'): (ServiceHealth.OFFLINE,
-                                              ServiceHealth.STOPPED),
-            ('warning',
-             'M0_CONF_HA_PROCESS_STARTED'): (ServiceHealth.OFFLINE,
-                                             ServiceHealth.FAILED),
-            ('warning',
-             'M0_CONF_HA_PROCESS_STOPPED'): (ServiceHealth.STOPPED,
-                                             ServiceHealth.STOPPED),
-            ('warning',
-             'M0_CONF_HA_PROCESS_STARTING'): (ServiceHealth.OFFLINE,
-                                              ServiceHealth.OFFLINE),
-            ('warning',
-             'Unknown'): (ServiceHealth.UNKNOWN, ServiceHealth.UNKNOWN)}
+            cur_consul_status('passing', 'M0_CONF_HA_PROCESS_STARTING'):
+            local_remote_health_ret(ServiceHealth.OFFLINE,
+                                    ServiceHealth.OK),
+            cur_consul_status('passing', 'M0_CONF_HA_PROCESS_STOPPING'):
+            local_remote_health_ret(ServiceHealth.OFFLINE,
+                                    ServiceHealth.UNKNOWN),
+            cur_consul_status('passing', 'M0_CONF_HA_PROCESS_STARTED'):
+            local_remote_health_ret(ServiceHealth.OK,
+                                    ServiceHealth.OK),
+            cur_consul_status('passing', 'M0_CONF_HA_PROCESS_STOPPED'):
+            local_remote_health_ret(ServiceHealth.OFFLINE,
+                                    ServiceHealth.UNKNOWN),
+            cur_consul_status('passing', 'Unknown'):
+            local_remote_health_ret(ServiceHealth.UNKNOWN,
+                                    ServiceHealth.UNKNOWN),
+            cur_consul_status('warning', 'M0_CONF_HA_PROCESS_STOPPING'):
+            local_remote_health_ret(ServiceHealth.OFFLINE,
+                                    ServiceHealth.STOPPED),
+            cur_consul_status('warning', 'M0_CONF_HA_PROCESS_STARTED'):
+            local_remote_health_ret(ServiceHealth.OFFLINE,
+                                    ServiceHealth.FAILED),
+            cur_consul_status('warning', 'M0_CONF_HA_PROCESS_STOPPED'):
+            local_remote_health_ret(ServiceHealth.STOPPED,
+                                    ServiceHealth.STOPPED),
+            cur_consul_status('warning', 'M0_CONF_HA_PROCESS_STARTING'):
+            local_remote_health_ret(ServiceHealth.OFFLINE,
+                                    ServiceHealth.OFFLINE),
+            cur_consul_status('warning', 'Unknown'):
+            local_remote_health_ret(ServiceHealth.UNKNOWN,
+                                    ServiceHealth.UNKNOWN)}
         try:
             node_data: List[Dict[str, Any]] = self.cns.health.node(node)[1]
             if not node_data:
@@ -939,15 +970,22 @@ class ConsulUtil:
                     if item['Status'] == 'critical':
                         return ServiceHealth.FAILED
                     pfid = create_process_fid(svc_id)
-                    svc_consul_status = self.get_svc_status(pfid)
-                    svc_health = svc_to_motr_status_map[(item['Status'],
-                                                         svc_consul_status)]
+                    cns_status = self.get_process_status(pfid)
+                    svc_health = svc_to_motr_status_map[MotrConsulProcStatus(
+                                         item['Status'],
+                                         cns_status.consul_svc_status)]
+                    LOG.debug('consul.status %s svc_health: %s',
+                              cns_status, svc_health)
                     local_node = self.get_local_nodename()
                     proc_node = self.get_process_node(pfid)
                     if proc_node == local_node:
-                        status = svc_health[0]
+                        status = svc_health.motr_proc_status_local
                     else:
-                        status = svc_health[1]
+                        status = svc_health.motr_proc_status_remote
+                    if (status == ServiceHealth.FAILED and
+                            cns_status.consul_motr_proc_status == (
+                            m0HaProcessType.M0_CONF_HA_PROCESS_M0MKFS.name)):
+                        status = ServiceHealth.STOPPED
 
                     # This situation is not expected but we handle
                     # the same. Hax may end up here if the process has stopped
@@ -955,7 +993,7 @@ class ConsulUtil:
                     # 'unknown' by Consul. Hax will do nothing in this case
                     # and will report OFFLINE for that process.
                     if (item['Status'] == 'warning' and
-                            svc_consul_status == 'Unknown' and
+                            cns_status.consul_svc_status == 'Unknown' and
                             status == ServiceHealth.UNKNOWN):
                         status = ServiceHealth.OFFLINE
 
@@ -1049,13 +1087,14 @@ class ConsulUtil:
     def service_health_to_m0dstatus_update(self, proc_fid: Fid,
                                            svc_health: ServiceHealth):
         ev = ConfHaProcess(chp_event=self.svcHealthToM0Status(svc_health),
-                           chp_type=m0HaProcessType.M0_CONF_HA_PROCESS_M0D,
+                           chp_type=int(
+                                m0HaProcessType.M0_CONF_HA_PROCESS_M0D),
                            chp_pid=0,
                            fid=proc_fid)
         self.update_process_status(ev)
 
     def is_confd_failed(self, proc_fid: Fid) -> bool:
-        status = self.get_process_status(proc_fid)
+        status = self.get_process_status(proc_fid).consul_svc_status
         return status in ('M0_CONF_HA_PROCESS_STOPPING',
                           'M0_CONF_HA_PROCESS_STOPPED',
                           'M0_CONF_HA_PROCESS_STARTING')

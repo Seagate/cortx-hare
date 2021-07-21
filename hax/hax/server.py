@@ -71,11 +71,17 @@ def process_ha_states(planner: WorkPlanner, consul_util: ConsulUtil):
         data = await request.json()
 
         loop = asyncio.get_event_loop()
-        # Note that planner.add_command is potentially a blocking call
-        await loop.run_in_executor(
-            None, lambda: planner.add_command(
+
+        def fn():
+            # import pudb.remote
+            # pudb.remote.set_trace(term_size=(80, 40), port=9998)
+            LOG.debug('Service health from Consul: %s', data)
+            planner.add_command(
                 BroadcastHAStates(states=to_ha_states(data, consul_util),
-                                  reply_to=None)))
+                                  reply_to=None))
+
+        # Note that planner.add_command is potentially a blocking call
+        await loop.run_in_executor(None, fn)
         return web.Response()
 
     return _process
@@ -185,51 +191,79 @@ async def encode_exception(request, handler):
                               reason="Unexpected error has happened")
 
 
-def run_server(
-    planner: WorkPlanner,
-    herald: DeliveryHerald,
-    consul_util: ConsulUtil,
-    threads_to_wait: List[StoppableThread] = [],
-    port=8008,
-):
-    node_address = consul_util.get_hax_ip_address()
+class ServerRunner:
+    def __init__(
+        self,
+        planner: WorkPlanner,
+        herald: DeliveryHerald,
+        consul_util: ConsulUtil,
+    ):
+        self.consul_util = consul_util
+        self.herald = herald
+        self.planner = planner
 
-    # We can't use broad 0.0.0.0 IP address to make it possible to run
-    # multiple hax instances at the same machine (i.e. in failover situation).
-    # Instead, every hax will use a private IP only.
-    web_address = node_address
+    def _create_server(self) -> web.Application:
+        return web.Application(middlewares=[encode_exception])
 
-    # Note that bq-delivered mechanism must use a unique node name rather than
-    # broad '0.0.0.0' that doesn't identify the node from outside.
-    inbox_filter = InboxFilter(
-        OffsetStorage(node_address, key_prefix='bq-delivered'))
+    def _get_my_hostname(self) -> str:
+        return self.consul_util.get_hax_ip_address()
 
-    conf_obj = ConfObjUtil(consul_util)
+    def _configure(self) -> None:
+        # We can't use broad 0.0.0.0 IP address to make it possible to run
+        # multiple hax instances at the same machine (i.e. in failover
+        # situation).
+        # Instead, every hax will use a private IP only.
+        node_address = self._get_my_hostname()
 
-    app = web.Application(middlewares=[encode_exception])
-    app.add_routes([
-        web.get('/', hello_reply),
-        web.post('/', process_ha_states(planner, consul_util)),
-        web.post(
-            '/watcher/bq',
-            process_bq_update(inbox_filter,
-                              BQProcessor(planner, herald, conf_obj))),
-        web.post('/api/v1/sns/{operation}', process_sns_operation(planner)),
-        web.get('/api/v1/sns/repair-status',
-                get_sns_status(planner, SnsRepairStatus)),
-        web.get('/api/v1/sns/rebalance-status',
-                get_sns_status(planner, SnsRebalanceStatus)),
-    ])
-    LOG.info(f'Starting HTTP server at {web_address}:{port} ...')
-    try:
-        web.run_app(app, host=web_address, port=port)
-        LOG.debug('Server stopped normally')
-    finally:
-        LOG.debug('Stopping the threads')
-        planner.shutdown()
-        for thread in threads_to_wait:
-            thread.stop()
-        for thread in threads_to_wait:
-            thread.join()
+        # Note that bq-delivered mechanism must use a unique node name rather
+        # than broad '0.0.0.0' that doesn't identify the node from outside.
+        inbox_filter = InboxFilter(
+            OffsetStorage(node_address,
+                          key_prefix='bq-delivered',
+                          kv=self.consul_util.kv))
 
-        LOG.info('The http server has stopped')
+        conf_obj = ConfObjUtil(self.consul_util)
+        planner = self.planner
+        herald = self.herald
+        consul_util = self.consul_util
+
+        app = self._create_server()
+        app.add_routes([
+            web.get('/', hello_reply),
+            web.post('/', process_ha_states(planner, consul_util)),
+            web.post(
+                '/watcher/bq',
+                process_bq_update(inbox_filter,
+                                  BQProcessor(planner, herald, conf_obj))),
+            web.post('/api/v1/sns/{operation}',
+                     process_sns_operation(planner)),
+            web.get('/api/v1/sns/repair-status',
+                    get_sns_status(planner, SnsRepairStatus)),
+            web.get('/api/v1/sns/rebalance-status',
+                    get_sns_status(planner, SnsRebalanceStatus)),
+        ])
+        self.app = app
+
+    def _start(self, web_address: str, port: int) -> None:
+        web.run_app(self.app, host=web_address, port=port)
+
+    def run(
+        self,
+        threads_to_wait: List[StoppableThread] = [],
+        port=8008,
+    ):
+        self._configure()
+        web_address = self._get_my_hostname()
+        LOG.info(f'Starting HTTP server at {web_address}:{port} ...')
+        try:
+            self._start(web_address, port)
+            LOG.debug('Server stopped normally')
+        finally:
+            LOG.debug('Stopping the threads')
+            self.planner.shutdown()
+            for thread in threads_to_wait:
+                thread.stop()
+            for thread in threads_to_wait:
+                thread.join()
+
+            LOG.info('The http server has stopped')
