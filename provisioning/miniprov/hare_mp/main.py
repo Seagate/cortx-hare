@@ -640,12 +640,12 @@ def main():
 
     add_subcommand(subparser,
                    'pre-upgrade',
-                   help_str='Performs the Hare rpm upgrade tasks',
+                   help_str='Performs the Hare rpm pre-upgrade tasks',
                    handler_fn=noop)
 
     add_subcommand(subparser,
                    'post-upgrade',
-                   help_str='Performs the Hare rpm upgrade tasks',
+                   help_str='Performs the Hare rpm post-upgrade tasks',
                    handler_fn=noop)
 
     create_logger_directory()
