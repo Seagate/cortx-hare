@@ -79,6 +79,7 @@ and health-checking mechanisms.
   ```sh
   make
   sudo make install
+  sudo chown -R $USER .
   ```
 
 * Add current user to `hare` group.
