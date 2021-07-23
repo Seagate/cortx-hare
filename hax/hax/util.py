@@ -50,6 +50,10 @@ ServiceData = NamedTuple('ServiceData', [('node', str), ('fid', Fid),
 
 FidWithType = NamedTuple('FidWithType', [('fid', Fid), ('service_type', str)])
 
+
+MotrConsulProcInfo = NamedTuple('MotrConsulProcInfo', [('proc_status', str),
+                                                       ('proc_type', str)])
+
 MotrConsulProcStatus = NamedTuple('MotrConsulProcStatus', [(
                                         'consul_svc_status', str),
                                         ('consul_motr_proc_status', str)])
@@ -396,11 +400,11 @@ class ConsulUtil:
 
     def get_svc_status(self, srv_fid: Fid) -> str:
         try:
-            return self.get_process_status(srv_fid).consul_svc_status
+            return self.get_process_status(srv_fid).proc_status
         except Exception:
             return 'Unknown'
 
-    def get_m0d_statuses(self) -> List[Tuple[ServiceData, str]]:
+    def get_m0d_statuses(self) -> List[Tuple[ServiceData, ServiceHealth]]:
         """
         Return the list of all Motr service statuses according to Consul
         watchers. The following services are considered: ios, confd.
@@ -411,7 +415,11 @@ class ConsulUtil:
             if service_name not in m0d_services:
                 continue
             data = self.get_service_data_by_name(service_name)
-            result += [(item, self.get_svc_status(item.fid)) for item in data]
+            LOG.debug('svc data: %s', str(data))
+            for item in data:
+                node = self.get_process_node(item.fid)
+                svc_health = self.get_service_health(node, item.fid.key)
+            result += [(item, svc_health) for item in data]
         return result
 
     def get_service_data_by_name(self, name: str) -> List[ServiceData]:
@@ -542,7 +550,7 @@ class ConsulUtil:
             pfid = self.get_service_process_fid(svc_fid)
         else:
             pfid = create_process_fid(fidk)
-        if self.get_process_status(pfid).consul_svc_status in (
+        if self.get_process_status(pfid).proc_status in (
                 'M0_CONF_HA_PROCESS_STARTING', 'M0_CONF_HA_PROCESS_STARTED',
                 'M0_CONF_HA_PROCESS_STOPPING', 'Unknown'):
             return HaNoteStruct.M0_NC_ONLINE
@@ -769,6 +777,11 @@ class ConsulUtil:
 
     @repeat_if_fails()
     def get_sdev_state(self, obj_t: ObjT, fidk: int) -> int:
+        drive_to_ha_state_map = {
+            'unknown': HaNoteStruct.M0_NC_UNKNOWN,
+            'online': HaNoteStruct.M0_NC_ONLINE,
+            'offline': HaNoteStruct.M0_NC_TRANSIENT,
+            'failed': HaNoteStruct.M0_NC_FAILED}
         if obj_t.name == ObjT.DRIVE.name:
             drive_fid = create_drive_fid(fidk)
             sdev_fid = self.drive_to_sdev_fid(drive_fid)
@@ -784,9 +797,7 @@ class ConsulUtil:
             val = json.loads(sdev['Value'])
             LOG.debug('Sdev=%s state=%s', str(sdev_fid), val['state'])
             if str(val['state']).lower() in ('unknown', 'offline', 'failed'):
-                return HaNoteStruct.M0_NC_FAILED
-            else:
-                return HaNoteStruct.M0_NC_ONLINE
+                return drive_to_ha_state_map[str(val['state']).lower()]
 
         return HaNoteStruct.M0_NC_ONLINE
 
@@ -877,15 +888,15 @@ class ConsulUtil:
         return self.sdev_to_drive_fid(sdev_fid)
 
     # Returns status of process from its local node.
-    def get_process_status(self, fid: Fid) -> MotrConsulProcStatus:
+    def get_process_status(self, fid: Fid) -> MotrConsulProcInfo:
         proc_node = self.get_process_node(fid)
         key = f'{proc_node}/processes/{fid}'
         status = self.kv.kv_get(key)
         if status:
             val = json.loads(status['Value'])
-            return MotrConsulProcStatus(val['state'], val['type'])
+            return MotrConsulProcInfo(val['state'], val['type'])
         else:
-            return MotrConsulProcStatus('Unknown', 'Unknown')
+            return MotrConsulProcInfo('Unknown', 'Unknown')
 
     def get_process_local_status(self, fid: Fid) -> str:
         local_node = self.get_local_nodename()
@@ -1002,7 +1013,7 @@ class ConsulUtil:
                     cns_status = self.get_process_status(pfid)
                     svc_health = svc_to_motr_status_map[MotrConsulProcStatus(
                                          item['Status'],
-                                         cns_status.consul_svc_status)]
+                                         cns_status.proc_status)]
                     LOG.debug('consul.status %s svc_health: %s',
                               cns_status, svc_health)
                     local_node = self.get_local_nodename()
@@ -1012,7 +1023,7 @@ class ConsulUtil:
                     else:
                         status = svc_health.motr_proc_status_remote
                     if (status == ServiceHealth.FAILED and
-                            cns_status.consul_motr_proc_status == (
+                            cns_status.proc_type == (
                             m0HaProcessType.M0_CONF_HA_PROCESS_M0MKFS.name)):
                         status = ServiceHealth.STOPPED
 
@@ -1022,7 +1033,7 @@ class ConsulUtil:
                     # 'unknown' by Consul. Hax will do nothing in this case
                     # and will report OFFLINE for that process.
                     if (item['Status'] == 'warning' and
-                            cns_status.consul_svc_status == 'Unknown' and
+                            cns_status.proc_status == 'Unknown' and
                             status == ServiceHealth.UNKNOWN):
                         status = ServiceHealth.OFFLINE
 
@@ -1074,7 +1085,8 @@ class ConsulUtil:
     def ensure_ioservices_running(self) -> List[bool]:
         statuses = self.get_m0d_statuses()
         LOG.debug('The following statuses received: %s', statuses)
-        started = ['M0_CONF_HA_PROCESS_STARTED' == v[1] for v in statuses]
+        # started = ['M0_CONF_HA_PROCESS_STARTED' == v[1] for v in statuses]
+        started = [ServiceHealth.OK == v[1] for v in statuses]
         return started
 
     @repeat_if_fails()
@@ -1087,10 +1099,13 @@ class ConsulUtil:
             wait_for_event(event, 2)
 
     def m0ds_stopping(self) -> bool:
+        # statuses = self.get_m0d_statuses()
         statuses = self.get_m0d_statuses()
         LOG.debug('The following statuses received: %s', statuses)
-        stopping = [v[1] in ('M0_CONF_HA_PROCESS_STOPPING',
-                             'M0_CONF_HA_PROCESS_STOPPED') for v in statuses]
+        # stopping = [v[1] in ('M0_CONF_HA_PROCESS_STOPPING',
+        #                      'M0_CONF_HA_PROCESS_STOPPED') for v in statuses]
+        stopping = [v[1] in (ServiceHealth.OFFLINE,
+                             ServiceHealth.STOPPED) for v in statuses]
         return all(stopping)
 
     def get_process_current_status(self, status_reported: ServiceHealth,
@@ -1123,7 +1138,7 @@ class ConsulUtil:
         self.update_process_status(ev)
 
     def is_confd_failed(self, proc_fid: Fid) -> bool:
-        status = self.get_process_status(proc_fid).consul_svc_status
+        status = self.get_process_status(proc_fid).proc_status
         return status in ('M0_CONF_HA_PROCESS_STOPPING',
                           'M0_CONF_HA_PROCESS_STOPPED',
                           'M0_CONF_HA_PROCESS_STARTING')
