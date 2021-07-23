@@ -109,12 +109,22 @@ class NodeDesc(DhallTuple):
     data_iface_type: Maybe[Protocol]
     m0_servers: Maybe[DList[M0ServerDesc]]
     s3_instances: int
+    client_instances: int
 
 
 @dataclass(repr=False)
 class DiskRef(DhallTuple):
     path: Text
     node: Maybe[Text]
+
+
+@dataclass(repr=False)
+class AllowedFailures(DhallTuple):
+    site: int
+    rack: int
+    encl: int
+    ctrl: int
+    disk: int
 
 
 @dataclass(repr=False)
@@ -125,6 +135,7 @@ class PoolDesc(DhallTuple):
     parity_units: int
     spare_units: Maybe[int]
     type: PoolType
+    allowed_failures: Maybe[AllowedFailures]
 
 
 @dataclass(repr=False)
@@ -146,3 +157,10 @@ class MissingKeyError(Exception):
 
     def __str__(self):
         return f"Required key '{self.key}' not found"
+
+
+@dataclass(repr=False)
+class Layout:
+    data: int
+    parity: int
+    spare: int

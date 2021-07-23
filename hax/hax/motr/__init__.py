@@ -103,7 +103,8 @@ class Motr:
         LOG.info('Stopping motr')
         self.is_stopping = True
         self.notify_hax_stop()
-        self.stop_rconfc()
+        if self.is_spiel_ready():
+            self.stop_rconfc()
         self._ffi.motr_stop(self._ha_ctx)
 
     def fini(self):
@@ -347,10 +348,8 @@ class Motr:
                   len(event.nvec))
         notes: List[HaNoteStruct] = []
         for n in event.nvec:
-            n.note.no_state = HaNoteStruct.M0_NC_ONLINE
-            if (n.obj_t in (ObjT.PROCESS.name, ObjT.SERVICE.name)):
-                n.note.no_state = self.consul_util.get_conf_obj_status(
-                    ObjT[n.obj_t], n.note.no_id.f_key)
+            n.note.no_state = self.consul_util.get_conf_obj_status(
+                ObjT[n.obj_t], n.note.no_id.f_key)
             notes.append(n.note)
 
         LOG.debug('Replying ha nvec of length ' + str(len(event.nvec)))
@@ -385,7 +384,7 @@ class Motr:
                   proc_fid, len(disk_list), int(new_state), disk_list)
         if disk_list:
             state = (ServiceHealth.OK if new_state ==
-                     HaNoteStruct.M0_NC_ONLINE else ServiceHealth.FAILED)
+                     HaNoteStruct.M0_NC_ONLINE else ServiceHealth.OFFLINE)
             # XXX: Need to check the current state of the device, transition
             # to ONLINE only in case of an explicit request or iff the prior
             # state of the device is UNKNOWN/OFFLINE.
@@ -420,11 +419,8 @@ class Motr:
     def notify_hax_stop(self):
         LOG.debug('Notifying hax stop')
         hax_fid = self.consul_util.get_hax_fid()
-        profile_fid = self._profile.fid
         hax_endpoint = self.consul_util.get_hax_endpoint()
-        self._ffi.hax_stop(self._ha_ctx, hax_fid.to_c(),
-                           make_c_str(hax_endpoint))
-        ids = self._ffi.hax_stop(self._ha_ctx, profile_fid.to_c(),
+        ids = self._ffi.hax_stop(self._ha_ctx, hax_fid.to_c(),
                                  make_c_str(hax_endpoint))
         self.herald.wait_for_all(HaLinkMessagePromise(ids))
 
