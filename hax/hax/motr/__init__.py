@@ -380,8 +380,6 @@ class Motr:
         proc_fid = Fid.from_struct(note.no_id)
         for svc in services:
             disk_list += cns.get_disks_by_parent_process(proc_fid, svc.fid)
-        LOG.debug('proc fid=%s encloses %d disks with state %d as follows: %s',
-                  proc_fid, len(disk_list), int(new_state), disk_list)
         if disk_list:
             state = (ServiceHealth.OK if new_state ==
                      HaNoteStruct.M0_NC_ONLINE else ServiceHealth.OFFLINE)
@@ -389,9 +387,15 @@ class Motr:
             # to ONLINE only in case of an explicit request or iff the prior
             # state of the device is UNKNOWN/OFFLINE.
             cns.update_drive_state(disk_list, state, device_event=False)
-        return [
-            HaNoteStruct(no_id=x.to_c(), no_state=new_state) for x in disk_list
-        ]
+        LOG.debug('proc fid=%s encloses %d disks as follows: %s',
+                  proc_fid, len(disk_list), disk_list)
+        drive_ha_notes: List[HaNoteStruct] = []
+        for drive_id in disk_list:
+            # Get the drive state from Consul KV.
+            dstate = cns.get_sdev_state(ObjT.DRIVE, drive_id.key)
+            drive_ha_notes.append(HaNoteStruct(no_id=drive_id.to_c(),
+                                               no_state=dstate))
+        return drive_ha_notes
 
     def notify_node_status(self,
                            proc_note: HaNoteStruct) -> List[HaNoteStruct]:
