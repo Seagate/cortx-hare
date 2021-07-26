@@ -15,3 +15,24 @@
 # For any questions about this software or licensing,
 # please email opensource@seagate.com or cortx-questions@seagate.com.
 #
+
+import re
+from typing import List
+
+
+class HaxUnitTransformer:
+    def transform(self, contents: List[str]) -> List[str]:
+        result = []
+        # Note that more matchers may be required in the future.
+        # E.g. when HA starts controlling motr-kernel, we may want to disable
+        # 'After' dependency.
+        matchers = [
+            r'^[\s]*Restart=',
+        ]
+        for line in contents:
+            out = line
+            if any(re.match(i, line) for i in matchers):
+                out = f'# {line} # - Added by Hare Mini Provisioner'
+            result.append(out)
+
+        return result

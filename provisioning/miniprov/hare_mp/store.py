@@ -16,9 +16,9 @@
 # please email opensource@seagate.com or cortx-questions@seagate.com.
 #
 
-from typing import Any
+from typing import Any, List
 
-from cortx.utils.conf_store import ConfStore
+from cortx.utils.conf_store import Conf
 
 from hare_mp.types import MissingKeyError
 
@@ -39,15 +39,32 @@ class ValueProvider:
     def get_cluster_id(self) -> str:
         raise NotImplementedError()
 
-    def get_storage_set_id(self) -> int:
+    def get_storage_set_index(self) -> int:
+        raise NotImplementedError()
+
+    def get_storage_set_nodes(self) -> List[str]:
         raise NotImplementedError()
 
 
 class ConfStoreProvider(ValueProvider):
     def __init__(self, url: str):
         self.url = url
-        conf = ConfStore()
-        conf.load('hare', url)
+        # Note that we don't instantiate Conf class on purpose.
+        #
+        # Conf is a 'singleton' (as it is understood by its authors).
+        # In fact it is a class with static methods only.
+        #
+        # fail_reload flag is required to be False otherwise the error as
+        # follows will be thrown when ConfStoreProvider is instantiated not for
+        # the first time in the current address space:
+        #
+        # ConfError: error(22): conf index hare already exists
+        #
+        # Reason: although Conf has static methods only, it does have a state.
+        # That state is also static...
+
+        conf = Conf
+        conf.load('hare', url, fail_reload=False)
         self.conf = conf
 
     def _raw_get(self, key: str) -> str:
@@ -63,13 +80,29 @@ class ConfStoreProvider(ValueProvider):
         cluster_id = self.get(f'server_node>{machine_id}>cluster_id')
         return cluster_id
 
-    def get_storage_set_id(self) -> int:
+    def get_storage_set_index(self) -> int:
+        i = 0
+        cluster_id = self.get_cluster_id()
         machine_id = self.get_machine_id()
         storage_set_id = self.get((f'server_node>{machine_id}>'
                                    f'storage_set_id'))
-        return int(storage_set_id)
+
+        for storage_set in self.get(f'cluster>{cluster_id}>storage_set'):
+            if storage_set['name'] == storage_set_id:
+                return i
+            i += 1
+
+        raise RuntimeError('No storage set found. Is ConfStore data valid?')
 
     def get_hostname(self) -> str:
         machine_id = self.get_machine_id()
         hostname = self._raw_get(f'server_node>{machine_id}>hostname')
         return hostname
+
+    def get_storage_set_nodes(self) -> List[str]:
+        cluster_id = self.get_cluster_id()
+        storage_set_index = self.get_storage_set_index()
+
+        server_nodes_key = (f'cluster>{cluster_id}>'
+                            f'storage_set[{storage_set_index}]>server_nodes')
+        return self.get(server_nodes_key)

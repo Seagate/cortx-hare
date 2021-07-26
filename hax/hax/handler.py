@@ -47,6 +47,7 @@ class ConsumerThread(StoppableThread):
     The thread exits gracefully when it receives message of type Die (i.e.
     it is a 'poison pill').
     """
+
     def __init__(self, planner: WorkPlanner, motr: Motr,
                  herald: DeliveryHerald, consul: ConsulUtil, idx: int):
         super().__init__(target=self._do_work,
@@ -56,6 +57,7 @@ class ConsumerThread(StoppableThread):
         self.consul = consul
         self.eq_publisher = EQPublisher()
         self.herald = herald
+        self.idx = idx
 
     def stop(self) -> None:
         self.is_stopped = True
@@ -68,13 +70,31 @@ class ConsumerThread(StoppableThread):
         #
         # This thread will become blocked until that
         # intermittent error gets resolved.
+        motr_to_svc_status = {
+            (m0HaProcessType.M0_CONF_HA_PROCESS_M0MKFS,
+                m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED): (
+                    ServiceHealth.OK),
+            (m0HaProcessType.M0_CONF_HA_PROCESS_M0MKFS,
+                m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED): (
+                    ServiceHealth.STOPPED),
+            (m0HaProcessType.M0_CONF_HA_PROCESS_M0D,
+                m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED): (
+                    ServiceHealth.OK),
+            (m0HaProcessType.M0_CONF_HA_PROCESS_M0D,
+                m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED): (
+                    ServiceHealth.FAILED),
+            (m0HaProcessType.M0_CONF_HA_PROCESS_OTHER,
+                m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED): (
+                    ServiceHealth.OK),
+            (m0HaProcessType.M0_CONF_HA_PROCESS_OTHER,
+                m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED): (
+                    ServiceHealth.FAILED)}
         self.consul.update_process_status(event)
-        svc_status = m0HaProcessEvent.event_to_svchealth(event.chp_event)
         if event.chp_event in (m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED,
                                m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED):
+            svc_status = motr_to_svc_status[(event.chp_type, event.chp_event)]
             motr.broadcast_ha_states(
-                [HAState(fid=event.fid, status=svc_status)],
-                notify_devices=False)
+                [HAState(fid=event.fid, status=svc_status)])
 
     @repeat_if_fails(wait_seconds=1)
     def update_process_failure(self, planner: WorkPlanner,
@@ -119,7 +139,7 @@ class ConsumerThread(StoppableThread):
                         BroadcastHAStates(states=[
                             HAState(fid=state.fid, status=ServiceHealth.FAILED)
                         ],
-                                          reply_to=None))
+                            reply_to=None))
                 if current_status not in (ServiceHealth.UNKNOWN,
                                           ServiceHealth.OFFLINE):
                     # We also need to account and report the failure of remote
@@ -135,7 +155,8 @@ class ConsumerThread(StoppableThread):
                     self.consul.update_process_status(
                         ConfHaProcess(
                             chp_event=event,
-                            chp_type=m0HaProcessType.M0_CONF_HA_PROCESS_M0D,
+                            chp_type=int(
+                                m0HaProcessType.M0_CONF_HA_PROCESS_M0D),
                             chp_pid=0,
                             fid=state.fid))
                 new_ha_states.append(
@@ -256,7 +277,8 @@ class ConsumerThread(StoppableThread):
                     planner.notify_finished(item)
         except StopIteration:
             LOG.info('Consumer Stopped')
-            motr.stop()
+            if self.idx == 0:
+                motr.stop()
             motr.shun_motr_thread()
         finally:
             LOG.info('Handler thread has exited')

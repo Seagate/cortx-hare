@@ -80,7 +80,11 @@ and health-checking mechanisms.
   make
   sudo make install
   ```
-
+* Create `hare` group.
+  ```sh
+  sudo groupadd --force hare
+  ```
+  
 * Add current user to `hare` group.
   ```sh
   sudo usermod --append --groups hare $USER
@@ -91,21 +95,9 @@ and health-checking mechanisms.
 
 **NOTE: If you have built Motr and HARE from sources you need not generate RPM packages as below, however, it might be more convenient to build and install rpms on a multinode setup sometimes**
 
-* Build Motr RPMs
-
-  * From sources
+* Build & Install Motr RPMs
+  *  Follow [Motr quick start guide](https://github.com/Seagate/cortx-motr/blob/main/doc/Quick-Start-Guide.rst) to install Motr.
   
-    **NOTE:** Installing motr RPMs other than "cortx-motr-test*.rpm".
-    ```sh
-    git clone --recursive https://github.com/Seagate/cortx-motr.git
-    cd cortx-motr
-
-    scripts/m0 make rpms
-    cd ~/rpmbuild/RPMS/x86_64/
-    sudo rpm -ivh $(ls | grep  "cortx-motr-" | grep -v "cortx-motr-tests")
-    cd -
-    ```
-
 * Build `hare` RPMs
 
   * Download `hare` source as mentioned above

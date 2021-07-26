@@ -99,8 +99,11 @@ sudo systemctl --all --full --no-pager status {hare,m0,motr,s3}\* \
 sudo timeout --kill-after 30 15 hctl status \
      > hctl-status.txt || true
 
+sysconfig_dir='/etc/sysconfig'
+[ -d $sysconfig_dir ] || sysconfig_dir='/etc/default'
+
 extra_files=(
-    /etc/sysconfig/motr
+    $sysconfig_dir/motr
     /opt/seagate/cortx-prvsnr/pillar/components/cluster.sls
     /opt/seagate/cortx/s3/conf/s3config.yaml
 )
@@ -112,7 +115,7 @@ done
 
 cp --parents /var/lib/hare/* . 2>/dev/null || true
 cp -r --parents /var/lib/hare/consul-{env,server,client}-* . 2>/dev/null || true
-cp -r --parents /var/log/hare/ . 2>/dev/null || true
+cp -r --parents /var/log/seagate/hare/ . 2>/dev/null || true
 cp -r --parents /var/log/cluster/ . 2>/dev/null || true
 
 cd ..
