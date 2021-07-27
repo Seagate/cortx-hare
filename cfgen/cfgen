@@ -476,9 +476,23 @@ def run_command(hostname: str, *args: str) -> str:
                                    timeout=15).decode()
 
 
+def validate_facter(hostname: str) -> None:
+    ver_str = run_command(hostname, 'facter', '--version')
+    # The output may contain commit id like this:
+    # 3.14.8 (commit 4339472f441868ecdae694ffc71e7c8ed0fc24e3)
+    ver_str = ver_str.split(' ')[0]
+
+    if version(ver_str) >= version('3.14.8'):
+        return
+    raise RuntimeError(
+        f'Unsupported facter version found at node {hostname}: {ver_str}. '
+        'Please use 3.14.8 or higher.')
+
+
 def get_facts(hostname: str, mock_p: bool, *args: str) -> Dict[str, Any]:
     if mock_p:
         return fabricate_facts(hostname, *args)
+    validate_facter(hostname)
     result: Dict[str, Any] = json.loads(
         run_command(hostname, 'facter', '--json', *args))
     return result
