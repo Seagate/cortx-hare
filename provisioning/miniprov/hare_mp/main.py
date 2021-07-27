@@ -284,7 +284,7 @@ def test_hare_prereq():
     logging.info('PCS status: %s', resp)
     for line in resp:
         assert 'stopped' not in line, 'Some services are not up.' \
-                if 'Some services are not up.' else line
+            if 'Some services are not up.' else line
 
     if 'cluster is not currently' in resp:
         return
@@ -294,7 +294,7 @@ def test_hare_prereq():
     sleep(20)
     if is_cluster_running():
         logging.error('Still Cluster is running. Cluster should stopped for'
-                        'executing tests')
+                      'executing tests')
         exit(-1)
 
 
@@ -302,11 +302,11 @@ def test_hare_postreq(cdf_file: str, timeinfo: str, logfile: str):
     """
     Test suite is for restoring the setting after test.
     """
-    cluster_start = ['cortx ', 'cluster ', 'start']
     pcs_status = ['pcs', 'status']
 
     logging.info('Start the Cluster')
-    resp = os.system('cortx cluster start')
+    out = os.system('cortx cluster start')
+    logging.info(out)
     sleep(10)
 
     cluster_sts = check_cluster_status(cdf_file)
@@ -314,25 +314,25 @@ def test_hare_postreq(cdf_file: str, timeinfo: str, logfile: str):
         logging.error('Cluster status reports failure')
         resp = executecmds(['journalctl', '--since', timeinfo, '>', logfile])
         exit(-1)
-        
+
     logging.info('Check all services are up, pcs.')
     resp = executecmds(pcs_status)
     logging.info('PCS status: %s', resp)
     for line in resp:
         assert 'stopped' not in line, 'Some services are not up.' \
-                if 'Some services are not up.' else line
+            if 'Some services are not up.' else line
 
     logging.info('Check that all the services are up.')
     sleep(10)
-    resp = os.system('hctl status -d')
-    if resp:
+    out = os.system('hctl status -d')
+    if out:
         resp = executecmds(['journalctl', '--since', timeinfo, '>', logfile])
         exit(-1)
 
     logging.info('Successfully performed cleanup after testing')
 
 
-#@pytest.mark.sanity
+# @pytest.mark.sanity
 def test_hare_bootstrap_shutdown(args):
     """
     Test suite for single node hare init in loop.
@@ -342,65 +342,66 @@ def test_hare_bootstrap_shutdown(args):
     test_hare_prereq()
 
     logging.info('Check cluster is not running.')
-    resp = os.system('hctl status -d')
-    if resp :
+    out = os.system('hctl status -d')
+    if out:
         for count in range(loop_count):
             logging.info('Loop count: {}'.format(count + 1))
-            now = datetime.now() # current date and time
+            now = datetime.now()     # current date and time
             date_time = now.strftime("%Y-%m-%d %H:%M:%S")
-            journal_log = '~/journal_ctrl_' + now.strftime("%Y_%m_%d_%H_%M_%S")\
-                            + '.log'
-            
+            jlog = '~/journal_ctrl_' + now.strftime('%Y_%m_%d_%H%M%S') + '.log'
+
             logging.info('Start Bootstrap')
             resp = bootstrap_cluster(str(args.file[0]), True)
             if resp:
                 logging.error('Failed to bootstrap')
-                resp = executecmds(['journalctl', '--since', date_time, '>', \
-                                        journal_log])
+                resp = executecmds(['journalctl', '--since', date_time, '>',
+                                    jlog])
                 exit(-1)
             if not is_cluster_running():
                 logging.error('Still Cluster is not running.')
-                resp = executecmds(['journalctl', '--since', date_time, '>', \
-                                        journal_log])
+                resp = executecmds(['journalctl', '--since', date_time, '>',
+                                    jlog])
                 exit(-1)
-                
+
             sleep(10)
             logging.info('Check that all the services are up in hctl.')
             if is_cluster_running():
                 logging.info('Cluster is running.')
             else:
                 logging.error('Still Cluster is not running.')
-                resp = executecmds(['journalctl', '--since', date_time, '>', \
-                                        journal_log])
+                resp = executecmds(['journalctl', '--since', date_time, '>',
+                                    jlog])
                 exit(-1)
 
             sleep(10)
             logging.info('Shutdown the cluster.')
-            resp = os.system('hctl shutdown')
+            out = os.system('hctl shutdown')
+            if out:
+                logging.error('Shutdown Failed')
 
             sleep(10)
             logging.info('Check that no service is running.')
             if is_cluster_running():
                 logging.error('Still Cluster is running.')
-                resp = executecmds(['journalctl', '--since', date_time, '>', \
-                                        journal_log])
+                resp = executecmds(['journalctl', '--since', date_time, '>',
+                                    jlog])
                 exit(-1)
 
-    test_hare_postreq(str(args.file[0]), date_time, journal_log)
+    test_hare_postreq(str(args.file[0]), date_time, jlog)
 
 
 def test_IVT(args):
     try:
         rc = 0
         path_to_cdf = args.file[0]
-        is_dev_opt_enbl = args.dev[0]
+        is_dev_opt_enbl = int(args.dev[0])
 
         if not is_dev_opt_enbl:
             logging.info('Running test plan: ' + str(args.plan[0].value))
-            # TODO We need to handle plan type and execute test cases accordingly
+        # TODO We need to handle plan type and execute test cases accordingly
             if not is_cluster_running():
-                logging.error('Cluster is not running. Cluster must be running '
-                              'for executing tests')
+                logging.error('Cluster is not running. Cluster must be '
+                              'running for executing tests')
                 exit(-1)
             cluster_status = check_cluster_status(path_to_cdf)
             if cluster_status:
@@ -714,6 +715,7 @@ def add_dev_argument(parser):
     parser.add_argument('--dev',
                         help='Test Development purpose. Supported '
                         'values: any non zero value',
+                        default='0',
                         type=str,
                         action='store')
     return parser
@@ -746,7 +748,6 @@ def main():
                        'init',
                        help_str='Initializes Hare',
                        handler_fn=init))
-
 
     add_dev_argument(
         add_param_argument(
