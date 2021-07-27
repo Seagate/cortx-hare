@@ -31,6 +31,7 @@ from enum import Enum
 from sys import exit
 from time import sleep
 from typing import Any, Callable, Dict, List
+from datetime import datetime
 
 import yaml
 from cortx.utils.product_features import unsupported_features
@@ -254,21 +255,165 @@ def test(args):
         exit(-1)
 
 
+def executecmds(cmd: List[str]) -> str:
+    process = subprocess.Popen(cmd,
+                               stdin=subprocess.PIPE,
+                               stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE,
+                               encoding='utf8')
+    out, err = process.communicate()
+    if process.returncode:
+        raise Exception(
+            f'Command {cmd} exited with error code {process.returncode}. '
+            f'Command output: {err}')
+
+    return out
+
+
+def test_hare_prereq():
+    """
+    Test suite for setting the test environment before start of test.
+    """
+    pcs_status = ['pcs', 'status']
+    cluster_stop = ['cortx', 'cluster', 'stop']
+
+    logging.info('Test started on Host: {}'.format(executecmds(['hostname'])))
+    logging.info('Check that all services are up in PCS.')
+
+    resp = executecmds(pcs_status)
+    logging.info('PCS status: %s', resp)
+    for line in resp:
+        assert 'stopped' not in line, 'Some services are not up.' \
+                if 'Some services are not up.' else line
+
+    if 'cluster is not currently' in resp:
+        return
+
+    logging.info('Make Node ready for testing, by stopping the cluster')
+    resp = executecmds(cluster_stop)
+    sleep(20)
+    if is_cluster_running():
+        logging.error('Still Cluster is running. Cluster should stopped for'
+                        'executing tests')
+        exit(-1)
+
+
+def test_hare_postreq(cdf_file: str, timeinfo: str, logfile: str):
+    """
+    Test suite is for restoring the setting after test.
+    """
+    cluster_start = ['cortx ', 'cluster ', 'start']
+    pcs_status = ['pcs', 'status']
+
+    logging.info('Start the Cluster')
+    resp = os.system('cortx cluster start')
+    sleep(10)
+
+    cluster_sts = check_cluster_status(cdf_file)
+    if cluster_sts:
+        logging.error('Cluster status reports failure')
+        resp = executecmds(['journalctl', '--since', timeinfo, '>', logfile])
+        exit(-1)
+        
+    logging.info('Check all services are up, pcs.')
+    resp = executecmds(pcs_status)
+    logging.info('PCS status: %s', resp)
+    for line in resp:
+        assert 'stopped' not in line, 'Some services are not up.' \
+                if 'Some services are not up.' else line
+
+    logging.info('Check that all the services are up.')
+    sleep(10)
+    resp = os.system('hctl status -d')
+    if resp:
+        resp = executecmds(['journalctl', '--since', timeinfo, '>', logfile])
+        exit(-1)
+
+    logging.info('Successfully performed cleanup after testing')
+
+
+#@pytest.mark.sanity
+def test_hare_bootstrap_shutdown(args):
+    """
+    Test suite for single node hare init in loop.
+    """
+    loop_count = int(args.dev[0])
+
+    test_hare_prereq()
+
+    logging.info('Check cluster is not running.')
+    resp = os.system('hctl status -d')
+    if resp :
+        for count in range(loop_count):
+            logging.info('Loop count: {}'.format(count + 1))
+            now = datetime.now() # current date and time
+            date_time = now.strftime("%Y-%m-%d %H:%M:%S")
+            journal_log = '~/journal_ctrl_' + now.strftime("%Y_%m_%d_%H_%M_%S")\
+                            + '.log'
+            
+            logging.info('Start Bootstrap')
+            resp = bootstrap_cluster(str(args.file[0]), True)
+            if resp:
+                logging.error('Failed to bootstrap')
+                resp = executecmds(['journalctl', '--since', date_time, '>', \
+                                        journal_log])
+                exit(-1)
+            if not is_cluster_running():
+                logging.error('Still Cluster is not running.')
+                resp = executecmds(['journalctl', '--since', date_time, '>', \
+                                        journal_log])
+                exit(-1)
+                
+            sleep(10)
+            logging.info('Check that all the services are up in hctl.')
+            if is_cluster_running():
+                logging.info('Cluster is running.')
+            else:
+                logging.error('Still Cluster is not running.')
+                resp = executecmds(['journalctl', '--since', date_time, '>', \
+                                        journal_log])
+                exit(-1)
+
+            sleep(10)
+            logging.info('Shutdown the cluster.')
+            resp = os.system('hctl shutdown')
+
+            sleep(10)
+            logging.info('Check that no service is running.')
+            if is_cluster_running():
+                logging.error('Still Cluster is running.')
+                resp = executecmds(['journalctl', '--since', date_time, '>', \
+                                        journal_log])
+                exit(-1)
+
+    test_hare_postreq(str(args.file[0]), date_time, journal_log)
+
+
 def test_IVT(args):
     try:
         rc = 0
         path_to_cdf = args.file[0]
+        is_dev_opt_enbl = args.dev[0]
 
-        logging.info('Running test plan: ' + str(args.plan[0].value))
-        # TODO We need to handle plan type and execute test cases accordingly
-        if not is_cluster_running():
-            logging.error('Cluster is not running. Cluster must be running '
-                          'for executing tests')
-            exit(-1)
-        cluster_status = check_cluster_status(path_to_cdf)
-        if cluster_status:
-            logging.error('Cluster status reports failure')
-            rc = -1
+        if not is_dev_opt_enbl:
+            logging.info('Running test plan: ' + str(args.plan[0].value))
+            # TODO We need to handle plan type and execute test cases accordingly
+            if not is_cluster_running():
+                logging.error('Cluster is not running. Cluster must be running '
+                              'for executing tests')
+                exit(-1)
+            cluster_status = check_cluster_status(path_to_cdf)
+            if cluster_status:
+                logging.error('Cluster status reports failure')
+                rc = -1
+        else:
+            logging.info('Running test plan: ' + str(args.plan[0].value))
+            test_hare_bootstrap_shutdown(args)
+
+            cluster_status = check_cluster_status(path_to_cdf)
+            if cluster_status:
+                logging.error('Cluster status reports failure')
+                rc = -1
 
         logging.info('Tests executed successfully')
         exit(rc)
@@ -565,6 +710,15 @@ def add_param_argument(parser):
     return parser
 
 
+def add_dev_argument(parser):
+    parser.add_argument('--dev',
+                        help='Test Development purpose. Supported '
+                        'values: any non zero value',
+                        type=str,
+                        action='store')
+    return parser
+
+
 def main():
     p = argparse.ArgumentParser(description='Configure hare settings')
     subparser = p.add_subparsers()
@@ -593,13 +747,15 @@ def main():
                        help_str='Initializes Hare',
                        handler_fn=init))
 
-    add_param_argument(
-        add_plan_argument(
-            add_file_argument(
-                add_subcommand(subparser,
-                               'test',
-                               help_str='Tests Hare component',
-                               handler_fn=test_IVT))))
+
+    add_dev_argument(
+        add_param_argument(
+            add_plan_argument(
+                add_file_argument(
+                    add_subcommand(subparser,
+                                   'test',
+                                   help_str='Tests Hare component',
+                                   handler_fn=test_IVT)))))
 
     sb_sub_parser = add_subcommand(subparser,
                                    'support_bundle',
