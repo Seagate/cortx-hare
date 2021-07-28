@@ -268,9 +268,7 @@ def executecmds(cmd: List[str]) -> list:
 
 
 def test_hare_prereq():
-    """
-    Test suite for setting the test environment before start of test.
-    """
+    """Test suite for setting the test environment before start of test."""
     pcs_status = ['pcs', 'status']
     cluster_stop = ['cortx', 'cluster', 'stop']
 
@@ -299,9 +297,7 @@ def test_hare_prereq():
                 else line
 
 def test_hare_postreq(cdf_file: str, timeinfo: str, logfile: str):
-    """
-    Test suite is for restoring the setting after test.
-    """
+    """Test suite is for restoring the setting after test."""
     pcs_status = ['pcs', 'status']
     cluster_start = ['cortx', 'cluster', 'start']
     hctl_status = ['hctl', 'status', '-d']
@@ -360,9 +356,7 @@ def test_hare_postreq(cdf_file: str, timeinfo: str, logfile: str):
 
 # @pytest.mark.sanity
 def test_hare_bootstrap_shutdown(args):
-    """
-    Test suite for single node hare init in loop.
-    """
+    """Test suite for single node hare init in loop."""
     loop_count = int(args.dev[0])
     hctl_status = ['hctl', 'status', '-d']
     hctl_shutdown = ['hctl', 'shutdown']
@@ -412,7 +406,7 @@ def test_hare_bootstrap_shutdown(args):
             resp = executecmds(hctl_shutdown)
             logging.info('hctl shutdown: %s', resp[0])
             if int(resp[2]):
-                logging.error('Shutdown Failed', resp[1])
+                logging.error('Shutdown Failed %s', resp[1])
                 resp = executecmds(
                     ['journalctl', '--since', date_time, '>', jlog])
                 logging.info('created journal log.%s', jlog)
