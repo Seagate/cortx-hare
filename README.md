@@ -288,7 +288,7 @@ Symptoms:
     19:58:21  make[4]: *** [mypy] Error 1
     ```
 
-Solution: install cortx-py-utils RPM and retry.
+Solution: install cortx-py-utils RPM and retry
 
 <!------------------------------------------------------------------->
 ## See also
