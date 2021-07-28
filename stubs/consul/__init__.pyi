@@ -111,6 +111,10 @@ class Session:
         consistency: str = None,
         dc: str = None,
     ) -> Tuple[int, Any]: ...
+    def destroy(
+        self,
+        session_id: str
+    ) -> bool: ...
 
 class ConsulException(Exception): ...
 
