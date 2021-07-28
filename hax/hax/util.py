@@ -390,6 +390,17 @@ class ConsulUtil:
             raise HAConsistencyException(
                 'Could not get the leader from Consul')
 
+    def destroy_session(self, session: str) -> None:
+        """
+        Destroys the given Consul Session by name.
+        The method doesn't raise any exception if the session doesn't exist.
+        """
+        try:
+            self.cns.session.destroy(session)
+        except (ConsulException, HTTPError, RequestException) as e:
+            raise HAConsistencyException('Failed to communicate to'
+                                         ' Consul Agent: ' + str(e))
+
     def get_session_node(self, session_id: str) -> str:
         try:
             session = self.cns.session.info(session_id)[1]
