@@ -19,6 +19,7 @@
 #
 
 import logging
+import re
 from typing import List, NamedTuple
 
 from hax.filestats import FsStatsUpdater
@@ -57,6 +58,29 @@ def _run_stats_updater_thread(motr: Motr,
 
 
 @repeat_if_fails()
+def _remove_stale_session(util: ConsulUtil) -> None:
+    '''Destroys a stale RC leader session if it exists or does nothing otherwise.
+
+    An RC leader session may survive 'hctl shutdown'. In such a case 'leader'
+    key will contain a garbage value 'elect2805' but the session will be alive
+    and thus RC leader will not be re-elected.
+    '''
+    if not util.kv.kv_get_raw('leader'):
+        # No leader key means that there can be no stale RC leader session for
+        # sure. We're starting for the first time against a fresh Consul KV.
+        return
+
+    sess = util.get_leader_session_no_wait()
+    node = util.get_leader_node()
+    if re.match(r'^elect[\d]+$', node):
+        LOG.debug(
+            'Stale leader session found: RC leader session %s is '
+            'found while the leader node seems to be stub: %s', sess, node)
+        util.destroy_session(sess)
+        LOG.debug('Stale session %s destroyed to enable RC re-election', sess)
+
+
+@repeat_if_fails()
 def _get_motr_fids(util: ConsulUtil) -> HL_Fids:
     hax_ep: str = util.get_hax_endpoint()
     hax_fid: Fid = util.get_hax_fid()
@@ -91,6 +115,7 @@ def main():
     planner = WorkPlanner()
 
     util: ConsulUtil = ConsulUtil()
+    _remove_stale_session(util)
     cfg: HL_Fids = _get_motr_fids(util)
 
     LOG.info('Welcome to HaX')
