@@ -168,7 +168,6 @@ class ConsumerThread(StoppableThread):
     def _do_work(self, planner: WorkPlanner, motr: Motr):
         LOG.info('Handler thread has started')
         motr.adopt_motr_thread()
-
         try:
             while True:
                 try:

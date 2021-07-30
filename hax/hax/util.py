@@ -24,7 +24,7 @@ from base64 import b64encode
 from functools import wraps
 from typing import Any, Dict, List, NamedTuple, Optional, Tuple, Callable
 from hax.log import TRACE
-from threading import Event
+from threading import Event, Lock
 from time import sleep
 
 import simplejson
@@ -167,7 +167,42 @@ def wait_for_event(event: Event, interval_sec) -> None:
         raise InterruptedException()
 
 
+class KVCache:
+    def __init__(self):
+        self.cache = {}
+        self.cache_lock = Lock()
+
+    def kv_cache_set(self, key: str, data: Any):
+        try:
+            with self.cache_lock:
+                self.cache[key] = data
+        except Exception:
+            pass
+
+    def kv_cache_get(self, key: str) -> Any:
+        data = None
+        try:
+            with self.cache_lock:
+                print("fetching cache data for key: " + str(key))
+                for items in self.cache:
+                    data = items.get(key, None)
+        except Exception:
+            return None
+        return data
+
+    def kv_cache_invalidate(self, key: str):
+        try:
+            with self.cache_lock:
+                for k in self.cache.keys():
+                    if k in key:
+                        self.cache[key] = None
+        except Exception:
+            pass
+
+
 class KVAdapter:
+    kvcache = KVCache()
+
     def __init__(self, cns: Optional[Consul] = None):
         self.cns = cns or Consul()
 
@@ -192,7 +227,9 @@ class KVAdapter:
         """
         assert key
         try:
-            return self.cns.kv.put(key, data, **kwargs)
+            result = self.cns.kv.put(key, data, **kwargs)
+            self.kvcache.kv_cache_invalidate(key)
+            return result
         except (ConsulException, HTTPError, RequestException) as e:
             raise HAConsistencyException('Failed to put value to KV') from e
 
@@ -244,6 +281,29 @@ class KVAdapter:
         except (ConsulException, HTTPError, RequestException) as e:
             raise HAConsistencyException(f'Failed to delete key(s)'
                                          f' from KV, error: {e}')
+
+    # Caches the result of remote KV fetch operation if not already cached.
+    # Caching is an expensive operation and is mainly required and implemented
+    # in case of expensive IO bound operations with high frequencies. It is
+    # important to understand what data must be cached and what not based on
+    # the profiling results. It is important that only high frequency IO bound
+    # operations can be cached which produce atleast 50% performance gains
+    # against their execution without caching. Invalidating the cache is also
+    # an expensive and a tricky operation. Thus candidates for caching must be
+    # carefully selected.
+    @staticmethod
+    def _kv_cache_decorator(key: str):
+        def callable(f):
+            @wraps(f)
+            def recorder(*args, **kwds):
+                data = KVAdapter.kvcache.kv_cache_get(key)
+                print("kv cache data: " + str(data))
+                if data is None:
+                    data = f(*args, **kwds)
+                    KVAdapter.kvcache.kv_cache_set(key, data)
+                return data
+            return recorder
+        return callable
 
 
 class CatalogAdapter:
@@ -344,9 +404,17 @@ class ConsulUtil:
     def get_hax_ip_address(self) -> str:
         return self._service_data().ip_addr
 
+    # We are caching the result of m0conf/nodes recursive fetch
+    # operation as it is most frequently fetched KV through
+    # nested functions calls. The cached data is invalidated when
+    # any of the KV from the list of m0conf/nodes KV is updated.
+    @KVAdapter._kv_cache_decorator('m0conf/nodes')
+    def get_all_nodes_keys(self) -> Any:
+        return self.kv.kv_get('m0conf/nodes', recurse=True)
+
     def fid_to_endpoint(self, proc_fid: Fid) -> Optional[str]:
         pfidk = int(proc_fid.key)
-        process_items = self.kv.kv_get('m0conf/nodes', recurse=True)
+        process_items = self.get_all_nodes_keys()
         regex = re.compile(
             f'^m0conf\\/.*\\/processes\\/{pfidk}\\/endpoint')
         for proc_item in process_items:
@@ -444,7 +512,7 @@ class ConsulUtil:
 
     def get_services_by_parent_process(self,
                                        process_fid: Fid) -> List[FidWithType]:
-        node_items = self.kv.kv_get('m0conf/nodes', recurse=True)
+        node_items = self.get_all_nodes_keys()
         fidk = str(process_fid.key)
 
         # This is the RegExp to match the keys in Consul KV that describe
@@ -475,7 +543,7 @@ class ConsulUtil:
     def get_disks_by_parent_process(self,
                                     process_fid: Fid,
                                     svc_fid: Fid) -> List[Fid]:
-        node_items = self.kv.kv_get('m0conf/nodes', recurse=True)
+        node_items = self.get_all_nodes_keys()
         # This is the RegExp to match the keys in Consul KV that describe
         # the Motr processes and services that are enclosed into the Motr
         # process that has the given process_fid.
@@ -504,7 +572,7 @@ class ConsulUtil:
 
     @repeat_if_fails()
     def is_proc_client(self, process_fid: Fid) -> bool:
-        node_items = self.kv.kv_get('m0conf/nodes', recurse=True)
+        node_items = self.get_all_nodes_keys()
         fidk = str(process_fid.key)
 
         # This is the RegExp to match the keys in Consul KV that describe
@@ -543,7 +611,7 @@ class ConsulUtil:
         obj_state: int = HaNoteStruct.M0_NC_ONLINE
         if obj_t.name in (ObjT.PROCESS.name, ObjT.SERVICE.name):
             # 'node/<node_name>/process/<process_fidk>/service/type'
-            node_items = self.kv.kv_get('m0conf/nodes', recurse=True)
+            node_items = self.get_all_nodes_keys()
             # TODO [KN] This code is too cryptic. To be refactored.
             keys = getattr(self,
                            'get_{}_keys'.format(
@@ -659,7 +727,7 @@ class ConsulUtil:
         # m0conf/nodes/
         # 0x6e00000000000001:0x3:{"name": "ssc-vm-1623.colo.seagate.com",
         #                         "state": "M0_NC_UNKNOWN"}
-        node_items = self.kv.kv_get('m0conf/nodes', recurse=True)
+        node_items = self.get_all_nodes_keys()
         for item in node_items:
             key = item['Key']
             key_split = key.split('/')
@@ -1037,7 +1105,7 @@ class ConsulUtil:
                        state: str,
                        device_event=True) -> None:
         LOG.debug('Setting sdev=%s in KV with state=%s', sdev_fid, state)
-        sdev_items = self.kv.kv_get('m0conf/nodes', recurse=True)
+        sdev_items = self.get_all_nodes_keys()
         regex = re.compile(
             f'^m0conf\\/.*\\/sdevs\\/{sdev_fid}$')
         for sdev in sdev_items:
@@ -1062,7 +1130,7 @@ class ConsulUtil:
             sdev_fid = self.drive_to_sdev_fid(drive_fid)
         else:
             sdev_fid = create_sdev_fid(fidk)
-        sdev_items = self.kv.kv_get('m0conf/nodes', recurse=True)
+        sdev_items = self.get_all_nodes_keys()
         regex = re.compile(
             f'^m0conf\\/.*\\/sdevs\\/{sdev_fid}$')
         for sdev in sdev_items:
@@ -1149,7 +1217,7 @@ class ConsulUtil:
             if '/ios' in x['Key']:
                 fidk_ios = x['Value']
         ios_fid = create_service_fid(int(fidk_ios))
-        sdev_items = self.kv.kv_get('m0conf/nodes', recurse=True)
+        sdev_items = self.get_all_nodes_keys()
         for x in sdev_items:
             if f'/{ios_fid}/' in x['Key']:
                 if json.loads(x['Value'])['path'] == drive:
@@ -1185,7 +1253,7 @@ class ConsulUtil:
     def drive_name_to_id(self, uid: str) -> str:
         drive_id = ''
         # 'm0conf/nodes/<node_name>/processes/<process_fidk>/disks/<disk_uuid>'
-        node_items = self.kv.kv_get('m0conf/nodes', recurse=True)
+        node_items = self.get_all_nodes_keys()
         for x in node_items:
             if '/disks/' in x['Key'] and uid in x['Key']:
                 drive_id = x['Value']
@@ -1321,12 +1389,13 @@ class ConsulUtil:
     def get_process_node(self, proc_fid: Fid) -> str:
         fidk = proc_fid.key
         # 'node/<node_name>/process/<process_fidk>/service/type'
-        node_items = self.kv.kv_get('m0conf/nodes', recurse=True)
+        node_items = self.get_all_nodes_keys()
         if ObjT.PROCESS.value == proc_fid.container:
             keys = self.get_process_keys(node_items, fidk)
         elif ObjT.SERVICE.value == proc_fid.container:
             keys = self.get_service_keys(node_items, fidk)
 
+        print("keys: " + str(keys))
         assert len(keys) == 1
         key = keys[0].split('/')
         node_key = ('/'.join(key[:3]))
@@ -1336,7 +1405,7 @@ class ConsulUtil:
 
     def get_service_process_fid(self, svc_fid: Fid) -> Fid:
         assert ObjT.SERVICE.value == svc_fid.container
-        node_items = self.kv.kv_get('m0conf/nodes', recurse=True)
+        node_items = self.get_all_nodes_keys()
         keys = self.get_service_keys(node_items, svc_fid.key)
         assert len(keys) == 1
         process_fid: str = keys[0].split('/')[4]
@@ -1374,11 +1443,8 @@ class ConsulUtil:
             wait_for_event(event, 2)
 
     def m0ds_stopping(self) -> bool:
-        # statuses = self.get_m0d_statuses()
         statuses = self.get_m0d_statuses()
         LOG.debug('The following statuses received: %s', statuses)
-        # stopping = [v[1] in ('M0_CONF_HA_PROCESS_STOPPING',
-        #                      'M0_CONF_HA_PROCESS_STOPPED') for v in statuses]
         stopping = [v[1] in (ServiceHealth.OFFLINE,
                              ServiceHealth.STOPPED) for v in statuses]
         return all(stopping)
