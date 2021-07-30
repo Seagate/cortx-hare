@@ -658,33 +658,139 @@ class ConsulUtil:
         return None
 
     @repeat_if_fails()
-    def get_node_ctrl_fid(self, node: str) -> Optional[Fid]:
+    def get_node_ctrl_fids(self, node: str) -> Optional[List[Fid]]:
         """
-        Returns the fid of the controller for the given node.
-
         Parameters:
             node : hostname of the node.
         """
         # Example,
-        # {
+        # [
         #    "key": "m0conf/sites/0x5300000000000001:0x1/
         #            racks/0x6100000000000001:0x2/encls/
         #            0x6500000000000001:0x4/ctrls/0x6300000000000001:0x5",
-        # },
+        # ]
         encl_fid = self.get_node_encl_fid(node)
         if not encl_fid:
             return None
-        ctrl_items = self.kv.kv_get('m0conf/sites', recurse=True)
+        ctrl_items = self.get_all_sites()
         regex = re.compile(
             f'^m0conf\\/.*\\/racks\\/.*\\/encls\\/{encl_fid}\\/ctrls\\/'
             '([^/]+)$')
+        list_fids: List[Fid] = []
         for ctrl in ctrl_items:
             match_result = re.match(regex, ctrl['Key'])
             if not match_result:
                 continue
             ctrl_fid: str = match_result.group(1)
-            return Fid.parse(ctrl_fid)
+            list_fids.append(Fid.parse(ctrl_fid))
+        return list_fids
+
+    @repeat_if_fails()
+    def get_io_service_devices(self,
+                               ioservice_fid: Fid) -> Optional[List[str]]:
+        if not ioservice_fid:
+            return None
+        # Example key m0conf/nodes/0x6e00000000000001:0x3/processes/
+        #   0x7200000000000001:0x15/services/0x7300000000000001:0x17/sdevs/
+        #   0x6400000000000001:0x18:{"path": "/dev/sdc", "state": "offline"}
+        sdev_items = self.kv.kv_get('m0conf/nodes', recurse=True)
+        regex = re.compile(
+            f'^m0conf\\/.*\\/processes\\/{ioservice_fid}\\/.*\\/sdevs\\/.*$')
+        sdev_fids = []
+        for sdev in sdev_items:
+            match_result = re.match(regex, sdev['Key'])
+            if not match_result:
+                continue
+            sdev_key: str = match_result.group(0)
+            key = sdev_key.split('/')
+            sdev_fids.append(key[8])
+        return sdev_fids
+
+    @repeat_if_fails()
+    def get_all_sites(self):
+        return self.kv.kv_get('m0conf/sites', recurse=True)
+
+    @repeat_if_fails()
+    def get_device_controller(self, sdev_fid):
+        # Example key m0conf/sites/0x5300000000000001:0x1/racks/
+        #    0x6100000000000001:0x2/encls/0x6500000000000001:0x4/ctrls/
+        #    0x6300000000000001:0x5/drives/0x6b00000000000001:0x38:
+        #    {"sdev": "0x6400000000000001:0x37", "state": "M0_NC_UNKNOWN"}
+        sites_items = self.get_all_sites()
+
+        for item in sites_items:
+            if 'sdev' not in json.loads(item['Value']).keys():
+                continue
+
+            if json.loads(item['Value'])['sdev'] == f'{sdev_fid}':
+                key = item['Key'].split('/')
+                return key[8]
+
         return None
+
+    @repeat_if_fails()
+    def get_ioservice_ctrl_fid(self, ioservice_fid: Fid) -> Optional[Fid]:
+        """
+        Returns the fid of the controller for the given IOservice.
+
+        Parameters:
+            ioservice_fid : Fid of IO service for which ctrl fid is required.
+
+        TODO: Instead of comparing devices, add a mapping from controller
+              to I/O service
+        """
+        if not ioservice_fid:
+            return None
+
+        sdev_fids = self.get_io_service_devices(ioservice_fid)
+
+        if not sdev_fids:
+            return None
+
+        sdev_fid = sdev_fids[0]
+
+        ctrl_fid = self.get_device_controller(sdev_fid)
+
+        if ctrl_fid is None:
+            return None
+        else:
+            return Fid.parse(ctrl_fid)
+
+    @repeat_if_fails()
+    def all_io_services_failed(self, node: str) -> bool:
+        """
+        Checks if all the IO services of given node are in failed state.
+
+        Parameters:
+            node : hostname of the node.
+        """
+        node_fid = self.get_node_fid(node)
+
+        # Example m0conf/nodes/0x6e00000000000001:0x3/processes/
+        # 0x7200000000000001:0xa/services/0x7300000000000001:0xc:
+        # {"name": "ios", "state": "M0_NC_UNKNOWN"}
+
+        sites_items = self.kv.kv_get(f'm0conf/nodes/{node_fid}/processes',
+                                     recurse=True)
+        for item in sites_items:
+            if 'name' not in json.loads(item['Value']).keys():
+                continue
+
+            if json.loads(item['Value'])['name'] == 'ios':
+                # m0conf/nodes/0x6e00000000000001:0x3/processes/
+                # 0x7200000000000001:0xa:
+                # {"name": "m0_server", "state": "online"}
+                p_fid = item['Key'].split('/')[4]
+                p_key = f"m0conf/nodes/{node_fid}/processes/{p_fid}"
+                process = self.kv.kv_get(p_key, recurse=False)
+                if not process:
+                    raise HAConsistencyException('Failed to get process key')
+
+                state = json.loads(process['Value'])['state']
+                if state not in ('stopped', 'failed', 'offline'):
+                    return False
+
+        return True
 
     @repeat_if_fails()
     def get_node_encl_fid(self, node: str) -> Optional[Fid]:
@@ -1153,6 +1259,35 @@ class ConsulUtil:
         return status in ('M0_CONF_HA_PROCESS_STOPPING',
                           'M0_CONF_HA_PROCESS_STOPPED',
                           'M0_CONF_HA_PROCESS_STARTING')
+
+    @repeat_if_fails()
+    def set_process_state(self,
+                          process_fid: Fid,
+                          state: ServiceHealth) -> None:
+        LOG.debug('Setting process=%s in KV with state=%s',
+                  process_fid, state)
+        process_state_map = {
+            ServiceHealth.OK: 'online',
+            ServiceHealth.FAILED: 'failed',
+            ServiceHealth.OFFLINE: 'offline',
+            ServiceHealth.UNKNOWN: 'unknown',
+            ServiceHealth.STOPPED: 'stopped',
+        }
+
+        # Example key is as follows
+        # m0conf/nodes/0x6e00000000000001:0x3/processes/0x7200000000000001:
+        # 0x15:{"name": "m0_server", "state": "M0_NC_UNKNOWN"}
+        node_items = self.kv.kv_get('m0conf/nodes', recurse=True)
+        regex = re.compile(
+            f'^m0conf\\/nodes\\/.*\\/processes\\/{process_fid}$')
+        for item in node_items:
+            match_result = re.match(regex, item['Key'])
+            if not match_result:
+                continue
+#            value = item['Value']
+            value = json.loads(item['Value'])
+            value['state'] = process_state_map[state]
+            self.kv.kv_put(item['Key'], json.dumps(value))
 
 
 def dump_json(obj) -> str:

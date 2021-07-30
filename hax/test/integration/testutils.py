@@ -110,6 +110,19 @@ class AssertionPlan:
                 state = AssertionState(state.traces, True, res)
         return state.result
 
+    def not_exist(self, traces: List[Invocation]) -> bool:
+        '''
+        Evaluates the steps in this AssertionPlan and returns True if
+        match is not found.
+        '''
+        state = AssertionState(traces, False, -1)
+        for transformer, predicate in self.steps:
+            state = transformer(state)
+            res = predicate(state.traces)
+            if res >= 0:
+                return False
+        return True
+
     def _id(self):
         def fn(state: AssertionState) -> AssertionState:
             return state
