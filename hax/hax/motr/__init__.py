@@ -19,7 +19,7 @@
 import ctypes as c
 import logging
 from errno import EAGAIN
-from typing import Any, List
+from typing import Any, List, Optional
 
 from hax.exception import ConfdQuorumException, RepairRebalanceException
 from hax.message import (EntrypointRequest, FirstEntrypointRequest,
@@ -278,13 +278,36 @@ class Motr:
                 continue
             note = HaNoteStruct(st.fid.to_c(), ha_obj_state(st))
             notes.append(note)
+
+            if st.fid.container == ObjT.PROCESS.value:
+                self.consul_util.set_process_state(st.fid, st.status)
+
             notes += self._generate_sub_services(note, self.consul_util,
                                                  notify_devices)
             # For process failure, we report failure for the corresponding
-            # node (enclosure) and CVGs.
+            # node (enclosure) and CVGs if all Io services are failed.
             if (st.fid.container == ObjT.PROCESS.value
                     and st.status in (ServiceHealth.FAILED, ServiceHealth.OK)):
-                notes += self.notify_node_status(note)
+                # Check if we need to mark node as failed,
+                # otherwise just mark controller as failed/OK
+                # If we receive process failure then we will check if all IO
+                # services are failed, if True then we will mark node as failed
+                # If we receive process 'OK' then we will check if node is
+                # not in failed state then we will mark node as OK
+                # If both the above conditions are not true then we will just
+                # mark controller status
+                is_node_failed = self.is_node_failed(note)
+                if (st.status == ServiceHealth.FAILED
+                        and is_node_failed):
+                    notes += self.notify_node_status(note)
+                elif (st.status == ServiceHealth.OK
+                        and not is_node_failed):
+                    notes += self.notify_node_status(note)
+                else:
+                    ctrl_note = self.get_ctrl_status(note)
+                    if ctrl_note is not None:
+                        notes.append(ctrl_note)
+
             if st.fid.container == ObjT.DRIVE.value:
                 self.consul_util.update_drive_state([st.fid], st.status)
         if not notes:
@@ -345,8 +368,10 @@ class Motr:
                   len(event.nvec))
         notes: List[HaNoteStruct] = []
         for n in event.nvec:
-            n.note.no_state = self.consul_util.get_conf_obj_status(
-                ObjT[n.obj_t], n.note.no_id.f_key)
+            n.note.no_state = HaNoteStruct.M0_NC_ONLINE
+            if (n.obj_t in (ObjT.PROCESS.name, ObjT.SERVICE.name)):
+                n.note.no_state = self.consul_util.get_conf_obj_status(
+                    ObjT[n.obj_t], n.note.no_id.f_key)
             notes.append(n.note)
 
         LOG.debug('Replying ha nvec of length ' + str(len(event.nvec)))
@@ -406,16 +431,43 @@ class Motr:
 
         node_fid = self.consul_util.get_node_fid(node)
         encl_fid = self.consul_util.get_node_encl_fid(node)
-        ctrl_fid = self.consul_util.get_node_ctrl_fid(node)
-        LOG.debug('node_fid: %s encl_fid: %s ctrl_fid: %s with state: %s',
-                  node_fid, encl_fid, ctrl_fid, new_state)
+        ctrl_fids = self.consul_util.get_node_ctrl_fids(node)
+        LOG.debug('node_fid: %s encl_fid: %s ctrl_fids: %s with state: %s',
+                  node_fid, encl_fid, ctrl_fids, new_state)
 
         notes = []
-        if node_fid and encl_fid and ctrl_fid:
+        if node_fid and encl_fid:
             notes = [HaNoteStruct(no_id=x.to_c(), no_state=new_state)
-                     for x in [node_fid, encl_fid, ctrl_fid]]
+                     for x in [node_fid, encl_fid]]
+
+        if ctrl_fids:
+            for x in ctrl_fids:
+                notes.append(HaNoteStruct(no_id=x.to_c(), no_state=new_state))
 
         return notes
+
+    def get_ctrl_status(self,
+                        proc_note: HaNoteStruct) -> Optional[HaNoteStruct]:
+        new_state = proc_note.no_state
+        proc_fid = Fid.from_struct(proc_note.no_id)
+        assert ObjT.PROCESS.value == proc_fid.container
+        LOG.debug('Notifying ctrl status for process_fid=%s state=%s',
+                  proc_fid, new_state)
+
+        ctrl_fid = self.consul_util.get_ioservice_ctrl_fid(proc_fid)
+
+        if ctrl_fid:
+            return HaNoteStruct(no_id=ctrl_fid.to_c(), no_state=new_state)
+        return None
+
+    # Check if all the IO services of node are failed
+    def is_node_failed(self, proc_note: HaNoteStruct):
+        proc_fid = Fid.from_struct(proc_note.no_id)
+        assert ObjT.PROCESS.value == proc_fid.container
+
+        node = self.consul_util.get_process_node(proc_fid)
+
+        return self.consul_util.all_io_services_failed(node)
 
     def notify_hax_stop(self):
         LOG.debug('Notifying hax stop')
