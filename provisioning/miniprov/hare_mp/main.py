@@ -280,26 +280,6 @@ def test_IVT(args):
 def reset(args):
     try:
         rc = 0
-        util: ConsulUtil = ConsulUtil()
-
-        if is_cluster_running():
-            logging.info('Cluster is running, shutting down')
-            shutdown_cluster()
-
-        keys: List[KeyDelete] = [
-            KeyDelete(name='epoch', recurse=False),
-            KeyDelete(name='eq-epoch', recurse=False),
-            KeyDelete(name='last_fidk', recurse=False),
-            KeyDelete(name='leader', recurse=False),
-            KeyDelete(name='m0conf/', recurse=True),
-            KeyDelete(name='processes/', recurse=True),
-            KeyDelete(name='stats/', recurse=True)
-        ]
-
-        logging.info('Deleting Hare KV entries (%s)', keys)
-        if not util.kv.kv_delete_in_transaction(keys):
-            logging.error('Error during key delete in transaction')
-            rc = -1
 
         exit(rc)
     except Exception as error:
@@ -307,11 +287,33 @@ def reset(args):
         exit(-1)
 
 
+def kv_cleanup():
+    util: ConsulUtil = ConsulUtil()
+
+    if is_cluster_running():
+        logging.info('Cluster is running, shutting down')
+        shutdown_cluster()
+
+    keys: List[KeyDelete] = [
+        KeyDelete(name='epoch', recurse=False),
+        KeyDelete(name='eq-epoch', recurse=False),
+        KeyDelete(name='last_fidk', recurse=False),
+        KeyDelete(name='leader', recurse=False),
+        KeyDelete(name='m0conf/', recurse=True),
+        KeyDelete(name='processes/', recurse=True),
+        KeyDelete(name='stats/', recurse=True)
+    ]
+
+    logging.info('Deleting Hare KV entries (%s)', keys)
+    if not util.kv.kv_delete_in_transaction(keys):
+        raise RuntimeError('Error during key delete in transaction')
+
+
 def cleanup(args):
     try:
         rc = -1
 
-        if config_cleanup() == 0 and logs_cleanup() == 0:
+        if kv_cleanup() == 0 and config_cleanup() == 0 and logs_cleanup() == 0:
             rc = 0
 
         exit(rc)
