@@ -17,6 +17,7 @@ import subprocess
 import sys
 from typing import (Any, Callable, Dict, Iterable, Iterator, List, NamedTuple,
                     Optional, Set, Tuple)
+from math import floor, ceil
 import yaml
 import logging
 
@@ -24,6 +25,11 @@ import logging
 __version__ = '0.14'
 
 LOG = logging.getLogger('cfgen')
+
+faultToleranceInfo = NamedTuple('faultToleranceInfo', [
+                            ('max_drives_per_node', int),
+                            ('max_drives_per_ctrl', int),
+                            ('min_drives_per_node', int)])
 
 
 def repeat_on_cmd_timeout(max_retries=-1):
@@ -1230,6 +1236,37 @@ def cluster_encls(m0conf: Dict[Oid, Any]) -> List[Oid]:
     return encls
 
 
+def cluster_ctrls(m0conf: Dict[Oid, Any]) -> List[Oid]:
+    ctrls: List[Oid] = []
+    for item in m0conf:
+        if item.type is ObjT.controller:
+            ctrls.append(item)
+    return ctrls
+
+
+def drives_per_node_and_ctrl(m0conf: Dict[Oid, Any]) -> faultToleranceInfo:
+    max_drives_per_node = 0
+    max_drives_per_ctrl = 0
+    min_drives_per_node = 0
+    drives_per_node = 0
+    for encl_id in m0conf:
+        if encl_id.type is ObjT.enclosure:
+            for ctrl_id in m0conf[encl_id].ctrls:
+                drives_per_ctrl = len(m0conf[ctrl_id].drives)
+                drives_per_node += drives_per_ctrl
+                if max_drives_per_ctrl < drives_per_ctrl:
+                    max_drives_per_ctrl = drives_per_ctrl
+            if max_drives_per_node < drives_per_node:
+                max_drives_per_node = drives_per_node
+            if (min_drives_per_node == 0 or
+                    min_drives_per_node > drives_per_node):
+                min_drives_per_node = drives_per_node
+            drives_per_node = 0
+    return faultToleranceInfo(max_drives_per_node=max_drives_per_node,
+                              max_drives_per_ctrl=max_drives_per_ctrl,
+                              min_drives_per_node=min_drives_per_node)
+
+
 Failures = NamedTuple('Failures', [('site', int),
                                    ('rack', int),
                                    ('enclosure', int),
@@ -1276,6 +1313,46 @@ class ConfPool(ToDhall):
         return '{ %s }' % args
 
     @classmethod
+    def gen_sns_tolerance(cls, m0conf: Dict[Oid, Any],
+                          pool_desc: Dict[str, Any]) -> Failures:
+        encls_nr = len(cluster_encls(m0conf))
+        ctrls_per_encl = floor(len(cluster_ctrls(m0conf)) / encls_nr)
+        data_units = pool_desc['data_units']
+        parity_units = pool_desc['parity_units']
+        spare_units = pool_desc.get('spare_units', 0)
+        total_units = data_units + parity_units + spare_units
+        fault_tol_info = drives_per_node_and_ctrl(m0conf)
+        min_pool_width = fault_tol_info.min_drives_per_node * encls_nr
+        actual_pool_width = len(pool_drives(m0conf, pool_desc))
+        if ((min_pool_width < actual_pool_width) and
+                (min_pool_width / total_units) > 0):
+            # Pool is asymmetric, all the nodes don't have same number of
+            # drives.
+            # if (min_pool_width / total_units) > 0 means that one of the
+            # nodes can probably get more than K units of a parity group.
+            # Thus we cannot allow node failures.
+            enc_failure_allowed = 0
+            if fault_tol_info.max_drives_per_ctrl > parity_units:
+                ctrl_failure_allowed = 0
+        else:
+            enc_failure_allowed_FP = parity_units / ceil(total_units /
+                                                         encls_nr)
+            enc_failure_allowed = floor(enc_failure_allowed_FP)
+            temp = ctrls_per_encl * enc_failure_allowed
+            ctrl_failure_allowed = min(temp, parity_units)
+        return Failures(0, 0, enc_failure_allowed, ctrl_failure_allowed,
+                        parity_units)
+
+    @classmethod
+    def gen_md_tolerance(cls, m0conf: Dict[Oid, Any],
+                         pool_desc: Dict[str, Any]) -> Failures:
+        encls_nr = len(cluster_encls(m0conf))
+        ctrls_per_encl = floor(len(cluster_ctrls(m0conf)) / encls_nr)
+        encl_failures = encls_nr - 1
+        ctrl_failures = ctrls_per_encl * encl_failures
+        return Failures(0, 0, encl_failures, ctrl_failures, encl_failures)
+
+    @classmethod
     def build(cls, m0conf: Dict[Oid, Any], parent: Oid,
               pool_desc: Dict[str, Any]) -> Oid:
         assert parent.type is ObjT.root
@@ -1310,20 +1387,23 @@ class ConfPool(ToDhall):
                 parity_units = len(cluster_encls(m0conf)) - 1
             else:
                 assert t is PoolT.md
-                data_units = 1  # len(drives)
+                data_units = 1
                 parity_units = len(cluster_encls(m0conf)) - 1
-            pd_attrs = PDClustAttrs0(
-                data_units=data_units, parity_units=parity_units,
-                spare_units=0)
+            pd_attrs = PDClustAttrs0(data_units=data_units,
+                                     parity_units=parity_units,
+                                     spare_units=0)
         d = pool_desc.get('allowed_failures')
-        if t in (PoolT.sns, PoolT.dix) and d:
-            tolerance = Failures(d['site'], d['rack'], d['encl'], d['ctrl'],
-                                 d['disk'])
+        if t in (PoolT.sns, PoolT.dix):
+            if d:
+                tolerance = Failures(d['site'], d['rack'], d['encl'],
+                                     d['ctrl'], d['disk'])
+            else:
+                if t == PoolT.dix:
+                    tolerance = ConfPool.gen_md_tolerance(m0conf, pool_desc)
+                else:
+                    tolerance = ConfPool.gen_sns_tolerance(m0conf, pool_desc)
         else:
-            md_allowed_failures = len(cluster_encls(m0conf)) - 1
-            tolerance = Failures(0, 0, min(1, md_allowed_failures),
-                                 min(1, md_allowed_failures),
-                                 md_allowed_failures)
+            tolerance = ConfPool.gen_md_tolerance(m0conf, pool_desc)
 
         pver = ConfPver.build(m0conf, pool_id, pd_attrs, drives, tolerance)
         if t is PoolT.dix:
@@ -1334,13 +1414,7 @@ class ConfPool(ToDhall):
             m0conf[parent].mdpool = pool_id
         else:
             assert t is PoolT.sns
-            d = pool_desc.get('allowed_failures')
-            for v in gen_allowances(Failures(0, 0, 0, 0, 0) if d is None else
-                                    Failures(d['site'],
-                                             d['rack'],
-                                             d['encl'],
-                                             d['ctrl'],
-                                             d['disk'])):
+            for v in gen_allowances(tolerance):
                 ConfPverF.build(m0conf, pool_id, base=pver, allowance=v)
 
         return pool_id
