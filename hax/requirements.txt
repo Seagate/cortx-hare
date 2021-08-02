@@ -23,3 +23,5 @@ click==8.0.1
 dataclasses==0.8
 python-consul==1.1.0
 simplejson==3.17.2
+pytest-cov
+coverage
