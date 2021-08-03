@@ -96,7 +96,8 @@ class ConfStoreProvider(ValueProvider):
 
     def get_hostname(self) -> str:
         machine_id = self.get_machine_id()
-        hostname = self._raw_get(f'server_node>{machine_id}>hostname')
+        hostname = self._raw_get(
+            f'server_node>{machine_id}>network>data>private_fqdn')
         return hostname
 
     def get_storage_set_nodes(self) -> List[str]:
