@@ -7,7 +7,7 @@
       "storage_set": [
         {
           "durability": {
-            "sns": {
+            "TMPL_POOL_TYPE": {
               "data": "TMPL_DATA_UNITS_COUNT",
               "parity": "TMPL_PARITY_UNITS_COUNT",
               "spare": "TMPL_SPARE_UNITS_COUNT"
