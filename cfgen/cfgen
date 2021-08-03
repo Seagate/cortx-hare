@@ -9,6 +9,7 @@ import itertools
 import json
 import os
 from pprint import pprint
+import psutil
 import random
 import re
 import socket
@@ -462,10 +463,23 @@ def minion_id() -> Optional[str]:
         return f.readline().strip()
 
 
+def get_all_local_addrs() -> List[str]:
+    interface_details = psutil.net_if_addrs()
+    ips = []
+    for iface in interface_details.values():
+        ips.append(iface[0].address)
+    return ips
+
+
 def is_localhost(hostname: str) -> bool:
     assert hostname
-    return hostname in ('localhost', '127.0.0.1', minion_id(),
-                        socket.gethostname(), socket.getfqdn())
+    m_id = minion_id()
+    ids = [m_id] if m_id is not None else []
+    ids.extend(get_all_local_addrs())
+    for item in socket.gethostbyname_ex(hostname):
+        if any(x in item for x in ids):
+            return True
+    return False
 
 
 @repeat_on_cmd_timeout(max_retries=-1)

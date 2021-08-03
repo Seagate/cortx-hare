@@ -29,6 +29,7 @@
       "network": {
         "data": {
           "interface_type": "TMPL_DATA_INTERFACE_TYPE",
+          "private_fqdn": "TMPL_PRIVATE_FQDN",
           "private_interfaces": [
             "TMPL_PRIVATE_DATA_INTERFACE_1",
             "TMPL_PRIVATE_DATA_INTERFACE_2"
