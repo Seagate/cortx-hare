@@ -56,12 +56,13 @@ class Plan(Enum):
     Scalability = 'scalability'
 
 
-def execute(cmd: List[str]) -> str:
+def execute(cmd: List[str], env=None) -> str:
     process = subprocess.Popen(cmd,
                                stdin=subprocess.PIPE,
                                stdout=subprocess.PIPE,
                                stderr=subprocess.PIPE,
-                               encoding='utf8')
+                               encoding='utf8',
+                               env=env)
     out, err = process.communicate()
     if process.returncode:
         raise Exception(
@@ -490,9 +491,13 @@ def save(filename: str, contents: str) -> None:
 
 def generate_config(url: str, path_to_cdf: str) -> None:
     conf_dir = '/var/lib/hare'
-    os.environ['PATH'] += os.pathsep + '/opt/seagate/cortx/hare/bin/'
+    path = os.getenv('PATH')
+    if path:
+        path += os.pathsep + '/opt/seagate/cortx/hare/bin/'
+    python_path = os.pathsep.join(sys.path)
     cmd = ['cfgen', '-o', conf_dir, path_to_cdf]
-    execute(cmd)
+    execute(cmd, env={'PYTHONPATH': python_path, 'PATH': path})
+
     conf = ConfStoreProvider(url)
     hostname = conf.get_hostname()
     save(f'{conf_dir}/node-name', hostname)

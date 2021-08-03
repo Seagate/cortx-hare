@@ -114,6 +114,8 @@ class TestCDF(unittest.TestCase):
                 'myhost',
                 'server_node>MACH_ID>network>data>interface_type':
                 'tcp',
+                'server_node>MACH_ID>network>data>private_fqdn':
+                    'srvnode-1.data.private',
                 'server_node>MACH_ID>storage>cvg[0]>data_devices':
                 ['/dev/sdb'],
                 'server_node>MACH_ID>storage>cvg[1]>data_devices':
@@ -188,6 +190,8 @@ class TestCDF(unittest.TestCase):
                 'server_node>MACH_ID>hostname':                'myhost',
                 'server_node>MACH_ID>name': 'mynodename',
                 'server_node>MACH_ID>network>data>interface_type':                'o2ib',
+                'server_node>MACH_ID>network>data>private_fqdn':
+                    'srvnode-1.data.private',
                 'server_node>MACH_ID>network>data>private_interfaces':                ['eth1', 'eno2'],
                 'server_node>MACH_ID>s3_instances':                1,
                 'cortx>software>motr>service>client_instances':                2,
@@ -201,7 +205,7 @@ class TestCDF(unittest.TestCase):
         ret = CdfGenerator(provider=store)._create_node_descriptions()
         self.assertIsInstance(ret, list)
         self.assertEqual(1, len(ret))
-        self.assertEqual(Text('myhost'), ret[0].hostname)
+        self.assertEqual(Text('srvnode-1.data.private'), ret[0].hostname)
         self.assertEqual(Text('eth1'), ret[0].data_iface)
         self.assertEqual(1, ret[0].s3_instances)
         self.assertEqual(2, ret[0].client_instances)
@@ -215,7 +219,8 @@ class TestCDF(unittest.TestCase):
         self.assertEqual(0, ret[0].parity_units)
         self.assertEqual(0, ret[0].spare_units.get())
         disk_refs = ret[0].disk_refs.value
-        self.assertEqual(Text('myhost'), disk_refs.value[0].node.value)
+        self.assertEqual(Text('srvnode-1.data.private'),
+                         disk_refs.value[0].node.value)
         self.assertEqual(Text('/dev/sdb'), disk_refs.value[0].path)
         self.assertEqual(0, ret[0].allowed_failures.value.site)
         self.assertEqual(0, ret[0].allowed_failures.value.rack)
@@ -295,6 +300,8 @@ class TestCDF(unittest.TestCase):
                 'server_node>MACH_ID1>hostname':                'myhost',
                 'server_node>MACH_ID1>name': 'mynodename',
                 'server_node>MACH_ID1>network>data>interface_type':                'o2ib',
+                'server_node>MACH_ID1>network>data>private_fqdn':
+                    'srvnode-1.data.private',
                 'server_node>MACH_ID1>network>data>private_interfaces':                ['eth1', 'eno2'],
                 'server_node>MACH_ID1>s3_instances':                1,
                 'server_node>MACH_ID2>storage>cvg_count': '2',
@@ -305,6 +312,8 @@ class TestCDF(unittest.TestCase):
                 'server_node>MACH_ID2>hostname':                'myhost',
                 'server_node>MACH_ID2>name': 'mynodename',
                 'server_node>MACH_ID2>network>data>interface_type':                'o2ib',
+                'server_node>MACH_ID2>network>data>private_fqdn':
+                    'srvnode-2.data.private',
                 'server_node>MACH_ID2>network>data>private_interfaces':                ['eth1', 'eno2'],
                 'server_node>MACH_ID2>s3_instances':                1,
                 'server_node>MACH_ID3>storage>cvg_count': '2',
@@ -315,6 +324,8 @@ class TestCDF(unittest.TestCase):
                 'server_node>MACH_ID3>hostname':                'myhost',
                 'server_node>MACH_ID3>name': 'mynodename',
                 'server_node>MACH_ID3>network>data>interface_type':                'o2ib',
+                'server_node>MACH_ID3>network>data>private_fqdn':
+                    'srvnode-3.data.private',
                 'server_node>MACH_ID3>network>data>private_interfaces':                ['eth1', 'eno2'],
                 'server_node>MACH_ID3>s3_instances':                1,
             }
@@ -357,6 +368,8 @@ class TestCDF(unittest.TestCase):
                 'myhost',
                 'server_node>srvnode_1>network>data>interface_type':
                 'o2ib',
+                'server_node>srvnode_1>network>data>private_fqdn':
+                    'srvnode-1.data.private',
                 'server_node>srvnode_1>network>data>private_interfaces':
                 ['eth1', 'eno2'],
                 'server_node>srvnode_1>s3_instances':
@@ -513,6 +526,8 @@ class TestCDF(unittest.TestCase):
                 'myhost',
                 'server_node>MACH_ID>network>data>interface_type':
                 'o2ib',
+                'server_node>MACH_ID>network>data>private_fqdn':
+                    'srvnode-1.data.private',
                 'server_node>MACH_ID>network>data>private_interfaces':
                 ['eth1', 'eno2'],
                 'server_node>MACH_ID>s3_instances':
@@ -575,6 +590,8 @@ class TestCDF(unittest.TestCase):
                 'myhost',
                 'server_node>MACH_ID>network>data>interface_type':
                 'o2ib',
+                'server_node>MACH_ID>network>data>private_fqdn':
+                    'srvnode-1.data.private',
                 'server_node>MACH_ID>network>data>private_interfaces':
                 ['eth1', 'eno2'],
                 'server_node>MACH_ID>s3_instances':
@@ -632,7 +649,9 @@ class TestCDF(unittest.TestCase):
                 'cortx>software>motr>service>client_instances':
                 2,
                 'server_node>MACH_ID>network>data>interface_type':
-                'o2ib'
+                'o2ib',
+                'server_node>MACH_ID>network>data>private_fqdn':
+                    'srvnode-1.data.private',
             }
             return data[value]
 
@@ -667,6 +686,8 @@ class TestCDF(unittest.TestCase):
                 'server_node>MACH_ID>name': 'mynodename',
                 'server_node>MACH_ID>network>data>interface_type':
                 'o2ib',
+                'server_node>MACH_ID>network>data>private_fqdn':
+                    'srvnode-1.data.private',
                 'server_node>MACH_ID>network>data>private_interfaces':
                 ['eth1'],
                 'server_node>MACH_ID>s3_instances':
@@ -682,6 +703,8 @@ class TestCDF(unittest.TestCase):
                 'server_node>MACH_2_ID>name':                'host-2',
                 'server_node>MACH_2_ID>hostname':            'host-2',
                 'server_node>MACH_2_ID>network>data>interface_type':                'tcp',
+                'server_node>MACH_2_ID>network>data>private_fqdn':
+                    'srvnode-2.data.private',
                 'server_node>MACH_2_ID>network>data>private_interfaces':
                 ['eno1'],
                 'server_node>MACH_2_ID>s3_instances':                5,
@@ -700,11 +723,11 @@ class TestCDF(unittest.TestCase):
         ret = CdfGenerator(provider=store)._create_node_descriptions()
         self.assertIsInstance(ret, list)
         self.assertEqual(2, len(ret))
-        self.assertEqual(Text('myhost'), ret[0].hostname)
+        self.assertEqual(Text('srvnode-1.data.private'), ret[0].hostname)
         self.assertEqual(Text('eth1'), ret[0].data_iface)
         self.assertEqual(1, ret[0].s3_instances)
         self.assertEqual(2, ret[0].client_instances)
-        self.assertEqual(Text('host-2'), ret[1].hostname)
+        self.assertEqual(Text('srvnode-2.data.private'), ret[1].hostname)
         self.assertEqual(Text('eno1'), ret[1].data_iface)
         self.assertEqual(5, ret[1].s3_instances)
         self.assertEqual(2, ret[1].client_instances)
@@ -728,6 +751,8 @@ class TestCDF(unittest.TestCase):
                 ['/dev/sdb'],
                 'server_node>MACH_ID>network>data>interface_type':
                 None,
+                'server_node>MACH_ID>network>data>private_fqdn':
+                    'srvnode-1.data.private',
                 'server_node>MACH_ID>s3_instances':
                 1,
                 'cortx>software>motr>service>client_instances':
