@@ -176,7 +176,8 @@ class CdfGenerator:
                         DiskRef(
                             path=Text(device),
                             node=Maybe(
-                                Text(conf.get(f'server_node>{node}>hostname')),
+                                Text(conf.get(f'server_node>{node}>'
+                                              'network>data>private_fqdn')),
                                 'Text'))
                         for node in self._get_server_nodes(pool)
                         for device in self._get_devices(pool, node)
@@ -283,7 +284,8 @@ class CdfGenerator:
 
     def _create_node(self, machine_id: str) -> NodeDesc:
         store = self.provider
-        hostname = store.get(f'server_node>{machine_id}>hostname')
+        hostname = store.get(
+            f'server_node>{machine_id}>network>data>private_fqdn')
         name = store.get(f'server_node>{machine_id}>name')
         iface = self._get_iface(machine_id)
         try:
