@@ -23,9 +23,9 @@ FILENAME=$1
 URL="json://$(readlink -f "$FILENAME")"
 
 conf "$URL" set 'cluster>TMPL_CLUSTER_ID>site>storage_set_count=TMPL_STORAGESET_COUNT'
-conf "$URL" set 'cluster>TMPL_CLUSTER_ID>storage_set[0]>durability>sns>data=TMPL_DATA_UNITS_COUNT'
-conf "$URL" set 'cluster>TMPL_CLUSTER_ID>storage_set[0]>durability>sns>parity=TMPL_PARITY_UNITS_COUNT'
-conf "$URL" set 'cluster>TMPL_CLUSTER_ID>storage_set[0]>durability>sns>spare=TMPL_SPARE_UNITS_COUNT'
+conf "$URL" set 'cluster>TMPL_CLUSTER_ID>storage_set[0]>durability>TMPL_POOL_TYPE>data=TMPL_DATA_UNITS_COUNT'
+conf "$URL" set 'cluster>TMPL_CLUSTER_ID>storage_set[0]>durability>TMPL_POOL_TYPE>parity=TMPL_PARITY_UNITS_COUNT'
+conf "$URL" set 'cluster>TMPL_CLUSTER_ID>storage_set[0]>durability>TMPL_POOL_TYPE>spare=TMPL_SPARE_UNITS_COUNT'
 conf "$URL" set 'cluster>TMPL_CLUSTER_ID>storage_set[0]>name=TMPL_STORAGESET_NAME'
 conf "$URL" set 'cluster>TMPL_CLUSTER_ID>storage_set[0]>server_nodes[0]=TMPL_MACHINE_ID'
 conf "$URL" set 'server_node>TMPL_MACHINE_ID>cluster_id=TMPL_CLUSTER_ID'
