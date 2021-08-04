@@ -276,9 +276,8 @@ def test_hare_prereq():
     logging.info('Make Node ready for testing, by stopping the cluster.')
     resp = execute(cluster_stop)
     logging.info('Cluster Stopped: %s', resp)
-    for line in resp:
-        if 'Cluster stop is in progress' not in line:
-            logging.error('Cluster is in progress.')
+    if 'Cluster stop is in progress' not in resp:
+        logging.error('Cluster is in progress.')
 
 
 def test_hare_postreq(cdf_file: str, timeinfo: str, logfile: str):
@@ -289,16 +288,14 @@ def test_hare_postreq(cdf_file: str, timeinfo: str, logfile: str):
     logging.info('Start the Cluster')
     resp = execute(cluster_start)
     logging.info('cluster status: %s', resp)
-    for line in resp:
-        if 'Cluster start operation performed' not in line:
-            logging.error('Cluster not yet started.')
+    if 'Cluster start operation performed' not in resp:
+        logging.error('Cluster not yet started.')
 
     logging.info('PCS: Check all services are up.')
     resp = execute(pcs_status)
     logging.info('PCS status: %s', resp)
-    for line in resp[0]:
-        if 'stopped' not in line:
-            logging.error('Some services are not up.')
+    if 'stopped' not in resp:
+        logging.error('Some services are not up.')
 
     logging.info('hctl: Check that all the services are started.')
     cluster_sts = check_cluster_status(cdf_file)
@@ -310,36 +307,43 @@ def test_hare_postreq(cdf_file: str, timeinfo: str, logfile: str):
     logging.info('Successfully performed cleanup after testing')
 
 
+def _hctlstatus():
+    """know the hctl status."""
+    hctl_status = ['hctl', 'status', '-d']
+    hctl_shutdown = ['hctl', 'shutdown', '--skip-consul-stop']
+
+    process = subprocess.Popen(hctl_status,
+                               stdin=subprocess.PIPE,
+                               stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE,
+                               encoding='utf8')
+    logging.debug('Issuing CLI command: %s', hctl_status)
+    out, err = process.communicate()
+    exit_code = process.returncode
+    logging.debug('Finished. Exit code: %d', exit_code)
+    if exit_code:
+        if 'Cluster is not running' not in out:
+            resp = execute(hctl_shutdown)
+            logging.info('hctl shutdown: %s', resp)
+            if is_cluster_running():
+                raise Exception('After shutdown, hctl is running.')
+        else:
+            raise Exception(
+                f'Command hctl status exited with error code {exit_code}'
+                f'Command output: {err}')
+    else:
+        raise Exception('Fail to control cluster, exit the test.')
+
+
 def test_hare_bootstrap_shutdown(args):
     """Test suite for single node hare init in loop."""
     loop_count = int(args.dev[0])
-    hctl_status = ['hctl', 'status', '-d']
-    hctl_shutdown = ['hctl', 'shutdown']
+    hctl_shutdown = ['hctl', 'shutdown', '--skip-consul-stop']
 
     test_hare_prereq()
 
     if is_cluster_running():
-        process = subprocess.Popen(hctl_status,
-                                   stdin=subprocess.PIPE,
-                                   stdout=subprocess.PIPE,
-                                   stderr=subprocess.PIPE,
-                                   encoding='utf8')
-        logging.debug('Issuing CLI command: %s', hctl_status)
-        out, err = process.communicate()
-        exit_code = process.returncode
-        logging.debug('Finished. Exit code: %d', exit_code)
-        if exit_code:
-            if 'Cluster is not running' not in out:
-                resp = execute(hctl_shutdown)
-                logging.info('hctl shutdown: %s', resp)
-                if is_cluster_running():
-                    raise Exception('After shutdown, hctl is running.')
-            else:
-                raise Exception(
-                    f'Command hctl status exited with error code {exit_code}'
-                    f'Command output: {err}')
-        else:
-            raise Exception('Fail to control cluster, exit the test.')
+        _hctlstatus()
 
     logging.info('-------Starting BOOTSTRAP-SHUTDOWN in LOOP-------')
     for count in range(loop_count):
