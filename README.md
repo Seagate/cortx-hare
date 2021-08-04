@@ -52,6 +52,11 @@ and health-checking mechanisms.
   sudo yum -y install python3 python3-devel
   ```
 
+* Install puppet-agent (&ge; 6.13.0)
+  ```sh
+  sudo yum localinstall -y https://yum.puppetlabs.com/puppet/el/7/x86_64/puppet-agent-7.0.0-1.el7.x86_64.rpm
+  ```
+
 * Install Consul.
   ```sh
   sudo yum -y install yum-utils
