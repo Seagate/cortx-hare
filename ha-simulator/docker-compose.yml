@@ -1,0 +1,49 @@
+version: "3.8"
+
+services:
+  zookeeper:
+    image: docker.io/bitnami/zookeeper:3.7
+    ports:
+      - "2181:2181"
+    volumes:
+      - "zookeeper_data:/bitnami"
+    environment:
+      - ALLOW_ANONYMOUS_LOGIN=yes
+  kafka:
+    image: docker.io/bitnami/kafka:2
+    ports:
+      - "9092:9092"
+      - "9093:9093"
+    volumes:
+      - "kafka_data:/bitnami"
+    environment:
+      - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
+      - ALLOW_PLAINTEXT_LISTENER=yes        
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CLIENT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      - KAFKA_CFG_LISTENERS=CLIENT://:9092,EXTERNAL://:9093
+      #- KAFKA_CFG_ADVERTISED_LISTENERS=CLIENT://kafka:9092,EXTERNAL://localhost:9093
+      - KAFKA_CFG_ADVERTISED_LISTENERS=CLIENT://kafka:9092,EXTERNAL://ssc-vm-g2-rhev4-0175.colo.seagate.com:9093
+      - KAFKA_INTER_BROKER_LISTENER_NAME=CLIENT
+    depends_on:
+      - zookeeper
+  consul:
+    image: consul:latest
+    command: "agent -server -bootstrap -retry-join \"127.0.0.1\" -client 0.0.0.0"
+  emitter:
+    build:
+      context: docker/
+      dockerfile: Dockerfile
+      target: dev
+    environment:
+      - CONSUL_HOSTNAME=consul
+
+    volumes:
+      - "./emitter.py:/app/emitter.py"
+      - "./docker/etc/ha.conf:/etc/cortx/ha/ha.conf"
+      - "./docker/etc/message_bus.conf:/etc/cortx/message_bus.conf"
+
+volumes:
+  zookeeper_data:
+    driver: local
+  kafka_data:
+    driver: local
