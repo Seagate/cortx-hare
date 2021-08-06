@@ -337,5 +337,5 @@ class CdfGenerator:
             # TODO in the future the value must be taken from a correct
             # ConfStore key (it doesn't exist now).
             s3_instances=int(
-                store.get(f'server_node>{machine_id}>s3_instances')),
+                store.get('cortx>software>s3>service>instances')),
             client_instances=no_m0clients)
