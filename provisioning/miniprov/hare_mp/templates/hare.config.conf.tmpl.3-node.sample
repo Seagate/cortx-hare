@@ -29,9 +29,14 @@
         "service": {
           "client_instances": "2"
         }
+      },
+      "s3": {
+        "service": {
+          "instances": "1"
+        }
       }
     }
-  },      
+  },   
   "server_node": {
     "1114a50a6bf6f9c93ebd3c49d07d3fd4": {
       "cluster_id": "my-cluster",
@@ -47,7 +52,6 @@
           ]
         }
       },
-      "s3_instances": "1",
       "storage_set_id": "storage1",
       "storage": {
         "cvg_count": "2",
@@ -89,7 +93,6 @@
           ]
         }
       },
-      "s3_instances": "1",
       "storage_set_id": "storage1",
       "storage": {
         "cvg_count": "2",
@@ -131,7 +134,6 @@
           ]
         }
       },
-      "s3_instances": "1",
       "storage_set_id": "storage1",
       "storage": {
         "cvg_count": "2",
