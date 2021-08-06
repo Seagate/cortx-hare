@@ -23,6 +23,20 @@
       ]
     }
   },
+  "cortx": {
+    "software": {
+      "motr": {
+        "service": {
+          "client_instances": "2"
+        }
+      },
+      "s3": {
+        "service": {
+          "instances": "TMPL_S3SERVER_INSTANCES_COUNT"
+        }
+      }
+    }
+  },
   "server_node": {
     "TMPL_MACHINE_ID_1": {
       "cluster_id": "TMPL_CLUSTER_ID",
@@ -38,7 +52,6 @@
           ]
         }
       },
-      "s3_instances": "TMPL_S3SERVER_INSTANCES_COUNT",
       "storage_set_id": "TMPL_STORAGE_SET_ID",
       "storage": {
         "cvg_count": "TMPL_CVG_COUNT",
@@ -78,7 +91,6 @@
           ]
         }
       },
-      "s3_instances": "TMPL_S3SERVER_INSTANCES_COUNT",
       "storage_set_id": "TMPL_STORAGE_SET_ID",
       "storage": {
         "cvg_count": "TMPL_CVG_COUNT",
@@ -118,7 +130,6 @@
           ]
         }
       },
-      "s3_instances": "TMPL_S3SERVER_INSTANCES_COUNT",
       "storage_set_id": "TMPL_STORAGE_SET_ID",
       "storage": {
         "cvg_count": "TMPL_CVG_COUNT",
