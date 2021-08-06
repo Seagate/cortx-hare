@@ -1,0 +1,18 @@
+output-format: json
+
+strictness: medium
+test-warnings: true
+doc-warnings: false
+member-warnings: false
+inherits:
+  - default
+ignore-paths:
+  - docs
+ignore-patterns:
+  - (^|/)skip(this)?(/|$)
+autodetect: true
+max-line-length: 88
+
+pep257:
+  disable:
+    - D212
