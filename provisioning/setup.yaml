@@ -16,7 +16,7 @@ hare:
     args: --config $URL
   cleanup:
     cmd: /opt/seagate/cortx/hare/bin/hare_setup cleanup
-    args: --config $URL
+    args: --config $URL --pre-factory
   prepare:
     cmd: /opt/seagate/cortx/hare/bin/hare_setup prepare
     args: --config $URL

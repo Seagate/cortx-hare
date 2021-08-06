@@ -43,8 +43,8 @@ from hare_mp.systemd import HaxUnitTransformer
 from hare_mp.validator import Validator
 
 # Logger details
-LOG_DIR = "/var/log/seagate/hare/"
-LOG_FILE = "/var/log/seagate/hare/setup.log"
+LOG_DIR = "/var/log/seagate/hare/hare_deployment/"
+LOG_FILE = "/var/log/seagate/hare/hare_deployment/setup.log"
 LOG_FILE_SIZE = 5 * 1024 * 1024
 
 
@@ -310,14 +310,20 @@ def kv_cleanup():
         raise RuntimeError('Error during key delete in transaction')
 
 
+def pre_factory():
+    logging.info('Executing pre-factory cleanup command...')
+    deployment_logs_cleanup()
+
+
 def cleanup(args):
     try:
-        rc = -1
+        kv_cleanup()
+        logs_cleanup()
+        config_cleanup()
+        if args.pre_factory:
+            pre_factory()
 
-        if kv_cleanup() == 0 and config_cleanup() == 0 and logs_cleanup() == 0:
-            rc = 0
-
-        exit(rc)
+        exit(0)
     except Exception as error:
         logging.error('Error during cleanup (%s)', error)
         exit(-1)
@@ -325,13 +331,11 @@ def cleanup(args):
 
 def logs_cleanup():
     try:
-        logging.info('Cleaning up hare log directory(/var/log/seagate/hare)')
-        os.system('rm -rf /var/log/seagate/hare')
+        logging.info('Cleaning up hare log directory(/var/log/seagate/hare/*)')
+        os.system('rm -f /var/log/seagate/hare/*')
 
-        return 0
     except Exception as error:
-        logging.error('Error during logs cleanup (%s)', error)
-        return -1
+        raise RuntimeError(f'Error during logs cleanup : key={error}')
 
 
 def config_cleanup():
@@ -339,10 +343,18 @@ def config_cleanup():
         logging.info('Cleaning up hare config directory(/var/lib/hare)')
         os.system('rm -rf /var/lib/hare/*')
 
-        return 0
     except Exception as error:
-        logging.error('Error during config cleanup (%s)', error)
-        return -1
+        raise RuntimeError(f'Error during config cleanup : key={error}')
+
+
+def deployment_logs_cleanup():
+    try:
+        logging.info('''Cleaning up hare deployment log directory
+            (/var/log/seagate/hare/hare_deployment)''')
+        os.system('rm -rf /var/log/seagate/hare/hare_deployment')
+
+    except Exception as error:
+        raise RuntimeError(f'Error during deployment log cleanup: key={error}')
 
 
 def generate_support_bundle(args):
@@ -572,6 +584,16 @@ def add_param_argument(parser):
     return parser
 
 
+def add_factory_argument(parser):
+    parser.add_argument('--pre-factory',
+                        help="""Deletes contents of /var/log/seagate/hare,
+                        /var/lib/hare and /var/motr. Undoes everything that
+                        is done in post-install stage of hare provisioner""",
+                        required=False,
+                        action='store_true')
+    return parser
+
+
 def main():
     p = argparse.ArgumentParser(description='Configure hare settings')
     subparser = p.add_subparsers()
@@ -633,12 +655,13 @@ def main():
                    handler_fn=reset,
                    config_required=False)
 
-    add_subcommand(
-        subparser,
-        'cleanup',
-        help_str='Resets Hare configuration, logs and formats Motr metadata',
-        handler_fn=cleanup,
-        config_required=False)
+    add_factory_argument(
+        add_subcommand(
+            subparser,
+            'cleanup',
+            help_str='Resets Hare configuration, logs & formats Motr metadata',
+            handler_fn=cleanup,
+            config_required=False))
 
     add_subcommand(subparser,
                    'prepare',
