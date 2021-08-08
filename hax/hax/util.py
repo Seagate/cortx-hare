@@ -561,9 +561,9 @@ class ConsulUtil:
             pfid = self.get_service_process_fid(svc_fid)
         else:
             pfid = create_process_fid(fidk)
-        if self.get_process_status(pfid).proc_status in (
-                'M0_CONF_HA_PROCESS_STARTING', 'M0_CONF_HA_PROCESS_STARTED',
-                'M0_CONF_HA_PROCESS_STOPPING', 'Unknown'):
+        proc_node = self.get_process_node(pfid)
+        if (self.get_service_health(proc_node, fidk) in
+                (ServiceHealth.OK, ServiceHealth.UNKNOWN)):
             return HaNoteStruct.M0_NC_ONLINE
         else:
             return HaNoteStruct.M0_NC_FAILED
