@@ -278,9 +278,6 @@ class Motr:
                 continue
             note = HaNoteStruct(st.fid.to_c(), ha_obj_state(st))
             notes.append(note)
-            if (st.fid.container == ObjT.PROCESS.value
-                    and st.status == ServiceHealth.STOPPED):
-                notify_devices = False
             notes += self._generate_sub_services(note, self.consul_util,
                                                  notify_devices)
             # For process failure, we report failure for the corresponding
