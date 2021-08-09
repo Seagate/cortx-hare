@@ -23,6 +23,7 @@ import re
 from typing import List, NamedTuple
 
 from hax.filestats import FsStatsUpdater
+from hax.ha.thread import EventPollingThread
 from hax.handler import ConsumerThread
 from hax.log import setup_logging
 from hax.motr import Motr
@@ -31,7 +32,7 @@ from hax.motr.ffi import HaxFFI
 from hax.motr.planner import WorkPlanner
 from hax.motr.rconfc import RconfcStarter
 from hax.server import ServerRunner
-from hax.types import Fid, Profile
+from hax.types import Fid, Profile, StoppableThread
 from hax.util import ConsulUtil, repeat_if_fails
 
 __all__ = ['main']
@@ -42,19 +43,20 @@ HL_Fids = NamedTuple('HL_Fids', [('hax_ep', str), ('hax_fid', Fid),
 LOG = logging.getLogger('hax')
 
 
-def _run_qconsumer_thread(planner: WorkPlanner, motr: Motr,
-                          herald: DeliveryHerald, consul: ConsulUtil,
-                          idx: int) -> ConsumerThread:
-    thread = ConsumerThread(planner, motr, herald, consul, idx)
+def _run_thread(thread: StoppableThread) -> StoppableThread:
     thread.start()
     return thread
+
+
+def _run_qconsumer_thread(planner: WorkPlanner, motr: Motr,
+                          herald: DeliveryHerald, consul: ConsulUtil,
+                          idx: int) -> StoppableThread:
+    return _run_thread(ConsumerThread(planner, motr, herald, consul, idx))
 
 
 def _run_stats_updater_thread(motr: Motr,
-                              consul_util: ConsulUtil) -> FsStatsUpdater:
-    thread = FsStatsUpdater(motr, consul_util, interval_sec=30)
-    thread.start()
-    return thread
+                              consul_util: ConsulUtil) -> StoppableThread:
+    return _run_thread(FsStatsUpdater(motr, consul_util, interval_sec=30))
 
 
 @repeat_if_fails()
@@ -146,12 +148,14 @@ def main():
         rconfc_starter = _run_rconfc_starter_thread(motr, consul_util=util)
 
         stats_updater = _run_stats_updater_thread(motr, consul_util=util)
+        event_poller = _run_thread(EventPollingThread(planner, util))
         # [KN] This is a blocking call. It will work until the program is
         # terminated by signal
 
         server = ServerRunner(planner, herald, consul_util=util)
-        server.run(
-            threads_to_wait=[*consumer_threads, stats_updater, rconfc_starter])
+        server.run(threads_to_wait=[
+            *consumer_threads, stats_updater, rconfc_starter, event_poller
+        ])
     except Exception:
         LOG.exception('Exiting due to an exception')
     finally:
