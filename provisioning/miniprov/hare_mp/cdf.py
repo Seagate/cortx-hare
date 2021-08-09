@@ -30,12 +30,9 @@ class PoolHandle:
 
 
 class CdfGenerator:
-    def __init__(self,
-                 provider: ValueProvider,
-                 motr_provider: ValueProvider):
+    def __init__(self, provider: ValueProvider):
         super().__init__()
         self.provider = provider
-        self.motr_provider = motr_provider
 
     def _get_dhall_path(self) -> str:
         if P.exists(DHALL_PATH):
@@ -280,15 +277,10 @@ class CdfGenerator:
                 f'storage>cvg[{cvg}]>data_devices')], 'List Text')
         return data_devices
 
-    def _get_metadata_device(self, name: str, cvg: int, m0d: int) -> Text:
-        motr_store = self.motr_provider
-        metadata_device = Text(motr_store.get(
-            f'server>{name}>cvg[{cvg}]>m0d[{m0d}]>md_seg1'))
+    def _get_metadata_device(self, name: str, cvg: int) -> Text:
+        metadata_device = Text(f'/dev/vg_{name}_md{cvg+1}'
+                               f'/lv_raw_md{cvg+1}')
         return metadata_device
-
-    def _get_m0d_per_cvg(self, name: str, cvg: int) -> int:
-        motr_store = self.motr_provider
-        return len(motr_store.get(f'server>{name}>cvg[{cvg}]>m0d'))
 
     def _create_node(self, machine_id: str) -> NodeDesc:
         store = self.provider
@@ -302,20 +294,18 @@ class CdfGenerator:
                 allow_null=True))
         except TypeError:
             no_m0clients = 2
-        # Currently, there is 1 m0d per cvg.
         # We will create 1 IO service entry in CDF per cvg.
         # An IO service entry will use data devices from corresponding cvg.
-        # meta data device is taken from motr-hare shared store.
+        # meta data device is currently hardcoded.
         servers = DList([
             M0ServerDesc(
                 io_disks=DisksDesc(
-                    data=self._get_data_devices(machine_id, cvg),
+                    data=self._get_data_devices(machine_id, i),
                     meta_data=Maybe(
-                        self._get_metadata_device(name, cvg, m0d), 'Text')),
+                        self._get_metadata_device(name, i), 'Text')),
                 runs_confd=Maybe(False, 'Bool'))
-            for cvg in range(len(store.get(
+            for i in range(len(store.get(
                 f'server_node>{machine_id}>storage>cvg')))
-            for m0d in range(self._get_m0d_per_cvg(name, cvg))
         ], 'List M0ServerDesc')
 
         # Adding a Motr confd entry per server node in CDF.

@@ -31,7 +31,6 @@ from enum import Enum
 from sys import exit
 from time import sleep
 from typing import Any, Callable, Dict, List
-from urllib.parse import urlparse
 
 import yaml
 from cortx.utils.product_features import unsupported_features
@@ -480,13 +479,8 @@ def check_cluster_status(path_to_cdf: str):
     return 0
 
 
-def generate_cdf(url: str, motr_md_url: str) -> str:
-    # ConfStoreProvider creates an empty file, if file does not exist.
-    # So, we are validating the file is present or not.
-    if not os.path.isfile(urlparse(motr_md_url).path):
-        raise FileNotFoundError(f'config file: {motr_md_url} does not exist')
-    motr_provider = ConfStoreProvider(motr_md_url, index='motr_md')
-    generator = CdfGenerator(ConfStoreProvider(url), motr_provider)
+def generate_cdf(url: str) -> str:
+    generator = CdfGenerator(ConfStoreProvider(url))
     return generator.generate()
 
 
@@ -523,9 +517,7 @@ def config(args):
     try:
         url = args.config[0]
         filename = args.file[0] or '/var/lib/hare/cluster.yaml'
-        motr_md_path = '/opt/seagate/cortx/motr/conf/motr_hare_keys.json'
-        motr_md_url = 'json://' + motr_md_path
-        save(filename, generate_cdf(url, motr_md_url))
+        save(filename, generate_cdf(url))
         update_hax_unit('/usr/lib/systemd/system/hare-hax.service')
         generate_config(url, filename)
     except Exception as error:
