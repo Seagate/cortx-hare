@@ -98,12 +98,15 @@ class TestCDF(unittest.TestCase):
             #
             # the method will raise an exception if either
             # Dhall is unhappy or some values are not found in ConfStore
-            CdfGenerator(provider=store).generate()
+            cdf = CdfGenerator(provider=store, motr_provider=Mock())
+            cdf._get_m0d_per_cvg = Mock(return_value=1)
+            cdf.generate()
         finally:
             os.unlink(path)
 
     def test_it_works(self):
         store = ValueProvider()
+        motr_store = ValueProvider()
 
         def ret_values(value: str) -> Any:
             data = {
@@ -114,6 +117,8 @@ class TestCDF(unittest.TestCase):
                 'myhost',
                 'server_node>MACH_ID>network>data>interface_type':
                 'tcp',
+                'server_node>MACH_ID>network>data>private_fqdn':
+                    'srvnode-1.data.private',
                 'server_node>MACH_ID>storage>cvg[0]>data_devices':
                 ['/dev/sdb'],
                 'server_node>MACH_ID>storage>cvg[1]>data_devices':
@@ -158,10 +163,26 @@ class TestCDF(unittest.TestCase):
         store.get_machine_id = Mock(return_value='MACH_ID')
         store.get_storage_set_nodes = Mock(return_value=['MACH_ID'])
 
-        CdfGenerator(provider=store).generate()
+        def ret_motr_mdvalues(value: str) -> Any:
+            data = {
+                'server>myhost>cvg[0]>m0d':
+                ['/dev/vg_srvnode-1_md1/lv_raw_md1'],
+                'server>myhost>cvg[0]>m0d[0]>md_seg1':
+                '/dev/vg_srvnode-1_md1/lv_raw_md1',
+                'server>myhost>cvg[1]>m0d':
+                ['/dev/vg_srvnode-1_md2/lv_raw_md2'],
+                'server>myhost>cvg[1]>m0d[0]>md_seg1':
+                '/dev/vg_srvnode-1_md2/lv_raw_md2'
+            }
+            return data.get(value)
+
+        motr_store._raw_get = Mock(side_effect=ret_motr_mdvalues)
+
+        CdfGenerator(provider=store, motr_provider=motr_store).generate()
 
     def test_provided_values_respected(self):
         store = ValueProvider()
+        motr_store = ValueProvider()
 
         def ret_values(value: str) -> Any:
             data = {
@@ -188,6 +209,8 @@ class TestCDF(unittest.TestCase):
                 'server_node>MACH_ID>hostname':                'myhost',
                 'server_node>MACH_ID>name': 'mynodename',
                 'server_node>MACH_ID>network>data>interface_type':                'o2ib',
+                'server_node>MACH_ID>network>data>private_fqdn':
+                    'srvnode-1.data.private',
                 'server_node>MACH_ID>network>data>private_interfaces':                ['eth1', 'eno2'],
                 'server_node>MACH_ID>s3_instances':                1,
                 'cortx>software>motr>service>client_instances':                2,
@@ -198,15 +221,33 @@ class TestCDF(unittest.TestCase):
         store.get_machine_id = Mock(return_value='MACH_ID')
         store.get_storage_set_nodes = Mock(return_value=['MACH_ID'])
 
-        ret = CdfGenerator(provider=store)._create_node_descriptions()
+        def ret_motr_mdvalues(value: str) -> Any:
+            data = {
+                'server>mynodename>cvg[0]>m0d':
+                ['/dev/vg_srvnode-1_md1/lv_raw_md1'],
+                'server>mynodename>cvg[0]>m0d[0]>md_seg1':
+                '/dev/vg_srvnode-1_md1/lv_raw_md1',
+                'server>mynodename>cvg[1]>m0d':
+                ['/dev/vg_srvnode-1_md2/lv_raw_md2'],
+                'server>mynodename>cvg[1]>m0d[0]>md_seg1':
+                '/dev/vg_srvnode-1_md2/lv_raw_md2'
+            }
+            return data.get(value)
+
+        motr_store._raw_get = Mock(side_effect=ret_motr_mdvalues)
+
+        ret = CdfGenerator(provider=store,
+                           motr_provider=motr_store)._create_node_descriptions()
         self.assertIsInstance(ret, list)
         self.assertEqual(1, len(ret))
-        self.assertEqual(Text('myhost'), ret[0].hostname)
+        self.assertEqual(Text('srvnode-1.data.private'), ret[0].hostname)
         self.assertEqual(Text('eth1'), ret[0].data_iface)
         self.assertEqual(1, ret[0].s3_instances)
         self.assertEqual(2, ret[0].client_instances)
 
-        ret = CdfGenerator(provider=store)._create_pool_descriptions()
+
+        ret = CdfGenerator(provider=store,
+                           motr_provider=Mock())._create_pool_descriptions()
         self.assertIsInstance(ret, list)
         self.assertEqual(1, len(ret))
         self.assertEqual(Text('StorageSet-1__sns'), ret[0].name)
@@ -215,7 +256,8 @@ class TestCDF(unittest.TestCase):
         self.assertEqual(0, ret[0].parity_units)
         self.assertEqual(0, ret[0].spare_units.get())
         disk_refs = ret[0].disk_refs.value
-        self.assertEqual(Text('myhost'), disk_refs.value[0].node.value)
+        self.assertEqual(Text('srvnode-1.data.private'),
+                         disk_refs.value[0].node.value)
         self.assertEqual(Text('/dev/sdb'), disk_refs.value[0].path)
         self.assertEqual(0, ret[0].allowed_failures.value.site)
         self.assertEqual(0, ret[0].allowed_failures.value.rack)
@@ -223,7 +265,8 @@ class TestCDF(unittest.TestCase):
         self.assertEqual(0, ret[0].allowed_failures.value.ctrl)
         self.assertEqual(0, ret[0].allowed_failures.value.disk)
 
-        ret = CdfGenerator(provider=store)._create_profile_descriptions(ret)
+        ret = CdfGenerator(provider=store,
+                           motr_provider=Mock())._create_profile_descriptions(ret)
         self.assertIsInstance(ret, list)
         self.assertEqual(1, len(ret))
         self.assertEqual(Text('Profile_the_pool'), ret[0].name)
@@ -295,6 +338,8 @@ class TestCDF(unittest.TestCase):
                 'server_node>MACH_ID1>hostname':                'myhost',
                 'server_node>MACH_ID1>name': 'mynodename',
                 'server_node>MACH_ID1>network>data>interface_type':                'o2ib',
+                'server_node>MACH_ID1>network>data>private_fqdn':
+                    'srvnode-1.data.private',
                 'server_node>MACH_ID1>network>data>private_interfaces':                ['eth1', 'eno2'],
                 'server_node>MACH_ID1>s3_instances':                1,
                 'server_node>MACH_ID2>storage>cvg_count': '2',
@@ -305,6 +350,8 @@ class TestCDF(unittest.TestCase):
                 'server_node>MACH_ID2>hostname':                'myhost',
                 'server_node>MACH_ID2>name': 'mynodename',
                 'server_node>MACH_ID2>network>data>interface_type':                'o2ib',
+                'server_node>MACH_ID2>network>data>private_fqdn':
+                    'srvnode-2.data.private',
                 'server_node>MACH_ID2>network>data>private_interfaces':                ['eth1', 'eno2'],
                 'server_node>MACH_ID2>s3_instances':                1,
                 'server_node>MACH_ID3>storage>cvg_count': '2',
@@ -315,6 +362,8 @@ class TestCDF(unittest.TestCase):
                 'server_node>MACH_ID3>hostname':                'myhost',
                 'server_node>MACH_ID3>name': 'mynodename',
                 'server_node>MACH_ID3>network>data>interface_type':                'o2ib',
+                'server_node>MACH_ID3>network>data>private_fqdn':
+                    'srvnode-3.data.private',
                 'server_node>MACH_ID3>network>data>private_interfaces':                ['eth1', 'eno2'],
                 'server_node>MACH_ID3>s3_instances':                1,
             }
@@ -324,7 +373,8 @@ class TestCDF(unittest.TestCase):
         store.get_machine_id = Mock(return_value='MACH_ID1')
         store.get_storage_set_nodes = Mock(return_value=['MACH_ID1', 'MACH_ID2', 'MACH_ID3'])
 
-        ret = CdfGenerator(provider=store)._create_pool_descriptions()
+        ret = CdfGenerator(provider=store,
+                           motr_provider=Mock())._create_pool_descriptions()
         self.assertIsInstance(ret, list)
         return ret
 
@@ -357,6 +407,8 @@ class TestCDF(unittest.TestCase):
                 'myhost',
                 'server_node>srvnode_1>network>data>interface_type':
                 'o2ib',
+                'server_node>srvnode_1>network>data>private_fqdn':
+                    'srvnode-1.data.private',
                 'server_node>srvnode_1>network>data>private_interfaces':
                 ['eth1', 'eno2'],
                 'server_node>srvnode_1>s3_instances':
@@ -377,7 +429,9 @@ class TestCDF(unittest.TestCase):
         store._raw_get = Mock(side_effect=ret_values)
         store.get_machine_id = Mock(return_value='MACH_ID')
         store.get_storage_set_nodes = Mock(return_value=['MACH_ID'])
-        ret = CdfGenerator(provider=store).generate()
+        cdf = CdfGenerator(provider=store, motr_provider=Mock())
+        cdf._get_m0d_per_cvg = Mock(return_value=1)
+        cdf.generate()
 
     def test_invalid_storage_set_configuration_rejected(self):
         ''' This test case checks whether exception will be raise if total
@@ -435,7 +489,8 @@ class TestCDF(unittest.TestCase):
 
         with self.assertRaisesRegex(RuntimeError,
                                     r'Invalid storage set configuration'):
-            CdfGenerator(provider=store)._create_pool_descriptions()
+            CdfGenerator(provider=store,
+                         motr_provider=Mock())._create_pool_descriptions()
 
     def test_md_pool_ignored(self):
         store = ValueProvider()
@@ -480,7 +535,8 @@ class TestCDF(unittest.TestCase):
             return data.get(value)
 
         store._raw_get = Mock(side_effect=ret_values)
-        ret = CdfGenerator(provider=store)._create_pool_descriptions()
+        ret = CdfGenerator(provider=store,
+                           motr_provider=Mock())._create_pool_descriptions()
         self.assertEqual(0, len(ret))
 
     def test_dix_pool_uses_metadata_devices(self):
@@ -513,6 +569,8 @@ class TestCDF(unittest.TestCase):
                 'myhost',
                 'server_node>MACH_ID>network>data>interface_type':
                 'o2ib',
+                'server_node>MACH_ID>network>data>private_fqdn':
+                    'srvnode-1.data.private',
                 'server_node>MACH_ID>network>data>private_interfaces':
                 ['eth1', 'eno2'],
                 'server_node>MACH_ID>s3_instances':
@@ -535,7 +593,8 @@ class TestCDF(unittest.TestCase):
         store._raw_get = Mock(side_effect=ret_values)
         store.get_machine_id = Mock(return_value='MACH_ID')
         store.get_storage_set_nodes = Mock(return_value=['MACH_ID'])
-        ret = CdfGenerator(provider=store)._create_pool_descriptions()
+        ret = CdfGenerator(provider=store,
+                           motr_provider=Mock())._create_pool_descriptions()
         self.assertEqual(1, len(ret))
         diskrefs = ret[0].disk_refs.get()
         self.assertEqual(2, len(diskrefs))
@@ -575,6 +634,8 @@ class TestCDF(unittest.TestCase):
                 'myhost',
                 'server_node>MACH_ID>network>data>interface_type':
                 'o2ib',
+                'server_node>MACH_ID>network>data>private_fqdn':
+                    'srvnode-1.data.private',
                 'server_node>MACH_ID>network>data>private_interfaces':
                 ['eth1', 'eno2'],
                 'server_node>MACH_ID>s3_instances':
@@ -597,7 +658,8 @@ class TestCDF(unittest.TestCase):
         store._raw_get = Mock(side_effect=ret_values)
         store.get_machine_id = Mock(return_value='MACH_ID')
         store.get_storage_set_nodes = Mock(return_value=['MACH_ID'])
-        ret = CdfGenerator(provider=store)._create_pool_descriptions()
+        ret = CdfGenerator(provider=store,
+                           motr_provider=Mock())._create_pool_descriptions()
         self.assertEqual(['sns', 'dix'], [t.type.name for t in ret])
         self.assertEqual(['StorageSet-1__sns', 'StorageSet-1__dix'],
                          [t.name.s for t in ret])
@@ -612,6 +674,7 @@ class TestCDF(unittest.TestCase):
 
     def test_metadata_is_hardcoded(self):
         store = ValueProvider()
+        motr_store = ValueProvider()
 
         def ret_values(value: str) -> Any:
             data = {
@@ -622,9 +685,12 @@ class TestCDF(unittest.TestCase):
                 'myhost',
                 'server_node>MACH_ID>name': 'mynodename',
                 'server_node>MACH_ID>storage>cvg':
-                [{'data_devices': ['/dev/sdb'], 'metadata_devices': ['/dev/meta']}],
+                [{'data_devices': ['/dev/sdb'], 'metadata_devices': ['/dev/meta1']},
+                 {'data_devices': ['/dev/sdc'], 'metadata_devices': ['/dev/meta2']}],
                 'server_node>MACH_ID>storage>cvg[0]>data_devices':
                 ['/dev/sdb'],
+                'server_node>MACH_ID>storage>cvg[1]>data_devices':
+                ['/dev/sdc'],
                 'server_node>MACH_ID>network>data>private_interfaces':
                 ['eth1', 'eno2'],
                 'server_node>MACH_ID>s3_instances':
@@ -632,17 +698,38 @@ class TestCDF(unittest.TestCase):
                 'cortx>software>motr>service>client_instances':
                 2,
                 'server_node>MACH_ID>network>data>interface_type':
-                'o2ib'
+                'o2ib',
+                'server_node>MACH_ID>network>data>private_fqdn':
+                    'srvnode-1.data.private',
             }
             return data[value]
 
         store._raw_get = Mock(side_effect=ret_values)
 
-        ret = CdfGenerator(provider=store)._create_node_descriptions()
+        def ret_motr_mdvalues(value: str) -> Any:
+            data = {
+                'server>mynodename>cvg[0]>m0d':
+                ['/dev/vg_srvnode-1_md1/lv_raw_md1'],
+                'server>mynodename>cvg[0]>m0d[0]>md_seg1':
+                '/dev/vg_srvnode-1_md1/lv_raw_md1',
+                'server>mynodename>cvg[1]>m0d':
+                ['/dev/vg_srvnode-1_md2/lv_raw_md2'],
+                'server>mynodename>cvg[1]>m0d[0]>md_seg1':
+                '/dev/vg_srvnode-1_md2/lv_raw_md2'
+            }
+            return data.get(value)
+
+        motr_store._raw_get = Mock(side_effect=ret_motr_mdvalues)
+
+
+        ret = CdfGenerator(provider=store,
+                           motr_provider=motr_store)._create_node_descriptions()
         self.assertIsInstance(ret, list)
         self.assertEqual(1, len(ret))
-        self.assertEqual(Text('/dev/vg_mynodename_md1/lv_raw_md1'),
+        self.assertEqual(Text('/dev/vg_srvnode-1_md1/lv_raw_md1'),
                          (ret[0].m0_servers.value.value)[0].io_disks.meta_data.value)
+        self.assertEqual(Text('/dev/vg_srvnode-1_md2/lv_raw_md2'),
+                         (ret[0].m0_servers.value.value)[1].io_disks.meta_data.value)
 
 
     def test_multiple_nodes_supported(self):
@@ -667,6 +754,8 @@ class TestCDF(unittest.TestCase):
                 'server_node>MACH_ID>name': 'mynodename',
                 'server_node>MACH_ID>network>data>interface_type':
                 'o2ib',
+                'server_node>MACH_ID>network>data>private_fqdn':
+                    'srvnode-1.data.private',
                 'server_node>MACH_ID>network>data>private_interfaces':
                 ['eth1'],
                 'server_node>MACH_ID>s3_instances':
@@ -682,6 +771,8 @@ class TestCDF(unittest.TestCase):
                 'server_node>MACH_2_ID>name':                'host-2',
                 'server_node>MACH_2_ID>hostname':            'host-2',
                 'server_node>MACH_2_ID>network>data>interface_type':                'tcp',
+                'server_node>MACH_2_ID>network>data>private_fqdn':
+                    'srvnode-2.data.private',
                 'server_node>MACH_2_ID>network>data>private_interfaces':
                 ['eno1'],
                 'server_node>MACH_2_ID>s3_instances':                5,
@@ -697,14 +788,16 @@ class TestCDF(unittest.TestCase):
 
         store._raw_get = Mock(side_effect=ret_values)
 
-        ret = CdfGenerator(provider=store)._create_node_descriptions()
+        cdf = CdfGenerator(provider=store, motr_provider=Mock())
+        cdf._get_m0d_per_cvg = Mock(return_value=1)
+        ret = cdf._create_node_descriptions()
         self.assertIsInstance(ret, list)
         self.assertEqual(2, len(ret))
-        self.assertEqual(Text('myhost'), ret[0].hostname)
+        self.assertEqual(Text('srvnode-1.data.private'), ret[0].hostname)
         self.assertEqual(Text('eth1'), ret[0].data_iface)
         self.assertEqual(1, ret[0].s3_instances)
         self.assertEqual(2, ret[0].client_instances)
-        self.assertEqual(Text('host-2'), ret[1].hostname)
+        self.assertEqual(Text('srvnode-2.data.private'), ret[1].hostname)
         self.assertEqual(Text('eno1'), ret[1].data_iface)
         self.assertEqual(5, ret[1].s3_instances)
         self.assertEqual(2, ret[1].client_instances)
@@ -728,6 +821,8 @@ class TestCDF(unittest.TestCase):
                 ['/dev/sdb'],
                 'server_node>MACH_ID>network>data>interface_type':
                 None,
+                'server_node>MACH_ID>network>data>private_fqdn':
+                    'srvnode-1.data.private',
                 'server_node>MACH_ID>s3_instances':
                 1,
                 'cortx>software>motr>service>client_instances':
@@ -738,6 +833,7 @@ class TestCDF(unittest.TestCase):
             return data[value]
 
         store._raw_get = Mock(side_effect=ret_values)
-
-        ret = CdfGenerator(provider=store)._create_node_descriptions()
+        cdf = CdfGenerator(provider=store, motr_provider=Mock())
+        cdf._get_m0d_per_cvg = Mock(return_value=1)
+        ret = cdf._create_node_descriptions()
         self.assertEqual('None P', str(ret[0].data_iface_type))

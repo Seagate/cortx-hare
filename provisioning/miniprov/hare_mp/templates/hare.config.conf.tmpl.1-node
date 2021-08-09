@@ -7,7 +7,7 @@
       "storage_set": [
         {
           "durability": {
-            "sns": {
+            "TMPL_POOL_TYPE": {
               "data": "TMPL_DATA_UNITS_COUNT",
               "parity": "TMPL_PARITY_UNITS_COUNT",
               "spare": "TMPL_SPARE_UNITS_COUNT"
@@ -29,6 +29,7 @@
       "network": {
         "data": {
           "interface_type": "TMPL_DATA_INTERFACE_TYPE",
+          "private_fqdn": "TMPL_PRIVATE_FQDN",
           "private_interfaces": [
             "TMPL_PRIVATE_DATA_INTERFACE_1",
             "TMPL_PRIVATE_DATA_INTERFACE_2"
