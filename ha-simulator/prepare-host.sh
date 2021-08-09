@@ -25,9 +25,9 @@ cat <<EOF | sudo tee /etc/cortx/message_bus.conf > /dev/null
   "message_broker": {
     "type": "kafka",
     "message_bus": {
-      "recv_message_timeout": "100000",
-      "controller_socket_timeout": "100000",
-      "send_message_timeout": "100000"
+      "recv_message_timeout": "1000",
+      "controller_socket_timeout": "1000",
+      "send_message_timeout": "1000"
     },
     "cluster": [
       {

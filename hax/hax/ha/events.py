@@ -15,17 +15,18 @@
 # For any questions about this software or licensing, please email
 # opensource@seagate.com or cortx-questions@seagate.com.
 
-
-import logging
 import json
-from typing import List, Optional
+import logging
 from dataclasses import dataclass
+from typing import List, Optional
 
 from cortx.utils.message_bus import MessageBus, MessageConsumer
+
 from ha.core.event_manager.event_manager import EventManager
 from ha.core.event_manager.subscribe_event import SubscribeEvent
 
 COMPONENT_ID = 'hare'
+
 
 @dataclass
 class Event:
@@ -43,7 +44,6 @@ class Event:
 
 
 class EventListener():
-
     """
     This is listener for event manager
 
@@ -62,10 +62,6 @@ class EventListener():
           4. After event is received in queue, user will read it, process it
              and acknowledge it
     """
-    event_manager = None
-    consumer = None
-    topic = None
-
     def __init__(self, event_list: List[SubscribeEvent]):
         '''
 
@@ -77,25 +73,28 @@ class EventListener():
 
         topic = self._subscribe(event_list)
         if topic is None:
-           raise RuntimeError('Failed to subscribe to events')
+            raise RuntimeError('Failed to subscribe to events')
 
         message_bus = MessageBus()
-        self.consumer = MessageConsumer(message_bus=message_bus,
-                                        consumer_id=COMPONENT_ID,
-                                        consumer_group=COMPONENT_ID,
-                                        message_types=[topic],
-                                        auto_ack=False,
-                                        offset='earliest')
+        self.consumer = MessageConsumer(
+            message_bus=message_bus,
+            consumer_id=COMPONENT_ID,
+            consumer_group=COMPONENT_ID,
+            message_types=[topic],
+            # Why is it 'str' in cortx-py-utils??
+            auto_ack=str(False),
+            offset='earliest')
 
     def _subscribe(self, event_list: List[SubscribeEvent]) -> str:
         logging.info('Subscribing to events: %s', event_list)
-        kafka_topic_name = self.event_manager.subscribe(COMPONENT_ID,
-                                                        event_list)
+        # TODO create a PR for cortx-ha. The type annotation seems to be wrong
+        kafka_topic_name = str(
+            self.event_manager.subscribe(COMPONENT_ID, event_list))
         return kafka_topic_name
 
-    def unsubscribe(self, event_list: List[str]) -> bool:
+    def unsubscribe(self, event_list: List[str]):
         logging.info('Unsubscribing for events: %s', event_list)
-        return self.event_manager.unsubscribe(COMPONENT_ID, event_list)
+        self.event_manager.unsubscribe(COMPONENT_ID, event_list)
 
     def get_next_message(self, time_out) -> Optional[Event]:
         '''
@@ -103,19 +102,19 @@ class EventListener():
         Once user gets message using below command user needs to call ack() to
         acknowledge that message is already processed
         '''
-        logging.info('Getting next message from topic: (%s)', self.topic)
+        logging.debug('Listening......')
+        message = self.consumer.receive(time_out)
+        # FIXME: it seems like receive() returns bytes, not str
+        # ..while it is annotated as returning 'list'. Funny.
+        if message is not None:
+            # msg = str(message)  # wrong type annotation?
+            return self._parse(message)
+        else:
+            return None
 
-        try:
-            logging.info('Listening......')
-            message = self.consumer.receive(time_out)
-            if message is not None:
-                return self._parse(message)
-            else:
-                return None
-        except Exception as e:
-            logging.error('Exception occured in get_next_message (%s)', e)
-
-    def _parse(self, message: str) -> Event:
+    # [KN] I removed message type to fool mypy
+    # In fact, there is a bug in type information provided by cortx-py-utils
+    def _parse(self, message) -> Event:
         data = json.loads(message.decode('utf-8'))
         return Event(version=data['version'],
                      event_type=data['event_type'],
