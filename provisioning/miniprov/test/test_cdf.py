@@ -133,7 +133,7 @@ class TestCDF(unittest.TestCase):
                 ['/dev/meta'],
                 'server_node>MACH_ID>storage>cvg[1]>metadata_devices':
                 ['/dev/meta1'],
-                'server_node>MACH_ID>s3_instances':
+                'cortx>software>s3>service>instances':
                 1,
                 'cortx>software>motr>service>client_instances':
                 2,
@@ -212,7 +212,7 @@ class TestCDF(unittest.TestCase):
                 'server_node>MACH_ID>network>data>private_fqdn':
                     'srvnode-1.data.private',
                 'server_node>MACH_ID>network>data>private_interfaces':                ['eth1', 'eno2'],
-                'server_node>MACH_ID>s3_instances':                1,
+                'cortx>software>s3>service>instances':                1,
                 'cortx>software>motr>service>client_instances':                2,
             }
             return data.get(value)
@@ -341,7 +341,7 @@ class TestCDF(unittest.TestCase):
                 'server_node>MACH_ID1>network>data>private_fqdn':
                     'srvnode-1.data.private',
                 'server_node>MACH_ID1>network>data>private_interfaces':                ['eth1', 'eno2'],
-                'server_node>MACH_ID1>s3_instances':                1,
+                'cortx>software>s3>service>instances':                1,
                 'server_node>MACH_ID2>storage>cvg_count': '2',
                 'server_node>MACH_ID2>storage>cvg[0]>data_devices': ['/dev/sda', '/dev/sdb', '/dev/sdc', '/dev/sdd'],
                 'server_node>MACH_ID2>storage>cvg[1]>data_devices': ['/dev/sde', '/dev/sdf', '/dev/sdg', '/dev/sdh'],
@@ -353,7 +353,7 @@ class TestCDF(unittest.TestCase):
                 'server_node>MACH_ID2>network>data>private_fqdn':
                     'srvnode-2.data.private',
                 'server_node>MACH_ID2>network>data>private_interfaces':                ['eth1', 'eno2'],
-                'server_node>MACH_ID2>s3_instances':                1,
+                'cortx>software>s3>service>instances':                1,
                 'server_node>MACH_ID3>storage>cvg_count': '2',
                 'server_node>MACH_ID3>storage>cvg[0]>data_devices': ['/dev/sda', '/dev/sdb', '/dev/sdc', '/dev/sdd'],
                 'server_node>MACH_ID3>storage>cvg[1]>data_devices': ['/dev/sde', '/dev/sdf', '/dev/sdg', '/dev/sdh'],
@@ -365,7 +365,7 @@ class TestCDF(unittest.TestCase):
                 'server_node>MACH_ID3>network>data>private_fqdn':
                     'srvnode-3.data.private',
                 'server_node>MACH_ID3>network>data>private_interfaces':                ['eth1', 'eno2'],
-                'server_node>MACH_ID3>s3_instances':                1,
+                'cortx>software>s3>service>instances':                1,
             }
             return data.get(value)
 
@@ -411,7 +411,7 @@ class TestCDF(unittest.TestCase):
                     'srvnode-1.data.private',
                 'server_node>srvnode_1>network>data>private_interfaces':
                 ['eth1', 'eno2'],
-                'server_node>srvnode_1>s3_instances':
+                'cortx>software>s3>service>instances':
                 1,
                 'server_node>srvnode_1>storage>cvg_count':
                 2,
@@ -468,7 +468,7 @@ class TestCDF(unittest.TestCase):
                 'o2ib',
                 'server_node>MACH_ID>network>data>private_interfaces':
                 ['eth1', 'eno2'],
-                'server_node>MACH_ID>s3_instances':
+                'cortx>software>s3>service>instances':
                 1,
                 'server_node>MACH_ID>storage>cvg_count':
                 2,
@@ -523,7 +523,7 @@ class TestCDF(unittest.TestCase):
                 'o2ib',
                 'server_node>MACH_ID>network>data>private_interfaces':
                 ['eth1', 'eno2'],
-                'server_node>MACH_ID>s3_instances':
+                'cortx>software>s3>service>instances':
                 1,
                 'cortx>software>motr>service>client_instances':
                 2,
@@ -573,7 +573,7 @@ class TestCDF(unittest.TestCase):
                     'srvnode-1.data.private',
                 'server_node>MACH_ID>network>data>private_interfaces':
                 ['eth1', 'eno2'],
-                'server_node>MACH_ID>s3_instances':
+                'cortx>software>s3>service>instances':
                 1,
                 'server_node>MACH_ID>storage>cvg_count':
                 2,
@@ -638,7 +638,7 @@ class TestCDF(unittest.TestCase):
                     'srvnode-1.data.private',
                 'server_node>MACH_ID>network>data>private_interfaces':
                 ['eth1', 'eno2'],
-                'server_node>MACH_ID>s3_instances':
+                'cortx>software>s3>service>instances':
                 1,
                 'server_node>MACH_ID>storage>cvg_count':
                 2,
@@ -693,7 +693,7 @@ class TestCDF(unittest.TestCase):
                 ['/dev/sdc'],
                 'server_node>MACH_ID>network>data>private_interfaces':
                 ['eth1', 'eno2'],
-                'server_node>MACH_ID>s3_instances':
+                'cortx>software>s3>service>instances':
                 1,
                 'cortx>software>motr>service>client_instances':
                 2,
@@ -758,7 +758,7 @@ class TestCDF(unittest.TestCase):
                     'srvnode-1.data.private',
                 'server_node>MACH_ID>network>data>private_interfaces':
                 ['eth1'],
-                'server_node>MACH_ID>s3_instances':
+                'cortx>software>s3>service>instances':
                 1,
                 'cortx>software>motr>service>client_instances':
                 2,
@@ -775,7 +775,7 @@ class TestCDF(unittest.TestCase):
                     'srvnode-2.data.private',
                 'server_node>MACH_2_ID>network>data>private_interfaces':
                 ['eno1'],
-                'server_node>MACH_2_ID>s3_instances':                5,
+                'cortx>software>s3>service>instances':                1,
                 'cortx>software>motr>service>client_instances':                2,
                 'server_node>MACH_2_ID>storage>cvg':
                 [{'data_devices': ['/dev/sdb'], 'metadata_devices': ['/dev/meta']}],
@@ -799,7 +799,7 @@ class TestCDF(unittest.TestCase):
         self.assertEqual(2, ret[0].client_instances)
         self.assertEqual(Text('srvnode-2.data.private'), ret[1].hostname)
         self.assertEqual(Text('eno1'), ret[1].data_iface)
-        self.assertEqual(5, ret[1].s3_instances)
+        self.assertEqual(1, ret[1].s3_instances)
         self.assertEqual(2, ret[1].client_instances)
         self.assertEqual('Some (P.o2ib)', str(ret[0].data_iface_type))
         self.assertEqual('Some (P.tcp)', str(ret[1].data_iface_type))
@@ -823,7 +823,7 @@ class TestCDF(unittest.TestCase):
                 None,
                 'server_node>MACH_ID>network>data>private_fqdn':
                     'srvnode-1.data.private',
-                'server_node>MACH_ID>s3_instances':
+                'cortx>software>s3>service>instances':
                 1,
                 'cortx>software>motr>service>client_instances':
                 2,
