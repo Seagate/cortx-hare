@@ -1,0 +1,15 @@
+output-format: json
+strictness: medium
+test-warnings: true
+doc-warnings: false
+member-warnings: false
+inherits:
+  - default
+ignore-paths:
+  - docs
+autodetect: true
+max-line-length: 80
+
+pep257:
+  disable:
+    - D212
