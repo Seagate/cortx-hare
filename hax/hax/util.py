@@ -651,9 +651,15 @@ class ConsulUtil:
         #                         "state": "M0_NC_UNKNOWN"}
         node_items = self.kv.kv_get('m0conf/nodes', recurse=True)
         for item in node_items:
+            key = item['Key']
+            key_split = key.split('/')
+            if len(key_split) != 3:
+                # Although we make a recurse scan, we don't need anything
+                # deeper than 1 level down (see Example above).
+                continue
             item_value = json.loads(item['Value'])
             if 'name' in item_value and item_value['name'] == node:
-                node_fid: str = str(item['Key'].split('/')[2])
+                node_fid: str = str(key_split[2])
                 return Fid.parse(node_fid)
         return None
 
