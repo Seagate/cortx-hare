@@ -23,7 +23,6 @@ import re
 from typing import List, NamedTuple
 
 from hax.filestats import FsStatsUpdater
-from hax.ha.thread import EventPollingThread
 from hax.handler import ConsumerThread
 from hax.log import setup_logging
 from hax.motr import Motr
@@ -34,6 +33,7 @@ from hax.motr.rconfc import RconfcStarter
 from hax.server import ServerRunner
 from hax.types import Fid, Profile, StoppableThread
 from hax.util import ConsulUtil, repeat_if_fails
+from hax.ha import create_ha_thread
 
 __all__ = ['main']
 
@@ -148,7 +148,7 @@ def main():
         rconfc_starter = _run_rconfc_starter_thread(motr, consul_util=util)
 
         stats_updater = _run_stats_updater_thread(motr, consul_util=util)
-        event_poller = _run_thread(EventPollingThread(planner, util))
+        event_poller = _run_thread(create_ha_thread(planner, util))
         # [KN] This is a blocking call. It will work until the program is
         # terminated by signal
 
