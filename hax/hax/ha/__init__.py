@@ -15,3 +15,39 @@
 # For any questions about this software or licensing,
 # please email opensource@seagate.com or cortx-questions@seagate.com.
 #
+"""Module for cortx-ha integration."""
+
+import logging
+
+from hax.motr.planner import WorkPlanner
+from hax.types import StoppableThread
+from hax.util import ConsulUtil
+
+__all__ = ['create_ha_thread']
+
+LOG = logging.getLogger('hax')
+
+
+class StubEventThread(StoppableThread):
+    """Stub implementation of EventPollingThread.
+
+    The class is used as a Null Object pattern in cases when
+    cortx-ha types can't be imported. The only aim of this thread
+    is to log the corresponding message and exit gracefully.
+    """
+    def __init__(self):
+        super().__init__(target=self._execute, name='ha-event-listener')
+
+    def _execute(self):
+        LOG.info('cortx-ha component is not present. HaX will '
+                 'contunie working without HA integration')
+
+
+def create_ha_thread(planner: WorkPlanner,
+                     util: ConsulUtil) -> StoppableThread:
+    """Creates the proper HA-aware thread, handling possible import errors."""
+    try:
+        from .thread import EventPollingThread
+        return EventPollingThread(planner, util)
+    except ImportError:
+        return StubEventThread()
