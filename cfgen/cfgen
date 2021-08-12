@@ -1349,7 +1349,7 @@ class ConfPool(ToDhall):
         encls_nr = len(cluster_encls(m0conf))
         ctrls_per_encl = floor(len(cluster_ctrls(m0conf)) / encls_nr)
         encl_failures = encls_nr - 1
-        ctrl_failures = ctrls_per_encl * encl_failures
+        ctrl_failures = min(encl_failures, (ctrls_per_encl * encl_failures))
         return Failures(0, 0, encl_failures, ctrl_failures, encl_failures)
 
     @classmethod
