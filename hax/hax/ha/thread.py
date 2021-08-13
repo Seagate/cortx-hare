@@ -33,18 +33,16 @@ LOG = logging.getLogger('hax')
 
 
 class EventPollingThread(StoppableThread):
-
-    '''
-    Thread which polls the HA events from Kafka by means of EventListenerr
+    """
+    Thread which polls the HA events from Kafka by means of EventListener
     class.
-    '''
+    """
     def __init__(self,
                  planner: WorkPlanner,
                  consul: ConsulUtil,
                  listener: Optional[EventListener] = None,
                  interval_sec: float = 1.0):
-        '''Constructor.'''
-
+        """Constructor."""
         super().__init__(target=self._execute,
                          name='ha-event-listener',
                          args=())
@@ -111,6 +109,14 @@ class EventPollingThread(StoppableThread):
             LOG.debug("Error details:", exc_info=True)
 
     def _create_listener(self) -> EventListener:
-        # TODO: how to stop propagating HA types like this SubscribeEvent
-        # throughout hax sources?
-        return EventListener([SubscribeEvent('node', ['offline', 'online'])])
+        host = self.cns.get_local_nodename()
+        group = f'hare_{host}'
+        # group_id stands to Kafka group of consumers
+        #
+        # Here we make sure that different hax instances use different groups.
+        # That means that ack's executed from one hax instance will not affect
+        # the messages that another hax instance receives (so every hax reads
+        # the whole history of messages even if they process the messages with
+        # different speed).
+        return EventListener([SubscribeEvent('node', ['offline', 'online'])],
+                             group_id=group)
