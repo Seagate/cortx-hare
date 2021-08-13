@@ -62,12 +62,13 @@ class EventListener():
           4. After event is received in queue, user will read it, process it
              and acknowledge it
     """
-    def __init__(self, event_list: List[SubscribeEvent]):
-        '''
-
-        We will subscribe to events passes as 'event_list'.
-        We will also create consumer for events
-        '''
+    def __init__(self,
+                 event_list: List[SubscribeEvent],
+                 group_id: str = COMPONENT_ID):
+        """
+        event_list - list of events to subscribe to.
+        group_id - the group_id to pass to KafkaConsumer.
+        """
         logging.debug('Inside EventListener')
         self.event_manager = EventManager.get_instance()
 
@@ -79,7 +80,7 @@ class EventListener():
         self.consumer = MessageConsumer(
             message_bus=message_bus,
             consumer_id=COMPONENT_ID,
-            consumer_group=COMPONENT_ID,
+            consumer_group=group_id,
             message_types=[topic],
             # Why is it 'str' in cortx-py-utils??
             auto_ack=str(False),
@@ -97,11 +98,11 @@ class EventListener():
         self.event_manager.unsubscribe(COMPONENT_ID, event_list)
 
     def get_next_message(self, time_out) -> Optional[Event]:
-        '''
+        """
         Listen for events from event manager
         Once user gets message using below command user needs to call ack() to
         acknowledge that message is already processed
-        '''
+        """
         logging.debug('Listening......')
         message = self.consumer.receive(time_out)
         # FIXME: it seems like receive() returns bytes, not str
@@ -129,10 +130,10 @@ class EventListener():
                      timestamp=data['timestamp'])
 
     def ack(self):
-        '''
+        """
         1. This method will commit last read message offset for confirming
            which messages the consumer has already processed
         2. Consumer will read message using 'listen' and will acknowledge
            that message using ack method
-        '''
+        """
         self.consumer.ack()
