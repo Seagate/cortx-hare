@@ -664,6 +664,19 @@ class ConsulUtil:
         return None
 
     @repeat_if_fails()
+    def get_node_name_by_fid(self, node_fid: Fid) -> Optional[str]:
+        """
+        Returns the node name by its FID value or None if the given FID doesn't
+        correspond to any node.
+        """
+        node_data = self.kv.kv_get(f'm0conf/nodes/{node_fid}')
+        if node_data:
+            parsed = json.loads(node_data['Value'])
+            name: str = parsed['name']
+            return name
+        return None
+
+    @repeat_if_fails()
     def get_node_ctrl_fids(self, node: str) -> Optional[List[Fid]]:
         """
         Parameters:
