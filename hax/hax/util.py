@@ -22,7 +22,7 @@ import os
 import re
 from base64 import b64encode
 from functools import wraps
-from typing import Any, Dict, List, NamedTuple, Optional, Tuple
+from typing import Any, Dict, List, NamedTuple, Optional, Tuple, Callable
 from hax.log import TRACE
 from threading import Event
 from time import sleep
@@ -36,7 +36,8 @@ from urllib3.exceptions import HTTPError
 from hax.exception import HAConsistencyException, InterruptedException
 from hax.types import (ConfHaProcess, Fid, FsStatsWithTime,
                        ObjT, ServiceHealth, Profile, m0HaProcessEvent,
-                       m0HaProcessType, KeyDelete, HaNoteStruct)
+                       m0HaProcessType, KeyDelete, HaNoteStruct,
+                       m0HaObjState)
 
 __all__ = ['ConsulUtil', 'create_process_fid', 'create_service_fid',
            'create_sdev_fid', 'create_drive_fid']
@@ -531,6 +532,14 @@ class ConsulUtil:
 
     @repeat_if_fails()
     def get_conf_obj_status(self, obj_t: ObjT, fidk: int) -> int:
+
+        device_obj_types: Dict[str, Callable[[ObjT, int], int]] = {
+            ObjT.SDEV.name:  self.get_sdev_state,
+            ObjT.DRIVE.name: self.get_sdev_state,
+            ObjT.NODE.name: self.get_node_state,
+            ObjT.ENCLOSURE.name: self.get_encl_state,
+            ObjT.CONTROLLER.name: self.get_ctrl_state
+        }
         obj_state: int = HaNoteStruct.M0_NC_ONLINE
         if obj_t.name in (ObjT.PROCESS.name, ObjT.SERVICE.name):
             # 'node/<node_name>/process/<process_fidk>/service/type'
@@ -550,8 +559,9 @@ class ConsulUtil:
 
         if obj_t.name in (ObjT.PROCESS.name, ObjT.SERVICE.name):
             obj_state = self.get_proc_svc_conf_obj_status(obj_t, fidk)
-        elif obj_t.name in (ObjT.SDEV.name, ObjT.DRIVE.name):
-            obj_state = self.get_sdev_state(obj_t, fidk)
+
+        elif obj_t.name in device_obj_types:
+            obj_state = device_obj_types[obj_t.name](obj_t, fidk)
 
         return obj_state
 
@@ -842,6 +852,135 @@ class ConsulUtil:
                 encl_fid: str = match_result.group(1)
                 return Fid.parse(encl_fid)
         return None
+
+    def get_device_ha_state(self, status: ServiceHealth) -> str:
+
+        device_ha_state_map = {
+            ServiceHealth.UNKNOWN: m0HaObjState.M0_NC_UNKNOWN,
+            ServiceHealth.OK: m0HaObjState.M0_NC_ONLINE,
+            ServiceHealth.OFFLINE: m0HaObjState.M0_NC_TRANSIENT,
+            ServiceHealth.FAILED: m0HaObjState.M0_NC_FAILED}
+        return device_ha_state_map[status].name
+
+    @repeat_if_fails()
+    def set_node_state(self, node_fid: Fid, status: ServiceHealth) -> None:
+        # Example,
+        # {
+        #    "key": "m0conf/nodes/0x6e00000000000001:0x3",
+        #    "value": "{\"name\": \"srvnode-1.data.private\",
+        #               \"state\": \"M0_NC_UNKNOWN\"}"
+        # }
+        node_items = self.kv.kv_get('m0conf/nodes', recurse=True)
+        regex = re.compile(
+            f'^m0conf/nodes/{node_fid}$')
+        for node in node_items:
+            match_result = re.match(regex, node['Key'])
+            if not match_result:
+                continue
+            value = json.loads(node['Value'])
+            value['state'] = self.get_device_ha_state(status)
+            LOG.debug('Setting node=%s in KV with state=%s',
+                      node_fid, value['state'])
+            self.kv.kv_put(node['Key'], json.dumps(value))
+
+    @repeat_if_fails()
+    def set_encl_state(self, encl_fid: Fid, status: ServiceHealth) -> None:
+        # Example,
+        # {
+        #    "key": "m0conf/sites/0x5300000000000001:0x1/
+        #            racks/0x6100000000000001:0x2/encls/
+        #            0x6500000000000001:0x4",
+        #    "value": "{\"node\": \"0x6e00000000000001:0x3\",
+        #               \"state\": \"M0_NC_UNKNOWN\"}"
+        # }
+        node_items = self.get_all_sites()
+        regex = re.compile(
+            f'^m0conf\\/.*\\/{encl_fid}$')
+        for encl in node_items:
+            match_result = re.match(regex, encl['Key'])
+            if not match_result:
+                continue
+            value = json.loads(encl['Value'])
+            value['state'] = self.get_device_ha_state(status)
+            LOG.debug('Setting enclosure=%s in KV with state=%s',
+                      encl_fid, value['state'])
+            self.kv.kv_put(encl['Key'], json.dumps(value))
+
+    @repeat_if_fails()
+    def set_ctrl_state(self, ctrl_fid: Fid, status: ServiceHealth) -> None:
+        # Example,
+        # {
+        #    "key": "m0conf/sites/0x5300000000000001:0x1/
+        #            racks/0x6100000000000001:0x2/encls/
+        #            0x6500000000000001:0x4/ctrls/
+        #            0x6300000000000001:0x5",
+        #    "value": "{\"state\": \"M0_NC_UNKNOWN\"}"
+        # }
+        ctrl_items = self.get_all_sites()
+        regex = re.compile(f'^m0conf\\/.*\\/ctrls/{ctrl_fid}$')
+        for ctrl in ctrl_items:
+            match_result = re.match(regex, ctrl['Key'])
+            if not match_result:
+                continue
+            value = json.loads(ctrl['Value'])
+            value['state'] = self.get_device_ha_state(status)
+            LOG.debug('Setting ctrl=%s in KV with state=%s',
+                      ctrl_fid, value['state'])
+            self.kv.kv_put(ctrl['Key'], json.dumps(value))
+
+    @repeat_if_fails()
+    def get_ctrl_state(self, obj_t: ObjT, fidk: int) -> int:
+        assert obj_t.value == ObjT.CONTROLLER.value
+        ctrl_fid = mk_fid(ObjT.CONTROLLER, fidk)
+        ctrl_items = self.get_all_sites()
+        regex = re.compile(f'^m0conf\\/.*\\/ctrls/{ctrl_fid}$')
+        for ctrl in ctrl_items:
+            match_result = re.match(regex, ctrl['Key'])
+            if not match_result:
+                continue
+            val = json.loads(ctrl['Value'])
+            state = val['state']
+            LOG.debug('Controller=%s state=%s', ctrl_fid, state)
+            if state in (m0HaObjState.M0_NC_ONLINE.name,
+                         m0HaObjState.M0_NC_TRANSIENT.name,
+                         m0HaObjState.M0_NC_FAILED.name):
+                return m0HaObjState.parse(state)
+        return m0HaObjState.M0_NC_ONLINE
+
+    @repeat_if_fails()
+    def get_encl_state(self, obj_t: ObjT, fidk: int) -> int:
+        assert obj_t.value == ObjT.ENCLOSURE.value
+        encl_fid = mk_fid(ObjT.ENCLOSURE, fidk)
+        encl_items = self.get_all_sites()
+        regex = re.compile(f'^m0conf\\/.*\\/encls/{encl_fid}$')
+
+        for encl in encl_items:
+            match_result = re.match(regex, encl['Key'])
+            if not match_result:
+                continue
+            val = json.loads(encl['Value'])
+            state = val['state']
+            LOG.debug('Enclosure=%s state=%s', encl_fid, state)
+            if state in (m0HaObjState.M0_NC_ONLINE.name,
+                         m0HaObjState.M0_NC_TRANSIENT.name,
+                         m0HaObjState.M0_NC_FAILED.name):
+                return m0HaObjState.parse(state)
+        return m0HaObjState.M0_NC_ONLINE
+
+    @repeat_if_fails()
+    def get_node_state(self, obj_t: ObjT, fidk: int) -> int:
+        assert obj_t.value == ObjT.NODE.value
+        node_fid = mk_fid(ObjT.NODE, fidk)
+        node = self.kv.kv_get(f'm0conf/nodes/{node_fid}', recurse=False)
+        if node:
+            val = json.loads(node['Value'])
+            state = val['state']
+            LOG.debug('Node=%s state=%s', node_fid, state)
+            if state in (m0HaObjState.M0_NC_ONLINE.name,
+                         m0HaObjState.M0_NC_TRANSIENT.name,
+                         m0HaObjState.M0_NC_FAILED.name):
+                return m0HaObjState.parse(state)
+        return m0HaObjState.M0_NC_ONLINE
 
     @staticmethod
     def _to_canonical_service_data(service: Dict[str, Any]) -> ServiceData:

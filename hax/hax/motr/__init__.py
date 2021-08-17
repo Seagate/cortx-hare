@@ -311,6 +311,7 @@ class Motr:
             if st.fid.container == ObjT.DRIVE.value:
                 self.consul_util.update_drive_state([st.fid], st.status)
             elif st.fid.container == ObjT.NODE.value:
+                self.consul_util.set_node_state(st.fid, st.status)
                 notes += self.add_enclosing_devices_by_node(st.fid, st.status)
         if not notes:
             return []
@@ -440,6 +441,9 @@ class Motr:
             new_state: ServiceHealth
             ) -> List[HaNoteStruct]:
 
+        # Update the node state in consul kv.
+        self.consul_util.set_node_state(node_fid, new_state)
+
         state_int = new_state.to_ha_note_status()
         return [
             HaNoteStruct(no_id=node_fid.to_c(), no_state=state_int)
@@ -462,16 +466,25 @@ class Motr:
                   node_fid, encl_fid, ctrl_fids, new_state)
 
         state_int = new_state.to_ha_note_status()
+        # Update the enclosure state based on the event.
+        self.consul_util.set_encl_state(encl_fid, new_state)
+
+        # Update the states of all the controllers as failed, in case of
+        # node failure event.
+        if new_state == ServiceHealth.FAILED and ctrl_fids:
+            for x in ctrl_fids:
+                self.consul_util.set_ctrl_state(x, new_state)
+
         notes = []
         if encl_fid:
             notes = [
                 HaNoteStruct(no_id=encl_fid.to_c(), no_state=state_int)
             ]
-
         if ctrl_fids:
             for x in ctrl_fids:
-                notes.append(HaNoteStruct(no_id=x.to_c(), no_state=state_int))
-
+                ctrl_state = self.consul_util.get_ctrl_state(
+                    ObjT.CONTROLLER, x.key)
+                notes.append(HaNoteStruct(no_id=x.to_c(), no_state=ctrl_state))
         return notes
 
     def notify_node_status_by_process(
@@ -484,6 +497,16 @@ class Motr:
                   proc_fid, new_state)
 
         node = self.consul_util.get_process_node(proc_fid)
+
+        if new_state == ServiceHealth.OK:
+            # Node can have multiple controllers. Node can be online, with
+            # a single controller running online.
+            # If we receive process 'OK', only the process state is
+            # updated. So, we need to update the corresponding
+            # controller state.
+            ctrl_fid = self.consul_util.get_ioservice_ctrl_fid(proc_fid)
+            if ctrl_fid:
+                self.consul_util.set_ctrl_state(ctrl_fid, new_state)
 
         node_fid = self.consul_util.get_node_fid(node)
         notes = self.add_node_state_by_fid(node_fid, new_state)
@@ -503,6 +526,9 @@ class Motr:
         ctrl_fid = self.consul_util.get_ioservice_ctrl_fid(proc_fid)
 
         if ctrl_fid:
+            # Update controller state in consul kv.
+            self.consul_util.set_ctrl_state(
+                ctrl_fid, ServiceHealth.from_ha_note_state(new_state))
             return HaNoteStruct(no_id=ctrl_fid.to_c(), no_state=new_state)
         return None
 

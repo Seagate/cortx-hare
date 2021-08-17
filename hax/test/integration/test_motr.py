@@ -351,6 +351,11 @@ def test_broadcast_node_failure(mocker, motr, consul_util):
                   json.dumps({
                       "name": "ios",
                       "state": "failed"
+                  })),
+                 ('m0conf/nodes/0x6e00000000000001:0x3',
+                  json.dumps({
+                      "name": "localhost",
+                      "state": "M0_NC_FAILED"
                   }))]
             ]
         elif key == 'm0conf/sites' and recurse:
@@ -359,11 +364,11 @@ def test_broadcast_node_failure(mocker, motr, consul_util):
                 [('m0conf/sites/0x5300000000000001:0x1/racks'
                   '/0x6100000000000001:0x2/encls/0x6500000000000001:0x4'
                   '/ctrls/0x6300000000000001:0x5',
-                  json.dumps({"state": "M0_NC_UNKNOWN"})),
+                  json.dumps({"state": "M0_NC_FAILED"})),
                  ('m0conf/sites/0x5300000000000001:0x1/racks'
                   '/0x6100000000000001:0x2/encls/0x6500000000000001:0x4'
                   '/ctrls/0x6300000000000001:0x6',
-                  json.dumps({"state": "M0_NC_UNKNOWN"}))]
+                  json.dumps({"state": "M0_NC_FAILED"}))]
             ]
         elif (key == 'm0conf/nodes/0x6e00000000000001:0x3'
               '/processes' and recurse):
@@ -447,6 +452,7 @@ def test_broadcast_node_failure(mocker, motr, consul_util):
     mocker.patch.object(consul_util,
                         'get_node_fid',
                         return_value=Fid(0x6e00000000000001, 0x3))
+
     mocker.patch.object(consul_util,
                         'get_node_encl_fid',
                         return_value=Fid(0x6500000000000001, 0x4))
