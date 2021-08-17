@@ -299,10 +299,10 @@ class Motr:
                 is_node_failed = self.is_node_failed(note)
                 if (st.status == ServiceHealth.FAILED
                         and is_node_failed):
-                    notes += self.notify_node_status(note)
+                    notes += self.notify_node_status_by_process(note)
                 elif (st.status == ServiceHealth.OK
                         and not is_node_failed):
-                    notes += self.notify_node_status(note)
+                    notes += self.notify_node_status_by_process(note)
                 else:
                     ctrl_note = self.get_ctrl_status(note)
                     if ctrl_note is not None:
@@ -310,6 +310,8 @@ class Motr:
 
             if st.fid.container == ObjT.DRIVE.value:
                 self.consul_util.update_drive_state([st.fid], st.status)
+            elif st.fid.container == ObjT.NODE.value:
+                notes += self.add_enclosing_devices_by_node(st.fid, st.status)
         if not notes:
             return []
         message_ids: List[MessageId] = self._ffi.ha_broadcast(
@@ -419,9 +421,50 @@ class Motr:
                                                no_state=dstate))
         return drive_ha_notes
 
-    def notify_node_status(self,
-                           proc_note: HaNoteStruct) -> List[HaNoteStruct]:
-        new_state = proc_note.no_state
+    def add_node_state_by_fid(
+            self,
+            node_fid: Fid,
+            new_state: ServiceHealth
+            ) -> List[HaNoteStruct]:
+
+        state_int = new_state.value
+        return [
+            HaNoteStruct(no_id=node_fid.to_c(), no_state=state_int)
+        ]
+
+    def add_enclosing_devices_by_node(
+            self,
+            node_fid: Fid,
+            new_state: ServiceHealth,
+            node: Optional[str] = None) -> List[HaNoteStruct]:
+        """
+        Returns the list of HA notes with the state derived
+        from the given node. The node is not included into the resulting list.
+        """
+
+        node = node or self.consul_util.get_node_name_by_fid(node_fid)
+        encl_fid = self.consul_util.get_node_encl_fid(node)
+        ctrl_fids = self.consul_util.get_node_ctrl_fids(node)
+        LOG.debug('node_fid: %s encl_fid: %s ctrl_fids: %s with state: %s',
+                  node_fid, encl_fid, ctrl_fids, new_state)
+
+        state_int = new_state.value
+        notes = []
+        if encl_fid:
+            notes = [
+                HaNoteStruct(no_id=encl_fid.to_c(), no_state=state_int)
+            ]
+
+        if ctrl_fids:
+            for x in ctrl_fids:
+                notes.append(HaNoteStruct(no_id=x.to_c(), no_state=state_int))
+
+        return notes
+
+    def notify_node_status_by_process(
+            self, proc_note: HaNoteStruct) -> List[HaNoteStruct]:
+        # proc_note.no_state is of int type
+        new_state = ServiceHealth(proc_note.no_state)
         proc_fid = Fid.from_struct(proc_note.no_id)
         assert ObjT.PROCESS.value == proc_fid.container
         LOG.debug('Notifying node status for process_fid=%s state=%s',
@@ -430,20 +473,10 @@ class Motr:
         node = self.consul_util.get_process_node(proc_fid)
 
         node_fid = self.consul_util.get_node_fid(node)
-        encl_fid = self.consul_util.get_node_encl_fid(node)
-        ctrl_fids = self.consul_util.get_node_ctrl_fids(node)
-        LOG.debug('node_fid: %s encl_fid: %s ctrl_fids: %s with state: %s',
-                  node_fid, encl_fid, ctrl_fids, new_state)
-
-        notes = []
-        if node_fid and encl_fid:
-            notes = [HaNoteStruct(no_id=x.to_c(), no_state=new_state)
-                     for x in [node_fid, encl_fid]]
-
-        if ctrl_fids:
-            for x in ctrl_fids:
-                notes.append(HaNoteStruct(no_id=x.to_c(), no_state=new_state))
-
+        notes = self.add_node_state_by_fid(node_fid, new_state)
+        notes += self.add_enclosing_devices_by_node(node_fid,
+                                                    new_state,
+                                                    node=node)
         return notes
 
     def get_ctrl_status(self,
