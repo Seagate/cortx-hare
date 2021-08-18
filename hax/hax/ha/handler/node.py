@@ -17,6 +17,7 @@
 #
 
 import logging
+from typing import Dict
 
 from hax.ha.events import Event
 from hax.ha.handler import EventHandler
@@ -26,6 +27,14 @@ from hax.types import HAState, ServiceHealth
 from hax.util import ConsulUtil
 
 LOG = logging.getLogger('hax')
+
+__all__ = ['NodeEventHandler']
+
+statusMap: Dict[str, ServiceHealth] = {
+    'online': ServiceHealth.OK,
+    'offline': ServiceHealth.OFFLINE,
+    'failed': ServiceHealth.FAILED,
+}
 
 
 class NodeEventHandler(EventHandler):
@@ -55,10 +64,5 @@ class NodeEventHandler(EventHandler):
             ],
                               reply_to=None))
 
-    def _get_status_by_text(self, status: str):
-        if status == 'online':
-            return ServiceHealth.OK
-        elif status == 'offline':
-            return ServiceHealth.FAILED
-        else:
-            return ServiceHealth.UNKNOWN
+    def _get_status_by_text(self, status: str) -> ServiceHealth:
+        return statusMap.get(status, ServiceHealth.UNKNOWN)
