@@ -15,11 +15,7 @@ if [[ ! -f /etc/cortx/ha/ha.conf ]]; then
   sudo cp -f docker/etc/ha.conf /etc/cortx/ha/ha.conf
 fi
 
-#if [[ -f /etc/cortx/message_bus.conf ]]; then
-  #echo '/etc/cortx/message_bus.conf already exists. Please rename or remove it' >&2
-  #exit 1
-#fi
-
+HOST=$(hostname)
 cat <<EOF | sudo tee /etc/cortx/message_bus.conf > /dev/null
 {
   "message_broker": {
@@ -31,7 +27,7 @@ cat <<EOF | sudo tee /etc/cortx/message_bus.conf > /dev/null
     },
     "cluster": [
       {
-        "server": "ssc-vm-g2-rhev4-0175.colo.seagate.com",
+        "server": "${HOST}",
         "port": "9093"
       }
     ]
