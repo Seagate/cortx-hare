@@ -1,4 +1,4 @@
-from ha.core.action_handler.action_handler import NodeFailureActionHandler
+from ha.core.action_handler.action_handler import NodeActionHandler
 from ha.core.event_manager.event_manager import EventManager
 from ha.core.event_manager.subscribe_event import SubscribeEvent
 from ha.core.system_health.const import HEALTH_STATUSES
@@ -16,7 +16,7 @@ def main():
     # (just to make sure that the message will be sent)
     EventManager.get_instance().subscribe(
         component, [SubscribeEvent(resource_type, [state])])
-    handler = NodeFailureActionHandler()
+    handler = NodeActionHandler()
 
     event = HealthEvent("event_id", HEALTH_STATUSES.OFFLINE.value, "severity",
                         "1", "1", "e766bd52-c19c-45b6-9c91-663fd8203c2e",
