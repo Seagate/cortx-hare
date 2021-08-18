@@ -118,5 +118,6 @@ class EventPollingThread(StoppableThread):
         # the messages that another hax instance receives (so every hax reads
         # the whole history of messages even if they process the messages with
         # different speed).
-        return EventListener([SubscribeEvent('node', ['offline', 'online'])],
-                             group_id=group)
+        return EventListener(
+            [SubscribeEvent('node', ['offline', 'online', 'failed'])],
+            group_id=group)
