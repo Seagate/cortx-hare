@@ -25,9 +25,6 @@ services:
       - KAFKA_INTER_BROKER_LISTENER_NAME=CLIENT
     depends_on:
       - zookeeper
-  consul:
-    image: consul:latest
-    command: "agent -server -bootstrap -retry-join \"127.0.0.1\" -client 0.0.0.0"
 
   emitter:
     build:
