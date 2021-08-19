@@ -1,1 +1,159 @@
-{}
+{
+  "cluster": {
+    "TMPL_CLUSTER_ID": {
+      "site": {
+        "storage_set_count": "TMPL_STORAGESET_COUNT"
+      },
+      "storage_set": [
+        {
+          "durability": {
+            "TMPL_POOL_TYPE": {
+              "data": "TMPL_DATA_UNITS_COUNT",
+              "parity": "TMPL_PARITY_UNITS_COUNT",
+              "spare": "TMPL_SPARE_UNITS_COUNT"
+            }
+          },
+          "name": "TMPL_STORAGESET_NAME",
+          "server_nodes": [
+            "TMPL_MACHINE_ID_1",
+            "TMPL_MACHINE_ID_2",
+            "TMPL_MACHINE_ID_3"
+          ]
+        }
+      ]
+    }
+  },
+  "cortx": {
+    "software": {
+      "motr": {
+        "service": {
+          "client_instances": "2"
+        }
+      },
+      "s3": {
+        "service": {
+          "instances": "TMPL_S3SERVER_INSTANCES_COUNT"
+        }
+      }
+    }
+  },
+  "server_node": {
+    "TMPL_MACHINE_ID_1": {
+      "cluster_id": "TMPL_CLUSTER_ID",
+      "hostname": "TMPL_HOSTNAME",
+      "name": "TMPL_SERVER_NODE_NAME",
+      "network": {
+        "data": {
+          "interface_type": "TMPL_DATA_INTERFACE_TYPE",
+          "private_fqdn": "TMPL_PRIVATE_FQDN_1",
+          "private_interfaces": [
+            "TMPL_PRIVATE_DATA_INTERFACE_1",
+            "TMPL_PRIVATE_DATA_INTERFACE_2"
+          ]
+        }
+      },
+      "storage_set_id": "TMPL_STORAGE_SET_ID",
+      "storage": {
+        "cvg_count": "TMPL_CVG_COUNT",
+        "cvg": [
+          {
+            "data_devices": [
+              "TMPL_DATA_DEVICE_11",
+              "TMPL_DATA_DEVICE_12"
+            ],
+            "metadata_devices": [
+              "TMPL_METADATA_DEVICE_1"
+            ]
+          },
+          {
+            "data_devices": [
+              "TMPL_DATA_DEVICE_21",
+              "TMPL_DATA_DEVICE_22"
+            ],
+            "metadata_devices": [
+              "TMPL_METADATA_DEVICE_2"
+            ]
+          }
+        ]
+      }
+    },
+    "TMPL_MACHINE_ID_2": {
+      "cluster_id": "TMPL_CLUSTER_ID",
+      "hostname": "TMPL_HOSTNAME",
+      "name": "TMPL_SERVER_NODE_NAME",
+      "network": {
+        "data": {
+          "interface_type": "TMPL_DATA_INTERFACE_TYPE",
+          "private_fqdn": "TMPL_PRIVATE_FQDN_2",
+          "private_interfaces": [
+            "TMPL_PRIVATE_DATA_INTERFACE_1",
+            "TMPL_PRIVATE_DATA_INTERFACE_2"
+          ]
+        }
+      },
+      "storage_set_id": "TMPL_STORAGE_SET_ID",
+      "storage": {
+        "cvg_count": "TMPL_CVG_COUNT",
+        "cvg": [
+          {
+            "data_devices": [
+              "TMPL_DATA_DEVICE_11",
+              "TMPL_DATA_DEVICE_12"
+            ],
+            "metadata_devices": [
+              "TMPL_METADATA_DEVICE_1"
+            ]
+          },
+          {
+            "data_devices": [
+              "TMPL_DATA_DEVICE_21",
+              "TMPL_DATA_DEVICE_22"
+            ],
+            "metadata_devices": [
+              "TMPL_METADATA_DEVICE_2"
+            ]
+          }
+        ]
+      }
+    },
+    "TMPL_MACHINE_ID_3": {
+      "cluster_id": "TMPL_CLUSTER_ID",
+      "hostname": "TMPL_HOSTNAME",
+      "name": "TMPL_SERVER_NODE_NAME",
+      "network": {
+        "data": {
+          "interface_type": "TMPL_DATA_INTERFACE_TYPE",
+          "private_fqdn": "TMPL_PRIVATE_FQDN_3",
+          "private_interfaces": [
+            "TMPL_PRIVATE_DATA_INTERFACE_1",
+            "TMPL_PRIVATE_DATA_INTERFACE_2"
+          ]
+        }
+      },
+      "storage_set_id": "TMPL_STORAGE_SET_ID",
+      "storage": {
+        "cvg_count": "TMPL_CVG_COUNT",
+        "cvg": [
+          {
+            "data_devices": [
+              "TMPL_DATA_DEVICE_11",
+              "TMPL_DATA_DEVICE_12"
+            ],
+            "metadata_devices": [
+              "TMPL_METADATA_DEVICE_1"
+            ]
+          },
+          {
+            "data_devices": [
+              "TMPL_DATA_DEVICE_21",
+              "TMPL_DATA_DEVICE_22"
+            ],
+            "metadata_devices": [
+              "TMPL_METADATA_DEVICE_2"
+            ]
+          }
+        ]
+      }
+    }
+  }
+}
