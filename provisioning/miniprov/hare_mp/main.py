@@ -227,9 +227,8 @@ def init(args):
         enable_hare_consul_agent()
         exit(rc)
     except Exception as error:
-        logging.error('Error while initializing the cluster (%s)', error)
         shutdown_cluster()
-        exit(-1)
+        raise RuntimeError(f'Error while initializing cluster :key={error}')
 
 
 def test(args):
@@ -281,9 +280,13 @@ def test_IVT(args):
 
 def reset(args):
     try:
-        rc = 0
-
-        exit(rc)
+        # In motr reset, motr clean up the motr and IO tests generated data.
+        # But to restart the cluster, hare init needed to be called.
+        # As a part of motr reset, we need to mkfs and start m0d services,
+        # motr wants hare to start it through hare init.
+        # So its not actually cluster start but it is services start.
+        init(args)
+        exit(0)
     except Exception as error:
         logging.error('Error during reset (%s)', error)
         exit(-1)
@@ -314,6 +317,7 @@ def kv_cleanup():
 def pre_factory():
     logging.info('Executing pre-factory cleanup command...')
     deployment_logs_cleanup()
+    motr_cleanup()
 
 
 def cleanup(args):
@@ -356,6 +360,19 @@ def deployment_logs_cleanup():
 
     except Exception as error:
         raise RuntimeError(f'Error during deployment log cleanup: key={error}')
+
+
+def motr_cleanup():
+    try:
+        logging.info('Cleaning up motr directory(/var/motr/hax)')
+        os.system('rm -rf /var/motr/hax')
+        logging.info('Cleaning up sysconfig files(/etc/sysconfig/m0d-*)')
+        os.system('rm -rf /etc/sysconfig/m0d-0x7200000000000001*')
+        logging.info('Cleaning up sysconfig files(/etc/sysconfig/s3server-*)')
+        os.system('rm -rf /etc/sysconfig/s3server-0x7200000000000001*')
+
+    except Exception as error:
+        raise RuntimeError(f'Error during motr cleanup: key={error}')
 
 
 def generate_support_bundle(args):
@@ -657,11 +674,11 @@ def main():
                                nargs='?',
                                help='Target directory; defaults to /tmp/hare.')
 
-    add_subcommand(subparser,
-                   'reset',
-                   help_str='Resets temporary Hare data and configuration',
-                   handler_fn=reset,
-                   config_required=False)
+    add_file_argument(
+        add_subcommand(subparser,
+                       'reset',
+                       help_str='Resets temporary Hare data and configuration',
+                       handler_fn=reset))
 
     add_factory_argument(
         add_subcommand(
