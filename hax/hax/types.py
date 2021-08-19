@@ -216,15 +216,35 @@ class HaLinkMessagePromise:
 
 
 class ServiceHealth(Enum):
-    FAILED = 0
-    OK = 1
-    UNKNOWN = 2
-    OFFLINE = 3
-    STOPPED = 4
+    FAILED = (0, HaNoteStruct.M0_NC_FAILED)
+    OK = (1, HaNoteStruct.M0_NC_ONLINE)
+    UNKNOWN = (2, HaNoteStruct.M0_NC_UNKNOWN)
+    OFFLINE = (3, HaNoteStruct.M0_NC_TRANSIENT)
+    STOPPED = (4, HaNoteStruct.M0_NC_TRANSIENT)
 
     def __repr__(self):
         """Return human-readable constant name (useful in log output)."""
         return self.name
+
+    @staticmethod
+    def from_ha_note_state(state: int) -> 'ServiceHealth':
+        """
+        Converts the int constant from HaNoteStruct into the corresponding
+        ServiceHealth.
+        """
+        for i in list(ServiceHealth):
+            (_, note) = i.value
+            if note == state:
+                return i
+        return ServiceHealth.UNKNOWN
+
+    def to_ha_note_status(self) -> int:
+        """
+        Converts the given ServiceHealth to the most suitable HaNoteStruct
+        status.
+        """
+        ha_note: int = self.value[1]
+        return ha_note
 
 
 HAState = NamedTuple('HAState', [('fid', Fid), ('status', ServiceHealth)])
