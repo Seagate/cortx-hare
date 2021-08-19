@@ -427,7 +427,7 @@ class Motr:
             new_state: ServiceHealth
             ) -> List[HaNoteStruct]:
 
-        state_int = new_state.value
+        state_int = new_state.to_ha_note_status()
         return [
             HaNoteStruct(no_id=node_fid.to_c(), no_state=state_int)
         ]
@@ -448,7 +448,7 @@ class Motr:
         LOG.debug('node_fid: %s encl_fid: %s ctrl_fids: %s with state: %s',
                   node_fid, encl_fid, ctrl_fids, new_state)
 
-        state_int = new_state.value
+        state_int = new_state.to_ha_note_status()
         notes = []
         if encl_fid:
             notes = [
@@ -464,7 +464,7 @@ class Motr:
     def notify_node_status_by_process(
             self, proc_note: HaNoteStruct) -> List[HaNoteStruct]:
         # proc_note.no_state is of int type
-        new_state = ServiceHealth(proc_note.no_state)
+        new_state = ServiceHealth.from_ha_note_state(proc_note.no_state)
         proc_fid = Fid.from_struct(proc_note.no_id)
         assert ObjT.PROCESS.value == proc_fid.container
         LOG.debug('Notifying node status for process_fid=%s state=%s',
