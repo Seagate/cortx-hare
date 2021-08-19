@@ -30,7 +30,7 @@ LOG = logging.getLogger('hax')
 
 __all__ = ['NodeEventHandler']
 
-statusMap: Dict[str, ServiceHealth] = {
+status_map: Dict[str, ServiceHealth] = {
     'online': ServiceHealth.OK,
     'offline': ServiceHealth.OFFLINE,
     'failed': ServiceHealth.FAILED,
@@ -65,4 +65,4 @@ class NodeEventHandler(EventHandler):
                               reply_to=None))
 
     def _get_status_by_text(self, status: str) -> ServiceHealth:
-        return statusMap.get(status, ServiceHealth.UNKNOWN)
+        return status_map.get(status, ServiceHealth.UNKNOWN)
