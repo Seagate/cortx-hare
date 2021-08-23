@@ -1,0 +1,2 @@
+support_bundle:
+  - /opt/seagate/cortx/hare/bin/hare_setup support_bundle
