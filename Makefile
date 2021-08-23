@@ -246,7 +246,8 @@ install: install-dirs install-cfgen install-hax install-miniprov install-systemd
 	@$(call _log,copying m0trace-prune -> $(ETC_CRON_DIR))
 	@install utils/m0trace-prune $(ETC_CRON_DIR)
 	@for f in provisioning/miniprov/hare_mp/templates/hare.* \
-		  provisioning/setup.yaml ; do \
+		  provisioning/setup.yaml \
+                provisioning/support.yaml ; do \
 	     $(call _log,copying $$f -> $(MINIPROV_TMPL_DIR)); \
 	     install $$f $(MINIPROV_TMPL_DIR); \
 	 done
