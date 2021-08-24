@@ -24,7 +24,7 @@ from typing import Dict, List
 import pkg_resources
 import pytest
 from hare_mp.cdf import CdfGenerator
-from hare_mp.store import ConfStoreProvider
+from hare_mp.store import ConfStoreProvider, ValueProvider
 
 
 def substitute(content: str, replacement: Dict[str, str]) -> str:
@@ -60,10 +60,12 @@ def is_content_ok(content: str, mocker) -> bool:
 
         store = ConfStoreProvider(f'json://{path}')
         mocker.patch.object(store, 'get_machine_id', return_value='machine-id')
+        motr_store = ValueProvider()
+        mocker.patch.object(motr_store, '_raw_get', return_value='/dev/dummy')
         #
         # the method will raise an exception if either
         # Dhall is unhappy or some values are not found in ConfStore
-        CdfGenerator(provider=store).generate()
+        CdfGenerator(provider=store, motr_provider=motr_store).generate()
         return True
 
     finally:
