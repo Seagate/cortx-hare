@@ -283,12 +283,14 @@ class CCoverage(Strategy):
         :param report_dir: destination directory where report generated
         """
         self.cov_report_type: str = cov_report_type
-        self.report_dir = report_dir
+        self.utils = Utility()
+        self.abs_path = self.utils.get_abs_hare_home_path()
+        self.report_dir = self.abs_path + report_dir
         self.report = self.report_dir + sep
         self.report += (
             "html_report" if self.cov_report_type == "html"
-            else "coverage.xml")
-        self.utils = Utility()
+            else "c_coverage.xml")
+
         logging.info("Running C Coverage Tool.")
 
     def cleanup(self) -> None:
@@ -296,28 +298,49 @@ class CCoverage(Strategy):
         Cleaning up old coverage reports.
         :return: None
         """
-        pass
+        logging.info("Cleaning up the report.")
+        try:
+            if self.utils.is_file_system_node_exist(self.report) is True:
+                self.utils.run_cmd(f"rm -rf {self.report}")
+        except Exception as e:
+            logging.error(f"Error {e} while cleanup.")
 
     def run_ut(self) -> None:
         """
         Execute unit testcases.
         :return: None
         """
-        pass
+        logging.info("Running unit tests.")
+        dir_scanner = DirectoryScanner("test")
+        for test_dir_path in dir_scanner.search_dir(self.abs_path):
+            out: str = self.utils.run_cmd(f"pytest {test_dir_path}")
+            logging.info(f"Testcase Results:\n{out}")
 
     def run_coverage(self) -> None:
         """
         Running coverage tool over UTs.
         :return: None
         """
-        pass
+        logging.info("Running Coverage.")
+        command_line: str = f"gcovr -r {self.abs_path}hax{sep} --xml-pretty " \
+                            f"-o {self.report}"
+        self.utils.run_cmd(command_line)
 
     def check_report(self) -> None:
         """
         Validate the report generated
         :return: None
         """
-        pass
+        logging.info("Verify report.")
+        if self.utils.is_file_system_node_exist(self.report) is True:
+            logging.info("Python Code Coverage Report generated successfully "
+                         f"at {self.report!a}.")
+        else:
+            raise FailedToGenerateReport("Failed to generate the Coverage"
+                                         " report. Please check error logs"
+                                         f" at '{getcwd()}{sep}coverage.log'")
+        out: str = self.utils.run_cmd(f"gcovr -r {self.abs_path}hax/")
+        logging.info(f"C Coverage report:\n%s", out)
 
 
 class Executor:

@@ -153,6 +153,21 @@ def get_requirements():
     return result
 
 
+def get_extra_compile_args():
+    """Set coverage flags by reading coverage environment else not."""
+    if os.environ.get('ENV_COVERAGE') == "true":
+        return [x for x in get_motr_cflags() +
+                ['-fPIC', "-fprofile-arcs", "-ftest-coverage"]]
+    return [x for x in get_motr_cflags() + ['-fPIC']]
+
+
+def get_libraries():
+    """Link coverage library by reading coverage environment else not."""
+    if os.environ.get('ENV_COVERAGE') == "true":
+        return ['motr', 'gcov']
+    return ['motr']
+
+
 reqs = get_requirements()
 
 setup(
@@ -174,7 +189,7 @@ setup(
             define_macros=[('M0_INTERNAL', ''), ('M0_EXTERN', 'extern')],
             library_dirs=[get_motr_libs_dir()],
             runtime_library_dirs=[get_motr_libs_dir()],
-            libraries=['motr'],
-            extra_compile_args=[x for x in get_motr_cflags() + ['-fPIC']])
+            libraries=get_libraries(),
+            extra_compile_args=get_extra_compile_args())
     ],
 )

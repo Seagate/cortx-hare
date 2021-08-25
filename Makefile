@@ -35,6 +35,7 @@ help:
 	@echo '  check          - run `flake8` and `mypy` linters for Python code'
 	@echo '  flake8         - run `flake8` for Python code'
 	@echo '  mypy           - run `mypy` for Python code'
+	@echo '  gcov           - check and install `gcov` tool'
 	@echo
 	@echo 'Distribution targets:'
 	@echo '  rpm            - build release rpm package'
@@ -488,7 +489,14 @@ uninstall:
 PYTHON_SCRIPTS := $(shell grep 'python3' -n utils/* 2>/dev/null | grep ':1:' | sed 's/^\([^:]*\):.*$$/\1/g')
 
 .PHONY: check
-check: check-cfgen check-hax check-miniprov flake8 mypy
+check: check-cfgen check-hax check-miniprov flake8 mypy gcov
+
+.PHONY: gcov
+gcov:
+	@$(call _info, Checking gcov package.)
+	@if [ -z $(COV_BIN) ]; then \
+	$(call _log, install gcov required for coverage analysis); \
+	 fi
 
 .PHONY: check-cfgen
 check-cfgen: $(PY_VENV_DIR)
