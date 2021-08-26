@@ -37,7 +37,7 @@ in
       , named.Natural "mem_limit_rss" memsize_KiB
       , named.Natural "mem_limit_stack" memsize_KiB
       , named.Natural "mem_limit_memlock" memsize_KiB
-      , named.Text "endpoint" (./Endpoint.dhall x.endpoint)
+      , named.Text "endpoint" (./LibfabricEndpoint.dhall x.endpoint)
       , named.Oids "services" x.services
       ]
  ++ ")"

@@ -25,6 +25,6 @@ in
 { id : Oid
 , nr_cpu : Natural
 , memsize_MB : Natural
-, endpoint : ./Endpoint.dhall
+, endpoint : ./LibfabricEndpoint.dhall
 , services : List Oid
 }

@@ -42,6 +42,7 @@ from hare_mp.cdf import CdfGenerator
 from hare_mp.store import ConfStoreProvider
 from hare_mp.systemd import HaxUnitTransformer
 from hare_mp.validator import Validator
+from hare_mp.utils import execute, Utils
 
 # Logger details
 LOG_DIR = "/var/log/seagate/hare/hare_deployment/"
@@ -55,22 +56,6 @@ class Plan(Enum):
     Full = 'full'
     Performance = 'performance'
     Scalability = 'scalability'
-
-
-def execute(cmd: List[str], env=None) -> str:
-    process = subprocess.Popen(cmd,
-                               stdin=subprocess.PIPE,
-                               stdout=subprocess.PIPE,
-                               stderr=subprocess.PIPE,
-                               encoding='utf8',
-                               env=env)
-    out, err = process.communicate()
-    if process.returncode:
-        raise Exception(
-            f'Command {cmd} exited with error code {process.returncode}. '
-            f'Command output: {err}')
-
-    return out
 
 
 def create_logger_directory():
@@ -207,6 +192,13 @@ def enable_hare_consul_agent() -> None:
 def disable_hare_consul_agent() -> None:
     cmd = ['systemctl', 'disable', 'hare-consul-agent']
     execute(cmd)
+
+
+def prepare(args):
+    url = args.config[0]
+    utils = Utils(ConfStoreProvider(url))
+    utils.save_node_facts()
+    utils.save_drives_info()
 
 
 def init(args):
@@ -525,14 +517,19 @@ def save(filename: str, contents: str) -> None:
 
 
 def generate_config(url: str, path_to_cdf: str) -> None:
+    utils = Utils(ConfStoreProvider(url))
     conf_dir = '/var/lib/hare'
     path = os.getenv('PATH')
     if path:
         path += os.pathsep + '/opt/seagate/cortx/hare/bin/'
     python_path = os.pathsep.join(sys.path)
-    cmd = ['cfgen', '-o', conf_dir, path_to_cdf]
-    execute(cmd, env={'PYTHONPATH': python_path, 'PATH': path})
-
+    cmd = ['configure', '-c', conf_dir, path_to_cdf]
+    execute(cmd, env={'PYTHONPATH': python_path, 'PATH': path,
+                      'LC_ALL': "en_US.utf-8", 'LANG': "en_US.utf-8"})
+    utils.import_kv(conf_dir)
+    cmd = ['update-consul-conf']
+    execute(cmd, env={'PYTHONPATH': python_path, 'PATH': path,
+                      'LC_ALL': "en_US.utf-8", 'LANG': "en_US.utf-8"})
     conf = ConfStoreProvider(url)
     hostname = conf.get_hostname()
     save(f'{conf_dir}/node-name', hostname)
@@ -691,7 +688,7 @@ def main():
     add_subcommand(subparser,
                    'prepare',
                    help_str='Validates configuration pre-requisites',
-                   handler_fn=noop)
+                   handler_fn=prepare)
 
     add_subcommand(subparser,
                    'pre-upgrade',

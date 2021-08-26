@@ -21,6 +21,7 @@
 import os
 import tempfile
 import unittest
+import json
 from typing import Any
 from unittest.mock import Mock
 
@@ -28,9 +29,11 @@ import pkg_resources
 
 from hare_mp.cdf import CdfGenerator
 from hare_mp.store import ConfStoreProvider, ValueProvider
-from hare_mp.types import (DisksDesc, DList, M0Clients, M0ServerDesc, Maybe,
+from hare_mp.types import (DisksDesc, Disk, DList, M0Clients, M0ServerDesc, Maybe,
                            MissingKeyError, PoolDesc, PoolType, Protocol, Text,
                            AllowedFailures, Layout)
+from hare_mp.utils import Utils
+from hax.util import KVAdapter
 
 
 class TestTypes(unittest.TestCase):
@@ -94,11 +97,66 @@ class TestCDF(unittest.TestCase):
                 f.write(self._get_confstore_template())
 
             store = ConfStoreProvider(f'json://{path}')
+            def new_kv(key: str, val: str):
+                return {
+                    'Key': key,
+                    'CreateIndex': 1793,
+                    'ModifyIndex': 1793,
+                    'LockIndex': 0,
+                    'Flags': 0,
+                        'Value': val,
+                    'Session': ''
+                }
+
+
             store.get_machine_id = Mock(return_value='1114a50a6bf6f9c93ebd3c49d07d3fd4')
+            store.get_storage_set_nodes = Mock(return_value=['1114a50a6bf6f9c93ebd3c49d07d3fd4'])
+            utils = Utils(store)
+            kv = KVAdapter()
+            def my_get(key: str, recurse: bool = False):
+                if key == 'srvnode-1.data.private/dev/sda':
+                    return new_kv('srvnode-1.data.private/dev/sda',
+                                  json.dumps({"path": "/dev/sda",
+                                              "size": "4096000",
+                                              "blksize": "4096"}))
+                elif key == 'srvnode-1.data.private/dev/sdb':
+                    return new_kv('srvnode-1.data.private/dev/sdb',
+                                  json.dumps({"path": "/dev/sdb",
+                                              "size": "4096000",
+                                              "blksize": "4096"}))
+                elif key == 'srvnode-1.data.private/dev/sdc':
+                    return new_kv('srvnode-1.data.private/dev/sdc',
+                                  json.dumps({"path": "/dev/sdc",
+                                              "size": "4096000",
+                                              "blksize": "4096"}))
+                elif key == 'srvnode-1.data.private/dev/sdg':
+                    return new_kv('srvnode-1.data.private/dev/sdg',
+                                  json.dumps({"path": "/dev/sdg",
+                                              "size": "4096000",
+                                              "blksize": "4096"}))
+                elif key == 'srvnode-1.data.private/dev/sdh':
+                    return new_kv('srvnode-1.data.private/dev/sdh',
+                                  json.dumps({"path": "/dev/sdh",
+                                              "size": "4096000",
+                                              "blksize": "4096"}))
+                elif key == 'srvnode-1.data.private/dev/sdi':
+                    return new_kv('srvnode-1.data.private/dev/sdi',
+                                  json.dumps({"path": "/dev/sdi",
+                                              "size": "4096000",
+                                              "blksize": "4096"}))
+                elif key == 'srvnode-1.data.private/facts':
+                    return new_kv('srvnode-1.data.private/facts',
+                                  json.dumps({"processorcount": "16",
+                                              "memorysize_mb": "4096.123"}))
+                raise RuntimeError(f'Unexpected call: key={key}, recurse={recurse}')
+
+            kv.kv_get = my_get
+            utils.kv = kv
             #
             # the method will raise an exception if either
             # Dhall is unhappy or some values are not found in ConfStore
             cdf = CdfGenerator(provider=store, motr_provider=Mock())
+            cdf.utils = utils
             cdf._get_m0d_per_cvg = Mock(return_value=1)
             cdf.generate()
         finally:
@@ -107,6 +165,17 @@ class TestCDF(unittest.TestCase):
     def test_it_works(self):
         store = ValueProvider()
         motr_store = ValueProvider()
+        def new_kv(key: str, val: str):
+            return {
+                'Key': key,
+                'CreateIndex': 1793,
+                'ModifyIndex': 1793,
+                'LockIndex': 0,
+                'Flags': 0,
+                'Value': val,
+                'Session': ''
+            }
+
 
         def ret_values(value: str) -> Any:
             data = {
@@ -162,6 +231,27 @@ class TestCDF(unittest.TestCase):
         store._raw_get = Mock(side_effect=ret_values)
         store.get_machine_id = Mock(return_value='MACH_ID')
         store.get_storage_set_nodes = Mock(return_value=['MACH_ID'])
+        utils = Utils(store)
+        kv = KVAdapter()
+        def my_get(key: str, recurse: bool = False):
+            if key == 'srvnode-1.data.private/dev/sdb':
+                return new_kv('srvnode-1.data.private/dev/sdb',
+                              json.dumps({"path": "/dev/sdb",
+                                          "size": "4096000",
+                                          "blksize": "4096"}))
+            elif key == 'srvnode-1.data.private/dev/sdc':
+                return new_kv('srvnode-1.data.private/dev/sdc',
+                              json.dumps({"path": "/dev/sdb",
+                                          "size": "4096000",
+                                          "blksize": "4096"}))
+            elif key == 'srvnode-1.data.private/facts':
+                return new_kv('srvnode-1.data.private/facts',
+                              json.dumps({"processorcount": "16",
+                                          "memorysize_mb": "4096.123"}))
+            raise RuntimeError(f'Unexpected call: key={key}, recurse={recurse}')
+
+        kv.kv_get = my_get
+        utils.kv = kv
 
         def ret_motr_mdvalues(value: str) -> Any:
             data = {
@@ -178,11 +268,25 @@ class TestCDF(unittest.TestCase):
 
         motr_store._raw_get = Mock(side_effect=ret_motr_mdvalues)
 
-        CdfGenerator(provider=store, motr_provider=motr_store).generate()
+        cdf = CdfGenerator(provider=store, motr_provider=motr_store)
+        cdf.utils = utils
+        cdf.generate()
 
     def test_provided_values_respected(self):
         store = ValueProvider()
         motr_store = ValueProvider()
+        def new_kv(key: str, val: str):
+            return {
+                'Key': key,
+                'CreateIndex': 1793,
+                'ModifyIndex': 1793,
+                'LockIndex': 0,
+                'Flags': 0,
+                'Value': val,
+                'Session': ''
+            }
+
+
 
         def ret_values(value: str) -> Any:
             data = {
@@ -220,6 +324,27 @@ class TestCDF(unittest.TestCase):
         store._raw_get = Mock(side_effect=ret_values)
         store.get_machine_id = Mock(return_value='MACH_ID')
         store.get_storage_set_nodes = Mock(return_value=['MACH_ID'])
+        utils = Utils(store)
+        kv = KVAdapter()
+        def my_get(key: str, recurse: bool = False):
+            if key == 'srvnode-1.data.private/dev/sdb':
+                return new_kv('srvnode-1.data.private/dev/sdb',
+                              json.dumps({"path": "/dev/sdb",
+                                          "size": "4096000",
+                                          "blksize": "4096"}))
+            elif key == 'srvnode-1.data.private/dev/sdc':
+                return new_kv('srvnode-1.data.private/dev/sdc',
+                              json.dumps({"path": "/dev/sdb",
+                                          "size": "4096000",
+                                          "blksize": "4096"}))
+            elif key == 'srvnode-1.data.private/facts':
+                return new_kv('srvnode-1.data.private/facts',
+                              json.dumps({"processorcount": "16",
+                                          "memorysize_mb": "4096.123"}))
+            raise RuntimeError(f'Unexpected call: key={key}, recurse={recurse}')
+
+        kv.kv_get = my_get
+        utils.kv = kv
 
         def ret_motr_mdvalues(value: str) -> Any:
             data = {
@@ -236,8 +361,11 @@ class TestCDF(unittest.TestCase):
 
         motr_store._raw_get = Mock(side_effect=ret_motr_mdvalues)
 
-        ret = CdfGenerator(provider=store,
-                           motr_provider=motr_store)._create_node_descriptions()
+        cdf = CdfGenerator(provider=store,
+                           motr_provider=motr_store)
+        cdf.utils = utils
+        ret = cdf._create_node_descriptions()
+
         self.assertIsInstance(ret, list)
         self.assertEqual(1, len(ret))
         self.assertEqual(Text('srvnode-1.data.private'), ret[0].hostname)
@@ -246,8 +374,11 @@ class TestCDF(unittest.TestCase):
         self.assertEqual(2, ret[0].client_instances)
 
 
-        ret = CdfGenerator(provider=store,
-                           motr_provider=Mock())._create_pool_descriptions()
+        cdf = CdfGenerator(provider=store,
+                           motr_provider=Mock())
+        cdf.utils = utils
+        ret = cdf._create_pool_descriptions()
+
         self.assertIsInstance(ret, list)
         self.assertEqual(1, len(ret))
         self.assertEqual(Text('StorageSet-1__sns'), ret[0].name)
@@ -265,8 +396,11 @@ class TestCDF(unittest.TestCase):
         self.assertEqual(0, ret[0].allowed_failures.value.ctrl)
         self.assertEqual(0, ret[0].allowed_failures.value.disk)
 
-        ret = CdfGenerator(provider=store,
-                           motr_provider=Mock())._create_profile_descriptions(ret)
+        cdf = CdfGenerator(provider=store,
+                           motr_provider=Mock())
+        cdf.utils = utils
+        ret = cdf._create_profile_descriptions(ret)
+
         self.assertIsInstance(ret, list)
         self.assertEqual(1, len(ret))
         self.assertEqual(Text('Profile_the_pool'), ret[0].name)
@@ -381,9 +515,20 @@ class TestCDF(unittest.TestCase):
     def test_disk_refs_can_be_empty(self):
         store = ValueProvider()
 
+        def new_kv(key: str, val: str):
+            return {
+                'Key': key,
+                'CreateIndex': 1793,
+                'ModifyIndex': 1793,
+                'LockIndex': 0,
+                'Flags': 0,
+                'Value': val,
+                'Session': ''
+            }
+
         def ret_values(value: str) -> Any:
             data = {
-                'server_node>MACH_ID>storage>cvg_count': 1,
+                'server_node>srvnode_1>storage>cvg_count': 1,
                 'cluster>CLUSTER_ID>site>storage_set_count': 1,
                 'cluster>CLUSTER_ID>storage_set>server_node_count': 1,
                 'cluster>CLUSTER_ID>storage_set[0]>name': 'StorageSet-1',
@@ -427,10 +572,33 @@ class TestCDF(unittest.TestCase):
             return data.get(value)
 
         store._raw_get = Mock(side_effect=ret_values)
-        store.get_machine_id = Mock(return_value='MACH_ID')
-        store.get_storage_set_nodes = Mock(return_value=['MACH_ID'])
+        store.get_machine_id = Mock(return_value='srvnode_1')
+        store.get_storage_set_nodes = Mock(return_value=['srvnode_1'])
         cdf = CdfGenerator(provider=store, motr_provider=Mock())
         cdf._get_m0d_per_cvg = Mock(return_value=1)
+        utils = Utils(store)
+        kv = KVAdapter()
+        def my_get(key: str, recurse: bool = False):
+            if key == 'srvnode-1.data.private/dev/sdb':
+                return new_kv('srvnode-1.data.private/dev/sdb',
+                              json.dumps({"path": "/dev/sdb",
+                                          "size": "4096000",
+                                          "blksize": "4096"}))
+            elif key == 'srvnode-1.data.private/dev/sdc':
+                return new_kv('srvnode-1.data.private/dev/sdc',
+                              json.dumps({"path": "/dev/sdb",
+                                          "size": "4096000",
+                                          "blksize": "4096"}))
+            elif key == 'srvnode-1.data.private/facts':
+                return new_kv('srvnode-1.data.private/facts',
+                              json.dumps({"processorcount": "16",
+                                          "memorysize_mb": "4096.123"}))
+            raise RuntimeError(f'Unexpected call: key={key}, recurse={recurse}')
+
+
+        kv.kv_get = my_get
+        utils.kv = kv
+        cdf.utils = utils
         cdf.generate()
 
     def test_invalid_storage_set_configuration_rejected(self):
@@ -675,6 +843,17 @@ class TestCDF(unittest.TestCase):
     def test_metadata_is_hardcoded(self):
         store = ValueProvider()
         motr_store = ValueProvider()
+        def new_kv(key: str, val: str):
+            return {
+                'Key': key,
+                'CreateIndex': 1793,
+                'ModifyIndex': 1793,
+                'LockIndex': 0,
+                'Flags': 0,
+                'Value': val,
+                'Session': ''
+            }
+
 
         def ret_values(value: str) -> Any:
             data = {
@@ -705,6 +884,29 @@ class TestCDF(unittest.TestCase):
             return data[value]
 
         store._raw_get = Mock(side_effect=ret_values)
+        store.get_machine_id = Mock(return_value='MACH_ID')
+        store.get_storage_set_nodes = Mock(return_value=['MACH_ID'])
+        utils = Utils(store)
+        kv = KVAdapter()
+        def my_get(key: str, recurse: bool = False):
+            if key == 'srvnode-1.data.private/dev/sdb':
+                return new_kv('srvnode-1.data.private/dev/sdb',
+                              json.dumps({"path": "/dev/sdb",
+                                          "size": "4096000",
+                                          "blksize": "4096"}))
+            elif key == 'srvnode-1.data.private/dev/sdc':
+                return new_kv('srvnode-1.data.private/dev/sdc',
+                              json.dumps({"path": "/dev/sdb",
+                                          "size": "4096000",
+                                          "blksize": "4096"}))
+            elif key == 'srvnode-1.data.private/facts':
+                return new_kv('srvnode-1.data.private/facts',
+                              json.dumps({"processorcount": "16",
+                                          "memorysize_mb": "4096.123"}))
+            raise RuntimeError(f'Unexpected call: key={key}, recurse={recurse}')
+
+        kv.kv_get = my_get
+        utils.kv = kv
 
         def ret_motr_mdvalues(value: str) -> Any:
             data = {
@@ -722,8 +924,10 @@ class TestCDF(unittest.TestCase):
         motr_store._raw_get = Mock(side_effect=ret_motr_mdvalues)
 
 
-        ret = CdfGenerator(provider=store,
-                           motr_provider=motr_store)._create_node_descriptions()
+        cdf = CdfGenerator(provider=store,
+                           motr_provider=motr_store)
+        cdf.utils = utils
+        ret = cdf._create_node_descriptions()
         self.assertIsInstance(ret, list)
         self.assertEqual(1, len(ret))
         self.assertEqual(Text('/dev/vg_srvnode-1_md1/lv_raw_md1'),
@@ -734,6 +938,17 @@ class TestCDF(unittest.TestCase):
 
     def test_multiple_nodes_supported(self):
         store = ValueProvider()
+        def new_kv(key: str, val: str):
+            return {
+                'Key': key,
+                'CreateIndex': 1793,
+                'ModifyIndex': 1793,
+                'LockIndex': 0,
+                'Flags': 0,
+                'Value': val,
+                'Session': ''
+            }
+
 
         def ret_values(value: str) -> Any:
             data = {
@@ -788,7 +1003,34 @@ class TestCDF(unittest.TestCase):
 
         store._raw_get = Mock(side_effect=ret_values)
 
+        store.get_machine_id = Mock(return_value='MACH_ID')
+        store.get_storage_set_nodes = Mock(return_value=['MACH_ID'])
+        utils = Utils(store)
+        kv = KVAdapter()
+        def my_get(key: str, recurse: bool = False):
+            if key == 'srvnode-1.data.private/dev/sdb':
+                return new_kv('srvnode-1.data.private/dev/sdb',
+                              json.dumps({"path": "/dev/sdb",
+                                          "size": "4096000",
+                                          "blksize": "4096"}))
+            elif key == 'srvnode-1.data.private/dev/sdc':
+                return new_kv('srvnode-1.data.private/dev/sdc',
+                              json.dumps({"path": "/dev/sdb",
+                                          "size": "4096000",
+                                          "blksize": "4096"}))
+            elif key == 'srvnode-1.data.private/facts':
+                return new_kv('srvnode-1.data.private/facts',
+                              json.dumps({"processorcount": "16",
+                                          "memorysize_mb": "4096.123"}))
+            raise RuntimeError(f'Unexpected call: key={key}, recurse={recurse}')
+
+        kv.kv_get = my_get
+        utils.kv = kv
+
+
+
         cdf = CdfGenerator(provider=store, motr_provider=Mock())
+        cdf.utils = utils
         cdf._get_m0d_per_cvg = Mock(return_value=1)
         ret = cdf._create_node_descriptions()
         self.assertIsInstance(ret, list)
@@ -806,6 +1048,17 @@ class TestCDF(unittest.TestCase):
 
     def test_iface_type_can_be_null(self):
         store = ValueProvider()
+
+        def new_kv(key: str, val: str):
+            return {
+                'Key': key,
+                'CreateIndex': 1793,
+                'ModifyIndex': 1793,
+                'LockIndex': 0,
+                'Flags': 0,
+                'Value': val,
+                'Session': ''
+            }
 
         def ret_values(value: str) -> Any:
             data = {
@@ -833,7 +1086,32 @@ class TestCDF(unittest.TestCase):
             return data[value]
 
         store._raw_get = Mock(side_effect=ret_values)
+        store.get_machine_id = Mock(return_value='MACH_ID')
+        store.get_storage_set_nodes = Mock(return_value=['srvnode_1'])
         cdf = CdfGenerator(provider=store, motr_provider=Mock())
+        utils = Utils(store)
+        kv = KVAdapter()
+        def my_get(key: str, recurse: bool = False):
+            if key == 'srvnode-1.data.private/dev/sdb':
+                return new_kv('srvnode-1.data.private/dev/sdb',
+                              json.dumps({"path": "/dev/sdb",
+                                          "size": "4096000",
+                                          "blksize": "4096"}))
+            elif key == 'srvnode-1.data.private/dev/sdc':
+                return new_kv('srvnode-1.data.private/dev/sdc',
+                              json.dumps({"path": "/dev/sdb",
+                                          "size": "4096000",
+                                          "blksize": "4096"}))
+            elif key == 'srvnode-1.data.private/facts':
+                return new_kv('srvnode-1.data.private/facts',
+                              json.dumps({"processorcount": "16",
+                                          "memorysize_mb": "4096.123"}))
+            raise RuntimeError(f'Unexpected call: key={key}, recurse={recurse}')
+
+
+        kv.kv_get = my_get
+        utils.kv = kv
+        cdf.utils = utils
         cdf._get_m0d_per_cvg = Mock(return_value=1)
         ret = cdf._create_node_descriptions()
         self.assertEqual('None P', str(ret[0].data_iface_type))

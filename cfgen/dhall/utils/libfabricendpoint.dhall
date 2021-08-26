@@ -1,5 +1,5 @@
 {-
-  Copyright (c) 2020 Seagate Technology LLC and/or its Affiliates
+  Copyright (c) 2021 Seagate Technology LLC and/or its Affiliates
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -18,20 +18,21 @@
 
 -}
 
-let Prelude = ../Prelude.dhall
-
 let types = ../types.dhall
 
-let named = ./RNamed.dhall
-
 in
-\(x : types.Service) ->
-    "("
- ++ Prelude.Text.concatSep " "
-      [ ./Oid.dhall x.id
-      , named.TextUnquoted "type" ("@" ++ ./SvcT.dhall x.type)
-      , named.Texts "endpoints" [./LibfabricEndpoint.dhall x.endpoint]
-      , "params=[]"
-      , named.Oids "sdevs" x.sdevs
-      ]
- ++ ")"
+    \(netfamily : types.NetFamily)
+ -> \(proto : types.Protocol)
+ -> \(ipaddr : Text)
+ -> \(portal : Natural)
+ ->
+    let addr = { ipaddr = ipaddr, mdigit = None Natural }
+    in
+      { netfamily = merge { inet = types.NetFamily.inet
+                          , inet6 = types.NetFamily.inet6
+                          } netfamily
+      , nid = merge { tcp = types.NetId.tcp { tcp = addr }
+                    , o2ib = types.NetId.o2ib { o2ib = addr }
+                    } proto
+      , portal = portal
+      } : types.LibfabricEndpoint

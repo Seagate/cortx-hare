@@ -19,7 +19,10 @@
 -}
 
 { hostname : Text
+, processorcount: Optional Natural
+, memorysize_mb: Optional Double
 , data_iface : Text
+, data_iface_ip_addr : Optional Text
 , data_iface_type : Optional ./Protocol.dhall
 , m0_servers : Optional (List ./M0ServerDesc.dhall)
 , m0_clients : { s3 : Natural, other : Natural }

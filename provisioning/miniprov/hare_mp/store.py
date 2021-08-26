@@ -33,10 +33,10 @@ class ValueProvider:
     def _raw_get(self, key: str) -> str:
         raise NotImplementedError()
 
-    def get_machine_id(self) -> str:
+    def get_cluster_id(self) -> str:
         raise NotImplementedError()
 
-    def get_cluster_id(self) -> str:
+    def get_machine_id(self) -> str:
         raise NotImplementedError()
 
     def get_storage_set_index(self) -> int:
@@ -71,15 +71,13 @@ class ConfStoreProvider(ValueProvider):
     def _raw_get(self, key: str) -> str:
         return self.conf.get(self.index, key)
 
-    def get_machine_id(self) -> str:
-        with open('/etc/machine-id', 'r') as f:
-            machine_id = f.readline().strip('\n')
-            return machine_id
-
     def get_cluster_id(self) -> str:
         machine_id = self.get_machine_id()
         cluster_id = self.get(f'server_node>{machine_id}>cluster_id')
         return cluster_id
+
+    def get_machine_id(self) -> str:
+        return get_machine_id()
 
     def get_storage_set_index(self) -> int:
         i = 0
@@ -108,3 +106,9 @@ class ConfStoreProvider(ValueProvider):
         server_nodes_key = (f'cluster>{cluster_id}>'
                             f'storage_set[{storage_set_index}]>server_nodes')
         return self.get(server_nodes_key)
+
+
+def get_machine_id() -> str:
+    with open('/etc/machine-id', 'r') as f:
+        machine_id = f.readline().strip('\n')
+        return machine_id

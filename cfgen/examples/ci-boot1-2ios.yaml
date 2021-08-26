@@ -8,18 +8,18 @@ nodes:
           data: []
       - io_disks:
           data:
-            - /dev/loop0
-            - /dev/loop1
-            - /dev/loop2
-            - /dev/loop3
+            - path: /dev/loop0
+            - path: /dev/loop1
+            - path: /dev/loop2
+            - path: /dev/loop3
       - io_disks:
           data:
-            - /dev/loop4
-            - /dev/loop5
-            - /dev/loop6
-            - /dev/loop7
-            - /dev/loop8
-            - /dev/loop9
+            - path: /dev/loop4
+            - path: /dev/loop5
+            - path: /dev/loop6
+            - path: /dev/loop7
+            - path: /dev/loop8
+            - path: /dev/loop9
     m0_clients:
         s3: 0
         other: 2

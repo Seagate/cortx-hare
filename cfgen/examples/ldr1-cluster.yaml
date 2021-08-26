@@ -12,10 +12,10 @@ nodes:
           data: []
       - io_disks:
           data:
-            - /dev/sdd
-            - /dev/sde
-            - /dev/sdf
-            - /dev/sdg
+            - path: /dev/sdd
+            - path: /dev/sde
+            - path: /dev/sdf
+            - path: /dev/sdg
     m0_clients:
         s3: 0           # number of S3 servers to start
         other: 2        # max quantity of other Motr clients this node may have
@@ -28,10 +28,10 @@ nodes:
           data: []
       - io_disks:
           data:
-            - /dev/sdh
-            - /dev/sdi
-            - /dev/sdj
-            - /dev/sdk
+            - path: /dev/sdh
+            - path: /dev/sdi
+            - path: /dev/sdj
+            - path: /dev/sdk
     m0_clients:
         s3: 0
         other: 2
