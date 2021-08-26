@@ -38,9 +38,13 @@
 , NetId       = ./types/NetId.dhall
 , Protocol    = ./types/Protocol.dhall
 
+, LibfabricEndpoint = ./types/LibfabricEndpoint.dhall
+, NetFamily   = ./types/NetFamily.dhall
+
 , ClusterDesc  = ./types/ClusterDesc.dhall
 , NodeDesc     = ./types/NodeDesc.dhall
 , M0ServerDesc = ./types/M0ServerDesc.dhall
+, Disk         = ./types/IODisk.dhall
 , PoolDesc     = ./types/PoolDesc.dhall
 , DiskRef      = ./types/DiskRef.dhall
 , FailVec      = ./types/FailVec.dhall

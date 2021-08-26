@@ -20,5 +20,5 @@
 
 -- m0d process
 { runs_confd : Optional Bool
-, io_disks : { meta_data : Optional Text, data : List Text }
+, io_disks : { meta_data : Optional Text, data : (List ./IODisk.dhall) }
 }

@@ -71,7 +71,7 @@ def mkServiceData(service: Dict[str, Any]) -> ServiceData:
             ObjT.PROCESS,  # XXX s/PROCESS/SERVICE/ ?
             int(service['ServiceID'])),
         ip_addr=service['Address'],
-        address='{}:{}'.format(service['ServiceAddress'],
+        address='{}@{}'.format(service['ServiceAddress'],
                                service['ServicePort']))
 
 
@@ -992,7 +992,7 @@ class ConsulUtil:
         return ServiceData(node=node,
                            fid=create_process_fid(fidk),
                            ip_addr=srv_ip_addr,
-                           address=f'{srv_address}:{srv_port}')
+                           address=f'{srv_address}@{srv_port}')
 
     def update_fs_stats(self, stats_data: FsStatsWithTime) -> None:
         # TODO investigate whether we can replace json with simplejson in

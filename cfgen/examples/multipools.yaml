@@ -9,13 +9,13 @@ nodes:
       - io_disks:
           meta_data: /dev/vg_metadata_srvnode-1/lv_raw_metadata
           data:
-            - /dev/foo
-            - /dev/disk/by-id/dm-name-mpatha
-            - /dev/disk/by-id/dm-name-mpathb
-            - /dev/disk/by-id/dm-name-mpathc
-            - /dev/disk/by-id/dm-name-mpathd
-            - /dev/disk/by-id/dm-name-mpathe
-            - /dev/disk/by-id/dm-name-mpathf
+            - path: /dev/foo
+            - path: /dev/disk/by-id/dm-name-mpatha
+            - path: /dev/disk/by-id/dm-name-mpathb
+            - path: /dev/disk/by-id/dm-name-mpathc
+            - path: /dev/disk/by-id/dm-name-mpathd
+            - path: /dev/disk/by-id/dm-name-mpathe
+            - path: /dev/disk/by-id/dm-name-mpathf
     m0_clients:
       s3: 11
       other: 3
@@ -29,13 +29,13 @@ nodes:
       - io_disks:
           meta_data: /dev/vg_metadata_srvnode-2/lv_raw_metadata
           data:
-            - /dev/foo
-            - /dev/disk/by-id/dm-name-mpathg
-            - /dev/disk/by-id/dm-name-mpathh
-            - /dev/disk/by-id/dm-name-mpathi
-            - /dev/disk/by-id/dm-name-mpathj
-            - /dev/disk/by-id/dm-name-mpathk
-            - /dev/disk/by-id/dm-name-mpathl
+            - path: /dev/foo
+            - path: /dev/disk/by-id/dm-name-mpathg
+            - path: /dev/disk/by-id/dm-name-mpathh
+            - path: /dev/disk/by-id/dm-name-mpathi
+            - path: /dev/disk/by-id/dm-name-mpathj
+            - path: /dev/disk/by-id/dm-name-mpathk
+            - path: /dev/disk/by-id/dm-name-mpathl
     m0_clients:
       s3: 11
       other: 3

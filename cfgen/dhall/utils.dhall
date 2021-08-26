@@ -19,5 +19,6 @@
 -}
 
 { endpoint = ./utils/endpoint.dhall
+, libfabricendpoint = ./utils/libfabricendpoint.dhall
 , zoid = ./utils/zoid.dhall
 }

@@ -4,16 +4,31 @@ let T = $path/types.dhall
 let P = T.Protocol
 let DiskRef = T.DiskRef
 
-let M0dProcess =
+
+let Disk =
+      { path : Optional Text
+      , size : Optional Natural
+      , blksize : Optional Natural
+      }
+
+let IODisks =
+      { meta_data : Optional Text
+      , data : List Disk
+      }
+
+let M0ServerDesc =
       { runs_confd : Optional Bool
-      , io_disks : { meta_data : Optional Text, data : List Text }
+      , io_disks : IODisks
       }
 
 let NodeInfo =
       { hostname : Text
+      , processorcount : Optional Natural
+      , memorysize_mb : Optional Double
       , data_iface : Text
+      , data_iface_ip_addr : Optional Text
       , data_iface_type : Optional T.Protocol
-      , m0_servers : Optional  (List M0dProcess)
+      , m0_servers : Optional (List M0ServerDesc)
       , s3_instances : Natural
       , client_instances : Natural
       }
@@ -51,6 +66,9 @@ let toNodeDesc
     : NodeInfo -> T.NodeDesc
     =     \(n : NodeInfo)
       ->  { hostname = n.hostname
+          , processorcount = n.processorcount
+          , memorysize_mb = n.memorysize_mb
+          , data_iface_ip_addr = n.data_iface_ip_addr
           , data_iface = n.data_iface
           , data_iface_type = n.data_iface_type
           , m0_clients = { other = n.client_instances, s3 = n.s3_instances }

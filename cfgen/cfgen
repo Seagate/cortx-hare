@@ -304,11 +304,18 @@ def enrich_cluster_desc(desc: Dict[str, Any], mock_p: bool) -> None:
     for node in desc['nodes']:
         # The fact names used here correspond to version 2.4.1 of `facter`.
         # See https://puppet.com/docs/puppet/6.6/core_facts.html#legacy-facts
-        node['facts'] = get_facts(node['hostname'], mock_p,
-                                  'processorcount', 'memorysize_mb',
-                                  ipaddr_key(node['data_iface']))
-        node['facts']['_memsize_MB'] = int(float(
-            node['facts']['memorysize_mb']))
+        if all(key in node.keys() for key in ('processorcount',
+                                              'memorysize_mb')):
+            node['facts'] = {'_memsize_MB': int(float(node['memorysize_mb'])),
+                             'processorcount': node['processorcount'],
+                             ipaddr_key(node['data_iface']):
+                                 node['data_iface_ip_addr']}
+        else:
+            node['facts'] = get_facts(node['hostname'], mock_p,
+                                      'processorcount', 'memorysize_mb',
+                                      ipaddr_key(node['data_iface']))
+            node['facts']['_memsize_MB'] = int(float(
+                node['facts']['memorysize_mb']))
 
         if 'm0_servers' not in node:
             continue
@@ -318,8 +325,11 @@ def enrich_cluster_desc(desc: Dict[str, Any], mock_p: bool) -> None:
             if 'meta_data' in m0d['io_disks']:
                 if m0d['io_disks']['meta_data'] is None:
                     del m0d['io_disks']['meta_data']
-            m0d['_io_disks'] = get_disks(node['hostname'], mock_p,
-                                         m0d['io_disks']['data'])
+            m0d['_io_disks'] = get_disks_from_cdf(node['hostname'], mock_p,
+                                                  m0d['io_disks']['data'])
+            if not m0d['_io_disks']:
+                m0d['_io_disks'] = get_disks_ssh(node['hostname'], mock_p,
+                                                 m0d['io_disks']['data'])
 
     if 'profiles' not in desc:
         sns_pools = [pool['name'] for pool in desc['pools']
@@ -378,12 +388,13 @@ Make sure the value of data_iface in the CDF is correct."""
         for m0d in node['m0_servers']:
             d = m0d['io_disks']
             assert m0d['runs_confd'] or d['data'], \
-                f"{name}: Either 'runs_confd' or 'io_disks.data' must be set"
+                f"{name}: Either 'runs_confd' or" \
+                "'io_disks.data' must be set"
             assert '' not in d['data'], \
                 f"{name}: Empty strings in 'io_disks.data' are not allowed"
             if 'meta_data' in d:
-                assert d['meta_data'], \
-                    f"{name}: 'io_disks.meta_data' must not be an empty string"
+                assert d['meta_data'], f"{name}: 'io_disks.meta_data'" \
+                    "must not be an empty string"
                 assert d['meta_data'] not in d['data'], \
                     f"{name}: Meta-data disk must not belong io_disks.data"
 
@@ -570,9 +581,13 @@ Disk.blksize.__doc__ = 'Block size for file system I/O'
 
 
 # XXX see build_disk_info() in motr's `utils/m0genfacts`
-def get_disks(hostname: str, mock_p: bool, paths: List[str]) -> List[Disk]:
-    if not paths:
+def get_disks_ssh(hostname: str, mock_p: bool,
+                  data_disks: List[Dict[str, Any]]) -> List[Disk]:
+    if not data_disks:
         return []
+    paths = []
+    for d in data_disks:
+        paths.append(d['path'])
     if mock_p:
         return fabricate_disks(hostname, paths)
 
@@ -597,6 +612,22 @@ print([dict(path=path,
     return [Disk(**kwargs) for kwargs in
             ast.literal_eval(run_command(hostname,
                                          'sudo', 'python3', '-c', code))]
+
+
+# XXX see build_disk_info() in motr's `utils/m0genfacts`
+def get_disks_from_cdf(hostname: str, mock_p: bool,
+                       data_disks: List[Dict[str, Any]]) -> List[Disk]:
+    if not data_disks:
+        return []
+
+    disks = []
+    for disk in data_disks:
+        if not all(key in disk.keys() for key in ('path', 'size', 'blksize')):
+            return []
+        disks.append(Disk(path=disk['path'], size=disk['size'],
+                          blksize=disk['blksize']))
+
+    return disks
 
 
 def fabricate_disks(hostname: str, paths: List[str]) -> List[Disk]:
@@ -671,16 +702,16 @@ NetProtocol = Enum('NetProtocol', 'tcp o2ib')
 class Endpoint:
     _tmids: Dict[Tuple[str, int], int] = {}
 
-    def __init__(self, proto: NetProtocol, ipaddr: str, portal: int,
+    def __init__(self, proto: NetProtocol, ipaddr: str, portalgroup: int,
                  tmid: int = None):
         self.proto = proto
         assert ipaddr
         self.ipaddr = ipaddr
-        assert portal > 0
-        self.portal = portal
+        assert portalgroup > 0
+        self.portalgroup = portalgroup
         if tmid is None:
-            self.tmid = self._tmids.setdefault((ipaddr, portal), 1)
-            self._tmids[(ipaddr, portal)] += 1
+            self.tmid = self._tmids.setdefault((ipaddr, portalgroup), 1)
+            self._tmids[(ipaddr, portalgroup)] += 1
         else:
             assert tmid > 0
             self.tmid = tmid
@@ -688,18 +719,53 @@ class Endpoint:
     def __repr__(self):
         args = ', '.join([f'proto={self.proto!r}',
                           f'ipaddr={self.ipaddr!r}',
-                          f'portal={self.portal}',
+                          f'portal={self.portalgroup}',
                           f'tmid={self.tmid}'])
         return f'{self.__class__.__name__}({args})'
 
     def to_dhall(self):
         return f'utils.endpoint types.Protocol.{self.proto.name}' \
-            f' "{self.ipaddr}" {self.portal} {self.tmid}'
+            f' "{self.ipaddr}" {self.portalgroup} {self.tmid}'
 
     def __str__(self):
         ip = self.ipaddr
         proto = self.proto.name
-        return f'{ip}@{proto}:12345:{self.portal}:{self.tmid}'
+        return f'{ip}@{proto}:12345:{self.portalgroup}:{self.tmid}'
+
+
+class LibfabricEndpoint:
+    ep_map: Dict[Tuple[str, int], int] = {}
+
+    def __init__(self, NetFamily: str, proto: NetProtocol, ipaddr: str,
+                 portalgroup: int):
+        self.netfamily = NetFamily
+        self.proto = proto
+        assert ipaddr
+        self.ipaddr = ipaddr
+        assert portalgroup > 0
+        self.portalgroup = portalgroup
+        self.portal = 0
+        self.portal = self.ep_map.setdefault((ipaddr, portalgroup),
+                                             (portalgroup + 1))
+        self.ep_map[(ipaddr, portalgroup)] += 1
+
+    def __repr__(self):
+        args = ', '.join([f'netfamily={self.netfamily!r}',
+                          f'proto={self.proto!r}',
+                          f'ipaddr={self.ipaddr!r}',
+                          f'portal={self.portal}'])
+        return f'{self.__class__.__name__}({args})'
+
+    def to_dhall(self):
+        return f'utils.libfabricendpoint types.NetFamily.{self.netfamily} ' \
+            f'types.Protocol.{self.proto.name}' \
+            f' "{self.ipaddr}" {self.portal}'
+
+    def __str__(self):
+        netfamily = self.netfamily
+        ip = self.ipaddr
+        proto = self.proto.name
+        return f'{netfamily}:{proto}:{ip}@{self.portal}'
 
 
 class ToDhall(metaclass=abc.ABCMeta):
@@ -807,15 +873,22 @@ class ConfNode(ToDhall):
         return node_id
 
 
-ProcT = Enum('ProcT', 'hax m0_server m0_client_s3 m0_client_other')
-ProcT.__doc__ = 'Type of process'
+# ProcT = Enum('ProcT', 'hax m0_server m0_client_s3 m0_client_other')
+# ProcT.__doc__ = 'Type of process'
+
+class ProcT(Enum):
+    hax = 2000
+    m0_server = 3000
+    m0_client_s3 = 4000
+    m0_client_other = 5000
 
 
 class ConfProcess(ToDhall):
     _objt = ObjT.process
     _downlinks = {Downlink('services', ObjT.service)}
 
-    def __init__(self, nr_cpu: int, memsize_MB: int, endpoint: Endpoint,
+    def __init__(self, nr_cpu: int, memsize_MB: int,
+                 endpoint: LibfabricEndpoint,
                  services: List[Oid], meta_data: str = None):
         assert nr_cpu > 0
         self.nr_cpu = nr_cpu
@@ -855,9 +928,14 @@ class ConfProcess(ToDhall):
 
         facts = node_desc['facts']
         proto = node_desc.get('data_iface_type', 'tcp')
-        ep = Endpoint(proto=NetProtocol[proto],
-                      ipaddr=facts[ipaddr_key(node_desc['data_iface'])],
-                      portal=proc_t.value)
+        # Creates Lnet endpoint, remove once deprecated.
+        # ep = Endpoint(proto=NetProtocol[proto],
+        #               ipaddr=facts[ipaddr_key(node_desc['data_iface'])],
+        #              portal=proc_t.value)
+        ep = LibfabricEndpoint(NetFamily='inet', proto=NetProtocol[proto],
+                               ipaddr=facts[ipaddr_key(
+                                            node_desc['data_iface'])],
+                               portalgroup=proc_t.value)
         proc_id = new_oid(ObjT.process)
 
         meta_data = None
@@ -937,8 +1015,8 @@ class ConfService(ToDhall):
     _objt = ObjT.service
     _downlinks = {Downlink('sdevs', ObjT.sdev)}
 
-    def __init__(self, stype: SvcT, endpoint: Endpoint, sdevs: List[Oid],
-                 ctrl_id: Oid = None):
+    def __init__(self, stype: SvcT, endpoint: LibfabricEndpoint,
+                 sdevs: List[Oid], ctrl_id: Oid = None):
         self.type = stype
         self.endpoint = endpoint
         assert all(x.type is ObjT.sdev for x in sdevs)
@@ -961,7 +1039,7 @@ class ConfService(ToDhall):
 
     @classmethod
     def build(cls, m0conf: Dict[Oid, Any], parent: Oid,
-              stype: SvcT, endpoint: Endpoint,
+              stype: SvcT, endpoint: LibfabricEndpoint,
               ctrl: Optional[Oid] = None) -> Oid:
         assert parent.type is ObjT.process
         svc_id = new_oid(ObjT.service)
@@ -1803,7 +1881,7 @@ def consul_kv_sdevs(m0conf: Dict[Oid, Any]) -> Dict[str, str]:
             assert proc_id.type is ObjT.process
             proc_key = f'{node_key}/processes/' + oid_to_fidstr(proc_id)
             # XXX-VERIFYME Can we really convert from portal (int) to name?
-            proc_name = ProcT(m0conf[proc_id].endpoint.portal).name
+            proc_name = ProcT(m0conf[proc_id].endpoint.portalgroup).name
             d[proc_key] = json.dumps({'name': proc_name,
                                       'state': 'M0_NC_UNKNOWN'})
             for svc_id in m0conf[proc_id].services:
@@ -1834,7 +1912,7 @@ def generate_consul_kv(cluster: Cluster, dhall_dir: str) -> str:
     m0conf = cluster.m0conf
 
     ConsulService = NamedTuple('ConsulService', [
-        ('node_name', str), ('proc_id', Oid), ('ep', Endpoint),
+        ('node_name', str), ('proc_id', Oid), ('ep', LibfabricEndpoint),
         ('svc_id', Oid), ('stype', str), ('meta_data', Optional[str])])
 
     def processes() -> Iterator[ConsulService]:
@@ -1859,7 +1937,7 @@ def generate_consul_kv(cluster: Cluster, dhall_dir: str) -> str:
                                         proc_id=proc_id,
                                         ep=proc.endpoint,
                                         svc_id=cluster.m0_clients[proc_id],
-                                        stype=ProcT(proc_ep.portal).name,
+                                        stype=ProcT(proc_ep.portalgroup).name,
                                         meta_data=None)
 
     def sns_pools() -> List[Oid]:

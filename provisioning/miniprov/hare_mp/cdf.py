@@ -9,7 +9,9 @@ import pkg_resources
 from hare_mp.store import ValueProvider
 from hare_mp.types import (ClusterDesc, DiskRef, DList, Maybe, NodeDesc,
                            PoolDesc, PoolType, ProfileDesc, Protocol, Text,
-                           M0ServerDesc, DisksDesc, AllowedFailures, Layout)
+                           M0ServerDesc, DisksDesc, AllowedFailures,
+                           Layout)
+from hare_mp.utils import Utils
 
 DHALL_PATH = '/opt/seagate/cortx/hare/share/cfgen/dhall'
 DHALL_EXE = '/opt/seagate/cortx/hare/bin/dhall'
@@ -36,6 +38,7 @@ class CdfGenerator:
         super().__init__()
         self.provider = provider
         self.motr_provider = motr_provider
+        self.utils = Utils(provider)
 
     def _get_dhall_path(self) -> str:
         if P.exists(DHALL_PATH):
@@ -139,7 +142,6 @@ class CdfGenerator:
     # Controller or CVG failure = min(K, cvg per node * Node failures)
     def _calculate_allowed_failure(self, layout: Layout) -> AllowedFailures:
         conf = self.provider
-
         machine_id = conf.get_machine_id()
         node_count = len(conf.get_storage_set_nodes())
         cvg_per_node = int(conf.get(
@@ -306,10 +308,11 @@ class CdfGenerator:
         # We will create 1 IO service entry in CDF per cvg.
         # An IO service entry will use data devices from corresponding cvg.
         # meta data device is taken from motr-hare shared store.
+        data_drives_info = self.utils.get_drives_info()
         servers = DList([
             M0ServerDesc(
                 io_disks=DisksDesc(
-                    data=self._get_data_devices(machine_id, cvg),
+                    data=data_drives_info,
                     meta_data=Maybe(
                         self._get_metadata_device(name, cvg, m0d), 'Text')),
                 runs_confd=Maybe(False, 'Bool'))
@@ -323,13 +326,17 @@ class CdfGenerator:
         # will be started on the node or not.
         servers.value.append(M0ServerDesc(
             io_disks=DisksDesc(
-                data=DList([], 'List Text'),
+                data=DList([], 'List Disk'),
                 meta_data=Maybe(None, 'Text')),
             runs_confd=Maybe(True, 'Bool')))
 
+        node_facts = self.utils.get_node_facts()
         return NodeDesc(
             hostname=Text(hostname),
+            processorcount=Maybe(node_facts['processorcount'], 'Natural'),
+            memorysize_mb=Maybe(node_facts['memorysize_mb'], 'Double'),
             data_iface=Text(iface),
+            data_iface_ip_addr=Maybe(Text(hostname), 'Text'),
             data_iface_type=Maybe(self._get_iface_type(machine_id), 'P'),
             m0_servers=Maybe(servers, 'List M0ServerDesc'),
             #

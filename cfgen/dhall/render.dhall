@@ -21,6 +21,9 @@
 { Endpoint   = ./render/Endpoint.dhall
 , NetId      = ./render/NetId.dhall
 
+, LibfabricEndpoint = ./render/LibfabricEndpoint.dhall
+, NetFamily   = ./types/NetFamily.dhall
+
 , Obj        = ./render/Obj.dhall
 , Objs       = ./render/Objs.dhall
 , ObjT       = ./render/ObjT.dhall

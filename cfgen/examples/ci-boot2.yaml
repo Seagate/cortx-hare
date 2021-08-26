@@ -7,12 +7,12 @@ nodes:
           data: []
       - io_disks:
           data:
-            - /dev/vdb
-            - /dev/vdc
-            - /dev/vdd
-            - /dev/vde
-            - /dev/vdf
-            - /dev/vdg
+            - path: /dev/vdb
+            - path: /dev/vdc
+            - path: /dev/vdd
+            - path: /dev/vde
+            - path: /dev/vdf
+            - path: /dev/vdg
     m0_clients:
         s3: 0
         other: 2
@@ -24,12 +24,12 @@ nodes:
           data: []
       - io_disks:
           data:
-            - /dev/vdb
-            - /dev/vdc
-            - /dev/vdd
-            - /dev/vde
-            - /dev/vdf
-            - /dev/vdg
+            - path: /dev/vdb
+            - path: /dev/vdc
+            - path: /dev/vdd
+            - path: /dev/vde
+            - path: /dev/vdf
+            - path: /dev/vdg
     m0_clients:
         s3: 0
         other: 2

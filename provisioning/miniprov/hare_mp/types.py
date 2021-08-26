@@ -91,9 +91,16 @@ class M0Clients(DhallTuple):
 
 
 @dataclass(repr=False)
+class Disk(DhallTuple):
+    path: Maybe[Text]
+    size: Maybe[int]
+    blksize: Maybe[int]
+
+
+@dataclass(repr=False)
 class DisksDesc(DhallTuple):
     meta_data: Maybe[Text]
-    data: DList[Text]
+    data: DList[Disk]
 
 
 @dataclass(repr=False)
@@ -105,7 +112,10 @@ class M0ServerDesc(DhallTuple):
 @dataclass(repr=False)
 class NodeDesc(DhallTuple):
     hostname: Text
+    processorcount: Maybe[int]
+    memorysize_mb: Maybe[int]
     data_iface: Text
+    data_iface_ip_addr: Maybe[Text]
     data_iface_type: Maybe[Protocol]
     m0_servers: Maybe[DList[M0ServerDesc]]
     s3_instances: int

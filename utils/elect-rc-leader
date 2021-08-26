@@ -81,7 +81,9 @@ create_session() {
     # Join array items into a comma-separated string.
     local checks=$(IFS=,; echo "[\"serfHealth\", ${checks_a[*]}]")
     local payld="{\"Name\": \"leader\", \"Checks\": $checks, \"LockDelay\": \"2s\"}"
-    local res=$(curl -sX PUT -d "$payld" http://localhost:8500/v1/session/create)
+    # XXX Allowing leader election to happen immediately without any health checkers
+    # temporarily for container environment. Re-visit.
+    local res=$(curl -sX PUT -d "" http://localhost:8500/v1/session/create)
     local sid=$(echo "$res" | jq -r '.ID' 2>/dev/null || true)
 
     [[ $sid ]] || {

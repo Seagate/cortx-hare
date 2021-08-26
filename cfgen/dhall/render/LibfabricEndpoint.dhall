@@ -1,5 +1,5 @@
 {-
-  Copyright (c) 2020 Seagate Technology LLC and/or its Affiliates
+  Copyright (c) 2021 Seagate Technology LLC and/or its Affiliates
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -18,20 +18,8 @@
 
 -}
 
-let Prelude = ../Prelude.dhall
-
 let types = ../types.dhall
-
-let named = ./RNamed.dhall
-
 in
-\(x : types.Service) ->
-    "("
- ++ Prelude.Text.concatSep " "
-      [ ./Oid.dhall x.id
-      , named.TextUnquoted "type" ("@" ++ ./SvcT.dhall x.type)
-      , named.Texts "endpoints" [./LibfabricEndpoint.dhall x.endpoint]
-      , "params=[]"
-      , named.Oids "sdevs" x.sdevs
-      ]
- ++ ")"
+\(x : types.LibfabricEndpoint) ->
+    let nat = Natural/show
+    in "${./NetFamily.dhall x.netfamily}:${./NetId.dhall x.nid}@${nat x.portal}"
