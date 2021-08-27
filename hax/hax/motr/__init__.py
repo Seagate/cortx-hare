@@ -30,8 +30,8 @@ from hax.motr.planner import WorkPlanner
 from hax.types import (ConfHaProcess, Fid, FidStruct, FsStats,
                        HaLinkMessagePromise, HaNote, HaNoteStruct, HAState,
                        MessageId, ObjT, Profile, ReprebStatus, ServiceHealth,
-                       m0HaProcessEvent)
-from hax.util import ConsulUtil, repeat_if_fails
+                       m0HaProcessEvent, m0HaProcessType)
+from hax.util import ConsulUtil, repeat_if_fails, FidWithType
 
 LOG = logging.getLogger('hax')
 
@@ -395,11 +395,13 @@ class Motr:
             service_notes += self._generate_sub_disks(note, service_list, cns)
         return service_notes
 
-    def _generate_sub_disks(self, note: HaNoteStruct, services: List,
+    def _generate_sub_disks(self, note: HaNoteStruct,
+                            services: List[FidWithType],
                             cns: ConsulUtil) -> List[HaNoteStruct]:
         disk_list = []
         new_state = note.no_state
         proc_fid = Fid.from_struct(note.no_id)
+
         for svc in services:
             disk_list += cns.get_disks_by_parent_process(proc_fid, svc.fid)
         if disk_list:
@@ -408,7 +410,11 @@ class Motr:
             # XXX: Need to check the current state of the device, transition
             # to ONLINE only in case of an explicit request or iff the prior
             # state of the device is UNKNOWN/OFFLINE.
-            cns.update_drive_state(disk_list, state, device_event=False)
+            is_mkfs = self._is_mkfs
+            if not (state == ServiceHealth.STOPPED and is_mkfs(proc_fid)):
+                # We don't mark the devices as failed if the process is MKFS
+                # and if its effective status is STOPPED (see EOS-24124).
+                cns.update_drive_state(disk_list, state, device_event=False)
         LOG.debug('proc fid=%s encloses %d disks as follows: %s',
                   proc_fid, len(disk_list), disk_list)
         drive_ha_notes: List[HaNoteStruct] = []
@@ -418,6 +424,11 @@ class Motr:
             drive_ha_notes.append(HaNoteStruct(no_id=drive_id.to_c(),
                                                no_state=dstate))
         return drive_ha_notes
+
+    def _is_mkfs(self, proc_fid: Fid) -> bool:
+        status = self.consul_util.get_process_status(proc_fid)
+        mkfs = m0HaProcessType.M0_CONF_HA_PROCESS_M0MKFS.name
+        return status.proc_type == mkfs
 
     def add_node_state_by_fid(
             self,
