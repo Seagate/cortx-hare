@@ -1098,80 +1098,64 @@ class ConsulUtil:
         # {(consul_svc_status, motr_process_status):(local_node_ha_status,
         #                                            remote_node_ha_status)}
 
-        cur_consul_status = MotrConsulProcStatus
-        local_remote_health_ret = MotrProcStatusLocalRemote
+        stat = MotrConsulProcStatus
+        lr = MotrProcStatusLocalRemote
+        S = ServiceHealth
 
+        STARTING = 'M0_CONF_HA_PROCESS_STARTING'
+        STARTED = 'M0_CONF_HA_PROCESS_STARTED'
+        STOPPING = 'M0_CONF_HA_PROCESS_STOPPING'
+        STOPPED = 'M0_CONF_HA_PROCESS_STOPPED'
         svc_to_motr_status_map = {
-            cur_consul_status('passing', 'M0_CONF_HA_PROCESS_STARTING'):
-            local_remote_health_ret(ServiceHealth.OFFLINE,
-                                    ServiceHealth.OK),
-            cur_consul_status('passing', 'M0_CONF_HA_PROCESS_STOPPING'):
-            local_remote_health_ret(ServiceHealth.OFFLINE,
-                                    ServiceHealth.UNKNOWN),
-            cur_consul_status('passing', 'M0_CONF_HA_PROCESS_STARTED'):
-            local_remote_health_ret(ServiceHealth.OK,
-                                    ServiceHealth.OK),
-            cur_consul_status('passing', 'M0_CONF_HA_PROCESS_STOPPED'):
-            local_remote_health_ret(ServiceHealth.OFFLINE,
-                                    ServiceHealth.UNKNOWN),
-            cur_consul_status('passing', 'Unknown'):
-            local_remote_health_ret(ServiceHealth.UNKNOWN,
-                                    ServiceHealth.UNKNOWN),
-            cur_consul_status('warning', 'M0_CONF_HA_PROCESS_STOPPING'):
-            local_remote_health_ret(ServiceHealth.OFFLINE,
-                                    ServiceHealth.STOPPED),
-            cur_consul_status('warning', 'M0_CONF_HA_PROCESS_STARTED'):
-            local_remote_health_ret(ServiceHealth.OFFLINE,
-                                    ServiceHealth.FAILED),
-            cur_consul_status('warning', 'M0_CONF_HA_PROCESS_STOPPED'):
-            local_remote_health_ret(ServiceHealth.STOPPED,
-                                    ServiceHealth.STOPPED),
-            cur_consul_status('warning', 'M0_CONF_HA_PROCESS_STARTING'):
-            local_remote_health_ret(ServiceHealth.OFFLINE,
-                                    ServiceHealth.OFFLINE),
-            cur_consul_status('warning', 'Unknown'):
-            local_remote_health_ret(ServiceHealth.UNKNOWN,
-                                    ServiceHealth.UNKNOWN)}
+            stat('passing', STARTING): lr(S.OFFLINE, S.OK),
+            stat('passing', STOPPING): lr(S.OFFLINE, S.UNKNOWN),
+            stat('passing', STARTED): lr(S.OK, S.OK),
+            stat('passing', STOPPED): lr(S.OFFLINE, S.UNKNOWN),
+            stat('passing', 'Unknown'): lr(S.UNKNOWN, S.UNKNOWN),
+            stat('warning', STOPPING): lr(S.OFFLINE, S.STOPPED),
+            stat('warning', STARTED): lr(S.OFFLINE, S.FAILED),
+            stat('warning', STOPPED): lr(S.STOPPED, S.STOPPED),
+            stat('warning', STARTING): lr(S.OFFLINE, S.OFFLINE),
+            stat('warning', 'Unknown'): lr(S.UNKNOWN, S.UNKNOWN)
+        }
         try:
             node_data: List[Dict[str, Any]] = self.cns.health.node(node)[1]
             if not node_data:
-                return ServiceHealth.FAILED
+                return S.FAILED
             node_status = str(node_data[0]['Status'])
             if node_status != 'passing' or (not self.is_node_alive(node)):
-                return ServiceHealth.FAILED
-            status = ServiceHealth.UNKNOWN
+                return S.FAILED
+            status = S.UNKNOWN
             for item in node_data:
                 if item['ServiceID'] == str(svc_id):
                     LOG.debug('item.status %s', item['Status'])
                     if item['Status'] == 'critical':
-                        return ServiceHealth.FAILED
+                        return S.FAILED
                     pfid = create_process_fid(svc_id)
                     cns_status = self.get_process_status(pfid)
                     svc_health = svc_to_motr_status_map[MotrConsulProcStatus(
-                                         item['Status'],
-                                         cns_status.proc_status)]
-                    LOG.debug('consul.status %s svc_health: %s',
-                              cns_status, svc_health)
+                        item['Status'], cns_status.proc_status)]
+                    LOG.debug('consul.status %s svc_health: %s', cns_status,
+                              svc_health)
                     local_node = self.get_local_nodename()
                     proc_node = self.get_process_node(pfid)
                     if proc_node == local_node:
                         status = svc_health.motr_proc_status_local
                     else:
                         status = svc_health.motr_proc_status_remote
-                    if (status == ServiceHealth.FAILED and
-                            cns_status.proc_type == (
+                    if (status == S.FAILED and cns_status.proc_type == (
                             m0HaProcessType.M0_CONF_HA_PROCESS_M0MKFS.name)):
-                        status = ServiceHealth.STOPPED
+                        status = S.STOPPED
 
                     # This situation is not expected but we handle
                     # the same. Hax may end up here if the process has stopped
                     # already and its current status is also reported as
                     # 'unknown' by Consul. Hax will do nothing in this case
                     # and will report OFFLINE for that process.
-                    if (item['Status'] == 'warning' and
-                            cns_status.proc_status == 'Unknown' and
-                            status == ServiceHealth.UNKNOWN):
-                        status = ServiceHealth.OFFLINE
+                    if (item['Status'] == 'warning'
+                            and cns_status.proc_status == 'Unknown'
+                            and status == S.UNKNOWN):
+                        status = S.OFFLINE
 
                     return status
         except (ConsulException, HTTPError, RequestException) as e:
