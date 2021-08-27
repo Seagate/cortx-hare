@@ -163,7 +163,10 @@ setup(
     setup_requires=reqs['build'],
     install_requires=reqs['runtime'],
     entry_points={
-        'console_scripts': ['hax=hax.hax:main', 'q=hax.queue.cli:main']
+        'console_scripts': [
+            'hax=hax.hax:main', 'q=hax.queue.cli:main',
+            'configure=helper.configure:main'
+        ]
     },
     ext_modules=[
         Extension(

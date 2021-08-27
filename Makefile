@@ -422,6 +422,7 @@ devinstall-hax: hax/requirements.txt $(HAX_EGG_LINK)
 	@$(call _info,Creating symlinks for hax executables)
 	@ln -v -sf $(PY_VENV_DIR)/bin/hax $(DESTDIR)/$(PREFIX)/bin
 	@ln -v -sf $(PY_VENV_DIR)/bin/q $(DESTDIR)/$(PREFIX)/bin
+	@ln -v -sf $(PY_VENV_DIR)/bin/configure $(DESTDIR)/$(PREFIX)/bin
 
 .PHONY: devinstall-miniprov
 devinstall-miniprov: MP_INSTALL_CMD = $(SETUP_PY) develop
@@ -503,6 +504,7 @@ test-hax: $(PY_VENV_DIR)
 
 .PHONY: lint-hax
 lint-hax: $(PY_VENV_DIR)
+	@$(call _info,Running static analysis of hax sources)
 	@cd hax &&\
 	  $(PY_VENV) &&\
 	  MYPYPATH=../stubs $(PYTHON) setup.py flake8 mypy
