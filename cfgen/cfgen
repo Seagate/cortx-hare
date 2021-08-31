@@ -21,6 +21,17 @@ from math import floor, ceil
 import yaml
 import logging
 
+from dataclasses import dataclass
+
+
+# This class will hold info for disks mentioned in CDF file
+# One use case is to generate list of all disks present in CDF
+# file
+@dataclass
+class DiskRef():
+    node: str
+    path: str
+
 
 __version__ = '0.14'
 
@@ -1929,6 +1940,12 @@ def validate_m0conf(m0conf: Dict[Oid, Any]) -> None:
                for _rel, children in rel_children.items())
 
 
+# This function will return list of disks present in provided pool
+# It will return None if 'disk_refs' is not present in pool
+def get_pool_diskrefs(pool_desc: Dict[str, Any]):
+    return pool_desc.get('disk_refs')
+
+
 # AUX Pools :
 # This feature is developed considering the node (enclosure) failure
 # case. If a node in the cluster fails, it means that all the disks
@@ -1953,7 +1970,9 @@ def validate_m0conf(m0conf: Dict[Oid, Any]) -> None:
 # Outputs : None
 # Saves generated aux pools list in aux_pools[]
 
-def aux_pool_list(pool_desc: Dict[str, Any], m0conf: Dict[Oid, Any]) -> None:
+def aux_pool_list(pool_desc: Dict[str, Any],
+                  disks: List[DiskRef],
+                  m0conf: Dict[Oid, Any]) -> None:
     pool = pool_desc
 
     # Example of encl_ref_combination :
@@ -2004,9 +2023,16 @@ def aux_pool_list(pool_desc: Dict[str, Any], m0conf: Dict[Oid, Any]) -> None:
     # Generate the node combinations considering node failures as
     # allowed by node tolerance values
     temp_pool_nodes = []
-    for nodes in pool['disk_refs']:
-        temp_pool_nodes += [
-            nodes['node']]
+
+    disk_refs = get_pool_diskrefs(pool)
+    if disk_refs is None:
+        for disk in disks:
+            temp_pool_nodes += [
+                disk.node]
+    else:
+        for nodes in disk_refs:
+            temp_pool_nodes += [
+                nodes['node']]
     pool_nodes = list(set(temp_pool_nodes))
     for encl_failures in range(tolerance.enclosure, 0, -1):
         encl_ref_combination += [
@@ -2018,13 +2044,20 @@ def aux_pool_list(pool_desc: Dict[str, Any], m0conf: Dict[Oid, Any]) -> None:
     # Create the disk references for the generated
     # node combinations
     for encl in encl_ref_combination:
-        single_aux_comb = []
+        single_aux_comb: List[Dict[str, Any]] = []
         for encl_x in encl:
-            for dr in pool['disk_refs']:
-                if dr['node'] == encl_x:
-                    single_aux_comb += [dr]
+            if disk_refs is None:
+                for disk in disks:
+                    if disk.node == encl_x:
+                        data = {}
+                        data['node'] = disk.node
+                        data['path'] = disk.path
+                        single_aux_comb += [data]
+            else:
+                for dr in disk_refs:
+                    if dr['node'] == encl_x:
+                        single_aux_comb += [dr]
         disk_ref_combinations += [single_aux_comb]
-
     # Create list of auxilary pools
     aux_pools[pool['name']] = [
         {'name':         pool['name'] + f'-aux{i:003}',
@@ -2082,7 +2115,19 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
         pool_t = pool_type(pool)
         if pool_t == PoolT.sns:
             # For SNS pools create the aux pool list
-            aux_pool_list(pool, conf)
+            disks: List[DiskRef] = []
+            # We need to generate disk_refs only if it is not present
+            # in pool description
+            if not get_pool_diskrefs(pool):
+                for node in cluster_desc['nodes']:
+                    for m0d in node['m0_servers']:
+                        if m0d['runs_confd']:
+                            continue
+                        for d in m0d['io_disks']['data']:
+                            disks.append(DiskRef(path=d,
+                                                 node=node['hostname']))
+
+            aux_pool_list(pool, disks, conf)
         else:
             ConfPool.build(conf, root_id, pool)
 
