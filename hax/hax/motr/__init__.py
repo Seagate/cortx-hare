@@ -402,16 +402,20 @@ class Motr:
         new_state = note.no_state
         proc_fid = Fid.from_struct(note.no_id)
 
-        for svc in services:
-            disk_list += cns.get_disks_by_parent_process(proc_fid, svc.fid)
+        state = (ServiceHealth.OK if new_state ==
+                 HaNoteStruct.M0_NC_ONLINE else ServiceHealth.OFFLINE)
+        is_mkfs = self._is_mkfs(proc_fid)
+
+        mkfs_down = is_mkfs and state != ServiceHealth.OK
+
+        if not mkfs_down:
+            for svc in services:
+                disk_list += cns.get_disks_by_parent_process(proc_fid, svc.fid)
         if disk_list:
-            state = (ServiceHealth.OK if new_state ==
-                     HaNoteStruct.M0_NC_ONLINE else ServiceHealth.OFFLINE)
             # XXX: Need to check the current state of the device, transition
             # to ONLINE only in case of an explicit request or iff the prior
             # state of the device is UNKNOWN/OFFLINE.
-            is_mkfs = self._is_mkfs
-            if not (state == ServiceHealth.STOPPED and is_mkfs(proc_fid)):
+            if not mkfs_down:
                 # We don't mark the devices as failed if the process is MKFS
                 # and if its effective status is STOPPED (see EOS-24124).
                 cns.update_drive_state(disk_list, state, device_event=False)
