@@ -488,13 +488,13 @@ class ConsulUtil:
         #       0x7200000000000001:0x44/services/0x7300000000000001:0x46
         regex = re.compile(
             f'^m0conf\\/.*\\/processes\\/{process_fid}\\/services\\/'
-            f'{svc_fid}\\/(.+)$')
+            f'{svc_fid}\\/sdevs\\/([^/]+)$')
         disks = []
         for node in node_items:
             match_result = re.match(regex, node['Key'])
             if not match_result:
                 continue
-            sdev_fid_item = node['Key'].split('/')[8]
+            sdev_fid_item = match_result.group(1)
             sdev_fidk = Fid.parse(sdev_fid_item).key
             sdev_fid = create_sdev_fid(sdev_fidk)
             disk_fid = self.sdev_to_drive_fid(sdev_fid)
