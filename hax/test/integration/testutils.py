@@ -160,6 +160,17 @@ def tr_method(name: str) -> TraceMatcher:
     return fn
 
 
+def tr_not(matcher: TraceMatcher) -> TraceMatcher:
+    '''
+    Inverts the result of the nested matcher.
+    '''
+
+    def fn(trace: Invocation) -> bool:
+        return not matcher(trace)
+
+    return fn
+
+
 def tr_and(*matchers: TraceMatcher) -> TraceMatcher:
     '''
     Matcher for AssertionPlan that works as logical AND for the matchers
