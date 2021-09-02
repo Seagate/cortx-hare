@@ -68,8 +68,6 @@ make %{?_smp_mflags}
 rm -rf %{buildroot}
 make install DESTDIR=%{buildroot}
 sed -i -e 's@^#!.*\.py3venv@#!/usr@' %{buildroot}/opt/seagate/cortx/hare/bin/*
-sed -i "7i sys.path.insert(1, '/opt/seagate/cortx/hare/lib64/python3.6/site-packages')" %{buildroot}/opt/seagate/cortx/hare/bin/hare_setup
-sed -i "8i sys.path.insert(2, '/opt/seagate/cortx/hare/lib/python3.6/site-packages')" %{buildroot}/opt/seagate/cortx/hare/bin/hare_setup
 
 %clean
 rm -rf %{buildroot}
