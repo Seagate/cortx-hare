@@ -250,6 +250,9 @@ install: install-dirs install-cfgen install-hax install-miniprov install-systemd
 	     $(call _log,copying $$f -> $(MINIPROV_TMPL_DIR)); \
 	     install $$f $(MINIPROV_TMPL_DIR); \
 	 done
+	@$(call _info,Altering generated executables to make Python imports work)
+	@$(call _fix_hare_imports,hare_setup)
+	@$(call _fix_hare_imports,configure)
 
 .PHONY: install-dirs
 install-dirs:
@@ -634,4 +637,17 @@ define _log
     echo "$${YELLOW}    $(1)$${NC}"
 endef
 
+define _fix_hare_imports_ex
+    sed -i "7i sys.path.insert(1, '$(1)/lib64/python3.6/site-packages') # Added by Makefile" $(2) ;\
+    sed -i "8i sys.path.insert(2, '$(1)/lib/python3.6/site-packages') # Added by Makefile" $(2)
+endef
+
+# This function does't use DESTDIR intentionally.
+# DESTDIR will point to a temporary RPM BUILDROOT folder when make install is
+# invoked while building the RPM.
+#
+define _fix_hare_imports
+    $(call _log,Fixing /$(PREFIX)/bin/$(1)) ;\
+    $(call _fix_hare_imports_ex,/$(PREFIX),/$(DESTDIR)/$(PREFIX)/bin/$(1))
+endef
 # vim: textwidth=80 nowrap foldmethod=marker
