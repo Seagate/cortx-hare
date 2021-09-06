@@ -25,11 +25,12 @@ from typing import Any, Callable
 import pytest
 from hax.common import HaxGlobalState
 from hax.handler import ConsumerThread
-from hax.message import BaseMessage, Die, FirstEntrypointRequest
+from hax.message import (BaseMessage, Die, FirstEntrypointRequest,
+                         HaNvecGetEvent)
 from hax.motr import Motr, WorkPlanner
 from hax.motr.delivery import DeliveryHerald
 from hax.motr.ffi import HaxFFI
-from hax.types import (Fid, FidStruct, HaNoteStruct, HAState, Profile,
+from hax.types import (Fid, FidStruct, HaNoteStruct, HAState, Profile, HaNote,
                        ServiceHealth, Uint128)
 from hax.util import create_process_fid, create_profile_fid
 
@@ -266,7 +267,7 @@ def test_first_entrypoint_request_broadcasts_fail_first(
             'Session': ''
         }
 
-    def my_get(key: str, recurse: bool = False):
+    def my_get(key: str, recurse: bool = False, **kwds):
         if key == 'm0conf/nodes' and recurse:
             return [
                 new_kv(k, v) for k, v in [(
@@ -334,6 +335,142 @@ def test_first_entrypoint_request_broadcasts_fail_first(
         'is broadcast'
 
 
+def test_get_nvec_replies_something(
+        mocker, planner, motr, consumer, consul_util):
+    def new_kv(key: str, val: str):
+        return {
+            'Key': key,
+            'CreateIndex': 1793,
+            'ModifyIndex': 1793,
+            'LockIndex': 0,
+            'Flags': 0,
+            'Value': val,
+            'Session': ''
+        }
+
+    def my_get(key: str, recurse: bool = False, **kwds):
+        if key == 'm0conf/nodes' and recurse:
+            return [
+                new_kv(k, v) for k, v in
+                [('m0conf/nodes/0x6e00000000000001:0x3/processes'
+                  '/0x7200000000000001:0x15',
+                  json.dumps({
+                      "name": "m0_server",
+                      "state": "offline"
+                  })), ('m0conf/nodes/cmu/processes/21/services/rm', '16'),
+                 ('m0conf/nodes/localhost/processes/21/services/rms', '17'),
+                 ('m0conf/nodes/0x6e00000000000001:0x3/processes'
+                  '/0x7200000000000001:0x15/services/0x7300000000000001:0x10',
+                  json.dumps({
+                      "name": "rms",
+                      "state": "failed"
+                  })),
+                 ('m0conf/nodes/0x6e00000000000001:0x3/processes'
+                  '/0x7200000000000001:0x15/services/0x7300000000000001:0x10'
+                  '/sdevs/0x6400000000000001:0x20',
+                  json.dumps({
+                      "name": "ios",
+                      "state": "failed"
+                  })),
+                 ('m0conf/nodes/0x6e00000000000001:0x3/processes'
+                  '/0x7200000000000001:0xa/services/0x7300000000000001:0xc',
+                  json.dumps({
+                      "name": "ios",
+                      "state": "failed"
+                  }))]
+            ]
+        elif key == 'm0conf/nodes/localhost/processes/7/services/rms':
+            return new_kv('m0conf/nodes/localhost/processes/7/services/rms',
+                          '17')
+        elif key == 'm0conf/nodes/0x6e00000000000001:0x3':
+            return new_kv(
+                'm0conf/nodes/0x6e00000000000001:0x3',
+                json.dumps({
+                    "name": "localhost",
+                    "state": "M0_NC_UNKNOWN"
+                }))
+        elif key == 'm0conf/sites' and recurse:
+            return [
+                new_kv(k, v) for k, v in
+                [('m0conf/sites/0x5300000000000001:0x1/racks'
+                  '/0x6100000000000001:0x2/encls/0x6500000000000001:0x4'
+                  '/ctrls/0x6300000000000001:0x5',
+                  json.dumps({"state": "M0_NC_UNKNOWN"})),
+                 ('m0conf/sites/0x5300000000000001:0x1/racks'
+                  '/0x6100000000000001:0x2/encls/0x6500000000000001:0x4'
+                  '/ctrls/0x6300000000000001:0x6/drives'
+                  '/0x6b00000000000001:0x2d',
+                  json.dumps({"sdev": "0x6400000000000001:0x20"})),
+                 ('m0conf/sites/0x5300000000000001:0x1/racks'
+                  '/0x6100000000000001:0x2/encls/0x6500000000000001:0x4'
+                  '/ctrls/0x6300000000000001:0x6',
+                  json.dumps({"state": "M0_NC_UNKNOWN"}))]
+            ]
+        raise RuntimeError(f'Unexpected call: key={key}, recurse={recurse}')
+
+    def my_services(name):
+        if name == 'confd':
+            return [{
+                'Node': 'localhost',
+                'Service': 'confd',
+                'ServiceID': '7',
+                'Address': '192.168.0.28',
+                'ServiceAddress': '192.168.0.28',
+                'ServicePort': '12345'
+            }]
+        if name == 'hax':
+            return [{
+                'Node': 'localhost',
+                'Service': 'hax',
+                'ServiceID': '45',
+                'Address': '192.168.0.28',
+                'ServiceAddress': '192.168.0.28',
+                'ServicePort': '667'
+            }]
+        raise RuntimeError(f'Unexpected call: name={name}')
+
+    mocker.patch.object(consul_util.kv, 'kv_get', side_effect=my_get)
+    mocker.patch.object(consul_util,
+                        'get_leader_session_no_wait',
+                        return_value='localhost')
+    mocker.patch.object(consul_util,
+                        'get_session_node',
+                        return_value='localhost')
+
+    mocker.patch.object(consul_util.catalog,
+                        'get_services',
+                        side_effect=my_services)
+    mocker.patch.object(consul_util, 'get_node_health', return_value='passing')
+    mocker.patch.object(consul_util,
+                        'get_service_health',
+                        return_value=ServiceHealth.OK)
+
+    msg = HaNvecGetEvent(
+        hax_msg=12,
+        nvec=[
+            HaNote(obj_t='SERVICE',
+                   note=HaNoteStruct(
+                       no_id=Fid.parse('0x7300000000000001:0x10').to_c(),
+                       no_state=5)),
+            HaNote(obj_t='PROCESS',
+                   note=HaNoteStruct(
+                       no_id=Fid.parse('0x7200000000000001:0x15').to_c(),
+                       no_state=5)),
+            HaNote(obj_t='DRIVE',
+                   note=HaNoteStruct(
+                       no_id=Fid.parse('0x6b00000000000001:0x2d').to_c(),
+                       no_state=5)),
+            HaNote(obj_t='CONTROLLER',
+                   note=HaNoteStruct(
+                       no_id=Fid.parse('0x6300000000000001:0x5').to_c(),
+                       no_state=5))
+        ])
+    run_in_consumer(mocker, msg, planner, consumer, motr)
+    traces = motr._ffi.traces
+    assert AssertionPlan(
+        tr_method('ha_nvec_reply')).run(traces), 'ha_nvec_reply not invoked'
+
+
 def test_broadcast_node_failure(mocker, motr, consul_util):
     def new_kv(key: str, val: str):
         return {
@@ -346,7 +483,7 @@ def test_broadcast_node_failure(mocker, motr, consul_util):
             'Session': ''
         }
 
-    def my_get(key: str, recurse: bool = False):
+    def my_get(key: str, recurse: bool = False, **kwds):
         if key == 'm0conf/nodes' and recurse:
             return [
                 new_kv(k, v) for k, v in
@@ -497,7 +634,7 @@ def new_kv(key: str, val: str):
 
 
 def create_stub_get(process_type: str) -> Callable[[str, bool], Any]:
-    def my_get(key: str, recurse: bool = False):
+    def my_get(key: str, recurse: bool = False, **kwds):
         if key == 'm0conf/nodes' and recurse:
             return [
                 new_kv(k, v) for k, v in
@@ -694,7 +831,7 @@ def test_broadcast_io_service_failure(mocker, planner, motr, consumer,
             'Session': ''
         }
 
-    def my_get(key: str, recurse: bool = False):
+    def my_get(key: str, recurse: bool = False, **kwds):
         if key == 'm0conf/nodes' and recurse:
             return [
                 new_kv(k, v) for k, v in
