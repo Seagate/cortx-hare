@@ -25,11 +25,11 @@ import pytest
 
 from hax.handler import ConsumerThread
 from hax.message import (BaseMessage, Die, FirstEntrypointRequest,
-                         HaNvecGetEvent, StobId, StobIoqError)
+                         HaNvecGetEvent)
 from hax.motr import Motr, WorkPlanner
 from hax.motr.delivery import DeliveryHerald
 from hax.motr.ffi import HaxFFI
-from hax.types import (Fid, FidStruct, HaNote, HaNoteStruct, HAState, Profile,
+from hax.types import (Fid, FidStruct, HaNoteStruct, HAState, Profile, HaNote,
                        ServiceHealth, Uint128)
 from hax.util import create_process_fid, create_profile_fid, dump_json
 
@@ -413,14 +413,21 @@ def test_get_nvec_replies_something(
             }]
         raise RuntimeError(f'Unexpected call: name={name}')
 
-    patch = mocker.patch.object
-    patch(consul_util.kv, 'kv_get', side_effect=my_get)
-    patch(consul_util, 'get_leader_session_no_wait', return_value='localhost')
-    patch(consul_util, 'get_session_node', return_value='localhost')
+    mocker.patch.object(consul_util.kv, 'kv_get', side_effect=my_get)
+    mocker.patch.object(consul_util,
+                        'get_leader_session_no_wait',
+                        return_value='localhost')
+    mocker.patch.object(consul_util,
+                        'get_session_node',
+                        return_value='localhost')
 
-    patch(consul_util.catalog, 'get_services', side_effect=my_services)
-    patch(consul_util, 'get_node_health_status', return_value='passing')
-    patch(consul_util, 'get_service_health', return_value=ServiceHealth.OK)
+    mocker.patch.object(consul_util.catalog,
+                        'get_services',
+                        side_effect=my_services)
+    mocker.patch.object(consul_util, 'get_node_health', return_value='passing')
+    mocker.patch.object(consul_util,
+                        'get_service_health',
+                        return_value=ServiceHealth.OK)
 
     msg = HaNvecGetEvent(
         hax_msg=12,
@@ -445,7 +452,7 @@ def test_get_nvec_replies_something(
     run_in_consumer(mocker, msg, planner, consumer, motr)
     traces = motr._ffi.traces
     assert AssertionPlan(
-        tr_method('ha_nvec_reply')).exists(traces), 'ha_nvec_reply not invoked'
+        tr_method('ha_nvec_reply')).run(traces), 'ha_nvec_reply not invoked'
 
 
 def test_broadcast_node_failure(mocker, motr, consul_util):
