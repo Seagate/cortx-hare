@@ -56,6 +56,22 @@ and health-checking mechanisms.
   ```sh
   sudo yum localinstall -y https://yum.puppetlabs.com/puppet/el/7/x86_64/puppet-agent-7.0.0-1.el7.x86_64.rpm
   ```
+   * **Note:**   
+     Check facter version details, if already installed / exist in system
+     ```sh
+     facter -v
+     ls -ll /usr/bin/facter
+     ```
+     Supported version is **facter >= 3.14.8**, If the facter version is **< 3.14.8** then follow the steps below: 
+     ```sh
+     rm -rf /usr/bin/facter
+     yum list installed | grep "puppet-agent"
+     yum remove puppet-agent.x86_64
+     ```
+     Now install puppet-agent (above command in README), then create softlink to facter binary
+     ```sh
+     ln -s /opt/puppetlabs/bin/facter /usr/bin/facter
+     ```
 
 * Install Consul.
   ```sh
