@@ -21,6 +21,7 @@ import logging
 from errno import EAGAIN
 from typing import Any, List, Optional
 
+from hax.consul.cache import supports_consul_cache
 from hax.exception import ConfdQuorumException, RepairRebalanceException
 from hax.message import (EntrypointRequest, FirstEntrypointRequest,
                          HaNvecGetEvent, ProcessEvent, StobIoqError)
@@ -366,13 +367,14 @@ class Motr:
         self.planner.add_command(HaNvecGetEvent(hax_msg, nvec))
 
     @log_exception
-    def ha_nvec_get_reply(self, event: HaNvecGetEvent) -> None:
+    @supports_consul_cache
+    def ha_nvec_get_reply(self, event: HaNvecGetEvent, kv_cache=None) -> None:
         LOG.debug('Preparing the reply for HaNvecGetEvent (nvec size = %s)',
                   len(event.nvec))
         notes: List[HaNoteStruct] = []
         for n in event.nvec:
             n.note.no_state = self.consul_util.get_conf_obj_status(
-                ObjT[n.obj_t], n.note.no_id.f_key)
+                ObjT[n.obj_t], n.note.no_id.f_key, kv_cache=kv_cache)
             notes.append(n.note)
 
         LOG.debug('Replying ha nvec of length ' + str(len(event.nvec)))
