@@ -230,3 +230,7 @@ class FakeFFI(HaxFFI):
     @trace_call
     def hax_stop(self, *args):
         return [MessageId(111, 1)]
+
+    @trace_call
+    def ha_nvec_reply(self, _ha_ctx, ha_notes, notes_len):
+        return [MessageId(101, 1), MessageId(101, 2)]
