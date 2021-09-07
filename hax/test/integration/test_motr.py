@@ -309,11 +309,11 @@ def test_first_entrypoint_request_broadcasts_fail_first(
     traces = motr._ffi.traces
     assert AssertionPlan(
         tr_and(tr_method('ha_broadcast'),
-               ha_note_failed())).run(traces), 'M0_NC_FAILED not broadcast'
+               ha_note_failed())).exists(traces), 'M0_NC_FAILED not broadcast'
     assert AssertionPlan(
         tr_and(tr_method('ha_broadcast'),
                ha_note_failed())).and_then(
-        tr_method('entrypoint_reply')).run(traces), \
+        tr_method('entrypoint_reply')).exists(traces), \
         'entrypoint_reply should go after M0_NC_FAILED ' \
         'is broadcast'
 
@@ -451,7 +451,7 @@ def test_get_nvec_replies_something(
     run_in_consumer(mocker, msg, planner, consumer, motr)
     traces = motr._ffi.traces
     assert AssertionPlan(
-        tr_method('ha_nvec_reply')).run(traces), 'ha_nvec_reply not invoked'
+        tr_method('ha_nvec_reply')).exists(traces), 'ha_nvec_reply not invoked'
 
 
 def test_broadcast_node_failure(mocker, motr, consul_util):
@@ -601,7 +601,7 @@ def test_broadcast_node_failure(mocker, motr, consul_util):
     traces = motr._ffi.traces
     assert AssertionPlan(
         tr_and(tr_method('ha_broadcast'),
-               node_failed())).run(traces), 'Node failure not broadcast'
+               node_failed())).exists(traces), 'Node failure not broadcast'
 
 
 def new_kv(key: str, val: str):
@@ -770,7 +770,7 @@ def test_mkfs_process_stopped_no_disk_marked_offline(mocker, motr,
     traces = motr._ffi.traces
     assert AssertionPlan(
         tr_and(tr_method('ha_broadcast'),
-               tr_not(contains_drive()))).run(traces), \
+               tr_not(contains_drive()))).exists(traces), \
         'DRIVE should not be broadcast when MKFS is stopped'
 
 
@@ -797,7 +797,7 @@ def test_nonmkfs_process_stop_causes_drive_offline(mocker, motr, consul_util):
     traces = motr._ffi.traces
     assert AssertionPlan(
         tr_and(tr_method('ha_broadcast'),
-               contains_drive())).run(traces), \
+               contains_drive())).exists(traces), \
         'DRIVE must be broadcast when non-MKFS process is stopped'
 
 
@@ -945,7 +945,7 @@ def test_broadcast_io_service_failure(mocker, planner, motr, consumer,
     traces = motr._ffi.traces
     assert AssertionPlan(tr_and(
         tr_method('ha_broadcast'),
-        io_service_failed())).run(traces), 'IOservice failure not broadcast'
+        io_service_failed())).exists(traces), 'IOservice failure not broadcast'
     assert AssertionPlan(tr_and(tr_method('ha_broadcast'),
-                                node_fid_failed())).not_exist(traces), \
+                                node_fid_failed())).not_exists(traces), \
         'Node failure should not be broadcast'
