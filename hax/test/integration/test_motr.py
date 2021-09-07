@@ -429,21 +429,14 @@ def test_get_nvec_replies_something(
             }]
         raise RuntimeError(f'Unexpected call: name={name}')
 
-    mocker.patch.object(consul_util.kv, 'kv_get', side_effect=my_get)
-    mocker.patch.object(consul_util,
-                        'get_leader_session_no_wait',
-                        return_value='localhost')
-    mocker.patch.object(consul_util,
-                        'get_session_node',
-                        return_value='localhost')
+    patch = mocker.patch.object
+    patch(consul_util.kv, 'kv_get', side_effect=my_get)
+    patch(consul_util, 'get_leader_session_no_wait', return_value='localhost')
+    patch(consul_util, 'get_session_node', return_value='localhost')
 
-    mocker.patch.object(consul_util.catalog,
-                        'get_services',
-                        side_effect=my_services)
-    mocker.patch.object(consul_util, 'get_node_health', return_value='passing')
-    mocker.patch.object(consul_util,
-                        'get_service_health',
-                        return_value=ServiceHealth.OK)
+    patch(consul_util.catalog, 'get_services', side_effect=my_services)
+    patch(consul_util, 'get_node_health_status', return_value='passing')
+    patch(consul_util, 'get_service_health', return_value=ServiceHealth.OK)
 
     msg = HaNvecGetEvent(
         hax_msg=12,
