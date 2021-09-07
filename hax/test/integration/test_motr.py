@@ -452,7 +452,7 @@ def test_get_nvec_replies_something(
     run_in_consumer(mocker, msg, planner, consumer, motr)
     traces = motr._ffi.traces
     assert AssertionPlan(
-        tr_method('ha_nvec_reply')).run(traces), 'ha_nvec_reply not invoked'
+        tr_method('ha_nvec_reply')).exists(traces), 'ha_nvec_reply not invoked'
 
 
 def test_broadcast_node_failure(mocker, motr, consul_util):
