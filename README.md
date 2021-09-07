@@ -52,13 +52,17 @@ and health-checking mechanisms.
   sudo yum -y install python3 python3-devel
   ```
 
-* Install facter
+* Install puppet-agent (&ge; 6.13.0)
   
-  > **NOTE:** the supported version of facter is 3.14 or above, which is available in CentOS 8 as a separate rpm,
-  > but on CentOS 7 it needs to be installed from puppet-agent rpm.
-  
-  Check facter version details:
-  
+  Check facter version details, if already installed / exist in system
+  ```sh
+  facter -v
+  ```
+  Supported version is **facter >= 3.14.8**, If the facter version is **< 3.14.8** then follow the steps below: 
+  ```sh
+  yum erase -y $(rpm -q --whatprovides $(readlink -f /usr/bin/facter)) || rm -fv /usr/bin/facter
+  ```
+  Now install puppet-agent
   ```sh
   facter -v
   ```
@@ -75,6 +79,10 @@ and health-checking mechanisms.
   
   ```sh
   sudo yum install -y facter
+  ```
+  Create symlink to facter binary, if not
+  ```sh
+  [ ! -f /usr/bin/facter ] && sudo ln -s /opt/puppetlabs/bin/facter /usr/bin/facter
   ```
 
 * Install Consul.
