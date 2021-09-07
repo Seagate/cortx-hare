@@ -165,7 +165,8 @@ setup(
     entry_points={
         'console_scripts': [
             'hax=hax.hax:main', 'q=hax.queue.cli:main',
-            'configure=helper.configure:main'
+            'configure=helper.configure:main',
+            'update-conf=helper.update_conf:main'
         ]
     },
     ext_modules=[

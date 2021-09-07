@@ -254,6 +254,7 @@ install: install-dirs install-cfgen install-hax install-miniprov install-systemd
 	@$(call _info,Altering generated executables to make Python imports work)
 	@$(call _fix_hare_imports,hare_setup)
 	@$(call _fix_hare_imports,configure)
+	@$(call _fix_hare_imports,update-conf)
 
 .PHONY: install-dirs
 install-dirs:
@@ -427,6 +428,7 @@ devinstall-hax: hax/requirements.txt $(HAX_EGG_LINK)
 	@ln -v -sf $(PY_VENV_DIR)/bin/hax $(DESTDIR)/$(PREFIX)/bin
 	@ln -v -sf $(PY_VENV_DIR)/bin/q $(DESTDIR)/$(PREFIX)/bin
 	@ln -v -sf $(PY_VENV_DIR)/bin/configure $(DESTDIR)/$(PREFIX)/bin
+	@ln -v -sf $(PY_VENV_DIR)/bin/update-conf $(DESTDIR)/$(PREFIX)/bin
 
 .PHONY: devinstall-miniprov
 devinstall-miniprov: MP_INSTALL_CMD = $(SETUP_PY) develop
