@@ -21,6 +21,7 @@
 
 import argparse
 import asyncio
+import inject
 import json
 import logging
 import os
@@ -35,6 +36,7 @@ from urllib.parse import urlparse
 
 import yaml
 from cortx.utils.product_features import unsupported_features
+from hax.common import di_configuration
 from hax.types import KeyDelete
 from hax.util import ConsulUtil, repeat_if_fails, KVAdapter
 
@@ -611,6 +613,7 @@ def add_factory_argument(parser):
 
 
 def main():
+    inject.configure(di_configuration)
     p = argparse.ArgumentParser(description='Configure hare settings')
     subparser = p.add_subparsers()
 

@@ -31,6 +31,7 @@ from hax.message import (BaseMessage, BroadcastHAStates, SnsDiskAttach,
                          SnsRebalanceStart, SnsRebalanceStatus,
                          SnsRebalanceStop, SnsRepairPause, SnsRepairResume,
                          SnsRepairStart, SnsRepairStatus, SnsRepairStop)
+from hax.common import HaxGlobalState
 from hax.motr.delivery import DeliveryHerald
 from hax.motr.planner import WorkPlanner
 from hax.queue import BQProcessor
@@ -197,10 +198,12 @@ class ServerRunner:
         planner: WorkPlanner,
         herald: DeliveryHerald,
         consul_util: ConsulUtil,
+        hax_state: HaxGlobalState
     ):
         self.consul_util = consul_util
         self.herald = herald
         self.planner = planner
+        self.hax_state = hax_state
 
     def _create_server(self) -> web.Application:
         return web.Application(middlewares=[encode_exception])
@@ -259,6 +262,7 @@ class ServerRunner:
             self._start(web_address, port)
             LOG.debug('Server stopped normally')
         finally:
+            self.hax_state.set_stopping()
             LOG.debug('Stopping the threads')
             self.planner.shutdown()
             for thread in threads_to_wait:

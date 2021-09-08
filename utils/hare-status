@@ -21,6 +21,7 @@
 
 import json
 import argparse
+import inject
 import io
 import logging
 import simplejson
@@ -29,6 +30,7 @@ from subprocess import PIPE, Popen
 from typing import Any, Dict, List, NamedTuple, Optional
 
 from consul import Consul, ConsulException
+from hax.common import di_configuration
 from hax.exception import HAConsistencyException
 from hax.util import repeat_if_fails
 from requests.exceptions import RequestException
@@ -302,6 +304,7 @@ def show_text_status(cns: Consul, devices_requested: bool) -> None:
 
 
 def main(argv=None):
+    inject.configure(di_configuration)
     setup_logging()
     opts = parse_opts(argv)
     cns = Consul()

@@ -17,10 +17,12 @@
 #
 
 # flake8: noqa
+import inject
 import logging
 import unittest
 from time import sleep
 
+from hax.common import di_configuration
 from hax.queue.offset import OffsetStorage
 from hax.util import KVAdapter
 from unittest.mock import Mock, MagicMock
@@ -29,6 +31,7 @@ from unittest.mock import Mock, MagicMock
 class TestOffsetStorage(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        inject.configure(di_configuration)
         logging.basicConfig(
             level=logging.DEBUG,
             format='%(asctime)s {%(threadName)s} [%(levelname)s] %(message)s')

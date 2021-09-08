@@ -19,11 +19,13 @@
 
 # :help: stop the cluster or local node
 
+import inject
 import logging
 import argparse
 from typing import Dict, List, Tuple
 
 from consul import Consul
+from hax.common import di_configuration
 from hax.util import ConsulUtil, repeat_if_fails
 
 import utils
@@ -108,7 +110,7 @@ def node_shutdown():
 
 
 def main() -> None:
-
+    inject.configure(di_configuration)
     parser = argparse.ArgumentParser()
     parser.add_argument("-v", "--verbose",
                         help="Increase output verbosity",
