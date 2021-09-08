@@ -16,6 +16,7 @@
 # please email opensource@seagate.com or cortx-questions@seagate.com.
 #
 
+import inject
 import json
 import logging
 import os
@@ -33,6 +34,7 @@ from consul.base import ClientError
 from requests.exceptions import RequestException
 from urllib3.exceptions import HTTPError
 
+from hax.common import HaxGlobalState
 from hax.exception import HAConsistencyException, InterruptedException
 from hax.types import (ConfHaProcess, Fid, FsStatsWithTime,
                        ObjT, ServiceHealth, Profile, m0HaProcessEvent,
@@ -132,20 +134,27 @@ def repeat_if_fails(wait_seconds=5, max_retries=-1):
         @wraps(f)
         def wrapper(*args, **kwds):
             attempt_count = 0
+            state: HaxGlobalState = inject.instance(HaxGlobalState)
             while (True):
                 try:
                     return f(*args, **kwds)
                 except HAConsistencyException as e:
+                    if state.is_stopping():
+                        LOG.warning(
+                            'HAConsistencyException will not cause '
+                            'automatic retries: application is exiting.')
+                        raise e
                     attempt_count += 1
                     if max_retries >= 0 and attempt_count > max_retries:
-                        LOG.warn(
+                        LOG.warning(
                             'Function %s: Too many errors happened in a row '
                             '(max_retries = %d)', f.__name__, max_retries)
                         raise e
-                    LOG.warn(f'Got HAConsistencyException: {e.message} while '
-                             f'invoking function {f.__name__} '
-                             f'(attempt {attempt_count}). The attempt will be '
-                             f'repeated in {wait_seconds} seconds')
+                    LOG.warning(
+                        f'Got HAConsistencyException: {e.message} while '
+                        f'invoking function {f.__name__} '
+                        f'(attempt {attempt_count}). The attempt will be '
+                        f'repeated in {wait_seconds} seconds')
                     sleep(wait_seconds)
 
         return wrapper
@@ -366,8 +375,15 @@ class ConsulUtil:
         just a randomly generated string (see hare-node-join script for
         more details).
         """
+
         leader = self.kv.kv_get('leader')
+        if leader is None:
+            raise HAConsistencyException('No leader key exists yet')
+
         node: bytes = leader['Value']
+        if node is None:
+            raise HAConsistencyException('No RC leader found')
+
         return node.decode('utf-8')
 
     @repeat_if_fails()

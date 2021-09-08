@@ -17,11 +17,13 @@
 #
 
 import ctypes
+import inject
 import json
 import logging
 from typing import Any, Callable
 
 import pytest
+from hax.common import HaxGlobalState
 from hax.handler import ConsumerThread
 from hax.message import BaseMessage, Die, FirstEntrypointRequest
 from hax.motr import Motr, WorkPlanner
@@ -47,6 +49,21 @@ def planner(mocker) -> WorkPlanner:
     planner = WorkPlanner()
     mocker.patch.object(planner, 'add_command', side_effect=RuntimeError())
     return planner
+
+
+@pytest.fixture
+def hax_state() -> HaxGlobalState:
+    return HaxGlobalState()
+
+
+@pytest.fixture(autouse=True)
+def logging_support(hax_state: HaxGlobalState):
+    def configure(binder: inject.Binder):
+        binder.bind(HaxGlobalState, hax_state)
+
+    inject.clear_and_configure(configure)
+    yield ''
+    inject.clear()
 
 
 def ha_note_failed() -> TraceMatcher:

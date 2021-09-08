@@ -20,8 +20,10 @@ import logging
 from base64 import b64encode
 from typing import List
 
+import inject
 import pytest
 import simplejson
+from hax.common import HaxGlobalState
 from hax.message import BroadcastHAStates
 from hax.motr import WorkPlanner
 from hax.motr.delivery import DeliveryHerald
@@ -46,9 +48,25 @@ def planner(mocker) -> WorkPlanner:
 
 
 @pytest.fixture
+def hax_state() -> HaxGlobalState:
+    return HaxGlobalState()
+
+
+@pytest.fixture(autouse=True)
+async def logging_support(hax_state: HaxGlobalState):
+    def configure(binder: inject.Binder):
+        binder.bind(HaxGlobalState, hax_state)
+
+    inject.clear_and_configure(configure)
+    yield ''
+    inject.clear()
+
+
+@pytest.fixture
 async def hax_client(mocker, aiohttp_client, herald, planner, consul_util,
                      loop):
-    srv = ServerRunner(planner, herald, consul_util)
+    state = inject.instance(HaxGlobalState)
+    srv = ServerRunner(planner, herald, consul_util, state)
     srv._configure()
     return await aiohttp_client(srv.app)
 

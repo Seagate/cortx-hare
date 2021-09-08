@@ -20,9 +20,14 @@
 
 import logging
 import re
+import signal
 from typing import List, NamedTuple
 
+import inject
+
+from hax.common import HaxGlobalState, di_configuration
 from hax.filestats import FsStatsUpdater
+from hax.ha import create_ha_thread
 from hax.handler import ConsumerThread
 from hax.log import setup_logging
 from hax.motr import Motr
@@ -33,7 +38,6 @@ from hax.motr.rconfc import RconfcStarter
 from hax.server import ServerRunner
 from hax.types import Fid, Profile, StoppableThread
 from hax.util import ConsulUtil, repeat_if_fails
-from hax.ha import create_ha_thread
 
 __all__ = ['main']
 
@@ -105,16 +109,28 @@ def main():
     # Note: no logging must happen before this call.
     # Otherwise the log configuration will not apply.
     setup_logging()
+    inject.configure(di_configuration)
 
-    # [KN] The elements in the queue will appear if
+    state = inject.instance(HaxGlobalState)
+
+    # [KN] The elements in the work planner will appear if
     # 1. A callback is invoked from ha_link (this will happen in a motr
     #    thread which must be free ASAP)
     # 2. A new HA notification has come form Consul via HTTP
-    # [KN] The messages are consumed by Python thread created by
+    # [KN] The messages are consumed by Python threads created by
     # _run_qconsumer_thread function.
     #
     # [KN] Note: The server is launched in the main thread.
     planner = WorkPlanner()
+
+    def handle_signal(sig, frame):
+        state.set_stopping()
+        planner.shutdown()
+
+    # This is necessary to allow hax to exit early if Consul is not available
+    # (otherwise _get_motr_fids() may be retrying forever even if the hax
+    # process needs to shutdown).
+    signal.signal(signal.SIGINT, handle_signal)
 
     util: ConsulUtil = ConsulUtil()
     _remove_stale_session(util)
@@ -152,7 +168,10 @@ def main():
         # [KN] This is a blocking call. It will work until the program is
         # terminated by signal
 
-        server = ServerRunner(planner, herald, consul_util=util)
+        server = ServerRunner(planner,
+                              herald,
+                              consul_util=util,
+                              hax_state=state)
         server.run(threads_to_wait=[
             *consumer_threads, stats_updater, rconfc_starter, event_poller
         ])
