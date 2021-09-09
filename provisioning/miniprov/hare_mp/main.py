@@ -523,6 +523,11 @@ def generate_config(url: str, path_to_cdf: str) -> None:
     if path:
         path += os.pathsep + '/opt/seagate/cortx/hare/bin/'
     python_path = os.pathsep.join(sys.path)
+
+    conf = ConfStoreProvider(url)
+    hostname = conf.get_hostname()
+    save(f'{conf_dir}/node-name', hostname)
+
     cmd = ['configure', '-c', conf_dir, path_to_cdf]
     execute(cmd, env={'PYTHONPATH': python_path, 'PATH': path,
                       'LC_ALL': "en_US.utf-8", 'LANG': "en_US.utf-8"})
@@ -530,9 +535,19 @@ def generate_config(url: str, path_to_cdf: str) -> None:
     cmd = ['update-consul-conf']
     execute(cmd, env={'PYTHONPATH': python_path, 'PATH': path,
                       'LC_ALL': "en_US.utf-8", 'LANG': "en_US.utf-8"})
-    conf = ConfStoreProvider(url)
-    hostname = conf.get_hostname()
-    save(f'{conf_dir}/node-name', hostname)
+
+    # Create motr confd.xc
+    with open(f'{conf_dir}/confd.dhall', 'r') as confdhall:
+        cmd = ['dhall', 'text']
+        conf_out = execute(cmd, env={'PYTHONPATH': python_path, 'PATH': path},
+                           stdin=confdhall)
+        with open(f'{conf_dir}/confd.xc', 'w+') as confxc:
+            cmd = ['m0confgen']
+            execute(cmd, env={'PYTHONPATH': python_path,
+                              'PATH': '/usr/bin',
+                              'LC_ALL': "en_US.utf-8",
+                              'LANG': "en_US.utf-8"},
+                    inp=conf_out, stdout=confxc)
 
 
 def update_hax_unit(filename: str) -> None:

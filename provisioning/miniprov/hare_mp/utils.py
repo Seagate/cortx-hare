@@ -114,17 +114,18 @@ class Utils:
                                str(item_data['value']))
 
 
-def execute(cmd: List[str], env=None) -> str:
+def execute(cmd: List[str], encoding=None, env=None, stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE, inp=None) -> str:
     process = subprocess.Popen(cmd,
-                               stdin=subprocess.PIPE,
-                               stdout=subprocess.PIPE,
+                               stdin=stdin,
+                               stdout=stdout,
                                stderr=subprocess.PIPE,
-                               encoding='utf8',
+                               encoding=encoding,
                                env=env)
-    out, err = process.communicate()
+    result, err = process.communicate(input=inp)
     if process.returncode:
         raise Exception(
             f'Command {cmd} exited with error code {process.returncode}. '
             f'Command output: {err}')
 
-    return out
+    return result
