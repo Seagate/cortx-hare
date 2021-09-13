@@ -19,7 +19,16 @@
 -}
 
 let types = ../types.dhall
+
+let renderAddr = \(label : Text) -> \(addr : types.Addr)
+ ->
+    "${label}:${addr.ipaddr}"
+
 in
-\(x : types.LibfabricEndpoint) ->
-    let nat = Natural/show
-    in "${./NetFamily.dhall x.netfamily}:${./LibfabricNetId.dhall x.nid}@${nat x.portal}"
+\(nid : types.NetId) ->
+    merge
+    { lo = "0@lo"
+    , tcp = \(x : { tcp : types.Addr }) -> renderAddr "tcp" x.tcp
+    , o2ib = \(x : { o2ib : types.Addr }) -> renderAddr "o2ib" x.o2ib
+    }
+    nid
