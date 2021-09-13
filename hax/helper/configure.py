@@ -130,7 +130,14 @@ class ConfGenerator:
 
         self.executor.run(Program([
             'mk-consul-env', '--mode', 'server', '--bind', join_ip,
-            *join_peers_opt, '--extra-options', '-ui -bootstrap-expect 1'
+            *join_peers_opt, '--extra-options', '-ui -bootstrap-expect 1',
+            '--conf-dir', f'{self.conf_dir}'
+        ]),
+                          env=self._get_pythonic_env())
+
+        self.executor.run(Program([
+            'update-consul-conf', '--conf-dir', f'{self.conf_dir}',
+            '--kv-file', f'{self.conf_dir}/consul-kv.json'
         ]),
                           env=self._get_pythonic_env())
 

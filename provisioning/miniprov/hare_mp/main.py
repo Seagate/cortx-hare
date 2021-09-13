@@ -527,12 +527,6 @@ def generate_config(url: str, path_to_cdf: str) -> None:
     execute(cmd, env={'PYTHONPATH': python_path, 'PATH': path,
                       'LC_ALL': "en_US.utf-8", 'LANG': "en_US.utf-8"})
     utils.import_kv(conf_dir)
-    cmd = ['update-consul-conf']
-    execute(cmd, env={'PYTHONPATH': python_path, 'PATH': path,
-                      'LC_ALL': "en_US.utf-8", 'LANG': "en_US.utf-8"})
-    conf = ConfStoreProvider(url)
-    hostname = conf.get_hostname()
-    save(f'{conf_dir}/node-name', hostname)
 
 
 def update_hax_unit(filename: str) -> None:
