@@ -40,6 +40,7 @@ Options:
   -b, --bind IP             IP address to bind to.
   -j, --join IP             IP address to join.
   -e, --extra-options STR   Additional options.
+  -c, --conf-dir STR        Configuration directory path.
   -h, --help                Show this help and exit.
 EOF
 }
@@ -48,9 +49,10 @@ mode=
 bind_addr=
 join_addr=
 extra_opts=
+conf_dir=
 
-TEMP=$(getopt --options hm:b:j:e: \
-              --longoptions help,mode:,bind:,join:,extra-options: \
+TEMP=$(getopt --options hm:b:j:e:c: \
+              --longoptions help,mode:,bind:,join:,extra-options:,conf-dir: \
               --name "$PROG" -- "$@" || true)
 
 (($? == 0)) || { usage >&2; exit 1; }
@@ -59,6 +61,7 @@ eval set -- "$TEMP"
 while true; do
     case "$1" in
         -h|--help)           usage; exit ;;
+        -c|--conf-dir)       conf_dir=$2; shift 2 ;;
         -m|--mode)           mode=$2; shift 2 ;;
         -b|--bind)           bind_addr=$2; shift 2 ;;
         -j|--join)           join_addr="$join_addr $2"; shift 2 ;;
@@ -103,7 +106,7 @@ fi
 # Prepare for consul-agent startup:
 sudo rm -rf /var/lib/hare/consul-data-$bind_addr
 
-conf_dir=consul-$mode-conf
-sudo mkdir -p /var/lib/hare/$conf_dir
-sudo cp $HARE_DIR/share/consul/$conf_dir.json.in \
-     /var/lib/hare/$conf_dir/$conf_dir.json
+consul_conf_dir=consul-$mode-conf
+sudo mkdir -p $conf_dir/$consul_conf_dir
+sudo cp $HARE_DIR/share/consul/$consul_conf_dir.json.in \
+     $conf_dir/$consul_conf_dir/$consul_conf_dir.json
