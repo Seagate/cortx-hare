@@ -17,7 +17,7 @@
 # For any questions about this software or licensing,
 # please email opensource@seagate.com or cortx-questions@seagate.com.
 
-set -eu -o pipefail
+set -u -o pipefail
 
 prog=${0##*/}
 
@@ -31,6 +31,8 @@ Options:
   -x, --hax       Check hax service.
   -f, --fid fid   Check Motr service of the specified fid.
   -s, --svc svc   Check another service specified as svc.
+  -p, --port port Check service liveness by sending request to
+                  the given port.
   -h, --help      Show this help.
 EOF
 }
@@ -39,8 +41,8 @@ fid=
 hax=
 svc=
 
-TEMP=$(getopt --options hxf:s: \
-              --longoptions help,hax,fid:,svc: \
+TEMP=$(getopt --options hxf:s:p: \
+              --longoptions help,hax,fid:,svc:,port: \
               --name "$prog" -- "$@" || true)
 
 (($? == 0)) || { usage >&2; exit 1; }
@@ -53,12 +55,13 @@ while true ; do
         -x|--hax)    hax=yes; shift 1 ;;
         -f|--fid)    fid=$2; shift 2 ;;
         -s|--svc)    svc=$2; shift 2 ;;
+        -p|--port)   port=$2; shift 2 ;;
         --)          shift; break ;;
         *)           echo 'getopt: internal error...'; exit 1 ;;
     esac
 done
 
-[[ -n $fid || -n $hax || -n $svc ]] || { usage >&2; exit 1; }
+[[ -n $fid || -n $hax || -n $svc || -n $port ]] || { usage >&2; exit 1; }
 
 if [[ $hax ]]; then
     service=hare-hax
@@ -74,6 +77,10 @@ declare -A status=(
     [warning]=1
     [failing]=2
 )
+
+get_node_name() {
+    /opt/seagate/cortx/hare/libexec/node-name
+}
 
 # Convert fid to decimal service id (used in Consul):
 # $ fid=0x7200000000000001:0xa
@@ -107,11 +114,22 @@ if [[ $service =~ m0d ]]; then
     fi
 fi
 
-case $(systemctl is-active $service) in
-    active|activating)
+curl $(get_node_name):$port
+rc=$?
+# Curl return codes that suggests that the service is active,
+# 0 -> OK, all fine. Proceed as usual.
+# 52 -> GOT_NOTHING (empty response), was able to communicate
+#       on the given hostname and port but server did not return
+#       anything, mostly because the service doesn't serve http
+#       requests.
+# 56 -> RECV_ERROR, Failure with receiving network data. Curl was
+#       able to communicate on the given hostname and port but did
+#       not receive any data. This the typical response code that
+#       is received when curl request is sent to motr processes on
+#       their given ports.
+case $rc in
+    0|52|56)
         exit ${status[passing]};;
-    failed)
-        exit ${status[failing]};;
     *)
         exit ${status[warning]};;
 esac

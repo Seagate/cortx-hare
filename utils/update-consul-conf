@@ -204,7 +204,8 @@ append_hax_svc() {
       \"port\": $port,
       \"checks\": [
           {
-            \"args\": [ \"/opt/seagate/cortx/hare/libexec/check-service\", \"--hax\" ],
+            \"args\": [ \"/opt/seagate/cortx/hare/libexec/check-service\",
+                        \"--hax\", \"--port\", \"$port\" ],
             \"interval\": \"1s\",
             \"status\": \"warning\"
           }
@@ -226,7 +227,7 @@ append_confd_svc() {
       \"checks\": [
           {
             \"args\": [ \"/opt/seagate/cortx/hare/libexec/check-service\",
-                        \"--fid\", \"$fid\" ],
+                        \"--fid\", \"$fid\", \"--port\", \"$port\" ],
             \"interval\": \"1s\",
             \"status\": \"warning\"
           }
@@ -256,7 +257,7 @@ append_ios_svc() {
       \"checks\": [
           {
             \"args\": [ \"/opt/seagate/cortx/hare/libexec/check-service\",
-                        \"--fid\", \"$fid\" ],
+                        \"--fid\", \"$fid\", \"--port\", \"$port\" ],
             \"interval\": \"1s\",
             \"status\": \"warning\"
           }
@@ -291,7 +292,7 @@ append_s3_svc() {
       \"checks\": [
           {
             \"args\": [ \"/opt/seagate/cortx/hare/libexec/check-service\",
-                        \"--svc\", \"$s3svc\" ],
+                        \"--svc\", \"$s3svc\", \"--port\", \"$port\" ],
             \"interval\": \"1s\",
             \"status\": \"warning\"
           }
@@ -335,7 +336,7 @@ sudo cp $tmpfile $CONF_FILE
 mkdir -p /etc/consul.d/
 sudo cp $CONF_FILE /etc/consul.d/
 
-sudo sed -r "s;(http://)localhost;\1$(get_service_ip_addr $HAX_EP);" \
+sudo sed -r "s;(http://)localhost;\1$(get_node_name);" \
          -i $CONF_FILE
 
 consul reload > /dev/null
