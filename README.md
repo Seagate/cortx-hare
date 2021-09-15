@@ -300,3 +300,4 @@ Solution: install cortx-py-utils RPM and retry.
 
 * [Hare RFCs](rfc/README.md)
 * [Hare wiki](https://github.com/Seagate/cortx-hare/wiki)
+* [QSG_Test_History](Testing_Verification_History.md)
