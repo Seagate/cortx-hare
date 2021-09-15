@@ -2222,6 +2222,8 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
                 # in pool description
                 if not get_pool_diskrefs(pool):
                     for node in cluster_desc['nodes']:
+                        if not node.get('m0_servers'):
+                            continue
                         for m0d in node['m0_servers']:
                             if m0d['runs_confd']:
                                 continue
@@ -2231,7 +2233,7 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
 
                 aux_pool_list(pool, disks, conf, cluster_desc)
             else:
-                ConfPool.build(conf, root_id, pool, cluster_desc)
+                ConfPool.build(conf, root_id, pool, cluster_desc)    
 
         for pool in itertools.chain(cluster_desc['pools'],
                                     *aux_pools.values()):
