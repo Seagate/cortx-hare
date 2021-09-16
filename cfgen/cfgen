@@ -2302,8 +2302,9 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
         ConfProfile.build(conf, root_id, prof)
 
     if 'fdmi_filters' in cluster_desc:
-        for fdmi_filter in cluster_desc['fdmi_filters']:
-            ConfFdmiFltGrp.build(conf, root_id, fdmi_filter, other_clients)
+        if cluster_desc['fdmi_filters'] is not None:
+            for fdmi_filter in cluster_desc['fdmi_filters']:
+                ConfFdmiFltGrp.build(conf, root_id, fdmi_filter, other_clients)
 
     validate_m0conf(conf)
     assert cluster.consul_servers
