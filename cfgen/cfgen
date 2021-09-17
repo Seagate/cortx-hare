@@ -2145,7 +2145,7 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
     if conf[root_id].mdpool is None:  # no Metadata pool defined in the CDF
         ConfPool.build(conf, root_id, {'type': 'md'})
 
-    conf[root_id].mdredundancy = len(cluster_svcs(conf, SvcT.M0_CST_CAS))
+    conf[root_id].mdredundancy = len(cluster_svcs(conf, SvcT.M0_CST_IOS))
 
     for prof in cluster_desc['profiles']:
         prof['pools'] += [aux_pool['name']
