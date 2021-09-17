@@ -1192,19 +1192,21 @@ def pool_type(pool_desc: Dict[str, Any]) -> PoolT:
     return PoolT[pool_desc.get('type', 'sns')]
 
 
+def cluster_svcs(m0conf: Dict[Oid, Any], svc_t) -> List[Oid]:
+    return [svc_id
+            for encl_id in m0conf if encl_id.type is ObjT.enclosure
+            for proc_id in m0conf[m0conf[encl_id].node].processes
+            for svc_id in m0conf[proc_id].services
+            if m0conf[svc_id].type is svc_t]
+
+
 def pool_drives(m0conf: Dict[Oid, Any],
                 pool_desc: Dict[str, Any]) -> List[Oid]:
     ptype = pool_type(pool_desc)
 
     if ptype is PoolT.dix:
-        cas = []
-        for item in m0conf:
-            if item.type is ObjT.enclosure:
-                encl_id = item
-                for proc_id in m0conf[m0conf[encl_id].node].processes:
-                    for svc_id in m0conf[proc_id].services:
-                        if m0conf[svc_id].type is SvcT.M0_CST_CAS:
-                            cas.append((svc_id, m0conf[svc_id].ctrl_id))
+        cas = [(svc_id, m0conf[svc_id].ctrl_id)
+               for svc_id in cluster_svcs(m0conf, SvcT.M0_CST_CAS)]
 
         return [ConfDrive.build(m0conf, ctrl_id,
                                 ConfSdev.build(m0conf, svc_id,
@@ -1255,19 +1257,16 @@ def pool_drives(m0conf: Dict[Oid, Any],
 
 
 def cluster_encls(m0conf: Dict[Oid, Any]) -> List[Oid]:
-    encls: List[Oid] = []
-    for item in m0conf:
-        if item.type is ObjT.enclosure:
-            encls.append(item)
-    return encls
+    return [encl_id
+            for encl_id in m0conf if encl_id.type is ObjT.enclosure
+            for proc_id in m0conf[m0conf[encl_id].node].processes
+            for svc_id in m0conf[proc_id].services
+            if m0conf[svc_id].type is SvcT.M0_CST_IOS]
 
 
 def cluster_ctrls(m0conf: Dict[Oid, Any]) -> List[Oid]:
-    ctrls: List[Oid] = []
-    for item in m0conf:
-        if item.type is ObjT.controller:
-            ctrls.append(item)
-    return ctrls
+    return [m0conf[encl_id].ctrls
+            for encl_id in cluster_encls(m0conf)]
 
 
 def drives_per_node_and_ctrl(m0conf: Dict[Oid, Any]) -> faultToleranceInfo:
@@ -1410,11 +1409,11 @@ class ConfPool(ToDhall):
                 # indivisible pieces of data, the whole CAS record is
                 # always stored on one node.
                 data_units = 1
-                parity_units = len(cluster_encls(m0conf)) - 1
+                parity_units = len(cluster_svcs(m0conf, SvcT.M0_CST_CAS)) - 1
             else:
                 assert t is PoolT.md
                 data_units = 1
-                parity_units = len(cluster_encls(m0conf)) - 1
+                parity_units = len(cluster_svcs(m0conf, SvcT.M0_CST_IOS)) - 1
             pd_attrs = PDClustAttrs0(data_units=data_units,
                                      parity_units=parity_units,
                                      spare_units=0)
