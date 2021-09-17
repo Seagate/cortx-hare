@@ -720,7 +720,7 @@ class ConfRoot(ToDhall):
                   Downlink('profiles', ObjT.profile)}  # XXX + fdmi_flt_grps
 
     def __init__(self, nodes: List[Oid], sites: List[Oid], pools: List[Oid],
-                 profiles: List[Oid], mdpool: Oid = None,
+                 profiles: List[Oid], mdpool: Oid = None, mdredundancy: int = 0,
                  imeta_pver: Oid = None):
         assert all(x.type is ObjT.node for x in nodes)
         assert all(x.type is ObjT.site for x in sites)
@@ -734,6 +734,7 @@ class ConfRoot(ToDhall):
         self.pools = pools
         self.profiles = profiles
         self.mdpool = mdpool
+        self.mdredundancy = mdredundancy
         self.imeta_pver = imeta_pver
 
     def __repr__(self):
@@ -742,6 +743,7 @@ class ConfRoot(ToDhall):
                           f'pools={self.pools}',
                           f'profiles={self.profiles}',
                           f'mdpool={self.mdpool}',
+                          f'mdredundancy={self.mdredundancy}',
                           f'imeta_pver={self.imeta_pver}'])
         return f'{self.__class__.__name__}({args})'
 
@@ -752,6 +754,7 @@ class ConfRoot(ToDhall):
         args = ', '.join([
             f'id = {oid_to_dhall(oid)}',
             f'mdpool = {oid_to_dhall(self.mdpool)}',
+            f'mdredundancy = {self.mdredundancy}',
             f'imeta_pver = Some ({oid_to_dhall(self.imeta_pver)})',
             f'nodes = {oids_to_dhall(self.nodes)}',
             f'sites = {oids_to_dhall(self.sites)}',
@@ -2141,6 +2144,8 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
 
     if conf[root_id].mdpool is None:  # no Metadata pool defined in the CDF
         ConfPool.build(conf, root_id, {'type': 'md'})
+
+    conf[root_id].mdredundancy = len(cluster_svcs(conf, SvcT.M0_CST_CAS))
 
     for prof in cluster_desc['profiles']:
         prof['pools'] += [aux_pool['name']
