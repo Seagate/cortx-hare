@@ -2080,9 +2080,10 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
 
     for node in cluster_desc['nodes']:
         node_id = ConfNode.build(conf, root_id, node)
-        encl_id = ConfEnclosure.build(conf, rack_id, node_id)
         ctrl_ids: List[Tuple[Optional[Oid], Any]] = []
         m0ds = node.get('m0_servers', [])
+        if m0ds:
+            encl_id = ConfEnclosure.build(conf, rack_id, node_id)
         for m0d in m0ds:
             if m0d['_io_disks']:
                 ctrl_ids.append((ConfController.build(conf, encl_id), m0d))
@@ -2139,6 +2140,8 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
 
     if conf[root_id].imeta_pver is None:  # no DIX pool defined in the CDF
         ConfPool.build(conf, root_id, {'type': 'dix'})
+
+    conf[root_id].mdredundancy = len(cluster_encls(conf)) - 1
 
     if conf[root_id].mdpool is None:  # no Metadata pool defined in the CDF
         ConfPool.build(conf, root_id, {'type': 'md'})
