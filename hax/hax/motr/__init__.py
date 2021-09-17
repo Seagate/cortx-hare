@@ -262,12 +262,17 @@ class Motr:
                                    rm_fid.to_c(), make_c_str(rm_eps))
         LOG.debug('Entrypoint request has been replied to')
 
+    # repairing -- kludge
     def broadcast_ha_states(self,
                             ha_states: List[HAState],
-                            notify_devices=True) -> List[MessageId]:
-        LOG.debug('Broadcasting HA states %s over ha_link', ha_states)
+                            notify_devices=True,
+                            repairing=False) -> List[MessageId]:
+        LOG.debug(f'Broadcasting HA states {ha_states} over ha_l {repairing}')
 
-        def ha_obj_state(st):
+        def ha_obj_state(st, repairing):
+            if repairing:
+                return HaNoteStruct.M0_NC_DTM_RECOVERING
+
             return HaNoteStruct.M0_NC_ONLINE if st.status == ServiceHealth.OK \
                 else HaNoteStruct.M0_NC_FAILED
 
@@ -275,7 +280,7 @@ class Motr:
         for st in ha_states:
             if st.status in (ServiceHealth.UNKNOWN, ServiceHealth.OFFLINE):
                 continue
-            note = HaNoteStruct(st.fid.to_c(), ha_obj_state(st))
+            note = HaNoteStruct(st.fid.to_c(), ha_obj_state(st, repairing))
             notes.append(note)
             if (st.fid.container == ObjT.PROCESS.value
                     and st.status == ServiceHealth.STOPPED):

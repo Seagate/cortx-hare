@@ -86,7 +86,8 @@ def create_drive_fid(key: int) -> Fid:
 ha_process_events = ('M0_CONF_HA_PROCESS_STARTING',
                      'M0_CONF_HA_PROCESS_STARTED',
                      'M0_CONF_HA_PROCESS_STOPPING',
-                     'M0_CONF_HA_PROCESS_STOPPED')
+                     'M0_CONF_HA_PROCESS_STOPPED',
+                     'M0_CONF_HA_PROCESS_DTM_RECOVERED')
 
 ha_conf_obj_states = ('M0_NC_UNKNOWN',
                       'M0_NC_ONLINE',
@@ -94,7 +95,8 @@ ha_conf_obj_states = ('M0_NC_UNKNOWN',
                       'M0_NC_TRANSIENT',
                       'M0_NC_REPAIR',
                       'M0_NC_REPAIRED',
-                      'M0_NC_REBALANCE')
+                      'M0_NC_REBALANCE',
+                      'M0_NC_DTM_RECOVERING')
 
 
 def repeat_if_fails(wait_seconds=5, max_retries=-1):
@@ -512,10 +514,12 @@ class ConsulUtil:
             pfid = self.get_service_process_fid(svc_fid)
         else:
             pfid = create_process_fid(fidk)
-        if (self.get_process_status(pfid) in ('M0_CONF_HA_PROCESS_STARTING',
-                                              'M0_CONF_HA_PROCESS_STARTED',
-                                              'M0_CONF_HA_PROCESS_STOPPING',
-                                              'Unknown')):
+        if (self.get_process_status(pfid)
+            in ('M0_CONF_HA_PROCESS_STARTING',
+                'M0_CONF_HA_PROCESS_STARTED',
+                'M0_CONF_HA_PROCESS_DTM_RECOVERED',
+                'M0_CONF_HA_PROCESS_STOPPING',
+                'Unknown')):
             return HaNoteStruct.M0_NC_ONLINE
         else:
             return HaNoteStruct.M0_NC_FAILED
@@ -852,6 +856,9 @@ class ConsulUtil:
              'M0_CONF_HA_PROCESS_STOPPED'): (ServiceHealth.OFFLINE,
                                              ServiceHealth.UNKNOWN),
             ('passing',
+             'M0_CONF_HA_PROCESS_DTM_RECOVERED'): (ServiceHealth.OK,
+                                                   ServiceHealth.OK),
+            ('passing',
              'Unknown'): (ServiceHealth.UNKNOWN, ServiceHealth.UNKNOWN),
             ('warning',
              'M0_CONF_HA_PROCESS_STOPPING'): (ServiceHealth.OFFLINE,
@@ -865,6 +872,9 @@ class ConsulUtil:
             ('warning',
              'M0_CONF_HA_PROCESS_STARTING'): (ServiceHealth.OFFLINE,
                                               ServiceHealth.OFFLINE),
+            ('warning',
+             'M0_CONF_HA_PROCESS_DTM_RECOVERED'): (ServiceHealth.OFFLINE,
+                                                   ServiceHealth.FAILED),
             ('warning',
              'Unknown'): (ServiceHealth.UNKNOWN, ServiceHealth.UNKNOWN)}
         try:
@@ -946,7 +956,8 @@ class ConsulUtil:
     def ensure_ioservices_running(self) -> List[bool]:
         statuses = self.get_m0d_statuses()
         LOG.debug('The following statuses received: %s', statuses)
-        started = ['M0_CONF_HA_PROCESS_STARTED' == v[1] for v in statuses]
+        started = ['M0_CONF_HA_PROCESS_DTM_RECOVERED' == v[1]
+                   for v in statuses]
         return started
 
     @repeat_if_fails()

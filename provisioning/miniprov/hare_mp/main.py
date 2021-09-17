@@ -359,7 +359,8 @@ def all_services_started(url: str, nr_svcs: int) -> bool:
     for val in status_data:
         state = val['Value']
         statuses.append(json.loads(state.decode('utf8'))['state'])
-    started = [status == 'M0_CONF_HA_PROCESS_STARTED' for status in statuses]
+    started = [status == 'M0_CONF_HA_PROCESS_DTM_RECOVERED'
+               for status in statuses]
     if len(started) != nr_svcs:
         return False
     return all(started)

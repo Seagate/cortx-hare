@@ -70,11 +70,18 @@ class ConsumerThread(StoppableThread):
         # intermittent error gets resolved.
         self.consul.update_process_status(event)
         svc_status = m0HaProcessEvent.event_to_svchealth(event.chp_event)
-        if event.chp_event in (m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED,
-                               m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED):
+        if event.chp_event \
+           in (m0HaProcessEvent.M0_CONF_HA_PROCESS_DTM_RECOVERED,
+               m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED):
             motr.broadcast_ha_states(
                 [HAState(fid=event.fid, status=svc_status)],
                 notify_devices=False)
+
+        if event.chp_event == m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED:
+            motr.broadcast_ha_states(
+                [HAState(fid=event.fid, status=svc_status)],
+                notify_devices=False,
+                repairing=True)
 
     @repeat_if_fails(wait_seconds=1)
     def update_process_failure(self, planner: WorkPlanner,
@@ -87,7 +94,8 @@ class ConsumerThread(StoppableThread):
                     state.status, state.fid)
                 if current_status == ServiceHealth.OK:
                     if (self.consul.get_process_local_status(
-                            state.fid) == 'M0_CONF_HA_PROCESS_STARTED'):
+                            state.fid) in ('M0_CONF_HA_PROCESS_DTM_RECOVERED',
+                                           'M0_CONF_HA_PROCESS_STARTED')):
                         continue
                 if current_status in (ServiceHealth.FAILED,
                                       ServiceHealth.STOPPED):
@@ -131,7 +139,9 @@ class ConsumerThread(StoppableThread):
                     if current_status != ServiceHealth.OK:
                         event = m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED
                     else:
-                        event = m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED
+                        # HM, this is wierd
+                        RE = m0HaProcessEvent.M0_CONF_HA_PROCESS_DTM_RECOVERED
+                        event = RE
                     self.consul.update_process_status(
                         ConfHaProcess(
                             chp_event=event,
