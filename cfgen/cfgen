@@ -720,8 +720,8 @@ class ConfRoot(ToDhall):
                   Downlink('profiles', ObjT.profile)}  # XXX + fdmi_flt_grps
 
     def __init__(self, nodes: List[Oid], sites: List[Oid], pools: List[Oid],
-                 profiles: List[Oid], mdpool: Oid = None, mdredundancy: int = 0,
-                 imeta_pver: Oid = None):
+                 profiles: List[Oid], mdpool: Oid = None,
+                 mdredundancy: int = 0, imeta_pver: Oid = None):
         assert all(x.type is ObjT.node for x in nodes)
         assert all(x.type is ObjT.site for x in sites)
         assert all(x.type is ObjT.pool for x in pools)
@@ -1259,17 +1259,17 @@ def pool_drives(m0conf: Dict[Oid, Any],
     return [drive_id for drive_id, _ in drives]
 
 
-def cluster_encls(m0conf: Dict[Oid, Any]) -> List[Oid]:
+def cluster_encls(m0conf: Dict[Oid, Any], svc_t) -> List[Oid]:
     return [encl_id
             for encl_id in m0conf if encl_id.type is ObjT.enclosure
             for proc_id in m0conf[m0conf[encl_id].node].processes
             for svc_id in m0conf[proc_id].services
-            if m0conf[svc_id].type is SvcT.M0_CST_IOS]
+            if m0conf[svc_id].type is svc_t]
 
 
 def cluster_ctrls(m0conf: Dict[Oid, Any]) -> List[Oid]:
     return [m0conf[encl_id].ctrls
-            for encl_id in cluster_encls(m0conf)]
+            for encl_id in cluster_encls(m0conf, SvcT.M0_CST_IOS)]
 
 
 def drives_per_node_and_ctrl(m0conf: Dict[Oid, Any]) -> faultToleranceInfo:
@@ -1343,7 +1343,7 @@ class ConfPool(ToDhall):
     @classmethod
     def gen_sns_tolerance(cls, m0conf: Dict[Oid, Any],
                           pool_desc: Dict[str, Any]) -> Failures:
-        encls_nr = len(cluster_encls(m0conf))
+        encls_nr = len(cluster_encls(m0conf, SvcT.M0_CST_IOS))
         ctrls_per_encl = floor(len(cluster_ctrls(m0conf)) / encls_nr)
         data_units = pool_desc['data_units']
         parity_units = pool_desc['parity_units']
@@ -1374,7 +1374,7 @@ class ConfPool(ToDhall):
     @classmethod
     def gen_md_tolerance(cls, m0conf: Dict[Oid, Any],
                          pool_desc: Dict[str, Any]) -> Failures:
-        encls_nr = len(cluster_encls(m0conf))
+        encls_nr = len(cluster_encls(m0conf, SvcT.M0_CST_IOS))
         ctrls_per_encl = floor(len(cluster_ctrls(m0conf)) / encls_nr)
         encl_failures = encls_nr - 1
         ctrl_failures = min(encl_failures, (ctrls_per_encl * encl_failures))
@@ -1412,11 +1412,11 @@ class ConfPool(ToDhall):
                 # indivisible pieces of data, the whole CAS record is
                 # always stored on one node.
                 data_units = 1
-                parity_units = len(cluster_svcs(m0conf, SvcT.M0_CST_CAS)) - 1
+                parity_units = len(cluster_encls(m0conf, SvcT.M0_CST_CAS)) - 1
             else:
                 assert t is PoolT.md
                 data_units = 1
-                parity_units = len(cluster_svcs(m0conf, SvcT.M0_CST_IOS)) - 1
+                parity_units = len(cluster_encls(m0conf, SvcT.M0_CST_IOS)) - 1
             pd_attrs = PDClustAttrs0(data_units=data_units,
                                      parity_units=parity_units,
                                      spare_units=0)
@@ -2145,7 +2145,7 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
     if conf[root_id].mdpool is None:  # no Metadata pool defined in the CDF
         ConfPool.build(conf, root_id, {'type': 'md'})
 
-    conf[root_id].mdredundancy = len(cluster_svcs(conf, SvcT.M0_CST_IOS))
+    conf[root_id].mdredundancy = len(cluster_encls(conf, SvcT.M0_CST_IOS))
 
     for prof in cluster_desc['profiles']:
         prof['pools'] += [aux_pool['name']
