@@ -167,7 +167,7 @@ class MissingKeyError(Exception):
     url: str
 
     def __str__(self):
-        return f"Required key '{self.key}' not found in '{self.url}'"
+        return f"Required key '{self.key}' not found at URL: {self.url}"
 
 
 @dataclass(repr=False)

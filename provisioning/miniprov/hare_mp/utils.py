@@ -60,7 +60,7 @@ class Utils:
         data_devices = DList(
             [Text(device) for device in self.provider.get(
                 f'server_node>{machine_id}>'
-                f'storage>cvg[{cvg}]>data_devices')], 'List Text')
+                f'storage>cvg[{cvg}]>devices>data')], 'List Text')
         return data_devices
 
     def _get_drive_info_form_os(self, path: str) -> Disk:

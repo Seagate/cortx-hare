@@ -274,7 +274,6 @@
     }
   },
   "cluster": {
-    "cluster_id": "e766bd52-c19c-45b6-9c91-663fd8203c2e",
     "storage_sets": {
       "storage-set-1": [
         "srvnode-1"

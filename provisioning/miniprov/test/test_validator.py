@@ -41,7 +41,7 @@ conf_store_data = {
   },
   "system": {
   },
-  "server_node": {
+  "node": {
     "srvmachine-1": {
       "name": "srvnode-1",
       "hostname": "ssc-vm-1623.colo.seagate.com",
@@ -50,14 +50,12 @@ conf_store_data = {
     }
   },
   "cluster": {
-    "e766bd52-c19c-45b6-9c91-663fd8203c2e": {
       "name": "cortx-cluster",
       "storage_set": [
           { "name": "StorageSet-1",
-           "server_nodes": [ "srvmachine-1" ]
+           "nodes": [ "srvmachine-1" ]
           }
-       ]
-    },
+       ],
     "storage_sets": {
       "storage-set-1": [
         "srvnode-1"
@@ -92,7 +90,6 @@ conf_store_data = {
           "private_interfaces": [
             "eth0"
           ],
-          "interface_type": "tcp",
           "transport_type": "lnet",
           "private_ip": "",
           "roaming_ip": "127.0.0.1"
@@ -121,7 +118,7 @@ def update_machine(machine_id: str, hostname: str):
 
     with open("/tmp/test-conf-store.json", "r+") as jf:
         data = json.load(jf)
-        new_machine = {"server_node": {
+        new_machine = {"node": {
                                        f'{machine_id}': {
                                          "name": "srvnode-1",
                                          "hostname": f'{hostname}',
@@ -131,7 +128,7 @@ def update_machine(machine_id: str, hostname: str):
                                       }
                       }
         data.update(new_machine)
-        data['cluster']['e766bd52-c19c-45b6-9c91-663fd8203c2e']['storage_set'][0]['server_nodes'] = [f'{machine_id}']
+        data['cluster']['storage_set'][0]['nodes'] = [f'{machine_id}']
         with open("/tmp/temp-test-conf-store.json", "w+") as ujf:
             json.dump(data, ujf)
 

@@ -30,36 +30,32 @@
     }
   },
   "cluster": {
-    "5c427765-ecf5-4387-bfa4-d6d53494b159": {
-      "name": "cortx_cluster",
-      "site_count": "1",
-      "site": {
-        "storage_set_count": "1"
+    "name": "cortx_cluster",
+    "site_count": "1",
+    "storage_set_count": "1",
+    "network": {
+      "management": {
+        "virtual_host": "None"
       },
-      "network": {
-        "management": {
-          "virtual_host": "None"
-        },
-        "search_domains": "None",
-        "dns_servers": "None"
-      },
-      "storage_set": [
-        {
-          "name": "storage-set-1",
-          "server_nodes": [
-            "a971a87aace34e05b4747bb3376d6661"
-          ],
-          "storage_enclosures": [
-            "encla971a87aace34e05b4747bb3376d6661"
-          ],
-          "data": "1",
-          "parity": "0",
-          "spare": "0"
-        }
-      ]
-    }
+      "search_domains": "None",
+      "dns_servers": "None"
+    },
+    "storage_set": [
+      {
+        "name": "storage-set-1",
+        "nodes": [
+          "a971a87aace34e05b4747bb3376d6661"
+        ],
+        "storage_enclosures": [
+          "encla971a87aace34e05b4747bb3376d6661"
+        ],
+        "data": "1",
+        "parity": "0",
+        "spare": "0"
+      }
+    ]
   },
-  "server_node": {
+  "node": {
     "a971a87aace34e05b4747bb3376d6661": {
       "name": "srvnode-1",
       "hostname": "ssc-vm-2673.colo.seagate.com",
