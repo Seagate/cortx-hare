@@ -51,11 +51,12 @@ class CdfGenerator:
             'hare_mp', resource_path)
         return raw_content.decode('utf-8')
 
+    # node>{machine-id}>cluster_id
     def _get_cluster_id(self) -> str:
         conf = self.provider
 
-        # We will read 'cluster_id' of 1st 'machine_id' present in server_node
-        server_node = conf.get('server_node')
+        # We will read 'cluster_id' of 1st 'machine_id' present in 'node'
+        server_node = conf.get('node')
         machine_id = list(server_node.keys())[0]
         cluster_id = server_node[machine_id]['cluster_id']
         return cluster_id
@@ -63,24 +64,26 @@ class CdfGenerator:
     def _create_node_descriptions(self) -> List[NodeDesc]:
         nodes: List[NodeDesc] = []
         conf = self.provider
-        machines: Dict[str, Any] = conf.get('server_node')
+        machines: Dict[str, Any] = conf.get('node')
         for machine_id in machines.keys():
             nodes.append(self._create_node(machine_id))
         return nodes
 
+    # cluster>storage_set[N]>durability>{type}>data/parity/spare
     def _get_pool_property(self, pool: PoolHandle, prop_name: str) -> int:
         conf = self.provider
         (cluster_id, pool_type, storage_ndx) = pool.tuple()
 
         return int(
-            conf.get(f'cluster>{cluster_id}>storage_set[{storage_ndx}]>'
+            conf.get(f'cluster>storage_set[{storage_ndx}]>'
                      f'durability>{pool_type}>{prop_name}'))
 
     def _get_layout(self, pool: PoolHandle) -> Optional[Layout]:
         conf = self.provider
         (cluster_id, pool_type, storage_ndx) = pool.tuple()
+        # cluster>storage_set[N]>durability>{type}
         type_value = conf.get(
-            f'cluster>{cluster_id}>storage_set[{storage_ndx}]'
+            f'cluster>storage_set[{storage_ndx}]'
             f'>durability>{pool_type}',
             allow_null=True)
         if not type_value:
@@ -97,20 +100,22 @@ class CdfGenerator:
         conf = self.provider
         pool_type = pool.pool_type
         prop_name = 'data_devices'
-        cvg_num = int(conf.get(f'server_node>{node}>storage>cvg_count'))
+        # node>{machine-id}>storage>cvg_count
+        cvg_num = int(conf.get(f'node>{node}>storage>cvg_count'))
         all_cvg_devices = []
         if pool_type == 'dix':
             prop_name = 'metadata_devices'
         for i in range(cvg_num):
+            # node>{machine-id}>storage>cvg[N]>name
             all_cvg_devices += conf.get(
-                f'server_node>{node}>storage>cvg[{i}]>{prop_name}')
+                f'node>{node}>storage>cvg[{i}]>{prop_name}')
         return all_cvg_devices
 
+    # cluster>storage_set[N]>nodes
     def _get_server_nodes(self, pool: PoolHandle) -> List[str]:
-        cid = pool.cluster_id
         i = pool.storage_ndx
         return self.provider.get(
-            f'cluster>{cid}>storage_set[{i}]>server_nodes')
+            f'cluster>storage_set[{i}]>nodes')
 
     def _validate_pool(self, pool: PoolHandle) -> None:
         layout = self._get_layout(pool)
@@ -120,8 +125,9 @@ class CdfGenerator:
         conf = self.provider
         (cluster_id, pool_type, i) = pool.tuple()
 
+        # cluster>storage_set[N]>name
         storage_set_name = conf.get(
-            f'cluster>{cluster_id}>storage_set[{i}]>name')
+            f'cluster>storage_set[{i}]>name')
 
         data_devices_count: int = 0
         for node in self._get_server_nodes(pool):
@@ -144,8 +150,9 @@ class CdfGenerator:
         conf = self.provider
         machine_id = conf.get_machine_id()
         node_count = len(conf.get_storage_set_nodes())
+        # node>{machine-id}>storage>cvg_count
         cvg_per_node = int(conf.get(
-            f'server_node>{machine_id}>storage>cvg_count'))
+            f'node>{machine_id}>storage>cvg_count'))
 
         total_unit = layout.data + layout.parity + layout.spare
         if total_unit == 0:
@@ -169,21 +176,17 @@ class CdfGenerator:
         if not layout:
             return
         (cid, pool_type, i) = pool.tuple()
-        storage_set_name = conf.get(f'cluster>{cid}>storage_set[{i}]>name')
+        storage_set_name = conf.get(f'cluster>storage_set[{i}]>name')
         pool_name = f'{storage_set_name}__{pool_type}'
-
         allowed_failure = self._calculate_allowed_failure(layout)
         out_list.append(
             PoolDesc(
                 name=Text(pool_name),
                 disk_refs=Maybe(
                     DList([
-                        DiskRef(
-                            path=Text(device),
-                            node=Maybe(
-                                Text(conf.get(f'server_node>{node}>'
-                                              'network>data>private_fqdn')),
-                                'Text'))
+                        DiskRef(path=Text(device),
+                                node=Maybe(Text(self.utils.get_hostname(node)),
+                                           'Text'))
                         for node in self._get_server_nodes(pool)
                         for device in self._get_devices(pool, node)
                     ], 'List DiskRef'), 'List DiskRef'),
@@ -197,8 +200,9 @@ class CdfGenerator:
         pools: List[PoolDesc] = []
         conf = self.provider
         cluster_id = self._get_cluster_id()
+        # cluster>storage_set_count
         storage_set_count = int(
-            conf.get(f'cluster>{cluster_id}>site>storage_set_count'))
+            conf.get('cluster>storage_set_count'))
 
         for i in range(storage_set_count):
             for pool_type in ('sns', 'dix'):
@@ -259,48 +263,55 @@ class CdfGenerator:
             raise RuntimeError(f'dhall-to-yaml binary failed: {err}')
         return yaml_out
 
+    # Only required for non K8s
     def _get_iface(self, machine_id: str) -> str:
         ifaces = self.provider.get(
-            f'server_node>{machine_id}>network>data>private_interfaces')
+            f'node>{machine_id}>network>data>private_interfaces')
         if not ifaces:
             raise RuntimeError('No data network interfaces found')
         return ifaces[0]
 
+    # cortx>motr>interface_type
     def _get_iface_type(self, machine_id: str) -> Optional[Protocol]:
         iface = self.provider.get(
-            f'server_node>{machine_id}>network>data>interface_type',
+            'cortx>motr>interface_type',
             allow_null=True)
         if iface is None:
             return None
         return Protocol[iface]
 
+    # node>{machine -id}>storage>cvg[N]>data_devices
     def _get_data_devices(self, machine_id: str, cvg: int) -> DList[Text]:
         store = self.provider
         data_devices = DList(
             [Text(device) for device in store.get(
-                f'server_node>{machine_id}>'
+                f'node>{machine_id}>'
                 f'storage>cvg[{cvg}]>data_devices')], 'List Text')
         return data_devices
 
+    # TBD motr
     def _get_metadata_device(self, name: str, cvg: int, m0d: int) -> Text:
         motr_store = self.motr_provider
         metadata_device = Text(motr_store.get(
             f'server>{name}>cvg[{cvg}]>m0d[{m0d}]>md_seg1'))
         return metadata_device
 
+    # TBD motr
     def _get_m0d_per_cvg(self, name: str, cvg: int) -> int:
         motr_store = self.motr_provider
         return len(motr_store.get(f'server>{name}>cvg[{cvg}]>m0d'))
 
     def _create_node(self, machine_id: str) -> NodeDesc:
         store = self.provider
-        hostname = store.get(
-            f'server_node>{machine_id}>network>data>private_fqdn')
-        name = store.get(f'server_node>{machine_id}>name')
+
+        hostname = self.utils.get_hostname(machine_id)
+        # node>{machine-id}>name
+        name = store.get(f'node>{machine_id}>name')
         iface = self._get_iface(machine_id)
         try:
+            # cortx>motr>client_instances
             no_m0clients = int(store.get(
-                'cortx>software>motr>service>client_instances',
+                'cortx>motr>client_instances',
                 allow_null=True))
         except TypeError:
             no_m0clients = 2
@@ -315,8 +326,9 @@ class CdfGenerator:
                     meta_data=Maybe(
                         self._get_metadata_device(name, cvg, m0d), 'Text')),
                 runs_confd=Maybe(False, 'Bool'))
+            # node>{machine_id}>storage>cvg
             for cvg in range(len(store.get(
-                f'server_node>{machine_id}>storage>cvg')))
+                f'node>{machine_id}>storage>cvg')))
             for m0d in range(self._get_m0d_per_cvg(name, cvg))
         ], 'List M0ServerDesc')
 
@@ -342,6 +354,7 @@ class CdfGenerator:
             # [KN] This is a hotfix for singlenode deployment
             # TODO in the future the value must be taken from a correct
             # ConfStore key (it doesn't exist now).
+            # cortx>s3>service_instances
             s3_instances=int(
-                store.get('cortx>software>s3>service>instances')),
+                store.get('cortx>s3>service_instances')),
             client_instances=no_m0clients)

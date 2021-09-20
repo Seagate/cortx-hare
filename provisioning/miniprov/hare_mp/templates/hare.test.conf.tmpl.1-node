@@ -1,48 +1,38 @@
 {
   "cluster": {
-    "TMPL_CLUSTER_ID": {
-      "site": {
-        "storage_set_count": "TMPL_STORAGESET_COUNT"
-      },
-      "storage_set": [
-        {
-          "durability": {
-            "TMPL_POOL_TYPE": {
-              "data": "TMPL_DATA_UNITS_COUNT",
-              "parity": "TMPL_PARITY_UNITS_COUNT",
-              "spare": "TMPL_SPARE_UNITS_COUNT"
-            }
-          },
-          "name": "TMPL_STORAGESET_NAME",
-          "server_nodes": [
-            "TMPL_MACHINE_ID"
-          ]
-        }
-      ]
-    }
+    "storage_set_count": "TMPL_STORAGESET_COUNT",
+    "storage_set": [
+      {
+        "durability": {
+          "TMPL_POOL_TYPE": {
+            "data": "TMPL_DATA_UNITS_COUNT",
+            "parity": "TMPL_PARITY_UNITS_COUNT",
+            "spare": "TMPL_SPARE_UNITS_COUNT"
+          }
+        },
+        "name": "TMPL_STORAGESET_NAME",
+        "nodes": [
+          "TMPL_MACHINE_ID"
+        ]
+      }
+    ]
   },
   "cortx": {
-    "software": {
-      "motr": {
-        "service": {
-          "client_instances": "2"
-        }
-      },
-      "s3": {
-        "service": {
-          "instances": "TMPL_S3SERVER_INSTANCES_COUNT"
-        }
-      }
+    "motr": {
+      "client_instances": "2",
+      "interface_type": "TMPL_DATA_INTERFACE_TYPE"
+    },
+    "s3": {
+      "service_instances": "TMPL_S3SERVER_INSTANCES_COUNT"
     }
   },
-  "server_node": {
+  "node": {
     "TMPL_MACHINE_ID": {
       "cluster_id": "TMPL_CLUSTER_ID",
       "hostname": "TMPL_HOSTNAME",
       "name": "TMPL_SERVER_NODE_NAME",
       "network": {
         "data": {
-          "interface_type": "TMPL_DATA_INTERFACE_TYPE",
           "private_fqdn": "TMPL_PRIVATE_FQDN",
           "private_interfaces": [
             "TMPL_PRIVATE_DATA_INTERFACE_1",

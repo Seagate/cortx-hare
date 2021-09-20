@@ -24,6 +24,9 @@ from hare_mp.types import MissingKeyError
 
 
 class ValueProvider:
+    def __init__(self):
+        self.url = None
+
     def get(self, key: str, allow_null: bool = False) -> Any:
         ret = self._raw_get(key)
         if ret is None and not allow_null:
@@ -73,7 +76,7 @@ class ConfStoreProvider(ValueProvider):
 
     def get_cluster_id(self) -> str:
         machine_id = self.get_machine_id()
-        cluster_id = self.get(f'server_node>{machine_id}>cluster_id')
+        cluster_id = self.get(f'node>{machine_id}>cluster_id')
         return cluster_id
 
     def get_machine_id(self) -> str:
@@ -81,30 +84,21 @@ class ConfStoreProvider(ValueProvider):
 
     def get_storage_set_index(self) -> int:
         i = 0
-        cluster_id = self.get_cluster_id()
         machine_id = self.get_machine_id()
-        storage_set_id = self.get((f'server_node>{machine_id}>'
+        storage_set_id = self.get((f'node>{machine_id}>'
                                    f'storage_set_id'))
 
-        for storage_set in self.get(f'cluster>{cluster_id}>storage_set'):
+        for storage_set in self.get('cluster>storage_set'):
             if storage_set['name'] == storage_set_id:
                 return i
             i += 1
 
         raise RuntimeError('No storage set found. Is ConfStore data valid?')
 
-    def get_hostname(self) -> str:
-        machine_id = self.get_machine_id()
-        hostname = self._raw_get(
-            f'server_node>{machine_id}>network>data>private_fqdn')
-        return hostname
-
     def get_storage_set_nodes(self) -> List[str]:
-        cluster_id = self.get_cluster_id()
         storage_set_index = self.get_storage_set_index()
 
-        server_nodes_key = (f'cluster>{cluster_id}>'
-                            f'storage_set[{storage_set_index}]>server_nodes')
+        server_nodes_key = (f'cluster>storage_set[{storage_set_index}]>nodes')
         return self.get(server_nodes_key)
 
 

@@ -117,7 +117,7 @@ def get_server_type(url: str) -> str:
     try:
         provider = ConfStoreProvider(url)
         machine_id = provider.get_machine_id()
-        server_type = provider.get(f'server_node>{machine_id}>type')
+        server_type = provider.get(f'node>{machine_id}>type')
 
         if server_type == 'VM':
             return 'virtual'
@@ -525,8 +525,8 @@ def nr_services() -> int:
 
 @repeat_if_fails()
 def all_services_started(url: str, nr_svcs: int) -> bool:
-    conf = ConfStoreProvider(url)
-    hostname = conf.get_hostname()
+    utils = Utils(ConfStoreProvider(url))
+    hostname = utils.get_local_hostname()
     kv = KVAdapter()
     status_data = kv.kv_get(f'{hostname}/processes', recurse=True)
     statuses = []

@@ -1,55 +1,45 @@
 {
   "cluster": {
-    "my-cluster": {
-      "site": {
-        "storage_set_count": "1"
-      },
-      "storage_set": [
-        {
-          "durability": {
-            "sns": {
-              "data": "4",
-              "parity": "2",
-              "spare": "2"
-            },
-            "dix": {
-              "data": "1",
-              "parity": "2",
-              "spare": "0"
-            }
+    "storage_set_count": "1",
+    "storage_set": [
+      {
+        "durability": {
+          "sns": {
+            "data": "4",
+            "parity": "2",
+            "spare": "2"
           },
-          "name": "storage1",
-          "server_nodes": [
-            "1114a50a6bf6f9c93ebd3c49d07d3fd4",
-            "9ec5de3a8b57493e8fc7bfae67ecd3b3",
-            "846fd26885f8423a8da0626538ed47bc"
-          ]
-        }
-      ]
-    }
+          "dix": {
+            "data": "1",
+            "parity": "2",
+            "spare": "0"
+          }
+        },
+        "name": "storage1",
+        "nodes": [
+          "1114a50a6bf6f9c93ebd3c49d07d3fd4",
+          "9ec5de3a8b57493e8fc7bfae67ecd3b3",
+          "846fd26885f8423a8da0626538ed47bc"
+        ]
+      }
+    ]
   },
   "cortx": {
-    "software": {
-      "motr": {
-        "service": {
-          "client_instances": "2"
-        }
-      },
-      "s3": {
-        "service": {
-          "instances": "1"
-        }
-      }
+    "motr": {
+      "client_instances": "2",
+      "interface_type": "tcp"
+    },
+    "s3": {
+      "service_instances": "1"
     }
-  },   
-  "server_node": {
+  },
+  "node": {
     "1114a50a6bf6f9c93ebd3c49d07d3fd4": {
       "cluster_id": "my-cluster",
       "hostname": "ssc-vm-1623.colo.seagate.com",
       "name": "srvnode-1",
       "network": {
         "data": {
-          "interface_type": "tcp",
           "private_fqdn": "srvnode-1.data.private",
           "private_interfaces": [
             "eth0",
@@ -90,7 +80,6 @@
       "name": "srvnode-2",
       "network": {
         "data": {
-          "interface_type": "tcp",
           "private_fqdn": "srvnode-2.data.private",
           "private_interfaces": [
             "eth0",
@@ -131,7 +120,6 @@
       "name": "srvnode-3",
       "network": {
         "data": {
-          "interface_type": "tcp",
           "private_fqdn": "srvnode-3.data.private",
           "private_interfaces": [
             "eth0",

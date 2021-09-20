@@ -16,6 +16,7 @@
 # please email opensource@seagate.com or cortx-questions@seagate.com.
 #
 
+import json
 import os
 import re
 import tempfile
@@ -25,6 +26,7 @@ import pkg_resources
 import pytest
 from hare_mp.cdf import CdfGenerator
 from hare_mp.store import ConfStoreProvider, ValueProvider
+from hax.util import KVAdapter
 
 
 def substitute(content: str, replacement: Dict[str, str]) -> str:
@@ -49,7 +51,7 @@ def read_template(filename: str) -> str:
     return raw_content.decode('utf-8')
 
 
-def is_content_ok(content: str, mocker) -> bool:
+def is_content_ok(content: str, mocker, kv_adapter) -> bool:
     if len(content) < 4:
         # Some templates represent empty JSONs and should be skipped
         return True
@@ -65,7 +67,9 @@ def is_content_ok(content: str, mocker) -> bool:
         #
         # the method will raise an exception if either
         # Dhall is unhappy or some values are not found in ConfStore
-        CdfGenerator(provider=store, motr_provider=motr_store).generate()
+        generator = CdfGenerator(provider=store, motr_provider=motr_store)
+        generator.utils.kv = kv_adapter
+        generator.generate()
         return True
 
     finally:
@@ -80,6 +84,10 @@ def placeholders() -> Dict[str, str]:
         'TMPL_CVG_COUNT': '1',
         'TMPL_DATA_DEVICE_1': '/dev/sdb',
         'TMPL_DATA_DEVICE_2': '/dev/sdc',
+        'TMPL_DATA_DEVICE_11': '/dev/sdb',
+        'TMPL_DATA_DEVICE_12': '/dev/sdc',
+        'TMPL_DATA_DEVICE_21': '/dev/sdb',
+        'TMPL_DATA_DEVICE_22': '/dev/sdc',
         'TMPL_DATA_INTERFACE_TYPE': 'tcp',
         'TMPL_DATA_UNITS_COUNT': '1',
         'TMPL_HOSTNAME': 'hostname',
@@ -96,15 +104,64 @@ def placeholders() -> Dict[str, str]:
         'TMPL_STORAGESET_COUNT': '1',
         'TMPL_STORAGESET_NAME': 'storage-set',
         'TMPL_STORAGE_SET_ID': 'storage-set',
+        'TMPL_PRIVATE_FQDN': 'my-node-1',
+        'TMPL_PRIVATE_FQDN_1': 'my-node-1',
+        'TMPL_PRIVATE_FQDN_2': 'my-node-2',
+        'TMPL_PRIVATE_FQDN_3': 'my-node-3',
     }
 
 
+def new_kv(key: str, val: str):
+    return {
+        'Key': key,
+        'CreateIndex': 1793,
+        'ModifyIndex': 1793,
+        'LockIndex': 0,
+        'Flags': 0,
+        'Value': val,
+        'Session': ''
+    }
+
+
+@pytest.fixture
+def kv_adapter(mocker):
+    kv = KVAdapter()
+    exc = RuntimeError('Not allowed')
+
+    def fake_get(key):
+        if key in [f'my-node-{i}/facts' for i in [1, 2, 3]]:
+            return new_kv(
+                key, json.dumps({
+                    'processorcount': 1,
+                    'memorysize_mb': 1024.0
+                }))
+        if key in [
+                f'my-node-{i}/dev/sd{x}' for i in [1, 2, 3]
+                for x in ['b', 'c']
+        ]:
+            return new_kv(
+                key,
+                json.dumps({
+                    'path': '/stub/',
+                    'size': 102400,
+                    'blksize': 8
+                }))
+        raise RuntimeError(f'Unexpected key = {key}')
+
+    mock = mocker.patch.object
+    mock(kv, 'kv_get', side_effect=fake_get)
+    mock(kv, 'kv_put', side_effect=exc)
+    mock(kv, 'kv_put_in_transaction', side_effect=exc)
+    mock(kv, 'kv_delete_in_transaction', side_effect=exc)
+    return kv
+
+
 @pytest.mark.parametrize('tmpl_file', template_files())
-def test_template_compiles(tmpl_file, placeholders, mocker):
+def test_template_compiles(tmpl_file, placeholders, mocker, kv_adapter):
     content = read_template(tmpl_file)
     content = substitute(content, placeholders)
 
-    assert is_content_ok(content, mocker)
+    assert is_content_ok(content, mocker, kv_adapter)
 
 
 def test_template_files_found():

@@ -179,48 +179,48 @@ class TestCDF(unittest.TestCase):
 
         def ret_values(value: str) -> Any:
             data = {
-                'cluster>cluster_id':
+                'node>MACH_ID>cluster_id':
                 'CLUSTER_ID',
-                'server_node>MACH_ID>name': 'myhost',
-                'server_node>MACH_ID>hostname':
+                'node>MACH_ID>name': 'myhost',
+                'node>MACH_ID>hostname':
                 'myhost',
-                'server_node>MACH_ID>network>data>interface_type':
-                'tcp',
-                'server_node>MACH_ID>network>data>private_fqdn':
+                'node>MACH_ID>network>data>private_fqdn':
                     'srvnode-1.data.private',
-                'server_node>MACH_ID>storage>cvg[0]>data_devices':
+                'node>MACH_ID>storage>cvg[0]>data_devices':
                 ['/dev/sdb'],
-                'server_node>MACH_ID>storage>cvg[1]>data_devices':
+                'node>MACH_ID>storage>cvg[1]>data_devices':
                 ['/dev/sdc'],
-                'server_node>MACH_ID>network>data>private_interfaces':
+                'node>MACH_ID>network>data>private_interfaces':
                 ['eth1', 'eno2'],
-                'server_node>MACH_ID>storage>cvg_count':
+                'node>MACH_ID>storage>cvg_count':
                 2,
-                'server_node>MACH_ID>storage>cvg':
+                'node>MACH_ID>storage>cvg':
                 [{'data_devices': ['/dev/sdb', '/dev/sdc'], 'metadata_devices': ['/dev/meta', '/dev/meta1']}],
-                'server_node>MACH_ID>storage>cvg[0]>metadata_devices':
+                'node>MACH_ID>storage>cvg[0]>metadata_devices':
                 ['/dev/meta'],
-                'server_node>MACH_ID>storage>cvg[1]>metadata_devices':
+                'node>MACH_ID>storage>cvg[1]>metadata_devices':
                 ['/dev/meta1'],
-                'cortx>software>s3>service>instances':
+                'cortx>s3>service_instances':
                 1,
-                'cortx>software>motr>service>client_instances':
+                'cortx>motr>interface_type':
+                'tcp',
+                'cortx>motr>client_instances':
                 2,
-                'server_node>MACH_ID>storage>cvg_count': 1,
-                'cluster>CLUSTER_ID>site>storage_set_count':
+                'node>MACH_ID>storage>cvg_count': 1,
+                'cluster>storage_set_count':
                 1,
-                'cluster>CLUSTER_ID>storage_set>server_node_count':
+                'cluster>storage_set>server_node_count':
                 1,
-                'cluster>CLUSTER_ID>storage_set[0]>name':
+                'cluster>storage_set[0]>name':
                 'StorageSet-1',
-                'cluster>CLUSTER_ID>storage_set[0]>server_nodes': ['MACH_ID'],
-                'cluster>CLUSTER_ID>storage_set[0]>durability>sns': {'stub': 1},
-                'cluster>CLUSTER_ID>storage_set[0]>durability>sns>data': 1,
-                'cluster>CLUSTER_ID>storage_set[0]>durability>sns>parity': 0,
-                'cluster>CLUSTER_ID>storage_set[0]>durability>sns>spare': 0,
-                'server_node>MACH_ID>cluster_id':
+                'cluster>storage_set[0]>nodes': ['MACH_ID'],
+                'cluster>storage_set[0]>durability>sns': {'stub': 1},
+                'cluster>storage_set[0]>durability>sns>data': 1,
+                'cluster>storage_set[0]>durability>sns>parity': 0,
+                'cluster>storage_set[0]>durability>sns>spare': 0,
+                'node>MACH_ID>cluster_id':
                 'CLUSTER_ID',
-                'server_node': {
+                'node': {
                     'MACH_ID': {
                         'cluster_id': 'CLUSTER_ID'
                     }
@@ -290,34 +290,34 @@ class TestCDF(unittest.TestCase):
 
         def ret_values(value: str) -> Any:
             data = {
-                'cluster>CLUSTER_ID>site>storage_set_count': 1,
-                'cluster>CLUSTER_ID>storage_set>server_node_count':
+                'cluster>storage_set_count': 1,
+                'cluster>storage_set>server_node_count':
                 1,
-                'cluster>CLUSTER_ID>storage_set[0]>name': 'StorageSet-1',
-                'cluster>CLUSTER_ID>storage_set[0]>durability>sns': {'a': 42},
-                'cluster>CLUSTER_ID>storage_set[0]>durability>sns>data': 1,
-                'cluster>CLUSTER_ID>storage_set[0]>durability>sns>parity': 0,
-                'cluster>CLUSTER_ID>storage_set[0]>durability>sns>spare': 0,
-                'cluster>CLUSTER_ID>storage_set[0]>server_nodes': ['MACH_ID'],
-                'cluster>CLUSTER_ID>storage_set>server_node_count': 1,
-                'cluster>cluster_id': 'CLUSTER_ID',
-                'server_node': {'MACH_ID': {'cluster_id': 'CLUSTER_ID'}},
-                'server_node>MACH_ID>cluster_id': 'CLUSTER_ID',
-                'server_node>MACH_ID>storage>cvg_count': 2,
-                'server_node>MACH_ID>storage>cvg':
+                'cluster>storage_set[0]>name': 'StorageSet-1',
+                'cluster>storage_set[0]>durability>sns': {'a': 42},
+                'cluster>storage_set[0]>durability>sns>data': 1,
+                'cluster>storage_set[0]>durability>sns>parity': 0,
+                'cluster>storage_set[0]>durability>sns>spare': 0,
+                'cluster>storage_set[0]>nodes': ['MACH_ID'],
+                'cluster>storage_set>server_node_count': 1,
+                'node>MACH_ID>cluster_id': 'CLUSTER_ID',
+                'node': {'MACH_ID': {'cluster_id': 'CLUSTER_ID'}},
+                'node>MACH_ID>cluster_id': 'CLUSTER_ID',
+                'node>MACH_ID>storage>cvg_count': 2,
+                'node>MACH_ID>storage>cvg':
                 [{'data_devices': ['/dev/sdb', '/dev/sdc'], 'metadata_devices': ['/dev/meta', '/dev/meta1']}],
-                'server_node>MACH_ID>storage>cvg[0]>data_devices': ['/dev/sdb'],
-                'server_node>MACH_ID>storage>cvg[0]>metadata_devices': ['/dev/meta'],
-                'server_node>MACH_ID>storage>cvg[1]>data_devices': ['/dev/sdc'],
-                'server_node>MACH_ID>storage>cvg[1]>metadata_devices': ['/dev/meta1'],
-                'server_node>MACH_ID>hostname':                'myhost',
-                'server_node>MACH_ID>name': 'mynodename',
-                'server_node>MACH_ID>network>data>interface_type':                'o2ib',
-                'server_node>MACH_ID>network>data>private_fqdn':
+                'node>MACH_ID>storage>cvg[0]>data_devices': ['/dev/sdb'],
+                'node>MACH_ID>storage>cvg[0]>metadata_devices': ['/dev/meta'],
+                'node>MACH_ID>storage>cvg[1]>data_devices': ['/dev/sdc'],
+                'node>MACH_ID>storage>cvg[1]>metadata_devices': ['/dev/meta1'],
+                'node>MACH_ID>hostname':                'myhost',
+                'node>MACH_ID>name': 'mynodename',
+                'node>MACH_ID>network>data>private_fqdn':
                     'srvnode-1.data.private',
-                'server_node>MACH_ID>network>data>private_interfaces':                ['eth1', 'eno2'],
-                'cortx>software>s3>service>instances':                1,
-                'cortx>software>motr>service>client_instances':                2,
+                'node>MACH_ID>network>data>private_interfaces':                ['eth1', 'eno2'],
+                'cortx>s3>service_instances':                1,
+                'cortx>motr>interface_type':                'o2ib',
+                'cortx>motr>client_instances':                2,
             }
             return data.get(value)
 
@@ -441,65 +441,65 @@ class TestCDF(unittest.TestCase):
 
         def ret_values(value: str) -> Any:
             data = {
-                'cluster>CLUSTER_ID>site>storage_set_count': 1,
-                'cluster>CLUSTER_ID>storage_set[0]>name': 'StorageSet-1',
-                'cluster>CLUSTER_ID>storage_set[0]>durability>sns':
+                'cluster>storage_set_count': 1,
+                'cluster>storage_set[0]>name': 'StorageSet-1',
+                'cluster>storage_set[0]>durability>sns':
                 {'data': 4, 'parity' : 2, 'spare' : 0},
-                'cluster>CLUSTER_ID>storage_set[0]>durability>sns>data': layout.data,
-                'cluster>CLUSTER_ID>storage_set[0]>durability>sns>parity': layout.parity,
-                'cluster>CLUSTER_ID>storage_set[0]>durability>sns>spare': layout.spare,
-                'cluster>CLUSTER_ID>storage_set[0]>server_nodes': ['MACH_ID1', 'MACH_ID2', 'MACH_ID3'],
-                'cluster>CLUSTER_ID>storage_set>server_node_count': 3,
-                'cluster>cluster_id': 'CLUSTER_ID',
-                'server_node': {'MACH_ID1': {'cluster_id': 'CLUSTER_ID'}},
-                'server_node>MACH_ID1>cluster_id': 'CLUSTER_ID',
-                'server_node>MACH_ID2>cluster_id': 'CLUSTER_ID',
-                'server_node>MACH_ID3>cluster_id': 'CLUSTER_ID',
-                'server_node>MACH_ID1>storage>cvg':
+                'cluster>storage_set[0]>durability>sns>data': layout.data,
+                'cluster>storage_set[0]>durability>sns>parity': layout.parity,
+                'cluster>storage_set[0]>durability>sns>spare': layout.spare,
+                'cluster>storage_set[0]>nodes': ['MACH_ID1', 'MACH_ID2', 'MACH_ID3'],
+                'cluster>storage_set>server_node_count': 3,
+                'node>MACH_ID>cluster_id': 'CLUSTER_ID',
+                'node': {'MACH_ID1': {'cluster_id': 'CLUSTER_ID'}},
+                'node>MACH_ID1>cluster_id': 'CLUSTER_ID',
+                'node>MACH_ID2>cluster_id': 'CLUSTER_ID',
+                'node>MACH_ID3>cluster_id': 'CLUSTER_ID',
+                'node>MACH_ID1>storage>cvg':
                 [{'data_devices': ['/dev/sda', '/dev/sdb', '/dev/sdc', '/dev/sdd'], 'metadata_devices': ['/dev/meta1']},
                  {'data_devices': ['/dev/sde', '/dev/sdf', '/dev/sdg', '/dev/sdh'], 'metadata_devices': ['/dev/meta2']}],
-                'server_node>MACH_ID2>storage>cvg':
+                'node>MACH_ID2>storage>cvg':
                 [{'data_devices': ['/dev/sda', '/dev/sdb', '/dev/sdc', '/dev/sdd'], 'metadata_devices': ['/dev/meta1']},
                  {'data_devices': ['/dev/sde', '/dev/sdf', '/dev/sdg', '/dev/sdh'], 'metadata_devices': ['/dev/meta2']}],
-                'server_node>MACH_ID3>storage>cvg':
+                'node>MACH_ID3>storage>cvg':
                 [{'data_devices': ['/dev/sda', '/dev/sdb', '/dev/sdc', '/dev/sdd'], 'metadata_devices': ['/dev/meta1']},
                  {'data_devices': ['/dev/sde', '/dev/sdf', '/dev/sdg', '/dev/sdh'], 'metadata_devices': ['/dev/meta2']}],
-                'server_node>MACH_ID1>storage>cvg_count': '2',
-                'server_node>MACH_ID1>storage>cvg[0]>data_devices': ['/dev/sda', '/dev/sdb', '/dev/sdc', '/dev/sdd'],
-                'server_node>MACH_ID1>storage>cvg[1]>data_devices': ['/dev/sde', '/dev/sdf', '/dev/sdg', '/dev/sdh'],
-                'server_node>MACH_ID1>storage>cvg[0]>metadata_devices': ['/dev/meta1'],
-                'server_node>MACH_ID1>storage>cvg[1]>metadata_devices': ['/dev/meta2'],
-                'server_node>MACH_ID1>hostname':                'myhost',
-                'server_node>MACH_ID1>name': 'mynodename',
-                'server_node>MACH_ID1>network>data>interface_type':                'o2ib',
-                'server_node>MACH_ID1>network>data>private_fqdn':
+                'node>MACH_ID1>storage>cvg_count': '2',
+                'node>MACH_ID1>storage>cvg[0]>data_devices': ['/dev/sda', '/dev/sdb', '/dev/sdc', '/dev/sdd'],
+                'node>MACH_ID1>storage>cvg[1]>data_devices': ['/dev/sde', '/dev/sdf', '/dev/sdg', '/dev/sdh'],
+                'node>MACH_ID1>storage>cvg[0]>metadata_devices': ['/dev/meta1'],
+                'node>MACH_ID1>storage>cvg[1]>metadata_devices': ['/dev/meta2'],
+                'node>MACH_ID1>hostname':                'myhost',
+                'node>MACH_ID1>name': 'mynodename',
+                'node>MACH_ID1>network>data>private_fqdn':
                     'srvnode-1.data.private',
-                'server_node>MACH_ID1>network>data>private_interfaces':                ['eth1', 'eno2'],
-                'cortx>software>s3>service>instances':                1,
-                'server_node>MACH_ID2>storage>cvg_count': '2',
-                'server_node>MACH_ID2>storage>cvg[0]>data_devices': ['/dev/sda', '/dev/sdb', '/dev/sdc', '/dev/sdd'],
-                'server_node>MACH_ID2>storage>cvg[1]>data_devices': ['/dev/sde', '/dev/sdf', '/dev/sdg', '/dev/sdh'],
-                'server_node>MACH_ID2>storage>cvg[0]>metadata_devices': ['/dev/meta1'],
-                'server_node>MACH_ID2>storage>cvg[1]>metadata_devices': ['/dev/meta2'],
-                'server_node>MACH_ID2>hostname':                'myhost',
-                'server_node>MACH_ID2>name': 'mynodename',
-                'server_node>MACH_ID2>network>data>interface_type':                'o2ib',
-                'server_node>MACH_ID2>network>data>private_fqdn':
+                'node>MACH_ID1>network>data>private_interfaces':                ['eth1', 'eno2'],
+                'cortx>s3>service_instances':                1,
+                'cortx>motr>interface_type':                'o2ib',
+                'node>MACH_ID2>storage>cvg_count': '2',
+                'node>MACH_ID2>storage>cvg[0]>data_devices': ['/dev/sda', '/dev/sdb', '/dev/sdc', '/dev/sdd'],
+                'node>MACH_ID2>storage>cvg[1]>data_devices': ['/dev/sde', '/dev/sdf', '/dev/sdg', '/dev/sdh'],
+                'node>MACH_ID2>storage>cvg[0]>metadata_devices': ['/dev/meta1'],
+                'node>MACH_ID2>storage>cvg[1]>metadata_devices': ['/dev/meta2'],
+                'node>MACH_ID2>hostname':                'myhost',
+                'node>MACH_ID2>name': 'mynodename',
+                'node>MACH_ID2>network>data>private_fqdn':
                     'srvnode-2.data.private',
-                'server_node>MACH_ID2>network>data>private_interfaces':                ['eth1', 'eno2'],
-                'cortx>software>s3>service>instances':                1,
-                'server_node>MACH_ID3>storage>cvg_count': '2',
-                'server_node>MACH_ID3>storage>cvg[0]>data_devices': ['/dev/sda', '/dev/sdb', '/dev/sdc', '/dev/sdd'],
-                'server_node>MACH_ID3>storage>cvg[1]>data_devices': ['/dev/sde', '/dev/sdf', '/dev/sdg', '/dev/sdh'],
-                'server_node>MACH_ID3>storage>cvg[0]>metadata_devices': ['/dev/meta1'],
-                'server_node>MACH_ID3>storage>cvg[1]>metadata_devices': ['/dev/meta2'],
-                'server_node>MACH_ID3>hostname':                'myhost',
-                'server_node>MACH_ID3>name': 'mynodename',
-                'server_node>MACH_ID3>network>data>interface_type':                'o2ib',
-                'server_node>MACH_ID3>network>data>private_fqdn':
+                'node>MACH_ID2>network>data>private_interfaces':                ['eth1', 'eno2'],
+                'cortx>s3>service_instances':                1,
+                'cortx>motr>interface_type':                'o2ib',
+                'node>MACH_ID3>storage>cvg_count': '2',
+                'node>MACH_ID3>storage>cvg[0]>data_devices': ['/dev/sda', '/dev/sdb', '/dev/sdc', '/dev/sdd'],
+                'node>MACH_ID3>storage>cvg[1]>data_devices': ['/dev/sde', '/dev/sdf', '/dev/sdg', '/dev/sdh'],
+                'node>MACH_ID3>storage>cvg[0]>metadata_devices': ['/dev/meta1'],
+                'node>MACH_ID3>storage>cvg[1]>metadata_devices': ['/dev/meta2'],
+                'node>MACH_ID3>hostname':                'myhost',
+                'node>MACH_ID3>name': 'mynodename',
+                'node>MACH_ID3>network>data>private_fqdn':
                     'srvnode-3.data.private',
-                'server_node>MACH_ID3>network>data>private_interfaces':                ['eth1', 'eno2'],
-                'cortx>software>s3>service>instances':                1,
+                'node>MACH_ID3>network>data>private_interfaces':                ['eth1', 'eno2'],
+                'cortx>s3>service_instances':                1,
+                'cortx>motr>interface_type':                'o2ib',
             }
             return data.get(value)
 
@@ -528,45 +528,45 @@ class TestCDF(unittest.TestCase):
 
         def ret_values(value: str) -> Any:
             data = {
-                'server_node>srvnode_1>storage>cvg_count': 1,
-                'cluster>CLUSTER_ID>site>storage_set_count': 1,
-                'cluster>CLUSTER_ID>storage_set>server_node_count': 1,
-                'cluster>CLUSTER_ID>storage_set[0]>name': 'StorageSet-1',
-                'cluster>CLUSTER_ID>storage_set[0]>server_nodes': ['srvnode_1'],
-                'cluster>CLUSTER_ID>storage_set[0]>durability>sns': {'stub': 1},
-                'cluster>CLUSTER_ID>storage_set[0]>durability>sns>data': 1,
-                'cluster>CLUSTER_ID>storage_set[0]>durability>sns>parity': 0,
-                'cluster>CLUSTER_ID>storage_set[0]>durability>sns>spare': 0,
-                'cluster>cluster_id':
+                'node>MACH_ID>storage>cvg_count': 1,
+                'cluster>storage_set_count': 1,
+                'cluster>storage_set>server_node_count': 1,
+                'cluster>storage_set[0]>name': 'StorageSet-1',
+                'cluster>storage_set[0]>nodes': ['srvnode_1'],
+                'cluster>storage_set[0]>durability>sns': {'stub': 1},
+                'cluster>storage_set[0]>durability>sns>data': 1,
+                'cluster>storage_set[0]>durability>sns>parity': 0,
+                'cluster>storage_set[0]>durability>sns>spare': 0,
+                'node>MACH_ID>cluster_id':
                 'CLUSTER_ID',
-                'server_node': {
+                'node': {
                     'srvnode_1': {
                         'cluster_id': 'CLUSTER_ID'
                     }
                 },
-                'server_node>srvnode_1>cluster_id':
+                'node>srvnode_1>cluster_id':
                 'CLUSTER_ID',
-                'server_node>srvnode_1>name':
+                'node>srvnode_1>name':
                 'myhost',
-                'server_node>srvnode_1>hostname':
+                'node>srvnode_1>hostname':
                 'myhost',
-                'server_node>srvnode_1>network>data>interface_type':
-                'o2ib',
-                'server_node>srvnode_1>network>data>private_fqdn':
+                'node>srvnode_1>network>data>private_fqdn':
                     'srvnode-1.data.private',
-                'server_node>srvnode_1>network>data>private_interfaces':
+                'node>srvnode_1>network>data>private_interfaces':
                 ['eth1', 'eno2'],
-                'cortx>software>s3>service>instances':
+                'cortx>s3>service_instances':
                 1,
-                'server_node>srvnode_1>storage>cvg_count':
+                'node>srvnode_1>storage>cvg_count':
                 2,
-                'cortx>software>motr>service>client_instances':
+                'cortx>motr>interface_type':
+                'o2ib',
+                'cortx>motr>client_instances':
                 2,
-                'server_node>srvnode_1>storage>cvg':
+                'node>srvnode_1>storage>cvg':
                 [{'data_devices': ['/dev/sdb', '/dev/sdc'], 'metadata_devices': ['/dev/meta', '/dev/meta1']}],
-                'server_node>srvnode_1>storage>cvg[0]>data_devices':
+                'node>srvnode_1>storage>cvg[0]>data_devices':
                 ['/dev/sdb'],
-                'server_node>srvnode_1>storage>cvg[1]>data_devices':
+                'node>srvnode_1>storage>cvg[1]>data_devices':
                 ['/dev/sdc'],
             }
             return data.get(value)
@@ -610,45 +610,45 @@ class TestCDF(unittest.TestCase):
 
         def ret_values(value: str) -> Any:
             data = {
-                'cluster>CLUSTER_ID>site>storage_set_count':
+                'cluster>storage_set_count':
                 1,
-                'cluster>CLUSTER_ID>storage_set>server_node_count':
+                'cluster>storage_set>server_node_count':
                 1,
-                'cluster>CLUSTER_ID>storage_set[0]>durability>sns': {'stub': 1},
-                'cluster>CLUSTER_ID>storage_set[0]>durability>sns>data': 4,
-                'cluster>CLUSTER_ID>storage_set[0]>durability>sns>parity': 0,
-                'cluster>CLUSTER_ID>storage_set[0]>durability>sns>spare': 0,
-                'cluster>CLUSTER_ID>storage_set[0]>name':
+                'cluster>storage_set[0]>durability>sns': {'stub': 1},
+                'cluster>storage_set[0]>durability>sns>data': 4,
+                'cluster>storage_set[0]>durability>sns>parity': 0,
+                'cluster>storage_set[0]>durability>sns>spare': 0,
+                'cluster>storage_set[0]>name':
                 'StorageSet-1',
-                'cluster>CLUSTER_ID>storage_set[0]>server_nodes': ['MACH_ID'],
-                'cluster>cluster_id':
+                'cluster>storage_set[0]>nodes': ['MACH_ID'],
+                'node>MACH_ID>cluster_id':
                 'CLUSTER_ID',
-                'server_node': {
+                'node': {
                     'MACH_ID': {
                         'cluster_id': 'CLUSTER_ID'
                     }
                 },
-                'server_node>MACH_ID>cluster_id':
+                'node>MACH_ID>cluster_id':
                 'CLUSTER_ID',
-                'server_node>MACH_ID>hostname':
+                'node>MACH_ID>hostname':
                 'myhost',
-                'server_node>MACH_ID>network>data>interface_type':
-                'o2ib',
-                'server_node>MACH_ID>network>data>private_interfaces':
+                'node>MACH_ID>network>data>private_interfaces':
                 ['eth1', 'eno2'],
-                'cortx>software>s3>service>instances':
+                'cortx>s3>service_instances':
                 1,
-                'server_node>MACH_ID>storage>cvg_count':
+                'node>MACH_ID>storage>cvg_count':
                 2,
-                'cortx>software>motr>service>client_instances':
+                'cortx>motr>interface_type':
+                'o2ib',
+                'cortx>motr>client_instances':
                 2,
-                'server_node>MACH_ID>storage>cvg[0]>data_devices':
+                'node>MACH_ID>storage>cvg[0]>data_devices':
                 ['/dev/sdb'],
-                'server_node>MACH_ID>storage>cvg[0]>metadata_devices':
+                'node>MACH_ID>storage>cvg[0]>metadata_devices':
                 ['/dev/meta'],
-                'server_node>MACH_ID>storage>cvg[1]>data_devices':
+                'node>MACH_ID>storage>cvg[1]>data_devices':
                 ['/dev/sdc'],
-                'server_node>MACH_ID>storage>cvg[1]>metadata_devices':
+                'node>MACH_ID>storage>cvg[1]>metadata_devices':
                 ['/dev/meta1'],
             }
             return data.get(value)
@@ -665,39 +665,39 @@ class TestCDF(unittest.TestCase):
 
         def ret_values(value: str) -> Any:
             data = {
-                'cluster>CLUSTER_ID>site>storage_set_count':
+                'cluster>storage_set_count':
                 1,
-                'cluster>CLUSTER_ID>storage_set>server_node_count':
+                'cluster>storage_set>server_node_count':
                 1,
-                'cluster>CLUSTER_ID>storage_set[0]>durability>md': {'1':2},
-                'cluster>CLUSTER_ID>storage_set[0]>durability>md>data': 2,
-                'cluster>CLUSTER_ID>storage_set[0]>durability>md>parity': 0,
-                'cluster>CLUSTER_ID>storage_set[0]>durability>md>spare': 0,
-                'cluster>CLUSTER_ID>storage_set[0]>name':
+                'cluster>storage_set[0]>durability>md': {'1':2},
+                'cluster>storage_set[0]>durability>md>data': 2,
+                'cluster>storage_set[0]>durability>md>parity': 0,
+                'cluster>storage_set[0]>durability>md>spare': 0,
+                'cluster>storage_set[0]>name':
                 'StorageSet-1',
-                'cluster>CLUSTER_ID>storage_set[0]>server_nodes': ['MACH_ID'],
-                'cluster>cluster_id':
+                'cluster>storage_set[0]>nodes': ['MACH_ID'],
+                'node>MACH_ID>cluster_id':
                 'CLUSTER_ID',
-                'server_node': {
+                'node': {
                     'MACH_ID': {
                         'cluster_id': 'CLUSTER_ID'
                     }
                 },
-                'server_node>MACH_ID>cluster_id':
+                'node>MACH_ID>cluster_id':
                 'CLUSTER_ID',
-                'server_node>MACH_ID>hostname':
+                'node>MACH_ID>hostname':
                 'myhost',
-                'server_node>MACH_ID>network>data>interface_type':
-                'o2ib',
-                'server_node>MACH_ID>network>data>private_interfaces':
+                'node>MACH_ID>network>data>private_interfaces':
                 ['eth1', 'eno2'],
-                'cortx>software>s3>service>instances':
+                'cortx>s3>service_instances':
                 1,
-                'cortx>software>motr>service>client_instances':
+                'cortx>motr>interface_type':
+                'o2ib',
+                'cortx>motr>client_instances':
                 2,
-                'server_node>MACH_ID>storage>cvg[0]>data_devices':
+                'node>MACH_ID>storage>cvg[0]>data_devices':
                 ['/dev/sdb'],
-                'server_node>MACH_ID>storage>cvg[0]>metadata_devices':
+                'node>MACH_ID>storage>cvg[0]>metadata_devices':
                 ['/dev/meta'],
             }
             return data.get(value)
@@ -712,48 +712,48 @@ class TestCDF(unittest.TestCase):
 
         def ret_values(value: str) -> Any:
             data = {
-                'server_node>MACH_ID>storage>cvg_count': 1,
-                'cluster>CLUSTER_ID>site>storage_set_count':
+                'node>MACH_ID>storage>cvg_count': 1,
+                'cluster>storage_set_count':
                 1,
-                'cluster>CLUSTER_ID>storage_set>server_node_count':
+                'cluster>storage_set>server_node_count':
                 1,
-                'cluster>CLUSTER_ID>storage_set[0]>durability>dix': {'1':2},
-                'cluster>CLUSTER_ID>storage_set[0]>durability>dix>data': 1,
-                'cluster>CLUSTER_ID>storage_set[0]>durability>dix>parity': 0,
-                'cluster>CLUSTER_ID>storage_set[0]>durability>dix>spare': 0,
-                'cluster>CLUSTER_ID>storage_set[0]>name':
+                'cluster>storage_set[0]>durability>dix': {'1':2},
+                'cluster>storage_set[0]>durability>dix>data': 1,
+                'cluster>storage_set[0]>durability>dix>parity': 0,
+                'cluster>storage_set[0]>durability>dix>spare': 0,
+                'cluster>storage_set[0]>name':
                 'StorageSet-1',
-                'cluster>CLUSTER_ID>storage_set[0]>server_nodes': ['MACH_ID'],
-                'cluster>cluster_id':
+                'cluster>storage_set[0]>nodes': ['MACH_ID'],
+                'node>MACH_ID>cluster_id':
                 'CLUSTER_ID',
-                'server_node': {
+                'node': {
                     'MACH_ID': {
                         'cluster_id': 'CLUSTER_ID'
                     }
                 },
-                'server_node>MACH_ID>cluster_id':
+                'node>MACH_ID>cluster_id':
                 'CLUSTER_ID',
-                'server_node>MACH_ID>hostname':
+                'node>MACH_ID>hostname':
                 'myhost',
-                'server_node>MACH_ID>network>data>interface_type':
-                'o2ib',
-                'server_node>MACH_ID>network>data>private_fqdn':
+                'node>MACH_ID>network>data>private_fqdn':
                     'srvnode-1.data.private',
-                'server_node>MACH_ID>network>data>private_interfaces':
+                'node>MACH_ID>network>data>private_interfaces':
                 ['eth1', 'eno2'],
-                'cortx>software>s3>service>instances':
+                'cortx>s3>service_instances':
                 1,
-                'server_node>MACH_ID>storage>cvg_count':
+                'node>MACH_ID>storage>cvg_count':
                 2,
-                'cortx>software>motr>service>client_instances':
+                'cortx>motr>interface_type':
+                'o2ib',
+                'cortx>motr>client_instances':
                 2,
-                'server_node>MACH_ID>storage>cvg[0]>data_devices':
+                'node>MACH_ID>storage>cvg[0]>data_devices':
                 ['/dev/sdb'],
-                'server_node>MACH_ID>storage>cvg[0]>metadata_devices':
+                'node>MACH_ID>storage>cvg[0]>metadata_devices':
                 ['/dev/meta'],
-                'server_node>MACH_ID>storage>cvg[1]>data_devices':
+                'node>MACH_ID>storage>cvg[1]>data_devices':
                 ['/dev/sdc'],
-                'server_node>MACH_ID>storage>cvg[1]>metadata_devices':
+                'node>MACH_ID>storage>cvg[1]>metadata_devices':
                 ['/dev/meta1'],
             }
             return data.get(value)
@@ -773,52 +773,52 @@ class TestCDF(unittest.TestCase):
 
         def ret_values(value: str) -> Any:
             data = {
-                'server_node>MACH_ID>storage>cvg_count': 1,
-                'cluster>CLUSTER_ID>site>storage_set_count':
+                'node>MACH_ID>storage>cvg_count': 1,
+                'cluster>storage_set_count':
                 1,
-                'cluster>CLUSTER_ID>storage_set>server_node_count':
+                'cluster>storage_set>server_node_count':
                 1,
-                'cluster>CLUSTER_ID>storage_set[0]>durability>dix': {'1':2},
-                'cluster>CLUSTER_ID>storage_set[0]>durability>dix>data': 1,
-                'cluster>CLUSTER_ID>storage_set[0]>durability>dix>parity': 0,
-                'cluster>CLUSTER_ID>storage_set[0]>durability>dix>spare': 0,
-                'cluster>CLUSTER_ID>storage_set[0]>durability>sns': {'1':2},
-                'cluster>CLUSTER_ID>storage_set[0]>durability>sns>data': 1,
-                'cluster>CLUSTER_ID>storage_set[0]>durability>sns>parity': 0,
-                'cluster>CLUSTER_ID>storage_set[0]>durability>sns>spare': 0,
-                'cluster>CLUSTER_ID>storage_set[0]>name':
+                'cluster>storage_set[0]>durability>dix': {'1':2},
+                'cluster>storage_set[0]>durability>dix>data': 1,
+                'cluster>storage_set[0]>durability>dix>parity': 0,
+                'cluster>storage_set[0]>durability>dix>spare': 0,
+                'cluster>storage_set[0]>durability>sns': {'1':2},
+                'cluster>storage_set[0]>durability>sns>data': 1,
+                'cluster>storage_set[0]>durability>sns>parity': 0,
+                'cluster>storage_set[0]>durability>sns>spare': 0,
+                'cluster>storage_set[0]>name':
                 'StorageSet-1',
-                'cluster>CLUSTER_ID>storage_set[0]>server_nodes': ['MACH_ID'],
-                'cluster>cluster_id':
+                'cluster>storage_set[0]>nodes': ['MACH_ID'],
+                'node>MACH_ID>cluster_id':
                 'CLUSTER_ID',
-                'server_node': {
+                'node': {
                     'MACH_ID': {
                         'cluster_id': 'CLUSTER_ID'
                     }
                 },
-                'server_node>MACH_ID>cluster_id':
+                'node>MACH_ID>cluster_id':
                 'CLUSTER_ID',
-                'server_node>MACH_ID>hostname':
+                'node>MACH_ID>hostname':
                 'myhost',
-                'server_node>MACH_ID>network>data>interface_type':
-                'o2ib',
-                'server_node>MACH_ID>network>data>private_fqdn':
+                'node>MACH_ID>network>data>private_fqdn':
                     'srvnode-1.data.private',
-                'server_node>MACH_ID>network>data>private_interfaces':
+                'node>MACH_ID>network>data>private_interfaces':
                 ['eth1', 'eno2'],
-                'cortx>software>s3>service>instances':
+                'cortx>s3>service_instances':
                 1,
-                'server_node>MACH_ID>storage>cvg_count':
+                'node>MACH_ID>storage>cvg_count':
                 2,
-                'cortx>software>motr>service>client_instances':
+                'cortx>motr>interface_type':
+                'o2ib',
+                'cortx>motr>client_instances':
                 2,
-                'server_node>MACH_ID>storage>cvg[0]>data_devices':
+                'node>MACH_ID>storage>cvg[0]>data_devices':
                 ['/dev/sda', '/dev/sdb'],
-                'server_node>MACH_ID>storage>cvg[0]>metadata_devices':
+                'node>MACH_ID>storage>cvg[0]>metadata_devices':
                 ['/dev/meta'],
-                'server_node>MACH_ID>storage>cvg[1]>data_devices':
+                'node>MACH_ID>storage>cvg[1]>data_devices':
                 ['/dev/sdc', '/dev/sdd'],
-                'server_node>MACH_ID>storage>cvg[1]>metadata_devices':
+                'node>MACH_ID>storage>cvg[1]>metadata_devices':
                 ['/dev/meta1'],
             }
             return data.get(value)
@@ -857,28 +857,28 @@ class TestCDF(unittest.TestCase):
 
         def ret_values(value: str) -> Any:
             data = {
-                'server_node': {
+                'node': {
                     'MACH_ID': 'stub'
                 },
-                'server_node>MACH_ID>hostname':
+                'node>MACH_ID>hostname':
                 'myhost',
-                'server_node>MACH_ID>name': 'mynodename',
-                'server_node>MACH_ID>storage>cvg':
+                'node>MACH_ID>name': 'mynodename',
+                'node>MACH_ID>storage>cvg':
                 [{'data_devices': ['/dev/sdb'], 'metadata_devices': ['/dev/meta1']},
                  {'data_devices': ['/dev/sdc'], 'metadata_devices': ['/dev/meta2']}],
-                'server_node>MACH_ID>storage>cvg[0]>data_devices':
+                'node>MACH_ID>storage>cvg[0]>data_devices':
                 ['/dev/sdb'],
-                'server_node>MACH_ID>storage>cvg[1]>data_devices':
+                'node>MACH_ID>storage>cvg[1]>data_devices':
                 ['/dev/sdc'],
-                'server_node>MACH_ID>network>data>private_interfaces':
+                'node>MACH_ID>network>data>private_interfaces':
                 ['eth1', 'eno2'],
-                'cortx>software>s3>service>instances':
+                'cortx>s3>service_instances':
                 1,
-                'cortx>software>motr>service>client_instances':
-                2,
-                'server_node>MACH_ID>network>data>interface_type':
+                'cortx>motr>interface_type':
                 'o2ib',
-                'server_node>MACH_ID>network>data>private_fqdn':
+                'cortx>motr>client_instances':
+                2,
+                'node>MACH_ID>network>data>private_fqdn':
                     'srvnode-1.data.private',
             }
             return data[value]
@@ -952,51 +952,45 @@ class TestCDF(unittest.TestCase):
 
         def ret_values(value: str) -> Any:
             data = {
-                'server_node': {
+                'node': {
                     'MACH_ID': 'stub',
                     'MACH_2_ID': 'stub'
                 },
-                'cluster>92f444df-87cc-4137-b680-aab3b35d1695>site>storage_set_count':
+                'cluster>storage_set_count':
                 1,
-                'cluster>92f444df-87cc-4137-b680-aab3b35d1695>storage_set>server_node_count':
+                'cluster>storage_set>server_node_count':
                 2,
-                'cluster>92f444df-87cc-4137-b680-aab3b35d1695>storage_set[0]>name':
+                'cluster>storage_set[0]>name':
                 'StorageSet-1',
-                'cluster>92f444df-87cc-4137-b680-aab3b35d1695>storage_set[0]>server_nodes':
+                'cluster>storage_set[0]>nodes':
                 ['srvnode_1', 'srvnode_2'],
-                'server_node>MACH_ID>hostname':
+                'node>MACH_ID>hostname':
                 'myhost',
-                'server_node>MACH_ID>name': 'mynodename',
-                'server_node>MACH_ID>network>data>interface_type':
-                'o2ib',
-                'server_node>MACH_ID>network>data>private_fqdn':
+                'node>MACH_ID>name': 'mynodename',
+                'node>MACH_ID>network>data>private_fqdn':
                     'srvnode-1.data.private',
-                'server_node>MACH_ID>network>data>private_interfaces':
+                'node>MACH_ID>network>data>private_interfaces':
                 ['eth1'],
-                'cortx>software>s3>service>instances':
-                1,
-                'cortx>software>motr>service>client_instances':
-                2,
-                'server_node>MACH_ID>storage>cvg':
+                'node>MACH_ID>storage>cvg':
                 [{'data_devices': ['/dev/sdb'], 'metadata_devices': ['/dev/meta']}],
-                'server_node>MACH_ID>storage>cvg[0]>data_devices':
+                'node>MACH_ID>storage>cvg[0]>data_devices':
                 ['/dev/sdb'],
-                'server_node>MACH_ID>storage>cvg[0]>metadata_devices':
+                'node>MACH_ID>storage>cvg[0]>metadata_devices':
                 ['/dev/meta'],
-                'server_node>MACH_2_ID>name':                'host-2',
-                'server_node>MACH_2_ID>hostname':            'host-2',
-                'server_node>MACH_2_ID>network>data>interface_type':                'tcp',
-                'server_node>MACH_2_ID>network>data>private_fqdn':
+                'node>MACH_2_ID>name':                'host-2',
+                'node>MACH_2_ID>hostname':            'host-2',
+                'cortx>motr>interface_type':                'tcp',
+                'node>MACH_2_ID>network>data>private_fqdn':
                     'srvnode-2.data.private',
-                'server_node>MACH_2_ID>network>data>private_interfaces':
+                'node>MACH_2_ID>network>data>private_interfaces':
                 ['eno1'],
-                'cortx>software>s3>service>instances':                1,
-                'cortx>software>motr>service>client_instances':                2,
-                'server_node>MACH_2_ID>storage>cvg':
+                'cortx>s3>service_instances':                1,
+                'cortx>motr>client_instances':                2,
+                'node>MACH_2_ID>storage>cvg':
                 [{'data_devices': ['/dev/sdb'], 'metadata_devices': ['/dev/meta']}],
-                'server_node>MACH_2_ID>storage>cvg[0]>data_devices':
+                'node>MACH_2_ID>storage>cvg[0]>data_devices':
                 ['/dev/sdb'],
-                'server_node>MACH_2_ID>storage>cvg[0]>metadata_devices':
+                'node>MACH_2_ID>storage>cvg[0]>metadata_devices':
                 ['/dev/meta'],
             }
             return data[value]
@@ -1043,7 +1037,7 @@ class TestCDF(unittest.TestCase):
         self.assertEqual(Text('eno1'), ret[1].data_iface)
         self.assertEqual(1, ret[1].s3_instances)
         self.assertEqual(2, ret[1].client_instances)
-        self.assertEqual('Some (P.o2ib)', str(ret[0].data_iface_type))
+        self.assertEqual('Some (P.tcp)', str(ret[0].data_iface_type))
         self.assertEqual('Some (P.tcp)', str(ret[1].data_iface_type))
 
     def test_iface_type_can_be_null(self):
@@ -1062,25 +1056,25 @@ class TestCDF(unittest.TestCase):
 
         def ret_values(value: str) -> Any:
             data = {
-                'server_node': {
+                'node': {
                     'MACH_ID': 'stub'
                 },
-                'server_node>MACH_ID>name': 'mynodename',
-                'server_node>MACH_ID>hostname':
+                'node>MACH_ID>name': 'mynodename',
+                'node>MACH_ID>hostname':
                 'myhost',
-                'server_node>MACH_ID>storage>cvg':
+                'node>MACH_ID>storage>cvg':
                 [{'data_devices': ['/dev/sdb'], 'metadata_devices': ['/dev/meta']}],
-                'server_node>MACH_ID>storage>cvg[0]>data_devices':
+                'node>MACH_ID>storage>cvg[0]>data_devices':
                 ['/dev/sdb'],
-                'server_node>MACH_ID>network>data>interface_type':
-                None,
-                'server_node>MACH_ID>network>data>private_fqdn':
+                'node>MACH_ID>network>data>private_fqdn':
                     'srvnode-1.data.private',
-                'cortx>software>s3>service>instances':
+                'cortx>s3>service_instances':
                 1,
-                'cortx>software>motr>service>client_instances':
+                'cortx>motr>interface_type':
+                None,
+                'cortx>motr>client_instances':
                 2,
-                'server_node>MACH_ID>network>data>private_interfaces':
+                'node>MACH_ID>network>data>private_interfaces':
                 ['eth1', 'eno2']
             }
             return data[value]

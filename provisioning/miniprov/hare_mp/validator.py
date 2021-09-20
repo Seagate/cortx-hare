@@ -31,21 +31,17 @@ class Validator:
 
     def is_first_node_in_storage_set(self) -> bool:
         machine_id = self._get_machine_id()
-        cluster_id = self.provider.get_cluster_id()
         storage_set_id = self.provider.get_storage_set_index()
-        server_nodes_key: str = (f'cluster>{cluster_id}>'
-                                 f'storage_set[{storage_set_id}]>server_nodes')
+        server_nodes_key: str = f'cluster>storage_set[{storage_set_id}]>nodes'
         server_nodes = self.provider.get(server_nodes_key)
         return server_nodes[0] == machine_id
 
     def is_first_node_in_cluster(self) -> bool:
         machine_id = self._get_machine_id()
-        cluster_id = self.provider.get_cluster_id()
-        server_nodes_key: str = (f'cluster>{cluster_id}>'
-                                 f'storage_set[0]>server_nodes')
+        server_nodes_key: str = ('cluster>storage_set[0]>nodes')
         server_nodes = self.provider.get(server_nodes_key)
         return server_nodes[0] == machine_id
 
     def is_local_machine_id_valid(self, machine_id: str) -> bool:
-        hostname = self.provider.get(f'server_node>{machine_id}>hostname')
+        hostname = self.provider.get(f'node>{machine_id}>hostname')
         return hostname == socket.gethostname()
