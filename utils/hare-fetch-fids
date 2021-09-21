@@ -178,6 +178,21 @@ def parse_opts(argv):
                    'Default: Returns the fids for all the services.',
                    type=str,
                    action='store')
+    p.add_argument('--index',
+                   '-i',
+                   help='service index. - Returns fid for given service'
+                   ' at given index.'
+                   ' Default: Returns the fids for all the services.'
+                   ' "--service" option is required for this option.'
+                   ' Also note that while returning result simplistic indexing'
+                   ' method is used where the index value is used as a'
+                   ' subscript into the list of identifiers for a given'
+                   ' service type. Hare does not guarantee that a mapping'
+                   ' between a given index and service identifier will always'
+                   ' be preserved',
+                   type=int,
+                   default=-1,
+                   action='store')
     p.add_argument(
         '--node',
         '-n',
@@ -207,7 +222,14 @@ def main(argv=None):
 
         svcs = get_service_for_node(nodes, opts.node, opts.service)
         if svcs:
-            print(simplejson.dumps(svcs, indent=2, for_json=True))
+            if opts.index >= 0:
+                if opts.index >= len(svcs):
+                    raise RuntimeError(f'There are only "{len(svcs)}"'
+                                       'instances of the provided service')
+                print(simplejson.dumps(svcs[opts.index],
+                                       indent=2, for_json=True))
+            else:
+                print(simplejson.dumps(svcs, indent=2, for_json=True))
 
     except (RuntimeError, FileNotFoundError) as e:
         print(e, file=sys.stderr)
