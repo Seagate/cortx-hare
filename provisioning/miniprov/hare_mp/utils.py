@@ -23,6 +23,7 @@ import subprocess
 import json
 import io
 import os
+import logging
 from typing import List
 
 from hax.util import repeat_if_fails, KVAdapter
@@ -35,6 +36,7 @@ class Utils:
     def __init__(self, provider: ValueProvider):
         self.provider = provider
         self.kv = KVAdapter()
+        self.hare_stop = False
 
     def get_hostname(self) -> str:
         machine_id = self.provider.get_machine_id()
@@ -113,6 +115,27 @@ class Utils:
                 self.kv.kv_put(item_data['key'],
                                str(item_data['value']))
 
+    def stop_hare(self):
+        self.hare_stop = True
+
+    def is_hare_stopping(self) -> bool:
+        return self.hare_stop
+
+
+class LogWriter:
+    def __init__(self, logger: logging.Logger, logging_handler):
+        self.logger = logger
+        self.logging_handler = logging_handler
+
+    def write(self, msg: str):
+        self.logger.log(logging.INFO, msg)
+
+    def flush(self):
+        pass
+
+    def fileno(self):
+        return self.logging_handler.stream.fileno()
+
 
 def execute(cmd: List[str], env=None) -> str:
     process = subprocess.Popen(cmd,
@@ -128,3 +151,21 @@ def execute(cmd: List[str], env=None) -> str:
             f'Command output: {err}')
 
     return out
+
+
+def execute_no_communicate(cmd: List[str], env=None,
+                           working_dir: str = '/var/log/cortx/hare',
+                           out_file=subprocess.PIPE):
+    process = subprocess.Popen(cmd,
+                               stdin=subprocess.PIPE,
+                               stdout=out_file,
+                               stderr=out_file,
+                               cwd=working_dir,
+                               close_fds=False,
+                               encoding='utf8',
+                               env=env)
+    if process.returncode:
+        raise Exception(
+            f'Command {cmd} exited with error code {process.returncode}. ')
+
+    return process

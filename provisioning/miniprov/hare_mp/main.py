@@ -32,6 +32,7 @@ from enum import Enum
 from sys import exit
 from time import sleep
 from typing import Any, Callable, Dict, List
+from threading import Event
 from urllib.parse import urlparse
 
 import yaml
@@ -45,6 +46,8 @@ from hare_mp.store import ConfStoreProvider
 from hare_mp.systemd import HaxUnitTransformer
 from hare_mp.validator import Validator
 from hare_mp.utils import execute, Utils
+from hare_mp.consul_starter import ConsulStarter
+from hare_mp.hax_starter import HaxStarter
 
 # Logger details
 LOG_DIR = "/var/log/seagate/hare/hare_deployment/"
@@ -223,6 +226,104 @@ def init(args):
     except Exception as error:
         shutdown_cluster()
         raise RuntimeError(f'Error while initializing cluster :key={error}')
+
+
+def __is_systemd_enabled() -> bool:
+    try:
+        cmd = ['systemctl']
+        execute(cmd)
+    except Exception:
+        return False
+    return True
+
+
+def start_hax_with_systemd():
+    cmd = ['systemctl', 'start', 'hare-hax']
+    execute(cmd)
+
+
+# def start_hax_without_systemd():
+#     try:
+#         path = os.getenv('PATH', '')
+#         path += os.pathsep + '/opt/seagate/cortx/hare/bin'
+#         path += os.pathsep + '/opt/seagate/cortx/hare/libexec'
+#         python_path = os.pathsep.join(sys.path)
+#         hare_log_file = '/var/log/seagate/hare/cortx-hare.log'
+#         var_hax_path = '/var/motr/hax'
+#         if not os.path.exists(var_hax_path):
+#             os.makedirs(var_hax_path)
+#         logger = logging.getLogger('hax-log')
+#         fhandler = logging.handlers.RotatingFileHandler(hare_log_file,
+#                                                         maxBytes=LOG_FILE_SIZE,
+#                                                         mode='a',
+#                                                         backupCount=5,
+#                                                         encoding=None,
+#                                                         delay=False)
+#         logger.addHandler(fhandler)
+#         cmd = ['hax']
+#         execute_no_communicate(cmd, env={'PYTHONPATH': python_path,
+#                                          'PATH': path,
+#                                          'LC_ALL': "en_US.utf-8",
+#                                          'LANG': "en_US.utf-8"},
+#                                working_dir=var_hax_path,
+#                                out_file=LogWriter(logger, fhandler))
+#     except Exception as error:
+#         raise RuntimeError(f'Error while initializing cluster :key={error}')
+
+def _start_consul(utils: Utils, stop_event: Event, hare_local_dir: str):
+    log_dir = f'{hare_local_dir}/consul/log'
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
+    data_dir = f'{hare_local_dir}/consul/data'
+    if not os.path.exists(data_dir):
+        os.makedirs(data_dir)
+    config_dir = f'{hare_local_dir}/consul/config'
+    if not os.path.exists(config_dir):
+        os.makedirs(config_dir)
+    peers = ['consul-server']
+    consul_starter = ConsulStarter(utils=utils, stop_event=stop_event,
+                                   log_dir=log_dir, data_dir=data_dir,
+                                   config_dir=config_dir, peers=peers)
+    consul_starter.start()
+    return consul_starter
+
+
+def _start_hax(utils: Utils, stop_event: Event, hare_local_dir: str):
+    home_dir = f'{hare_local_dir}'
+    log_dir = f'{hare_local_dir}/log'
+    if not os.path.exists(home_dir):
+        os.makedirs(home_dir)
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
+    hax_starter = HaxStarter(utils=utils, stop_event=stop_event,
+                             home_dir=home_dir, log_dir=log_dir)
+    hax_starter.start()
+    return hax_starter
+
+
+def start_hax_and_consul_without_systemd(config_url: str, utils: Utils):
+    local_dir = '/var/hare'
+    # Event on which hare receives a notification in case consul agent or hax
+    # terminates.
+    hare_stop_event = Event()
+    consul_starter = _start_consul(utils, hare_stop_event, local_dir)
+    hax_starter = _start_hax(utils, hare_stop_event, local_dir)
+    hare_stop_event.wait()
+    if utils.is_hare_stopping():
+        consul_starter.stop()
+        hax_starter.stop()
+
+
+def start(args):
+    url = args.config[0]
+    utils = Utils(ConfStoreProvider(url))
+    if __is_systemd_enabled():
+        start_hax_with_systemd()
+    else:
+        # This is a blocking call and will block until either consul
+        # or hax process terminates.
+        # TODO: Check if the respective processes need to be restarted.
+        start_hax_and_consul_without_systemd(url, utils)
 
 
 def test(args):
@@ -640,6 +741,12 @@ def main():
                        'init',
                        help_str='Initializes Hare',
                        handler_fn=init))
+
+    add_file_argument(
+        add_subcommand(subparser,
+                       'start',
+                       help_str='Starts Hare services',
+                       handler_fn=start))
 
     add_param_argument(
         add_plan_argument(
