@@ -1261,10 +1261,10 @@ def pool_drives(m0conf: Dict[Oid, Any],
 
 def cluster_encls(m0conf: Dict[Oid, Any], svc_t) -> List[Oid]:
     return list({encl_id
-            for encl_id in m0conf if encl_id.type is ObjT.enclosure
-            for proc_id in m0conf[m0conf[encl_id].node].processes
-            for svc_id in m0conf[proc_id].services
-            if m0conf[svc_id].type is svc_t})
+                 for encl_id in m0conf if encl_id.type is ObjT.enclosure
+                 for proc_id in m0conf[m0conf[encl_id].node].processes
+                 for svc_id in m0conf[proc_id].services
+                 if m0conf[svc_id].type is svc_t})
 
 
 def cluster_ctrls(m0conf: Dict[Oid, Any]) -> List[Oid]:
