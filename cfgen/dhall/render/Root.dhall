@@ -35,7 +35,7 @@ in
       , named.Oid "mdpool" x.mdpool
       , named.TextUnquoted "imeta_pver"
             (Optional/fold types.Oid x.imeta_pver Text renderOid "(0,0)")
-      , named.Natural "mdredundancy" (List/length types.Oid x.nodes)
+      , named.Natural "mdredundancy" x.mdredundancy
       , "params=[]"
       , named.Oids "nodes" x.nodes
       , named.Oids "sites" x.sites
