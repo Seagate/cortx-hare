@@ -50,9 +50,10 @@ from hare_mp.consul_starter import ConsulStarter
 from hare_mp.hax_starter import HaxStarter
 
 # Logger details
-LOG_DIR = "/var/log/seagate/hare/hare_deployment/"
-LOG_FILE = "/var/log/seagate/hare/hare_deployment/setup.log"
+LOG_DIR_EXT = '/hare/hare_deployment/'
+LOG_FILE = 'setup.log'
 LOG_FILE_SIZE = 5 * 1024 * 1024
+CONF_DIR_EXT = '/hare/'
 
 
 class Plan(Enum):
@@ -63,20 +64,27 @@ class Plan(Enum):
     Scalability = 'scalability'
 
 
-def create_logger_directory():
+def create_logger_directory(log_dir):
     """Create log directory if not exists."""
-    if not os.path.isdir(LOG_DIR):
+    if not os.path.isdir(log_dir):
         try:
-            os.makedirs(LOG_DIR)
+            os.makedirs(log_dir)
         except Exception:
-            logging.exception(f"{LOG_DIR} Could not be created")
+            logging.exception(f"{log_dir} Could not be created")
             shutdown_cluster()
             exit(-1)
 
 
-def setup_logging() -> None:
+def setup_logging(url) -> None:
+    provider = ConfStoreProvider(url)
+    log_path = provider.get('cortx>common>storage>log')
+    log_dir = log_path + LOG_DIR_EXT
+    log_file = log_dir + LOG_FILE
+
+    create_logger_directory(log_dir)
+
     console = logging.StreamHandler(stream=sys.stderr)
-    fhandler = logging.handlers.RotatingFileHandler(LOG_FILE,
+    fhandler = logging.handlers.RotatingFileHandler(log_file,
                                                     maxBytes=LOG_FILE_SIZE,
                                                     mode='a',
                                                     backupCount=5,
@@ -213,7 +221,10 @@ def init(args):
         validator = Validator(ConfStoreProvider(url))
         disable_hare_consul_agent()
         if validator.is_first_node_in_cluster():
-            path_to_cdf = args.file[0]
+            if args.file:
+                path_to_cdf = args.file[0]
+            else:
+                path_to_cdf = get_config_dir(url) + 'cluster.yaml'
             if not is_cluster_running() and bootstrap_cluster(
                     path_to_cdf, True):
                 logging.error('Failed to bootstrap the cluster')
@@ -332,7 +343,10 @@ def test(args):
         url = args.config[0]
         validator = Validator(ConfStoreProvider(url))
         if validator.is_first_node_in_cluster():
-            path_to_cdf = args.file[0]
+            if args.file:
+                path_to_cdf = args.file[0]
+            else:
+                path_to_cdf = get_config_dir(url) + 'cluster.yaml'
             if not is_cluster_running() and bootstrap_cluster(path_to_cdf):
                 logging.error('Failed to bootstrap the cluster')
                 rc = -1
@@ -353,7 +367,10 @@ def test(args):
 def test_IVT(args):
     try:
         rc = 0
-        path_to_cdf = args.file[0]
+        if args.file:
+            path_to_cdf = args.file[0]
+        else:
+            path_to_cdf = get_config_dir(args.config[0]) + 'cluster.yaml'
 
         logging.info('Running test plan: ' + str(args.plan[0].value))
         # TODO We need to handle plan type and execute test cases accordingly
@@ -409,19 +426,32 @@ def kv_cleanup():
         raise RuntimeError('Error during key delete in transaction')
 
 
-def pre_factory():
+def pre_factory(url):
     logging.info('Executing pre-factory cleanup command...')
-    deployment_logs_cleanup()
+    deployment_logs_cleanup(url)
     motr_cleanup()
+
+
+def get_log_dir(url) -> str:
+    provider = ConfStoreProvider(url)
+    log_path = provider.get('cortx>common>storage>log')
+    return log_path + LOG_DIR_EXT
+
+
+def get_config_dir(url) -> str:
+    provider = ConfStoreProvider(url)
+    config_path = provider.get('cortx>software>storage>config')
+    return config_path + CONF_DIR_EXT
 
 
 def cleanup(args):
     try:
         kv_cleanup()
-        logs_cleanup()
-        config_cleanup()
+        url = args.config[0]
+        logs_cleanup(url)
+        config_cleanup(url)
         if args.pre_factory:
-            pre_factory()
+            pre_factory(url)
 
         exit(0)
     except Exception as error:
@@ -429,29 +459,36 @@ def cleanup(args):
         exit(-1)
 
 
-def logs_cleanup():
+def logs_cleanup(url):
     try:
-        logging.info('Cleaning up hare log directory(/var/log/seagate/hare/*)')
-        os.system('rm -f /var/log/seagate/hare/*')
+        log_dir = get_log_dir(url)
+
+        logging.info(f'Cleaning up hare log directory({log_dir})')
+        os.system(f'rm -f {log_dir}/*')
 
     except Exception as error:
         raise RuntimeError(f'Error during logs cleanup : key={error}')
 
 
-def config_cleanup():
+def config_cleanup(url):
     try:
-        logging.info('Cleaning up hare config directory(/var/lib/hare)')
-        os.system('rm -rf /var/lib/hare/*')
+        config_dir = get_config_dir(url)
+
+        logging.info(f'Cleaning up hare config directory({config_dir})')
+        os.system(f'rm -rf {config_dir}/*')
 
     except Exception as error:
         raise RuntimeError(f'Error during config cleanup : key={error}')
 
 
-def deployment_logs_cleanup():
+def deployment_logs_cleanup(url):
     try:
-        logging.info('''Cleaning up hare deployment log directory
-            (/var/log/seagate/hare/hare_deployment)''')
-        os.system('rm -rf /var/log/seagate/hare/hare_deployment')
+        log_dir = get_log_dir(url)
+        deployment_logs_dir = log_dir + 'hare_deployment'
+
+        logging.info(f'Cleaning up hare deployment log directory'
+                     f' ({deployment_logs_dir})')
+        os.system(f'rm -rf {deployment_logs_dir}')
 
     except Exception as error:
         raise RuntimeError(f'Error during deployment log cleanup: key={error}')
@@ -621,7 +658,7 @@ def save(filename: str, contents: str) -> None:
 
 def generate_config(url: str, path_to_cdf: str) -> None:
     utils = Utils(ConfStoreProvider(url))
-    conf_dir = '/var/lib/hare'
+    conf_dir = get_config_dir(url)
     path = os.getenv('PATH')
     if path:
         path += os.pathsep + '/opt/seagate/cortx/hare/bin/'
@@ -645,9 +682,16 @@ def update_hax_unit(filename: str) -> None:
 def config(args):
     try:
         url = args.config[0]
-        filename = args.file[0] or '/var/lib/hare/cluster.yaml'
-        motr_md_path = '/opt/seagate/cortx/motr/conf/motr_hare_keys.json'
+        if args.file:
+            filename = args.file[0]
+        else:
+            filename = get_config_dir(url) + 'cluster.yaml'
+
+        provider = ConfStoreProvider(url)
+        config_path = provider.get('cortx>software>storage>config')
+        motr_md_path = config_path + '/motr/motr_hare_keys.json'
         motr_md_url = 'json://' + motr_md_path
+
         save(filename, generate_cdf(url, motr_md_url))
         update_hax_unit('/usr/lib/systemd/system/hare-hax.service')
         generate_config(url, filename)
@@ -677,7 +721,6 @@ def add_file_argument(parser):
     parser.add_argument('--file',
                         help='Full path to the CDF file.',
                         nargs=1,
-                        default=['/var/lib/hare/cluster.yaml'],
                         type=str,
                         action='store')
     return parser
@@ -705,8 +748,8 @@ def add_param_argument(parser):
 
 def add_factory_argument(parser):
     parser.add_argument('--pre-factory',
-                        help="""Deletes contents of /var/log/seagate/hare,
-                        /var/lib/hare and /var/motr. Undoes everything that
+                        help="""Deletes contents of hare log directory,
+                        hare config dir and /var/motr. Undoes everything that
                         is done in post-install stage of hare provisioner""",
                         required=False,
                         action='store_true')
@@ -804,10 +847,9 @@ def main():
                    help_str='Performs the Hare rpm post-upgrade tasks',
                    handler_fn=noop)
 
-    create_logger_directory()
-    setup_logging()
-
     parsed = p.parse_args(sys.argv[1:])
+
+    setup_logging(parsed.config[0])
 
     if not hasattr(parsed, 'func'):
         logging.error('Error: No valid command passed. Please check "--help"')
