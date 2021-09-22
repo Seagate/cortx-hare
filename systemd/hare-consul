@@ -33,5 +33,5 @@ exec consul agent \
      -bind $BIND \
      -client "$CLIENT" \
      $JOIN \
-     -config-dir=/var/lib/hare/consul-$MODE-conf \
-     -data-dir=/var/lib/hare/consul-data-$BIND $EXTRA_OPTS
+     -config-dir=$CONF/consul-$MODE-conf \
+     -data-dir=$CONF/consul-data-$BIND $EXTRA_OPTS

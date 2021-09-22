@@ -232,9 +232,9 @@ class CdfGenerator:
         profiles = self._create_profile_descriptions(pools)
 
         params_text = str(
-            ClusterDesc(node_info=nodes,
-                        pool_info=pools,
-                        profile_info=profiles))
+            ClusterDesc(node_info=DList(nodes, 'List NodeInfo'),
+                        pool_info=DList(pools, 'List PoolInfo'),
+                        profile_info=DList(profiles, 'List ProfileInfo')))
         gencdf = Template(self._gencdf()).substitute(path=dhall_path,
                                                      params=params_text)
         return gencdf
@@ -266,9 +266,16 @@ class CdfGenerator:
     # Only required for non K8s
     def _get_iface(self, machine_id: str) -> str:
         ifaces = self.provider.get(
-            f'node>{machine_id}>network>data>private_interfaces')
+            f'node>{machine_id}>network>data>private_interfaces',
+            allow_null=True)
         if not ifaces:
-            raise RuntimeError('No data network interfaces found')
+            # In LC environment:
+            # 1. This key will not be present
+            # 2. The value is ignored by Motr anyway
+            #
+            # So we don't need to fail if the key is absent but return some
+            # dummy value instead.
+            return 'dummy'
         return ifaces[0]
 
     # cortx>motr>interface_type

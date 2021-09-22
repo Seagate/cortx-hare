@@ -3,6 +3,7 @@ NODE=
 NODE_ID=
 MODE=server
 BIND={{GetPrivateIP}}
+CONF=
 CLIENT=127.0.0.1 {{GetPrivateIP}}
 # optional:
 JOIN=

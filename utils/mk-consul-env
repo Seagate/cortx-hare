@@ -27,7 +27,6 @@ PROG=${BASH_SOURCE[0]##*/}
 HARE_DIR=/opt/seagate/cortx/hare
 
 ENV_TEMPLATE=$HARE_DIR/share/consul/consul-env.in
-ENV_FILE=/var/lib/hare/consul-env
 
 usage() {
     cat <<EOF
@@ -49,7 +48,7 @@ mode=
 bind_addr=
 join_addr=
 extra_opts=
-conf_dir=
+conf_dir=/var/lib/hare/
 
 TEMP=$(getopt --options hm:b:j:e:c: \
               --longoptions help,mode:,bind:,join:,extra-options:,conf-dir: \
@@ -71,6 +70,8 @@ while true; do
     esac
 done
 
+ENV_FILE=$conf_dir/consul-env
+
 [[ -n $mode && -n $bind_addr ]] || {
     usage >&2
     exit 1
@@ -83,6 +84,7 @@ get_node_name() {
 sed -r -e "s/^(NODE=).*/\1$(get_node_name)/" \
        -e "s/^(NODE_ID=).*/\1$($HARE_DIR/libexec/gen-uuid $(get_node_name))/" \
        -e "s/^(MODE=).*/\1$mode/" \
+       -e "s|^(CONF=).*|\1$conf_dir|" \
        -e "s/^(BIND=).*/\1$bind_addr/" \
        -e "s/^(CLIENT)=.*/\1=127.0.0.1 $bind_addr/" $ENV_TEMPLATE |
     sudo tee $ENV_FILE >/dev/null
@@ -104,7 +106,7 @@ if [[ -n $extra_opts ]]; then
 fi
 
 # Prepare for consul-agent startup:
-sudo rm -rf /var/lib/hare/consul-data-$bind_addr
+sudo rm -rf $conf_dir/consul-data-$bind_addr
 
 consul_conf_dir=consul-$mode-conf
 sudo mkdir -p $conf_dir/$consul_conf_dir

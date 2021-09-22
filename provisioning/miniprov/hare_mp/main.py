@@ -440,7 +440,7 @@ def get_log_dir(url) -> str:
 
 def get_config_dir(url) -> str:
     provider = ConfStoreProvider(url)
-    config_path = provider.get('cortx>software>storage>config')
+    config_path = provider.get('cortx>common>storage>config')
     return config_path + CONF_DIR_EXT
 
 
@@ -652,6 +652,8 @@ def generate_cdf(url: str, motr_md_url: str) -> str:
 
 
 def save(filename: str, contents: str) -> None:
+    directory = os.path.dirname(filename)
+    os.makedirs(directory, exist_ok=True)
     with open(filename, 'w') as f:
         f.write(contents)
 
@@ -688,7 +690,7 @@ def config(args):
             filename = get_config_dir(url) + 'cluster.yaml'
 
         provider = ConfStoreProvider(url)
-        config_path = provider.get('cortx>software>storage>config')
+        config_path = provider.get('cortx>common>storage>config')
         motr_md_path = config_path + '/motr/motr_hare_keys.json'
         motr_md_url = 'json://' + motr_md_path
 
