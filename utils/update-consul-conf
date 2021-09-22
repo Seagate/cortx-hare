@@ -54,8 +54,8 @@ TEMP=$(getopt --options hn: \
 
 eval set -- "$TEMP"
 
-conf_dir=
-kv_file=
+conf_dir=/var/lib/hare
+kv_file=/var/lib/hare/consul-kv.json
 dry_run=false
 
 while true; do
