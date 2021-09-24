@@ -596,8 +596,11 @@ static void link_absent_cb(struct m0_halon_interface *hi,
 static void link_is_disconnecting_cb(struct m0_halon_interface *hi,
 				     struct m0_ha_link *hl)
 {
+	/*
+	 * We cannot use rlk_conn here anymore -
+	 * it can be freed already by this time.
 	M0_LOG(M0_DEBUG, "disconnecting ha link to %s",
-		m0_rpc_conn_addr(&hl->hln_rpc_link.rlk_conn));
+		m0_rpc_conn_addr(&hl->hln_rpc_link.rlk_conn)); */
 	m0_halon_interface_disconnect(hi, hl);
 }
 
@@ -606,24 +609,23 @@ static void link_disconnected_cb(struct m0_halon_interface *hi,
 {
 	struct hax_link *hxl_out = NULL;
 	struct hax_link *hxl;
-	const char *hxl_ep;
-	const char *hl_ep;
 
+	/*
+	 * We cannot use rlk_conn here anymore -
+	 * it can be freed already by this time.
 	M0_LOG(M0_DEBUG, "disconnected ha link to %s",
-		m0_rpc_conn_addr(&link->hln_rpc_link.rlk_conn));
+		m0_rpc_conn_addr(&link->hln_rpc_link.rlk_conn)); */
 	hax_lock(hc0);
 	m0_tl_for(hx_links, &hc0->hc_links, hxl) {
-		hxl_ep = m0_rpc_conn_addr(&hxl->hxl_link->hln_rpc_link.rlk_conn);
-                hl_ep = m0_rpc_conn_addr(&link->hln_rpc_link.rlk_conn);
-		if (m0_streq(hxl_ep, hl_ep)) {
+		if (hxl->hxl_link == link) {
 			hxl_out = hxl;
 			break;
 		}
 	} m0_tl_endfor;
 
-	M0_LOG(M0_DEBUG, "found %p link hxl_link for %s",
+	/* M0_LOG(M0_DEBUG, "found %p link hxl_link for %s",
 		hxl_out,
-		m0_rpc_conn_addr(&hxl_out->hxl_link->hln_rpc_link.rlk_conn));
+		m0_rpc_conn_addr(&hxl_out->hxl_link->hln_rpc_link.rlk_conn)); */
 	if (hxl_out != NULL) {
 		hx_links_tlink_del_fini(hxl_out);
 		m0_free(hxl_out);
