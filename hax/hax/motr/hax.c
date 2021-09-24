@@ -825,7 +825,6 @@ PyObject* m0_hax_stop(unsigned long long ctx, const struct m0_fid *process_fid,
 	struct hax_context *hc = (struct hax_context *)ctx;
 	struct m0_halon_interface *hi = hc->hc_hi;
 	struct hax_link *hxl;
-        const char *ep;
 	uint64_t tag;
 
 	M0_ALLOC_PTR(msg);
@@ -851,8 +850,7 @@ PyObject* m0_hax_stop(unsigned long long ctx, const struct m0_fid *process_fid,
 	m0_tl_for(hx_links, &hc->hc_links, hxl) {
 		if (!hxl->hxl_is_active)
 			continue;
-		ep = m0_rpc_conn_addr(&hxl->hxl_link->hln_rpc_link.rlk_conn);
-		if (m0_streq(ep, hax_endpoint)) {
+		if (m0_streq(hxl->hxl_ep_addr, hax_endpoint)) {
 			Py_BEGIN_ALLOW_THREADS
 			m0_halon_interface_send(hi, hxl->hxl_link, msg, &tag);
 			Py_END_ALLOW_THREADS
@@ -874,13 +872,10 @@ void m0_hax_link_stopped(unsigned long long ctx, const char *proc_ep)
 {
 	struct hax_context *hc = (struct hax_context *)ctx;
 	struct hax_link *hxl;
-        const char *hl_ep;
 
 	m0_tl_for(hx_links, &hc->hc_links, hxl) {
-		hl_ep = m0_rpc_conn_addr(&hxl->hxl_link->hln_rpc_link.rlk_conn);
-		if (m0_streq(proc_ep, hl_ep)) {
+		if (m0_streq(proc_ep, hxl->hxl_ep_addr))
 			hxl->hxl_is_active = false;
-		}
 	} m0_tl_endfor;
 }
 
