@@ -119,6 +119,14 @@ static void entrypoint_request_cb(struct m0_halon_interface *hi,
 				  bool first_request)
 {
 	struct hax_entrypoint_request *ep;
+	struct hax_link               *hxl;
+
+	hax_lock(hc0);
+	hxl = m0_tl_find(hx_links, l, &hc0->hc_links,
+			 m0_uint128_eq(&l->hxl_req_id, req_id));
+	M0_ASSERT(hxl != NULL);
+	strncpy(hxl->hxl_ep_addr, remote_rpc_endpoint, EP_ADDR_BUF_SIZE - 1);
+	hax_unlock(hc0);
 
 	/*
 	 * XXX This is obligatory since we want to work with Python object
@@ -575,6 +583,7 @@ static void link_connected_cb(struct m0_halon_interface *hi,
 	}
 	hxl->hxl_link = link;
 	hxl->hxl_is_active = true;
+	hxl->hxl_req_id = *req_id;
 	hax_lock(hc0);
 	hx_links_tlink_init_at_tail(hxl, &hc0->hc_links);
 	hax_unlock(hc0);
@@ -594,41 +603,32 @@ static void link_absent_cb(struct m0_halon_interface *hi,
 }
 
 static void link_is_disconnecting_cb(struct m0_halon_interface *hi,
-				     struct m0_ha_link *hl)
+				     struct m0_ha_link *link)
 {
-	/*
-	 * We cannot use rlk_conn here anymore -
-	 * it can be freed already by this time.
-	M0_LOG(M0_DEBUG, "disconnecting ha link to %s",
-		m0_rpc_conn_addr(&hl->hln_rpc_link.rlk_conn)); */
-	m0_halon_interface_disconnect(hi, hl);
+	struct hax_link *hxl;
+
+	hax_lock(hc0);
+	hxl = m0_tl_find(hx_links, l, &hc0->hc_links, l->hxl_link == link);
+	if (hxl != NULL)
+		M0_LOG(M0_DEBUG, "link=%p addr=%s", hxl,
+		       (const char*)hxl->hxl_ep_addr);
+	hax_unlock(hc0);
+
+	m0_halon_interface_disconnect(hi, link);
 }
 
 static void link_disconnected_cb(struct m0_halon_interface *hi,
 				 struct m0_ha_link *link)
 {
-	struct hax_link *hxl_out = NULL;
 	struct hax_link *hxl;
 
-	/*
-	 * We cannot use rlk_conn here anymore -
-	 * it can be freed already by this time.
-	M0_LOG(M0_DEBUG, "disconnected ha link to %s",
-		m0_rpc_conn_addr(&link->hln_rpc_link.rlk_conn)); */
 	hax_lock(hc0);
-	m0_tl_for(hx_links, &hc0->hc_links, hxl) {
-		if (hxl->hxl_link == link) {
-			hxl_out = hxl;
-			break;
-		}
-	} m0_tl_endfor;
-
-	/* M0_LOG(M0_DEBUG, "found %p link hxl_link for %s",
-		hxl_out,
-		m0_rpc_conn_addr(&hxl_out->hxl_link->hln_rpc_link.rlk_conn)); */
-	if (hxl_out != NULL) {
-		hx_links_tlink_del_fini(hxl_out);
-		m0_free(hxl_out);
+	hxl = m0_tl_find(hx_links, l, &hc0->hc_links, l->hxl_link == link);
+	if (hxl != NULL) {
+		M0_LOG(M0_DEBUG, "link=%p addr=%s", hxl,
+		       (const char*)hxl->hxl_ep_addr);
+		hx_links_tlink_del_fini(hxl);
+		m0_free(hxl);
 	}
 	hax_unlock(hc0);
 }
