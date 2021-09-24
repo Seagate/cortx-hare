@@ -45,9 +45,15 @@ struct hax_context {
 	bool                       hc_rconfc_initialized;
 };
 
+enum {
+	EP_ADDR_BUF_SIZE = 64
+};
+
 struct hax_link {
 	struct m0_ha_link *hxl_link;
 	struct m0_tlink    hxl_tlink;
+	struct m0_uint128  hxl_req_id;
+	char               hxl_ep_addr[EP_ADDR_BUF_SIZE];
 	uint64_t           hxl_magic;
 	bool               hxl_is_active;
 };
