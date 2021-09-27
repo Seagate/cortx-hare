@@ -79,7 +79,7 @@ fi
 sysconfig_dir='sysconfig'
 
 get_node_name() {
-    /opt/seagate/cortx/hare/libexec/node-name
+    /opt/seagate/cortx/hare/libexec/node-name --conf-dir=$conf_dir
 }
 
 get_service_ids() {
