@@ -45,6 +45,7 @@ let ClusterInfo =
       { node_info: List NodeInfo
       , pool_info: List PoolInfo
       , profile_info: List ProfileInfo
+      , fdmi_filter_info: Optional (List T.FdmiFilterDesc)
       }
 
 let toNodeDesc
@@ -75,6 +76,7 @@ let genCdf
       ->  { nodes = Prelude.List.map NodeInfo T.NodeDesc toNodeDesc cluster_info.node_info
           , pools = Prelude.List.map PoolInfo T.PoolDesc toPoolDesc cluster_info.pool_info
           , profiles = Some cluster_info.profile_info
+          , fdmi_filters = cluster_info.fdmi_filter_info
           }
 
 in  genCdf
