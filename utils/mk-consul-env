@@ -78,7 +78,7 @@ ENV_FILE=$conf_dir/consul-env
 }
 
 get_node_name() {
-    /opt/seagate/cortx/hare/libexec/node-name
+    /opt/seagate/cortx/hare/libexec/node-name --conf-dir=conf_dir
 }
 
 sed -r -e "s/^(NODE=).*/\1$(get_node_name)/" \

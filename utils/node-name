@@ -18,5 +18,37 @@
 # please email opensource@seagate.com or cortx-questions@seagate.com.
 
 set -eu -o pipefail
+# set -x
 
-cat /var/lib/hare/node-name
+PROG=${0##*/}
+
+usage() {
+    cat <<EOF
+Usage: $PROG [<option>]
+
+Get node name for current node
+
+Options:
+  -h, --help            Show this help and exit.
+  -c, --conf-dir        config dir where node-name file is present
+EOF
+}
+
+TEMP=$(getopt --options h: \
+              --longoptions help,conf-dir: \
+              --name "$PROG" -- "$@" || true)
+
+eval set -- "$TEMP"
+
+conf_dir=/var/lib/hare
+
+while true; do
+    case "$1" in
+        -h|--help)           usage; exit ;;
+        -c|--conf-dir)       conf_dir=$2; shift 2 ;;
+        --)                  shift; break ;;
+        *)                   usage; exit ;;
+    esac
+done
+
+cat $conf_dir/node-name
