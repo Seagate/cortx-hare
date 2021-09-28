@@ -1,0 +1,87 @@
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: io-sdb-2
+spec:
+  volumeMode: Block
+  capacity:
+    storage: 100Gi
+  local:
+    path: /dev/sdb
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Delete
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - ssc-vm-4218.colo.seagate.com
+---
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: io-sdc-2
+spec:
+  volumeMode: Block
+  capacity:
+    storage: 100Gi
+  local:
+    path: /dev/sdc
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Delete
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - ssc-vm-4218.colo.seagate.com
+---
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: io-sdd-2
+spec:
+  volumeMode: Block
+  capacity:
+    storage: 100Gi
+  local:
+    path: /dev/sdd
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Delete
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - ssc-vm-4218.colo.seagate.com
+---
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: io-sde-2
+spec:
+  volumeMode: Block
+  capacity:
+    storage: 100Gi
+  local:
+    path: /dev/sde
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Delete
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - ssc-vm-4218.colo.seagate.com

@@ -1,0 +1,58 @@
+{
+  "server": {
+    "srvnode-1": {
+      "cvg": [
+        {
+          "m0d": [
+            {
+              "md_seg1": "/dev/vg_srvnode-1_md1/lv_raw_md1"
+            }
+          ]
+        },
+        {
+          "m0d": [
+            {
+              "md_seg1": "/dev/vg_srvnode-1_md2/lv_raw_md2"
+            }
+          ]
+        }
+      ]
+    },
+    "srvnode-2": {
+      "cvg": [
+        {
+          "m0d": [
+            {
+              "md_seg1": "/dev/vg_srvnode-1_md1/lv_raw_md1"
+            }
+          ]
+        },
+        {
+          "m0d": [
+            {
+              "md_seg1": "/dev/vg_srvnode-1_md2/lv_raw_md2"
+            }
+          ]
+        }
+      ]
+    },
+    "srvnode-3": {
+      "cvg": [
+        {
+          "m0d": [
+            {
+              "md_seg1": "/dev/vg_srvnode-1_md1/lv_raw_md1"
+            }
+          ]
+        },
+        {
+          "m0d": [
+            {
+              "md_seg1": "/dev/vg_srvnode-1_md2/lv_raw_md2"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
