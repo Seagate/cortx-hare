@@ -25,7 +25,6 @@ import inject
 import json
 import logging
 import os
-import shutil
 import subprocess
 import sys
 from enum import Enum
@@ -50,7 +49,7 @@ from hare_mp.consul_starter import ConsulStarter
 from hare_mp.hax_starter import HaxStarter
 
 # Logger details
-LOG_DIR_EXT = '/hare/hare_deployment/'
+LOG_DIR_EXT = '/hare/'
 LOG_FILE = 'setup.log'
 LOG_FILE_SIZE = 5 * 1024 * 1024
 CONF_DIR_EXT = '/hare/'
@@ -78,7 +77,7 @@ def create_logger_directory(log_dir):
 def setup_logging(url) -> None:
     provider = ConfStoreProvider(url)
     log_path = provider.get('cortx>common>storage>log')
-    log_dir = log_path + LOG_DIR_EXT
+    log_dir = log_path + LOG_DIR_EXT + 'hare_deployment/'
     log_file = log_dir + LOG_FILE
 
     create_logger_directory(log_dir)
@@ -142,9 +141,17 @@ def logrotate(url: str):
         logging.info('Server type (%s)', server_type)
 
         if server_type != 'unknown':
-            shutil.copyfile(
-                f'/opt/seagate/cortx/hare/conf/logrotate/{server_type}',
-                '/etc/logrotate.d/hare')
+            with open(f'/opt/seagate/cortx/hare/conf/logrotate/{server_type}',
+                      'r') as f:
+                content = f.read()
+
+            log_dir = get_log_dir(url)
+            content = content.replace('/var/log/seagate/hare/*.log',
+                                      f'{log_dir}*.log')
+
+            with open('/etc/logrotate.d/hare', 'w') as f:
+                f.write(content)
+
     except Exception as error:
         logging.error('Cannot configure logrotate for hare (%s)', error)
 

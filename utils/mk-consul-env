@@ -48,7 +48,7 @@ mode=
 bind_addr=
 join_addr=
 extra_opts=
-conf_dir=/var/lib/hare/
+conf_dir="/var/lib/hare/"
 
 TEMP=$(getopt --options hm:b:j:e:c: \
               --longoptions help,mode:,bind:,join:,extra-options:,conf-dir: \
@@ -78,7 +78,7 @@ ENV_FILE=$conf_dir/consul-env
 }
 
 get_node_name() {
-    /opt/seagate/cortx/hare/libexec/node-name --conf-dir=conf_dir
+    /opt/seagate/cortx/hare/libexec/node-name --conf-dir=$conf_dir
 }
 
 sed -r -e "s/^(NODE=).*/\1$(get_node_name)/" \
