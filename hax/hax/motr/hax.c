@@ -121,11 +121,16 @@ static void entrypoint_request_cb(struct m0_halon_interface *hi,
 	struct hax_entrypoint_request *ep;
 	struct hax_link               *hxl;
 
-	hax_lock(hc0);
-	hxl = m0_tl_find(hx_links, l, &hc0->hc_links,
-			 m0_uint128_eq(&l->hxl_req_id, req_id));
-	M0_ASSERT(hxl != NULL);
+	M0_ALLOC_PTR(hxl);
+	if (hxl == NULL) {
+		M0_LOG(M0_ERROR, "Cannot allocate hax_link");
+		return;
+	}
+	hxl->hxl_req_id = *req_id;
 	strncpy(hxl->hxl_ep_addr, remote_rpc_endpoint, EP_ADDR_BUF_SIZE - 1);
+
+	hax_lock(hc0);
+	hx_links_tlink_init_at_tail(hxl, &hc0->hc_links);
 	hax_unlock(hc0);
 
 	/*
@@ -576,16 +581,12 @@ static void link_connected_cb(struct m0_halon_interface *hi,
 {
 	struct hax_link *hxl;
 
-	M0_ALLOC_PTR(hxl);
-	if (hxl == NULL) {
-		M0_LOG(M0_ERROR, "Cannot allocate hax_link");
-		return;
-	}
+	hax_lock(hc0);
+	hxl = m0_tl_find(hx_links, l, &hc0->hc_links,
+			 m0_uint128_eq(&l->hxl_req_id, req_id));
+	M0_ASSERT(hxl != NULL);
 	hxl->hxl_link = link;
 	hxl->hxl_is_active = true;
-	hxl->hxl_req_id = *req_id;
-	hax_lock(hc0);
-	hx_links_tlink_init_at_tail(hxl, &hc0->hc_links);
 	hax_unlock(hc0);
 }
 
