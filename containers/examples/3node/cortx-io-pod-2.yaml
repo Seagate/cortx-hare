@@ -1,0 +1,67 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: cortx-io-pod-2
+  labels:
+    app: cortx-io-pod-2
+spec:
+  restartPolicy: Never
+  nodeName: ssc-vm-4218.colo.seagate.com
+  containers:
+  - name: cortx-hare-container
+    image: ghcr.io/seagate/cortx-all:2.0.0-86-custom-ci
+    imagePullPolicy: IfNotPresent
+    ports:
+    - containerPort: 2001
+      protocol: TCP
+    command: [ "tail", "-f", "/dev/null" ]
+    volumeDevices:
+      - name: io-sdb-2
+        devicePath: /dev/sdb
+      - name: io-sdc-2
+        devicePath: /dev/sdc
+      - name: io-sdd-2
+        devicePath: /dev/sdd
+      - name: io-sde-2
+        devicePath: /dev/sde
+    volumeMounts:
+    - mountPath: /mnt/etc/cortx
+      name: cortx-config-vol-2
+  - name: cortx-io-container
+    image: ghcr.io/seagate/cortx-all:2.0.0-86-custom-ci
+    imagePullPolicy: IfNotPresent
+    ports:
+    - containerPort: 3002
+      protocol: TCP
+    command: [ "tail", "-f", "/dev/null" ]
+    volumeDevices:
+      - name: io-sdb-2
+        devicePath: /dev/sdb
+      - name: io-sdc-2
+        devicePath: /dev/sdc
+      - name: io-sdd-2
+        devicePath: /dev/sdd
+      - name: io-sde-2
+        devicePath: /dev/sde
+    volumeMounts:
+    - mountPath: /mnt/etc/cortx
+      name: cortx-config-vol-2
+  volumes:
+    - name: io-sdb-2
+      persistentVolumeClaim:
+        claimName: io-sdb-2
+    - name: io-sdc-2
+      persistentVolumeClaim:
+        claimName: io-sdc-2
+    - name: io-sdd-2
+      persistentVolumeClaim:
+        claimName: io-sdd-2
+    - name: io-sde-2
+      persistentVolumeClaim:
+        claimName: io-sde-2
+    - name: cortx-config-vol-2
+      persistentVolumeClaim:
+        claimName: cortx-config-vol-2
+  imagePullSecrets:
+  - name: cortxregcred
+  - name: docregcred

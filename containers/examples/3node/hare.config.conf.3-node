@@ -1,0 +1,153 @@
+{
+  "cluster": {    
+    "my-cluster": {
+      "site": {
+        "storage_set_count": "1"
+      },
+      "storage_set": [
+        {
+          "durability": {
+            "sns": {
+              "data": "4",
+              "parity": "2",
+              "spare": "0"
+            }
+          },
+          "name": "storage1",
+          "server_nodes": [
+            "a075603264464340a5a53b987555fe5c",
+            "a6422fd1d8b04510b291c03c537c147a",
+            "33604d428f544d9596fe0791d7d4d4b0"
+          ]
+        }
+      ]
+    }
+  },
+   "cortx": {
+    "software": {
+      "motr": {
+        "service": {
+          "client_instances": "2"
+        }
+      },
+      "s3": {
+        "service": {
+          "instances": "0"
+        }
+      }
+    }
+  },
+  "server_node": {
+    "a075603264464340a5a53b987555fe5c": {
+      "cluster_id": "my-cluster",
+      "hostname": "cortx-io-pod-1",
+      "roles": [
+        "primary",
+        "openldap_server",
+        "consul_server"
+      ],
+      "name": "srvnode-1",
+      "network": {
+        "data": {
+          "private_fqdn": "cortx-io-pod-1",
+          "interface_type": "tcp",
+          "private_interfaces": [
+            "eth0"
+          ]
+        }
+      },
+      "s3_instances": "2",
+      "storage_set_id": "storage1",
+      "storage": {
+        "cvg_count": "1",
+        "cvg": [
+          {
+            "data_devices": [
+              "/dev/sdb",
+              "/dev/sdc",
+              "/dev/sdd",
+              "/dev/sde"
+            ],
+            "metadata_devices": [
+              "/dev/sdj"
+            ]
+          }
+        ]
+      }
+    },
+    "a6422fd1d8b04510b291c03c537c147a": {
+      "cluster_id": "my-cluster",
+      "hostname": "cortx-io-pod-2",
+      "roles": [
+        "primary",
+        "openldap_server",
+        "consul_server"
+      ],
+      "name": "srvnode-2",
+      "network": {
+        "data": {
+          "private_fqdn": "cortx-io-pod-2",
+          "interface_type": "tcp",
+          "private_interfaces": [
+            "eth0"
+          ]
+        }
+      },
+      "s3_instances": "2",
+      "storage_set_id": "storage1",
+      "storage": {
+        "cvg_count": "1",
+        "cvg": [
+          {
+            "data_devices": [
+              "/dev/sdb",
+              "/dev/sdc",
+              "/dev/sdd",
+              "/dev/sde"
+            ],
+            "metadata_devices": [
+              "/dev/sdj"
+            ]
+          }
+        ]
+      }
+    },
+    "33604d428f544d9596fe0791d7d4d4b0": {
+      "cluster_id": "my-cluster",
+      "hostname": "cortx-io-pod-3",
+      "roles": [
+        "primary",
+        "openldap_server",
+        "consul_server"
+      ],
+      "name": "srvnode-3",
+      "network": {
+        "data": {
+          "private_fqdn": "cortx-io-pod-3",
+          "interface_type": "tcp",
+          "private_interfaces": [
+            "eth0"
+          ]
+        }
+      },
+      "s3_instances": "2",
+      "storage_set_id": "storage1",
+      "storage": {
+        "cvg_count": "1",
+        "cvg": [
+          {
+            "data_devices": [
+              "/dev/sdb",
+              "/dev/sdc",
+              "/dev/sdd",
+              "/dev/sde"
+            ],
+            "metadata_devices": [
+              "/dev/sdj"
+            ]
+          }
+        ]
+      }
+    }
+  }
+}
