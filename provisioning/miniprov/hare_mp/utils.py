@@ -97,11 +97,9 @@ class Utils:
                      size=Maybe(drive_info['size'], 'Natural'),
                      blksize=Maybe(drive_info['blksize'], 'Natural')))
 
-    def get_drives_info(self) -> DList[Disk]:
+    def get_drives_info_for(self, cvg: int) -> DList[Disk]:
         machine_id = self.provider.get_machine_id()
-        cvgs_key: str = f'server_node>{machine_id}>storage>cvg'
-        for cvg in range(len(self.provider.get(cvgs_key))):
-            data_devs = self.get_data_devices(machine_id, cvg)
+        data_devs = self.get_data_devices(machine_id, cvg)
         return DList([self.get_drive_info_from_consul(dev_path)
                       for dev_path in data_devs.value], 'List Disk')
 
