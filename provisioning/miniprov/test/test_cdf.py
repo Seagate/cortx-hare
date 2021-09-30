@@ -186,19 +186,19 @@ class TestCDF(unittest.TestCase):
                 'myhost',
                 'node>MACH_ID>network>data>private_fqdn':
                     'srvnode-1.data.private',
-                'node>MACH_ID>storage>cvg[0]>data_devices':
+                'node>MACH_ID>storage>cvg[0]>devices>data':
                 ['/dev/sdb'],
-                'node>MACH_ID>storage>cvg[1]>data_devices':
+                'node>MACH_ID>storage>cvg[1]>devices>data':
                 ['/dev/sdc'],
                 'node>MACH_ID>network>data>private_interfaces':
                 ['eth1', 'eno2'],
                 'node>MACH_ID>storage>cvg_count':
                 2,
                 'node>MACH_ID>storage>cvg':
-                [{'data_devices': ['/dev/sdb', '/dev/sdc'], 'metadata_devices': ['/dev/meta', '/dev/meta1']}],
-                'node>MACH_ID>storage>cvg[0]>metadata_devices':
+                [{'devices': {'data': ['/dev/sdb', '/dev/sdc'], 'metadata': ['/dev/meta', '/dev/meta1']}}],
+                'node>MACH_ID>storage>cvg[0]>devices>metadata':
                 ['/dev/meta'],
-                'node>MACH_ID>storage>cvg[1]>metadata_devices':
+                'node>MACH_ID>storage>cvg[1]>devices>metadata':
                 ['/dev/meta1'],
                 'cortx>s3>service_instances':
                 1,
@@ -305,11 +305,11 @@ class TestCDF(unittest.TestCase):
                 'node>MACH_ID>cluster_id': 'CLUSTER_ID',
                 'node>MACH_ID>storage>cvg_count': 2,
                 'node>MACH_ID>storage>cvg':
-                [{'data_devices': ['/dev/sdb', '/dev/sdc'], 'metadata_devices': ['/dev/meta', '/dev/meta1']}],
-                'node>MACH_ID>storage>cvg[0]>data_devices': ['/dev/sdb'],
-                'node>MACH_ID>storage>cvg[0]>metadata_devices': ['/dev/meta'],
-                'node>MACH_ID>storage>cvg[1]>data_devices': ['/dev/sdc'],
-                'node>MACH_ID>storage>cvg[1]>metadata_devices': ['/dev/meta1'],
+                [{'devices': {'data': ['/dev/sdb', '/dev/sdc'], 'metadata': ['/dev/meta', '/dev/meta1']}}],
+                'node>MACH_ID>storage>cvg[0]>devices>data': ['/dev/sdb'],
+                'node>MACH_ID>storage>cvg[0]>devices>metadata': ['/dev/meta'],
+                'node>MACH_ID>storage>cvg[1]>devices>data': ['/dev/sdc'],
+                'node>MACH_ID>storage>cvg[1]>devices>metadata': ['/dev/meta1'],
                 'node>MACH_ID>hostname':                'myhost',
                 'node>MACH_ID>name': 'mynodename',
                 'node>MACH_ID>network>data>private_fqdn':
@@ -456,19 +456,19 @@ class TestCDF(unittest.TestCase):
                 'node>MACH_ID2>cluster_id': 'CLUSTER_ID',
                 'node>MACH_ID3>cluster_id': 'CLUSTER_ID',
                 'node>MACH_ID1>storage>cvg':
-                [{'data_devices': ['/dev/sda', '/dev/sdb', '/dev/sdc', '/dev/sdd'], 'metadata_devices': ['/dev/meta1']},
-                 {'data_devices': ['/dev/sde', '/dev/sdf', '/dev/sdg', '/dev/sdh'], 'metadata_devices': ['/dev/meta2']}],
+                [{'devices': {'data': ['/dev/sda', '/dev/sdb', '/dev/sdc', '/dev/sdd'], 'metadata': ['/dev/meta1']}},
+                 {'devices': {'data': ['/dev/sde', '/dev/sdf', '/dev/sdg', '/dev/sdh'], 'metadata': ['/dev/meta2']}}],
                 'node>MACH_ID2>storage>cvg':
-                [{'data_devices': ['/dev/sda', '/dev/sdb', '/dev/sdc', '/dev/sdd'], 'metadata_devices': ['/dev/meta1']},
-                 {'data_devices': ['/dev/sde', '/dev/sdf', '/dev/sdg', '/dev/sdh'], 'metadata_devices': ['/dev/meta2']}],
+                [{'devices': {'data': ['/dev/sda', '/dev/sdb', '/dev/sdc', '/dev/sdd'], 'metadata': ['/dev/meta1']}},
+                 {'devices': {'data': ['/dev/sde', '/dev/sdf', '/dev/sdg', '/dev/sdh'], 'metadata': ['/dev/meta2']}}],
                 'node>MACH_ID3>storage>cvg':
-                [{'data_devices': ['/dev/sda', '/dev/sdb', '/dev/sdc', '/dev/sdd'], 'metadata_devices': ['/dev/meta1']},
-                 {'data_devices': ['/dev/sde', '/dev/sdf', '/dev/sdg', '/dev/sdh'], 'metadata_devices': ['/dev/meta2']}],
+                [{'devices': {'data': ['/dev/sda', '/dev/sdb', '/dev/sdc', '/dev/sdd'], 'metadata': ['/dev/meta1']}},
+                 {'devices': {'data': ['/dev/sde', '/dev/sdf', '/dev/sdg', '/dev/sdh'], 'metadata': ['/dev/meta2']}}],
                 'node>MACH_ID1>storage>cvg_count': '2',
-                'node>MACH_ID1>storage>cvg[0]>data_devices': ['/dev/sda', '/dev/sdb', '/dev/sdc', '/dev/sdd'],
-                'node>MACH_ID1>storage>cvg[1]>data_devices': ['/dev/sde', '/dev/sdf', '/dev/sdg', '/dev/sdh'],
-                'node>MACH_ID1>storage>cvg[0]>metadata_devices': ['/dev/meta1'],
-                'node>MACH_ID1>storage>cvg[1]>metadata_devices': ['/dev/meta2'],
+                'node>MACH_ID1>storage>cvg[0]>devices>data': ['/dev/sda', '/dev/sdb', '/dev/sdc', '/dev/sdd'],
+                'node>MACH_ID1>storage>cvg[1]>devices>data': ['/dev/sde', '/dev/sdf', '/dev/sdg', '/dev/sdh'],
+                'node>MACH_ID1>storage>cvg[0]>devices>metadata': ['/dev/meta1'],
+                'node>MACH_ID1>storage>cvg[1]>devices>metadata': ['/dev/meta2'],
                 'node>MACH_ID1>hostname':                'myhost',
                 'node>MACH_ID1>name': 'mynodename',
                 'node>MACH_ID1>network>data>private_fqdn':
@@ -477,10 +477,10 @@ class TestCDF(unittest.TestCase):
                 'cortx>s3>service_instances':                1,
                 'cortx>motr>interface_type':                'o2ib',
                 'node>MACH_ID2>storage>cvg_count': '2',
-                'node>MACH_ID2>storage>cvg[0]>data_devices': ['/dev/sda', '/dev/sdb', '/dev/sdc', '/dev/sdd'],
-                'node>MACH_ID2>storage>cvg[1]>data_devices': ['/dev/sde', '/dev/sdf', '/dev/sdg', '/dev/sdh'],
-                'node>MACH_ID2>storage>cvg[0]>metadata_devices': ['/dev/meta1'],
-                'node>MACH_ID2>storage>cvg[1]>metadata_devices': ['/dev/meta2'],
+                'node>MACH_ID2>storage>cvg[0]>devices>data': ['/dev/sda', '/dev/sdb', '/dev/sdc', '/dev/sdd'],
+                'node>MACH_ID2>storage>cvg[1]>devices>data': ['/dev/sde', '/dev/sdf', '/dev/sdg', '/dev/sdh'],
+                'node>MACH_ID2>storage>cvg[0]>devices>metadata': ['/dev/meta1'],
+                'node>MACH_ID2>storage>cvg[1]>devices>metadata': ['/dev/meta2'],
                 'node>MACH_ID2>hostname':                'myhost',
                 'node>MACH_ID2>name': 'mynodename',
                 'node>MACH_ID2>network>data>private_fqdn':
@@ -489,10 +489,10 @@ class TestCDF(unittest.TestCase):
                 'cortx>s3>service_instances':                1,
                 'cortx>motr>interface_type':                'o2ib',
                 'node>MACH_ID3>storage>cvg_count': '2',
-                'node>MACH_ID3>storage>cvg[0]>data_devices': ['/dev/sda', '/dev/sdb', '/dev/sdc', '/dev/sdd'],
-                'node>MACH_ID3>storage>cvg[1]>data_devices': ['/dev/sde', '/dev/sdf', '/dev/sdg', '/dev/sdh'],
-                'node>MACH_ID3>storage>cvg[0]>metadata_devices': ['/dev/meta1'],
-                'node>MACH_ID3>storage>cvg[1]>metadata_devices': ['/dev/meta2'],
+                'node>MACH_ID3>storage>cvg[0]>devices>data': ['/dev/sda', '/dev/sdb', '/dev/sdc', '/dev/sdd'],
+                'node>MACH_ID3>storage>cvg[1]>devices>data': ['/dev/sde', '/dev/sdf', '/dev/sdg', '/dev/sdh'],
+                'node>MACH_ID3>storage>cvg[0]>devices>metadata': ['/dev/meta1'],
+                'node>MACH_ID3>storage>cvg[1]>devices>metadata': ['/dev/meta2'],
                 'node>MACH_ID3>hostname':                'myhost',
                 'node>MACH_ID3>name': 'mynodename',
                 'node>MACH_ID3>network>data>private_fqdn':
@@ -563,10 +563,10 @@ class TestCDF(unittest.TestCase):
                 'cortx>motr>client_instances':
                 2,
                 'node>srvnode_1>storage>cvg':
-                [{'data_devices': ['/dev/sdb', '/dev/sdc'], 'metadata_devices': ['/dev/meta', '/dev/meta1']}],
-                'node>srvnode_1>storage>cvg[0]>data_devices':
+                [{'devices': {'data': ['/dev/sdb', '/dev/sdc'], 'metadata': ['/dev/meta', '/dev/meta1']}}],
+                'node>srvnode_1>storage>cvg[0]>devices>data':
                 ['/dev/sdb'],
-                'node>srvnode_1>storage>cvg[1]>data_devices':
+                'node>srvnode_1>storage>cvg[1]>devices>data':
                 ['/dev/sdc'],
             }
             return data.get(value)
@@ -642,13 +642,13 @@ class TestCDF(unittest.TestCase):
                 'o2ib',
                 'cortx>motr>client_instances':
                 2,
-                'node>MACH_ID>storage>cvg[0]>data_devices':
+                'node>MACH_ID>storage>cvg[0]>devices>data':
                 ['/dev/sdb'],
-                'node>MACH_ID>storage>cvg[0]>metadata_devices':
+                'node>MACH_ID>storage>cvg[0]>devices>metadata':
                 ['/dev/meta'],
-                'node>MACH_ID>storage>cvg[1]>data_devices':
+                'node>MACH_ID>storage>cvg[1]>devices>data':
                 ['/dev/sdc'],
-                'node>MACH_ID>storage>cvg[1]>metadata_devices':
+                'node>MACH_ID>storage>cvg[1]>devices>metadata':
                 ['/dev/meta1'],
             }
             return data.get(value)
@@ -695,9 +695,9 @@ class TestCDF(unittest.TestCase):
                 'o2ib',
                 'cortx>motr>client_instances':
                 2,
-                'node>MACH_ID>storage>cvg[0]>data_devices':
+                'node>MACH_ID>storage>cvg[0]>devices>data':
                 ['/dev/sdb'],
-                'node>MACH_ID>storage>cvg[0]>metadata_devices':
+                'node>MACH_ID>storage>cvg[0]>devices>metadata':
                 ['/dev/meta'],
             }
             return data.get(value)
@@ -747,13 +747,13 @@ class TestCDF(unittest.TestCase):
                 'o2ib',
                 'cortx>motr>client_instances':
                 2,
-                'node>MACH_ID>storage>cvg[0]>data_devices':
+                'node>MACH_ID>storage>cvg[0]>devices>data':
                 ['/dev/sdb'],
-                'node>MACH_ID>storage>cvg[0]>metadata_devices':
+                'node>MACH_ID>storage>cvg[0]>devices>metadata':
                 ['/dev/meta'],
-                'node>MACH_ID>storage>cvg[1]>data_devices':
+                'node>MACH_ID>storage>cvg[1]>devices>data':
                 ['/dev/sdc'],
-                'node>MACH_ID>storage>cvg[1]>metadata_devices':
+                'node>MACH_ID>storage>cvg[1]>devices>metadata':
                 ['/dev/meta1'],
             }
             return data.get(value)
@@ -812,13 +812,13 @@ class TestCDF(unittest.TestCase):
                 'o2ib',
                 'cortx>motr>client_instances':
                 2,
-                'node>MACH_ID>storage>cvg[0]>data_devices':
+                'node>MACH_ID>storage>cvg[0]>devices>data':
                 ['/dev/sda', '/dev/sdb'],
-                'node>MACH_ID>storage>cvg[0]>metadata_devices':
+                'node>MACH_ID>storage>cvg[0]>devices>metadata':
                 ['/dev/meta'],
-                'node>MACH_ID>storage>cvg[1]>data_devices':
+                'node>MACH_ID>storage>cvg[1]>devices>data':
                 ['/dev/sdc', '/dev/sdd'],
-                'node>MACH_ID>storage>cvg[1]>metadata_devices':
+                'node>MACH_ID>storage>cvg[1]>devices>metadata':
                 ['/dev/meta1'],
             }
             return data.get(value)
@@ -864,11 +864,11 @@ class TestCDF(unittest.TestCase):
                 'myhost',
                 'node>MACH_ID>name': 'mynodename',
                 'node>MACH_ID>storage>cvg':
-                [{'data_devices': ['/dev/sdb'], 'metadata_devices': ['/dev/meta1']},
-                 {'data_devices': ['/dev/sdc'], 'metadata_devices': ['/dev/meta2']}],
-                'node>MACH_ID>storage>cvg[0]>data_devices':
+                [{'devices': {'data': ['/dev/sdb'], 'metadata': ['/dev/meta1']}},
+                 {'devices': {'data': ['/dev/sdc'], 'metadata': ['/dev/meta2']}}],
+                'node>MACH_ID>storage>cvg[0]>devices>data':
                 ['/dev/sdb'],
-                'node>MACH_ID>storage>cvg[1]>data_devices':
+                'node>MACH_ID>storage>cvg[1]>devices>data':
                 ['/dev/sdc'],
                 'node>MACH_ID>network>data>private_interfaces':
                 ['eth1', 'eno2'],
@@ -972,10 +972,10 @@ class TestCDF(unittest.TestCase):
                 'node>MACH_ID>network>data>private_interfaces':
                 ['eth1'],
                 'node>MACH_ID>storage>cvg':
-                [{'data_devices': ['/dev/sdb'], 'metadata_devices': ['/dev/meta']}],
-                'node>MACH_ID>storage>cvg[0]>data_devices':
+                [{'devices': {'data': ['/dev/sdb'], 'metadata': ['/dev/meta']}}],
+                'node>MACH_ID>storage>cvg[0]>devices>data':
                 ['/dev/sdb'],
-                'node>MACH_ID>storage>cvg[0]>metadata_devices':
+                'node>MACH_ID>storage>cvg[0]>devices>metadata':
                 ['/dev/meta'],
                 'node>MACH_2_ID>name':                'host-2',
                 'node>MACH_2_ID>hostname':            'host-2',
@@ -987,10 +987,10 @@ class TestCDF(unittest.TestCase):
                 'cortx>s3>service_instances':                1,
                 'cortx>motr>client_instances':                2,
                 'node>MACH_2_ID>storage>cvg':
-                [{'data_devices': ['/dev/sdb'], 'metadata_devices': ['/dev/meta']}],
-                'node>MACH_2_ID>storage>cvg[0]>data_devices':
+                [{'devices': {'data': ['/dev/sdb'], 'metadata': ['/dev/meta']}}],
+                'node>MACH_2_ID>storage>cvg[0]>devices>data':
                 ['/dev/sdb'],
-                'node>MACH_2_ID>storage>cvg[0]>metadata_devices':
+                'node>MACH_2_ID>storage>cvg[0]>devices>metadata':
                 ['/dev/meta'],
             }
             return data[value]
@@ -1063,8 +1063,8 @@ class TestCDF(unittest.TestCase):
                 'node>MACH_ID>hostname':
                 'myhost',
                 'node>MACH_ID>storage>cvg':
-                [{'data_devices': ['/dev/sdb'], 'metadata_devices': ['/dev/meta']}],
-                'node>MACH_ID>storage>cvg[0]>data_devices':
+                [{'devices': {'data': ['/dev/sdb'], 'metadata': ['/dev/meta']}}],
+                'node>MACH_ID>storage>cvg[0]>devices>data':
                 ['/dev/sdb'],
                 'node>MACH_ID>network>data>private_fqdn':
                     'srvnode-1.data.private',

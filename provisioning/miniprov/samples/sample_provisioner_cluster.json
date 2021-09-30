@@ -100,12 +100,14 @@
         "cvg_count": "1",
         "cvg": [
           {
-            "metadata_devices": [
-              "/dev/sdb"
-            ],
-            "data_devices": [
-              "/dev/sdc"
-            ]
+            "devices": {
+              "metadata": [
+                "/dev/sdb"
+              ],
+              "data": [
+                "/dev/sdc"
+              ]
+            }
           }
         ],
         "enclosure_id": "encla971a87aace34e05b4747bb3376d6661"
