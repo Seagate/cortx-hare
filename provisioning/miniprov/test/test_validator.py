@@ -97,15 +97,17 @@ conf_store_data = {
       },
       "storage": {
         "enclosure_id": "enclosure-1",
-        "metadata_devices": [
-          "/dev/sdb"
-        ],
-        "data_devices": [
-          "/dev/sdd",
-          "/dev/sde",
-          "/dev/sdf",
-          "/dev/sdg"
-        ]
+        "devices": {
+          "metadata": [
+            "/dev/sdb"
+          ],
+          "data": [
+            "/dev/sdd",
+            "/dev/sde",
+            "/dev/sdf",
+            "/dev/sdg"
+          ]
+        }
       },
       "s3_instances": 1
     }

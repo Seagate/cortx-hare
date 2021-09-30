@@ -99,16 +99,16 @@ class CdfGenerator:
     def _get_devices(self, pool: PoolHandle, node: str) -> List[str]:
         conf = self.provider
         pool_type = pool.pool_type
-        prop_name = 'data_devices'
+        prop_name = 'data'
         # node>{machine-id}>storage>cvg_count
         cvg_num = int(conf.get(f'node>{node}>storage>cvg_count'))
         all_cvg_devices = []
         if pool_type == 'dix':
-            prop_name = 'metadata_devices'
+            prop_name = 'metadata'
         for i in range(cvg_num):
-            # node>{machine-id}>storage>cvg[N]>name
+            # node>{machine-id}>storage>cvg[N]>devices>name
             all_cvg_devices += conf.get(
-                f'node>{node}>storage>cvg[{i}]>{prop_name}')
+                f'node>{node}>storage>cvg[{i}]>devices>{prop_name}')
         return all_cvg_devices
 
     # cluster>storage_set[N]>nodes
@@ -287,13 +287,13 @@ class CdfGenerator:
             return None
         return Protocol[iface]
 
-    # node>{machine -id}>storage>cvg[N]>data_devices
+    # node>{machine -id}>storage>cvg[N]>devices>data
     def _get_data_devices(self, machine_id: str, cvg: int) -> DList[Text]:
         store = self.provider
         data_devices = DList(
             [Text(device) for device in store.get(
                 f'node>{machine_id}>'
-                f'storage>cvg[{cvg}]>data_devices')], 'List Text')
+                f'storage>cvg[{cvg}]>devices>data')], 'List Text')
         return data_devices
 
     # TBD motr

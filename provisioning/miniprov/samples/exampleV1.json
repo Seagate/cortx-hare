@@ -332,10 +332,10 @@
       },
       "storage": {
         "enclosure_id": "enclosure-1",
-        "metadata_devices": [
+        "metadata": [
           "/dev/sdb"
         ],
-        "data_devices": [
+        "data": [
           "/dev/sdc"
         ]
       },

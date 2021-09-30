@@ -45,13 +45,15 @@
         "cvg_count": "TMPL_CVG_COUNT",
         "cvg": [
           {
-            "data_devices": [
-              "TMPL_DATA_DEVICE_1",
-              "TMPL_DATA_DEVICE_2"
-            ],
-            "metadata_devices": [
-              "TMPL_METADATA_DEVICE"
-            ]
+            "devices": {
+              "data": [
+                "TMPL_DATA_DEVICE_1",
+                "TMPL_DATA_DEVICE_2"
+              ],
+              "metadata": [
+                "TMPL_METADATA_DEVICE"
+              ]
+            }
           }
         ]
       }
