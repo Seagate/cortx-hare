@@ -122,10 +122,7 @@ static void entrypoint_request_cb(struct m0_halon_interface *hi,
 	struct hax_link               *hxl;
 
 	M0_ALLOC_PTR(hxl);
-	if (hxl == NULL) {
-		M0_LOG(M0_ERROR, "Cannot allocate hax_link");
-		return;
-	}
+	M0_ASSERT(hxl != NULL);
 	hxl->hxl_req_id = *req_id;
 	hxl->hxl_ep_addr[0] = '\0';
 	strncat(hxl->hxl_ep_addr, remote_rpc_endpoint, EP_ADDR_BUF_SIZE - 1);
@@ -611,9 +608,8 @@ static void link_is_disconnecting_cb(struct m0_halon_interface *hi,
 
 	hax_lock(hc0);
 	hxl = m0_tl_find(hx_links, l, &hc0->hc_links, l->hxl_link == link);
-	if (hxl != NULL)
-		M0_LOG(M0_DEBUG, "link=%p addr=%s", hxl,
-		       (const char*)hxl->hxl_ep_addr);
+	M0_ASSERT(hxl != NULL);
+	M0_LOG(M0_DEBUG, "link=%p addr=%s", hxl, (const char*)hxl->hxl_ep_addr);
 	hax_unlock(hc0);
 
 	m0_halon_interface_disconnect(hi, link);
