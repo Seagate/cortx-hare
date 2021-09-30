@@ -105,10 +105,10 @@ def add_service_to_node(nodes: List[Node], node_name: str, svc_name: str,
 
 
 def get_service_for_node(nodes: List[Node], node_name: str,
-                         service: str) -> Optional[List[Process]]:
+                         service: str, path: str) -> Optional[List[Process]]:
     # if node_name is not specified, then local node is used.
     if not node_name:
-        node_name = get_node_name()
+        node_name = get_node_name(path)
 
     # if service is not specified, return all the services for a node.
     if not service:
@@ -144,15 +144,15 @@ def process_all_keys(keys: List, nodes: List[Node]) -> None:
                 f'node {node.name}')
 
 
-def read_file():
-    path = '/var/lib/hare/consul-kv.json'
-    with open(path) as consul_kv_file:
+def read_file(path: str):
+    filename = f'{path}/consul-kv.json'
+    with open(filename) as consul_kv_file:
         data = json.load(consul_kv_file)
     return data
 
 
-def get_nodes_for_cluster() -> List[Node]:
-    file_data = read_file()
+def get_nodes_for_cluster(path: str) -> List[Node]:
+    file_data = read_file(path)
     nodes: List[Node] = []
     for n in node_names(file_data):
         nodes.append(Node(n))
@@ -201,6 +201,14 @@ def parse_opts(argv):
         type=str,
         action='store')
     p.add_argument(
+        '--conf-dir',
+        '-c',
+        help='Path to hare config directory. '
+        'Default: /var/lib/hare',
+        type=str,
+        default='/var/lib/hare',
+        action='store')
+    p.add_argument(
         '--all',
         help='Returns fids of all the services for nodes in cluster.',
         action='store_true')
@@ -214,13 +222,14 @@ def parse_opts(argv):
 def main(argv=None):
     opts = parse_opts(argv)
     try:
-        nodes = get_nodes_for_cluster()
+        nodes = get_nodes_for_cluster(opts.conf_dir)
 
         if opts.all:
             print(simplejson.dumps(nodes, indent=2, for_json=True))
             return 0
 
-        svcs = get_service_for_node(nodes, opts.node, opts.service)
+        svcs = get_service_for_node(nodes, opts.node, opts.service,
+                                    opts.conf_dir)
         if svcs:
             if opts.index >= 0:
                 if opts.index >= len(svcs):

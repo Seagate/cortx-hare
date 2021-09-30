@@ -25,6 +25,7 @@ import inject
 import json
 import logging
 import os
+import shutil
 import subprocess
 import sys
 from enum import Enum
@@ -39,6 +40,7 @@ from cortx.utils.product_features import unsupported_features
 from hax.common import di_configuration
 from hax.types import KeyDelete
 from hax.util import ConsulUtil, repeat_if_fails, KVAdapter
+from helper.generate_sysconf import Generator
 
 from hare_mp.cdf import CdfGenerator
 from hare_mp.store import ConfStoreProvider
@@ -289,7 +291,7 @@ def prepare(args):
     consul_starter.stop()
 
 
-def init(args):
+def init_with_bootstrap(args):
     try:
         rc = 0
         url = args.config[0]
@@ -381,6 +383,51 @@ def start(args):
         # or hax process terminates.
         # TODO: Check if the respective processes need to be restarted.
         start_hax_and_consul_without_systemd(utils, url)
+
+
+def start_mkfs(hostname: str, hare_config_dir: str):
+    # TODO: path needs to be updated according to the new conf-store key
+    motr_config_dir = '/etc/motr'
+    sysconfig_dir = '/etc/sysconfig/'
+    os.makedirs(motr_config_dir, exist_ok=True)
+    shutil.copy(f'{hare_config_dir}/confd.xc', motr_config_dir)
+    src = f'{hare_config_dir}/sysconfig/motr/{hostname}'
+    for file in os.listdir(src):
+        shutil.copy(os.path.join(src, file), sysconfig_dir)
+
+    generator = Generator(hostname, hare_config_dir,
+                          kv_file=f'{hare_config_dir}/consul-kv.json')
+    cmd = '/usr/libexec/cortx-motr/motr-mkfs'
+    # start mkfs for confd, ios services
+    for svc in ('confd', 'ios'):
+        svc_fids = generator.get_svc_fids(svc)
+        for fid in svc_fids:
+            if svc == 'ios':
+                execute([cmd, fid, '--conf'])
+            else:
+                execute([cmd, fid])
+
+
+def init(args):
+    try:
+        url = args.config[0]
+        utils = Utils(ConfStoreProvider(url))
+        stop_event = Event()
+        hare_config_dir = get_config_dir(url)
+        # Starting consul and hax
+        consul_starter = _start_consul(utils, stop_event, hare_config_dir, url)
+        hax_starter = _start_hax(utils, stop_event, hare_config_dir)
+        hostname = utils.get_local_hostname()
+        start_mkfs(hostname, hare_config_dir)
+        # Stopping hax and consul
+        hax_starter.stop()
+        consul_starter.stop()
+    except Exception as error:
+        if hax_starter:
+            hax_starter.stop()
+        if consul_starter:
+            consul_starter.stop()
+        raise RuntimeError(f'Error while initializing cluster :key={error}')
 
 
 def test(args):

@@ -145,8 +145,8 @@ def processes_by_consul_svc_name(cns: Consul) -> Dict[str, List[Process]]:
             from e
 
 
-def get_node_name() -> str:
-    with open('/var/lib/hare/node-name') as f:
+def get_node_name(path='/var/lib/hare') -> str:
+    with open(f'{path}/node-name') as f:
         return f.readline().strip('\n')
 
 

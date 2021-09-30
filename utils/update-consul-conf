@@ -216,6 +216,8 @@ append_hax_svc() {
     }"
 }
 
+UUID=$(uuidgen --time)
+
 append_confd_svc() {
     local id=$1
     local fid=$(id2fid $id)
@@ -241,6 +243,7 @@ MOTR_M0D_EP='$ep'
 MOTR_HA_EP='$HAX_EP'
 MOTR_PROCESS_FID='$fid'
 MOTR_CONF_XC='/etc/motr/confd.xc'
+MOTR_NODE_UUID='$UUID'
 EOF
     install_motr_conf /tmp/m0d-$fid
 }
@@ -276,6 +279,9 @@ EOF
 MOTR_BE_SEG_PATH='$meta_data'
 EOF
     fi
+    cat <<EOF | sudo tee -a /tmp/m0d-$fid > /dev/null
+MOTR_NODE_UUID='$UUID'
+EOF
     install_motr_conf /tmp/m0d-$fid
 }
 

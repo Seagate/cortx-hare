@@ -103,6 +103,7 @@ class ConfStoreProvider(ValueProvider):
 
 
 def get_machine_id() -> str:
-    with open('/etc/machine-id', 'r') as f:
-        machine_id = f.readline().strip('\n')
+    machine_id = Conf.machine_id
+    if machine_id:
         return machine_id
+    raise RuntimeError('Machine-id is not found.')
