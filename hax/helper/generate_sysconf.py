@@ -112,13 +112,14 @@ class KVFile:
             return key['value']
         return None
 
-    def get_profile_fid(self) -> str:
+    def get_profile_fid(self) -> Optional[str]:
         regex = re.compile('m0conf/profiles/')
         for key in self.kv_data:
             match_result = re.match(regex, key['key'])
             if not match_result:
                 continue
             return key['key'].split('/')[-1]
+        return None
 
 
 class ConsulKV:
@@ -257,6 +258,8 @@ class Generator:
         IDs = self.get_all_svc_ids()
 
         hax_ep = self.provider.get_service_ep(IDs['HAX_ID'][0])
+        if not hax_ep:
+            raise RuntimeError('Cannot get hax endpoint.')
         for x in IDs['CONFD_IDs']:
             self.generate_confd(x, hax_ep, motr_conf_dir + '/')
 
@@ -298,10 +301,12 @@ class Generator:
 
     def prepare_svc(self, svc_id: str, name: str):
         ep = self.provider.get_service_ep(svc_id)
+        if not ep:
+            raise RuntimeError('Cannot get service endpoint.')
         addr = self.get_service_addr(ep)
         port = self.get_service_port(ep)
 
-        checks = {}
+        checks: Dict[str, Any] = {}
         checks['args'] = ['/opt/seagate/cortx/hare/libexec/check-service']
         checks['interval'] = '1s'
         checks['status'] = 'warning'
@@ -310,7 +315,7 @@ class Generator:
             checks['args'].append('--hax')
         elif name in ('confd', 'ios'):
             fid = Fid(ObjT.PROCESS.value, int(svc_id))
-            checks['args'].extend(['--fid', fid])
+            checks['args'].extend(['--fid', str(fid)])
         elif name == 's3service':
             fid = Fid(ObjT.PROCESS.value, int(svc_id))
             s3svc = 's3server@' + str(fid)
@@ -342,6 +347,8 @@ class Generator:
         self.append_svcs_to_file(svcs, conf_file)
 
         ep = self.provider.get_service_ep(IDs['HAX_ID'][0])
+        if not ep:
+            raise RuntimeError('Cannot get hax endpoint.')
         self.append_ipaddr_to_file(ep, conf_file)
 
     def get_all_svc_ids(self) -> Dict[str, List[str]]:
@@ -357,3 +364,14 @@ class Generator:
         IDs['IOS_IDs'] = self.provider.get_service_ids('ios')
         IDs['S3_IDs'] = self.provider.get_service_ids('m0_client_s3')
         return IDs
+
+    def get_svc_fids(self, svc_name: str) -> List[str]:
+        IDs = self.get_all_svc_ids()
+        id_map = {
+            'hax': IDs['HAX_ID'],
+            'confd': IDs['CONFD_IDs'],
+            'ios': IDs['IOS_IDs'],
+            's3': IDs['S3_IDs']
+        }
+        return [str(Fid(ObjT.PROCESS.value, int(x)))
+                for x in id_map[svc_name]]

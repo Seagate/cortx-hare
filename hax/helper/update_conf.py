@@ -20,7 +20,6 @@ import logging
 import sys
 
 from helper.generate_sysconf import Generator
-from hax.types import Fid, ObjT
 
 
 def _setup_logging():
@@ -83,15 +82,7 @@ def main(argv=None):
                               kv_file=opts.kv_file)
         if opts.fid:
             logging.disable(logging.DEBUG)
-            IDs = generator.get_all_svc_ids()
-            id_map = {
-                'hax': IDs['HAX_ID'],
-                'confd': IDs['CONFD_IDs'],
-                'ios': IDs['IOS_IDs'],
-                's3': IDs['S3_IDs']
-            }
-            print([Fid(ObjT.PROCESS.value, int(x))
-                   for x in id_map[opts.fid]])
+            print(generator.get_svc_fids(opts.fid))
             return
         if not opts.motr_conf_dir or not opts.s3_conf_dir:
             raise Exception('--motr-conf-dir and --s3-conf-dir arguments'
