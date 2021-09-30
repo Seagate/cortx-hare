@@ -25,6 +25,7 @@ import io
 import os
 import logging
 from typing import List
+from distutils.dir_util import copy_tree
 
 from hax.util import repeat_if_fails, KVAdapter
 
@@ -36,30 +37,43 @@ class Utils:
     def __init__(self, provider: ValueProvider):
         self.provider = provider
         self.kv = KVAdapter()
-        self.hare_stop = False
 
-    def get_hostname(self) -> str:
-        machine_id = self.provider.get_machine_id()
-        hostname = self.provider.get(
-            f'server_node>{machine_id}>network>data>private_fqdn')
-        return hostname
+    def get_hostname(self, machine_id: str) -> str:
+        """
+        Returns the hostname of the given machine_id according to the given
+        ConfStore (ValueProvider).
+        """
+
+        store = self.provider
+        hostname = store.get(
+            f'node>{machine_id}>network>data>private_fqdn', allow_null=True)
+        return hostname or store.get(f'node>{machine_id}>hostname')
+
+    def get_local_hostname(self) -> str:
+        """
+        Retrieves the machine-id of the node where the code runs and fetches
+        its hostname from the ConfStore (ValueProvider).
+        """
+        store = self.provider
+        machine_id = store.get_machine_id()
+        return self.get_hostname(machine_id)
 
     @repeat_if_fails()
     def save_node_facts(self):
-        hostname = self.get_hostname()
+        hostname = self.get_local_hostname()
         cmd = ['facter', '--json', 'processorcount', 'memorysize_mb']
         node_facts = execute(cmd)
         self.kv.kv_put(f'{hostname}/facts', node_facts)
 
     def get_node_facts(self):
-        hostname = self.get_hostname()
+        hostname = self.get_local_hostname()
         node_facts = self.kv.kv_get(f'{hostname}/facts')
         return json.loads(node_facts['Value'])
 
     def get_data_devices(self, machine_id: str, cvg: int) -> DList[Text]:
         data_devices = DList(
             [Text(device) for device in self.provider.get(
-                f'server_node>{machine_id}>'
+                f'node>{machine_id}>'
                 f'storage>cvg[{cvg}]>devices>data')], 'List Text')
         return data_devices
 
@@ -74,7 +88,7 @@ class Utils:
     @repeat_if_fails()
     def _save_drive_info(self, path: str):
         disk: Disk = self._get_drive_info_form_os(path)
-        hostname = self.get_hostname()
+        hostname = self.get_local_hostname()
         drive_info = json.dumps({'path': disk.path.get().s,
                                  'size': int(disk.size.get()),
                                  'blksize': int(disk.blksize.get())})
@@ -83,7 +97,7 @@ class Utils:
 
     def save_drives_info(self):
         machine_id = self.provider.get_machine_id()
-        cvgs_key: str = f'server_node>{machine_id}>storage>cvg'
+        cvgs_key: str = f'node>{machine_id}>storage>cvg'
         for cvg in range(len(self.provider.get(cvgs_key))):
             data_devs = self.get_data_devices(machine_id, cvg)
             for dev_path in data_devs.value:
@@ -91,7 +105,7 @@ class Utils:
 
     @repeat_if_fails()
     def get_drive_info_from_consul(self, path: Text) -> Disk:
-        hostname = self.get_hostname()
+        hostname = self.get_local_hostname()
         disk_path = json.loads(str(path)).lstrip(os.sep)
         drive_data = self.kv.kv_get(f'{hostname}/{disk_path}')
         drive_info = json.loads(drive_data['Value'])
@@ -112,6 +126,22 @@ class Utils:
                 item_data = json.loads(json.dumps(item))
                 self.kv.kv_put(item_data['key'],
                                str(item_data['value']))
+
+    def copy_conf_files(self, conf_dir_path: str):
+        machine_id = self.provider.get_machine_id()
+        global_config_path = self.provider.get('cortx>common>storage>local')
+
+        dest_s3 = f'{global_config_path}/s3/sysconfig/{machine_id}'
+        dest_motr = f'{global_config_path}/motr/sysconfig/{machine_id}'
+        os.makedirs(dest_s3, exist_ok=True)
+        os.makedirs(dest_motr, exist_ok=True)
+
+        cmd = ['/opt/seagate/cortx/hare/libexec/node-name',
+               '--conf-dir', conf_dir_path]
+        node_name = execute(cmd)
+
+        copy_tree(f'{conf_dir_path}/sysconfig/s3/{node_name}', dest_s3)
+        copy_tree(f'{conf_dir_path}/sysconfig/motr/{node_name}', dest_motr)
 
     def stop_hare(self):
         self.hare_stop = True

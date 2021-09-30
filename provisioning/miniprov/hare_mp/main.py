@@ -49,10 +49,10 @@ from hare_mp.consul_starter import ConsulStarter
 from hare_mp.hax_starter import HaxStarter
 
 # Logger details
-LOG_DIR_EXT = '/hare/'
+LOG_DIR_EXT = '/hare/log/'
 LOG_FILE = 'setup.log'
 LOG_FILE_SIZE = 5 * 1024 * 1024
-CONF_DIR_EXT = '/hare/'
+CONF_DIR_EXT = '/hare/config/'
 
 
 class Plan(Enum):
@@ -76,8 +76,9 @@ def create_logger_directory(log_dir):
 
 def setup_logging(url) -> None:
     provider = ConfStoreProvider(url)
+    machine_id = provider.get_machine_id()
     log_path = provider.get('cortx>common>storage>log')
-    log_dir = log_path + LOG_DIR_EXT + 'hare_deployment/'
+    log_dir = log_path + LOG_DIR_EXT + machine_id + '/hare_deployment/'
     log_file = log_dir + LOG_FILE
 
     create_logger_directory(log_dir)
@@ -147,7 +148,7 @@ def logrotate(url: str):
 
             log_dir = get_log_dir(url)
             content = content.replace('/var/log/seagate/hare/*.log',
-                                      f'{log_dir}*.log')
+                                      f'{log_dir}/*.log')
 
             with open('/etc/logrotate.d/hare', 'w') as f:
                 f.write(content)
@@ -231,7 +232,7 @@ def init(args):
             if args.file:
                 path_to_cdf = args.file[0]
             else:
-                path_to_cdf = get_config_dir(url) + 'cluster.yaml'
+                path_to_cdf = get_config_dir(url) + '/cluster.yaml'
             if not is_cluster_running() and bootstrap_cluster(
                     path_to_cdf, True):
                 logging.error('Failed to bootstrap the cluster')
@@ -353,7 +354,7 @@ def test(args):
             if args.file:
                 path_to_cdf = args.file[0]
             else:
-                path_to_cdf = get_config_dir(url) + 'cluster.yaml'
+                path_to_cdf = get_config_dir(url) + '/cluster.yaml'
             if not is_cluster_running() and bootstrap_cluster(path_to_cdf):
                 logging.error('Failed to bootstrap the cluster')
                 rc = -1
@@ -377,7 +378,7 @@ def test_IVT(args):
         if args.file:
             path_to_cdf = args.file[0]
         else:
-            path_to_cdf = get_config_dir(args.config[0]) + 'cluster.yaml'
+            path_to_cdf = get_config_dir(args.config[0]) + '/cluster.yaml'
 
         logging.info('Running test plan: ' + str(args.plan[0].value))
         # TODO We need to handle plan type and execute test cases accordingly
@@ -441,14 +442,16 @@ def pre_factory(url):
 
 def get_log_dir(url) -> str:
     provider = ConfStoreProvider(url)
+    machine_id = provider.get_machine_id()
     log_path = provider.get('cortx>common>storage>log')
-    return log_path + LOG_DIR_EXT
+    return log_path + LOG_DIR_EXT + machine_id
 
 
 def get_config_dir(url) -> str:
     provider = ConfStoreProvider(url)
-    config_path = provider.get('cortx>common>storage>config')
-    return config_path + CONF_DIR_EXT
+    machine_id = provider.get_machine_id()
+    config_path = provider.get('cortx>common>storage>local')
+    return config_path + CONF_DIR_EXT + '/' + machine_id
 
 
 def cleanup(args):
@@ -675,6 +678,7 @@ def generate_config(url: str, path_to_cdf: str) -> None:
     cmd = ['configure', '-c', conf_dir, path_to_cdf]
     execute(cmd, env={'PYTHONPATH': python_path, 'PATH': path,
                       'LC_ALL': "en_US.utf-8", 'LANG': "en_US.utf-8"})
+    utils.copy_conf_files(conf_dir)
     utils.import_kv(conf_dir)
 
 
@@ -694,12 +698,13 @@ def config(args):
         if args.file:
             filename = args.file[0]
         else:
-            filename = get_config_dir(url) + 'cluster.yaml'
+            filename = get_config_dir(url) + '/cluster.yaml'
 
         provider = ConfStoreProvider(url)
-        config_path = provider.get('cortx>common>storage>config')
-        motr_md_path = config_path + '/motr/motr_hare_keys.json'
-        motr_md_url = 'json://' + motr_md_path
+        config_path = provider.get('cortx>common>storage>local')
+        machine_id = provider.get_machine_id()
+        motr_md_path = config_path + '/motr/' + machine_id
+        motr_md_url = 'json://' + motr_md_path + '/motr_hare_keys.json'
 
         save(filename, generate_cdf(url, motr_md_url))
         update_hax_unit('/usr/lib/systemd/system/hare-hax.service')
