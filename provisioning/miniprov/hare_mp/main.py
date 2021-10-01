@@ -63,6 +63,10 @@ class Plan(Enum):
     Scalability = 'scalability'
 
 
+class Svc(Enum):
+    All = 'all'
+
+
 def create_logger_directory(log_dir):
     """Create log directory if not exists."""
     if not os.path.isdir(log_dir):
@@ -770,15 +774,25 @@ def add_factory_argument(parser):
     return parser
 
 
+def add_service_argument(parser):
+    parser.add_argument('--services',
+                        help='Services to be setup.',
+                        nargs=1,
+                        type=Svc,
+                        action='store')
+    return parser
+
+
 def main():
     inject.configure(di_configuration)
     p = argparse.ArgumentParser(description='Configure hare settings')
     subparser = p.add_subparsers()
 
-    parser = add_subcommand(subparser,
-                            'post_install',
-                            help_str='Validates installation',
-                            handler_fn=post_install)
+    parser = add_service_argument(
+        add_subcommand(subparser,
+                       'post_install',
+                       help_str='Validates installation',
+                       handler_fn=post_install))
     parser.add_argument(
         '--report-unavailable-features',
         help='Report unsupported features according to setup type',
@@ -787,37 +801,42 @@ def main():
                         help='Configure logrotate for hare',
                         action='store_true')
 
-    add_file_argument(
+    add_service_argument(
+        add_file_argument(
+            add_subcommand(subparser,
+                           'config',
+                           help_str='Configures Hare',
+                           handler_fn=config)))
+
+    add_service_argument(
+        add_file_argument(
+            add_subcommand(subparser,
+                           'init',
+                           help_str='Initializes Hare',
+                           handler_fn=init)))
+
+    add_service_argument(
+        add_file_argument(
+            add_subcommand(subparser,
+                           'start',
+                           help_str='Starts Hare services',
+                           handler_fn=start)))
+
+    add_service_argument(
+        add_param_argument(
+            add_plan_argument(
+                add_file_argument(
+                    add_subcommand(subparser,
+                                   'test',
+                                   help_str='Tests Hare component',
+                                   handler_fn=test_IVT)))))
+
+    sb_sub_parser = add_service_argument(
         add_subcommand(subparser,
-                       'config',
-                       help_str='Configures Hare',
-                       handler_fn=config))
-
-    add_file_argument(
-        add_subcommand(subparser,
-                       'init',
-                       help_str='Initializes Hare',
-                       handler_fn=init))
-
-    add_file_argument(
-        add_subcommand(subparser,
-                       'start',
-                       help_str='Starts Hare services',
-                       handler_fn=start))
-
-    add_param_argument(
-        add_plan_argument(
-            add_file_argument(
-                add_subcommand(subparser,
-                               'test',
-                               help_str='Tests Hare component',
-                               handler_fn=test_IVT))))
-
-    sb_sub_parser = add_subcommand(subparser,
-                                   'support_bundle',
-                                   help_str='Generates support bundle',
-                                   handler_fn=generate_support_bundle,
-                                   config_required=False)
+                       'support_bundle',
+                       help_str='Generates support bundle',
+                       handler_fn=generate_support_bundle,
+                       config_required=False))
 
     sb_sub_parser.add_argument(
         'bundleid',
@@ -832,34 +851,41 @@ def main():
                                nargs='?',
                                help='Target directory; defaults to /tmp/hare.')
 
-    add_file_argument(
+    add_service_argument(
+        add_file_argument(
+            add_subcommand(subparser,
+                           'reset',
+                           help_str='Resets temporary Hare data'
+                                    ' and configuration',
+                           handler_fn=reset)))
+
+    add_service_argument(
+        add_factory_argument(
+            add_subcommand(
+                subparser,
+                'cleanup',
+                help_str='Resets Hare configuration,'
+                         ' logs & formats Motr metadata',
+                handler_fn=cleanup,
+                config_required=False)))
+
+    add_service_argument(
         add_subcommand(subparser,
-                       'reset',
-                       help_str='Resets temporary Hare data and configuration',
-                       handler_fn=reset))
+                       'prepare',
+                       help_str='Validates configuration pre-requisites',
+                       handler_fn=prepare))
 
-    add_factory_argument(
-        add_subcommand(
-            subparser,
-            'cleanup',
-            help_str='Resets Hare configuration, logs & formats Motr metadata',
-            handler_fn=cleanup,
-            config_required=False))
+    add_service_argument(
+        add_subcommand(subparser,
+                       'pre-upgrade',
+                       help_str='Performs the Hare rpm pre-upgrade tasks',
+                       handler_fn=noop))
 
-    add_subcommand(subparser,
-                   'prepare',
-                   help_str='Validates configuration pre-requisites',
-                   handler_fn=prepare)
-
-    add_subcommand(subparser,
-                   'pre-upgrade',
-                   help_str='Performs the Hare rpm pre-upgrade tasks',
-                   handler_fn=noop)
-
-    add_subcommand(subparser,
-                   'post-upgrade',
-                   help_str='Performs the Hare rpm post-upgrade tasks',
-                   handler_fn=noop)
+    add_service_argument(
+        add_subcommand(subparser,
+                       'post-upgrade',
+                       help_str='Performs the Hare rpm post-upgrade tasks',
+                       handler_fn=noop))
 
     parsed = p.parse_args(sys.argv[1:])
 
