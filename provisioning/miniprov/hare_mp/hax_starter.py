@@ -63,14 +63,14 @@ class HaxStarter(StoppableThread):
             path += os.pathsep + '/opt/seagate/cortx/hare/libexec'
             python_path = os.pathsep.join(sys.path)
             cmd = ['hax']
-            self.process = \
-                execute_no_communicate(cmd,
-                                       env={'PYTHONPATH': python_path,
-                                            'PATH': path,
-                                            'LC_ALL': "en_US.utf-8",
-                                            'LANG': "en_US.utf-8"},
-                                       working_dir=self.home_dir,
-                                       out_file=LogWriter(LOG, fh))
+            self.process = execute_no_communicate(cmd,
+                                                  env={'PYTHONPATH':
+                                                       python_path,
+                                                       'PATH': path,
+                                                       'LC_ALL': "en_US.utf-8",
+                                                       'LANG': "en_US.utf-8"},
+                                                  working_dir=self.home_dir,
+                                                  out_file=LogWriter(LOG, fh))
             if self.process:
                 self.process.communicate()
         except Exception:

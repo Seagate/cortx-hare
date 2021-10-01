@@ -177,6 +177,37 @@ def unsupported_feature(url: str):
         logging.error('Error reporting hare unsupported features (%s)', error)
 
 
+def _start_consul(utils: Utils, stop_event: Event, hare_local_dir: str):
+    log_dir = f'{hare_local_dir}/consul/log'
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
+    data_dir = f'{hare_local_dir}/consul/data'
+    if not os.path.exists(data_dir):
+        os.makedirs(data_dir)
+    config_dir = f'{hare_local_dir}/consul/config'
+    if not os.path.exists(config_dir):
+        os.makedirs(config_dir)
+    peers = ['consul-server']
+    consul_starter = ConsulStarter(utils=utils, stop_event=stop_event,
+                                   log_dir=log_dir, data_dir=data_dir,
+                                   config_dir=config_dir, peers=peers)
+    consul_starter.start()
+    return consul_starter
+
+
+def _start_hax(utils: Utils, stop_event: Event, hare_local_dir: str):
+    home_dir = f'{hare_local_dir}'
+    log_dir = f'{hare_local_dir}/log'
+    if not os.path.exists(home_dir):
+        os.makedirs(home_dir)
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
+    hax_starter = HaxStarter(utils=utils, stop_event=stop_event,
+                             home_dir=home_dir, log_dir=log_dir)
+    hax_starter.start()
+    return hax_starter
+
+
 def post_install(args):
     try:
         if checkRpm('cortx-motr') != 0:
@@ -218,8 +249,12 @@ def disable_hare_consul_agent() -> None:
 def prepare(args):
     url = args.config[0]
     utils = Utils(ConfStoreProvider(url))
+    stop_event = Event()
+    local_dir = '/var/hare'
+    consul_starter = _start_consul(utils, stop_event, local_dir)
     utils.save_node_facts()
     utils.save_drives_info()
+    consul_starter.stop()
 
 
 def init(args):
@@ -288,36 +323,6 @@ def start_hax_with_systemd():
 #                                out_file=LogWriter(logger, fhandler))
 #     except Exception as error:
 #         raise RuntimeError(f'Error while initializing cluster :key={error}')
-
-def _start_consul(utils: Utils, stop_event: Event, hare_local_dir: str):
-    log_dir = f'{hare_local_dir}/consul/log'
-    if not os.path.exists(log_dir):
-        os.makedirs(log_dir)
-    data_dir = f'{hare_local_dir}/consul/data'
-    if not os.path.exists(data_dir):
-        os.makedirs(data_dir)
-    config_dir = f'{hare_local_dir}/consul/config'
-    if not os.path.exists(config_dir):
-        os.makedirs(config_dir)
-    peers = ['consul-server']
-    consul_starter = ConsulStarter(utils=utils, stop_event=stop_event,
-                                   log_dir=log_dir, data_dir=data_dir,
-                                   config_dir=config_dir, peers=peers)
-    consul_starter.start()
-    return consul_starter
-
-
-def _start_hax(utils: Utils, stop_event: Event, hare_local_dir: str):
-    home_dir = f'{hare_local_dir}'
-    log_dir = f'{hare_local_dir}/log'
-    if not os.path.exists(home_dir):
-        os.makedirs(home_dir)
-    if not os.path.exists(log_dir):
-        os.makedirs(log_dir)
-    hax_starter = HaxStarter(utils=utils, stop_event=stop_event,
-                             home_dir=home_dir, log_dir=log_dir)
-    hax_starter.start()
-    return hax_starter
 
 
 def start_hax_and_consul_without_systemd(config_url: str, utils: Utils):
@@ -693,8 +698,13 @@ def update_hax_unit(filename: str) -> None:
 
 
 def config(args):
+    consul_starter = None
     try:
         url = args.config[0]
+        utils = Utils(ConfStoreProvider(url))
+        stop_event = Event()
+        local_dir = '/var/hare'
+        consul_starter = _start_consul(utils, stop_event, local_dir)
         if args.file:
             filename = args.file[0]
         else:
@@ -709,8 +719,11 @@ def config(args):
         save(filename, generate_cdf(url, motr_md_url))
         update_hax_unit('/usr/lib/systemd/system/hare-hax.service')
         generate_config(url, filename)
+        consul_starter.stop()
     except Exception as error:
         logging.error('Error performing configuration (%s)', error)
+        if consul_starter:
+            consul_starter.stop()
         exit(-1)
 
 
