@@ -66,7 +66,10 @@ class CdfGenerator:
         conf = self.provider
         machines: Dict[str, Any] = conf.get('node')
         for machine_id in machines.keys():
-            nodes.append(self._create_node(machine_id))
+            node_type = conf.get(f'node>{machine_id}>type')
+            # Skipping for controller node
+            if node_type == 'storage_node':
+                nodes.append(self._create_node(machine_id))
         return nodes
 
     # cluster>storage_set[N]>durability>{type}>data/parity/spare
@@ -114,8 +117,15 @@ class CdfGenerator:
     # cluster>storage_set[N]>nodes
     def _get_server_nodes(self, pool: PoolHandle) -> List[str]:
         i = pool.storage_ndx
-        return self.provider.get(
-            f'cluster>storage_set[{i}]>nodes')
+        nodes = self.provider.get(f'cluster>storage_set[{i}]>nodes')
+        out = []
+        for node in nodes:
+            node_type = self.provider.get(f'node>{node}>type')
+            # Skipping for controller node
+            if node_type == 'storage_node':
+                out.append(node)
+
+        return out
 
     def _validate_pool(self, pool: PoolHandle) -> None:
         layout = self._get_layout(pool)

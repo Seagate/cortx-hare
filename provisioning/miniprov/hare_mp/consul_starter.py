@@ -69,7 +69,7 @@ class ConsulStarter(StoppableThread):
                    f'-config-dir={self.config_dir}', '-domain=consul',
                    '-serf-lan-port=8301']
             for peer in self.peers:
-                cmd.append(f'-retry-join={peer}:8301')
+                cmd.append(f'-retry-join={peer}')
 
             self.process = execute_no_communicate(cmd,
                                                   working_dir=self.log_dir,

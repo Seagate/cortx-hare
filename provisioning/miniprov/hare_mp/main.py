@@ -181,7 +181,7 @@ def unsupported_feature(url: str):
         logging.error('Error reporting hare unsupported features (%s)', error)
 
 
-def _start_consul(utils: Utils, stop_event: Event, hare_local_dir: str):
+def _create_consul_namespace(hare_local_dir: str):
     log_dir = f'{hare_local_dir}/consul/log'
     if not os.path.exists(log_dir):
         os.makedirs(log_dir)
@@ -191,11 +191,38 @@ def _start_consul(utils: Utils, stop_event: Event, hare_local_dir: str):
     config_dir = f'{hare_local_dir}/consul/config'
     if not os.path.exists(config_dir):
         os.makedirs(config_dir)
-    peers = ['consul-server']
+
+
+def _start_consul(utils: Utils,
+                  stop_event: Event,
+                  hare_local_dir: str,
+                  url: str):
+    log_dir = f'{hare_local_dir}/consul/log'
+    data_dir = f'{hare_local_dir}/consul/data'
+    config_dir = f'{hare_local_dir}/consul/config'
+
+    provider = ConfStoreProvider(url)
+    consul_endpoints = provider.get('cortx>external>consul>endpoints')
+
+    # remove tcp://
+    peers = []
+    for endpoint in consul_endpoints:
+        key = endpoint.split('/')
+        peer = ('/'.join(key[2:]))
+        peers.append(peer)
+
     consul_starter = ConsulStarter(utils=utils, stop_event=stop_event,
                                    log_dir=log_dir, data_dir=data_dir,
                                    config_dir=config_dir, peers=peers)
     consul_starter.start()
+
+    try:
+        util: ConsulUtil = ConsulUtil()
+        sess = util.get_leader_session_no_wait()
+        util.destroy_session(sess)
+    except Exception:
+        logging.info('No leader is elected yet')
+
     return consul_starter
 
 
@@ -254,8 +281,9 @@ def prepare(args):
     url = args.config[0]
     utils = Utils(ConfStoreProvider(url))
     stop_event = Event()
-    local_dir = '/var/hare'
-    consul_starter = _start_consul(utils, stop_event, local_dir)
+    conf_dir = get_config_dir(url)
+    _create_consul_namespace(conf_dir)
+    consul_starter = _start_consul(utils, stop_event, conf_dir, url)
     utils.save_node_facts()
     utils.save_drives_info()
     consul_starter.stop()
@@ -329,13 +357,14 @@ def start_hax_with_systemd():
 #         raise RuntimeError(f'Error while initializing cluster :key={error}')
 
 
-def start_hax_and_consul_without_systemd(config_url: str, utils: Utils):
-    local_dir = '/var/hare'
+def start_hax_and_consul_without_systemd(utils: Utils,
+                                         url: str):
+    conf_dir = get_config_dir(url)
     # Event on which hare receives a notification in case consul agent or hax
     # terminates.
     hare_stop_event = Event()
-    consul_starter = _start_consul(utils, hare_stop_event, local_dir)
-    hax_starter = _start_hax(utils, hare_stop_event, local_dir)
+    consul_starter = _start_consul(utils, hare_stop_event, conf_dir, url)
+    hax_starter = _start_hax(utils, hare_stop_event, conf_dir)
     hare_stop_event.wait()
     if utils.is_hare_stopping():
         consul_starter.stop()
@@ -351,7 +380,7 @@ def start(args):
         # This is a blocking call and will block until either consul
         # or hax process terminates.
         # TODO: Check if the respective processes need to be restarted.
-        start_hax_and_consul_without_systemd(url, utils)
+        start_hax_and_consul_without_systemd(utils, url)
 
 
 def test(args):
@@ -688,6 +717,7 @@ def generate_config(url: str, path_to_cdf: str) -> None:
     execute(cmd, env={'PYTHONPATH': python_path, 'PATH': path,
                       'LC_ALL': "en_US.utf-8", 'LANG': "en_US.utf-8"})
     utils.copy_conf_files(conf_dir)
+    utils.copy_consul_files(conf_dir)
     utils.import_kv(conf_dir)
 
 
@@ -707,8 +737,8 @@ def config(args):
         url = args.config[0]
         utils = Utils(ConfStoreProvider(url))
         stop_event = Event()
-        local_dir = '/var/hare'
-        consul_starter = _start_consul(utils, stop_event, local_dir)
+        conf_dir = get_config_dir(url)
+        consul_starter = _start_consul(utils, stop_event, conf_dir, url)
         if args.file:
             filename = args.file[0]
         else:
