@@ -26,6 +26,7 @@ import os
 import logging
 from typing import List
 from distutils.dir_util import copy_tree
+import shutil
 
 from hax.util import repeat_if_fails, KVAdapter
 
@@ -142,6 +143,11 @@ class Utils:
 
         copy_tree(f'{conf_dir_path}/sysconfig/s3/{node_name}', dest_s3)
         copy_tree(f'{conf_dir_path}/sysconfig/motr/{node_name}', dest_motr)
+
+    def copy_consul_files(self, conf_dir_path: str):
+        shutil.copyfile(
+            f'{conf_dir_path}/consul-server-conf/consul-server-conf.json',
+            f'{conf_dir_path}/consul/config/consul-server-conf.json')
 
     def stop_hare(self):
         self.hare_stop = True

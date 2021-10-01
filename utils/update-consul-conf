@@ -190,6 +190,9 @@ else
     CONF_FILE=$conf_dir/consul-client-conf/consul-client-conf.json
 fi
 
+pwdesc=$(echo $conf_dir | sed 's_/_\\/_g')
+sed -i "s/TMP_CONF_DIR/$pwdesc/" $CONF_FILE
+
 SVCS_CONF=''
 
 append_hax_svc() {

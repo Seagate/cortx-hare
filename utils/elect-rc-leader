@@ -19,16 +19,36 @@
 
 set -eu -o pipefail
 
-#
-# This is the handler for RC Leader election.
-#
-# It creates the session with confd health check and
-# tries to acquire the leader lock with this session.
-#
-# Use it like this:
-#
-# $ consul watch -type=key -key leader elect-rc-leader
-#
+# set -x
+
+PROG=${0##*/}
+
+usage() {
+    cat <<EOF
+Usage: $PROG [<option>]
+Elect new RC leader
+Options:
+  -h, --help            Show this help and exit.
+  -c, --conf-dir        config dir where config files are present
+EOF
+}
+
+TEMP=$(getopt --options h: \
+              --longoptions help,conf-dir: \
+              --name "$PROG" -- "$@" || true)
+
+eval set -- "$TEMP"
+
+conf_dir=/var/lib/hare
+
+while true; do
+    case "$1" in
+        -h|--help)           usage; exit ;;
+        -c|--conf-dir)       conf_dir=$2; shift 2 ;;
+        --)                  shift; break ;;
+        *)                   usage; exit ;;
+    esac
+done
 
 sudo mkdir -p /var/log/seagate/hare
 
@@ -52,7 +72,7 @@ get_node_name() {
     # script.
     # In non-hctl context, the scripts should use absolute path instead
     # when accessing scripts under hare/libexec/.
-    /opt/seagate/cortx/hare/libexec/node-name
+    /opt/seagate/cortx/hare/libexec/node-name --conf-dir $conf_dir
 }
 
 cleanup() {

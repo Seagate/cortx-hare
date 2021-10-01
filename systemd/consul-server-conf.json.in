@@ -5,7 +5,7 @@
     {
       "type": "key",
       "key": "leader",
-      "args": [ "/opt/seagate/cortx/hare/libexec/elect-rc-leader" ]
+      "args": [ "/opt/seagate/cortx/hare/libexec/elect-rc-leader", "--conf-dir", "TMP_CONF_DIR" ]
     },
     {
       "type": "keyprefix",
