@@ -47,7 +47,7 @@
           ]
         }
       },
-      "storage_set_id": "storage1",
+      "storage_set": "storage1",
       "storage": {
         "cvg_count": "2",
         "cvg": [
@@ -91,7 +91,7 @@
           ]
         }
       },
-      "storage_set_id": "storage1",
+      "storage_set": "storage1",
       "storage": {
         "cvg_count": "2",
         "cvg": [
@@ -135,7 +135,7 @@
           ]
         }
       },
-      "storage_set_id": "storage1",
+      "storage_set": "storage1",
       "storage": {
         "cvg_count": "2",
         "cvg": [
