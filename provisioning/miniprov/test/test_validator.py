@@ -46,7 +46,7 @@ conf_store_data = {
       "name": "srvnode-1",
       "hostname": "ssc-vm-1623.colo.seagate.com",
       "cluster_id": "e766bd52-c19c-45b6-9c91-663fd8203c2e",
-      "storage_set_id": 0
+      "storage_set": 0
     }
   },
   "cluster": {
@@ -66,7 +66,7 @@ conf_store_data = {
     },
     "cluster_id": "e766bd52-c19c-45b6-9c91-663fd8203c2e",
     "srvnode-1": {
-      "storage_set_id": 0,
+      "storage_set": 0,
       "hostname": "ssc-vm-1623.colo.seagate.com",
       "node_type": "VM",
       "roles": [
@@ -125,7 +125,7 @@ def update_machine(machine_id: str, hostname: str):
                                          "name": "srvnode-1",
                                          "hostname": f'{hostname}',
                                          "cluster_id": "e766bd52-c19c-45b6-9c91-663fd8203c2e",
-                                         "storage_set_id": 0
+                                         "storage_set": 0
                                        }
                                       }
                       }

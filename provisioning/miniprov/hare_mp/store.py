@@ -86,7 +86,7 @@ class ConfStoreProvider(ValueProvider):
         i = 0
         machine_id = self.get_machine_id()
         storage_set_id = self.get((f'node>{machine_id}>'
-                                   f'storage_set_id'))
+                                   f'storage_set'))
 
         for storage_set in self.get('cluster>storage_set'):
             if storage_set['name'] == storage_set_id:

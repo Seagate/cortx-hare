@@ -40,7 +40,7 @@
           ]
         }
       },
-      "storage_set_id": "TMPL_STORAGE_SET_ID",
+      "storage_set": "TMPL_STORAGE_SET_ID",
       "storage": {
         "cvg_count": "TMPL_CVG_COUNT",
         "cvg": [
