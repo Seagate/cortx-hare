@@ -223,7 +223,7 @@ def _start_consul(utils: Utils,
         sess = util.get_leader_session_no_wait()
         util.destroy_session(sess)
     except Exception:
-        logging.info('No leader is elected yet')
+        logging.debug('No leader is elected yet')
 
     return consul_starter
 

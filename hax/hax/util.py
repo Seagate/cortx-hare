@@ -150,7 +150,7 @@ def repeat_if_fails(wait_seconds=5, max_retries=-1):
                             'Function %s: Too many errors happened in a row '
                             '(max_retries = %d)', f.__name__, max_retries)
                         raise e
-                    LOG.warning(
+                    LOG.debug(
                         f'Got HAConsistencyException: {e.message} while '
                         f'invoking function {f.__name__} '
                         f'(attempt {attempt_count}). The attempt will be '
