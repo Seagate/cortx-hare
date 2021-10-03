@@ -76,6 +76,6 @@ class HaxStarter(StoppableThread):
         except Exception:
             LOG.exception('Aborting due to an error')
         finally:
-            LOG.exception('Stopping Hax')
+            LOG.debug('Stopping Hax')
             self.stop_event.set()
             self.utils.stop_hare()

@@ -79,6 +79,6 @@ class ConsulStarter(StoppableThread):
         except Exception:
             LOG.exception('Aborting due to an error')
         finally:
-            LOG.exception('Stopping Consul')
+            LOG.debug('Stopping Consul')
             self.stop_event.set()
             self.utils.stop_hare()
