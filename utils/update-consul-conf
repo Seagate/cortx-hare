@@ -33,11 +33,13 @@ usage() {
 Usage: . $PROG [-n | --dry-run]
          $PROG [<option>]... --conf-dir <dir>
          $PROG [<option>]... --kv-file <dir>
+         $PROG [<option>]... --uuid <str>
 
 Positional arguments:
   --conf-dir <dir>  Configuration directory path to read configuration
                     from or write to.
   --kv-file <kv>    Hare-Motr configuration key values file path.
+  --uuid <str>      UUID to be used to write in sysconfig file
 
 Create Consul agent configuration file.
 
@@ -48,7 +50,7 @@ EOF
 }
 
 TEMP=$(getopt --options hns: \
-              --longoptions help,dry-run,conf-dir:,kv-file: \
+              --longoptions help,dry-run,conf-dir:,kv-file:,uuid: \
               --longoptions server \
               --name "$PROG" -- "$@" || true)
 
@@ -60,6 +62,7 @@ conf_dir=/var/lib/hare
 kv_file=/var/lib/hare/consul-kv.json
 dry_run=false
 server=false
+uuid=
 
 while true; do
     case "$1" in
@@ -67,6 +70,7 @@ while true; do
         -c|--conf-dir)       conf_dir=$2; shift 2 ;;
         -k|--kv-file)        kv_file=$2; shift 2 ;;
         -s|--server)         server=true; shift ;;
+        --uuid)              uuid=$2; shift 2 ;;
         --dry-run)           dry_run=true; shift ;;
         --)                  shift; break ;;
         *)                   break ;;
@@ -75,6 +79,12 @@ done
 
 if [[ -z $conf_dir ]]; then
     conf_dir=/etc
+fi
+
+if [[ -z $uuid ]]; then
+    UUID=$(uuidgen --time)
+else
+    UUID=$uuid
 fi
 
 [[ -d $conf_dir ]] || die "'--conf-dir' argument is not a directory"
@@ -219,8 +229,6 @@ append_hax_svc() {
         ]
     }"
 }
-
-UUID=$(uuidgen --time)
 
 append_confd_svc() {
     local id=$1

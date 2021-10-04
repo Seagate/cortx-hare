@@ -36,6 +36,7 @@ class AppCtx:
     cdf_path: str
     conf_dir: str
     consul_server: bool
+    uuid: str
 
 
 def _setup_logging():
@@ -56,23 +57,36 @@ def _setup_logging():
               '-s',
               is_flag=True,
               help='Configure given node as a consul server.')
+@click.option('--uuid',
+              type=str,
+              help='UUID to be used',
+              show_default=True)
 @click.pass_context
-def parse_opts(ctx, cdf: str, conf_dir: str, consul_server: bool):
+def parse_opts(ctx, cdf: str,
+               conf_dir: str,
+               consul_server: bool,
+               uuid: str):
     """Generate Hare configuration according to the given CDF file.
 
     CDF   Full path to the Cluster Description File (CDF)."""
     ctx.ensure_object(dict)
-    ctx.obj['result'] = AppCtx(cdf_path=cdf, conf_dir=conf_dir,
-                               consul_server=consul_server)
+    ctx.obj['result'] = AppCtx(cdf_path=cdf,
+                               conf_dir=conf_dir,
+                               consul_server=consul_server,
+                               uuid=uuid)
     return ctx.obj
 
 
 class ConfGenerator:
-    def __init__(self, cdf_path: str, conf_dir: str,
-                 consul_server: bool):
+    def __init__(self,
+                 cdf_path: str,
+                 conf_dir: str,
+                 consul_server: bool,
+                 uuid: str):
         self.cdf_path = cdf_path
         self.conf_dir = conf_dir
         self.consul_server = consul_server
+        self.uuid = uuid
         self.executor = Executor()
 
     def generate(self) -> None:
@@ -153,6 +167,10 @@ class ConfGenerator:
                                   f'{self.conf_dir}/consul-kv.json']
         if self.consul_server:
             update_consul_conf_cmd.append('--server')
+
+        if self.uuid:
+            update_consul_conf_cmd.extend(['--uuid', self.uuid])
+
         self.executor.run(Program(update_consul_conf_cmd),
                           env=self._get_pythonic_env())
 
@@ -212,7 +230,10 @@ def main():
             # --help was invoked
             sys.exit(1)
         app_context = raw_ctx['result']
-        ConfGenerator(app_context.cdf_path, app_context.conf_dir).generate()
+        ConfGenerator(app_context.cdf_path,
+                      app_context.conf_dir,
+                      app_context.consul_server,
+                      app_context.uuid).generate()
     except CliException as e:
         logging.error('Exiting due to a failure: %s', e)
         logging.debug('Failed command: %s', e.cmd)
