@@ -114,6 +114,14 @@ while true ; do
     shift
 done
 
+is_systemd_enabled() {
+   if [[ `ps --no-headers -o comm 1` == systemd ]]; then
+       true
+   else
+       false
+   fi
+}
+
 # process commands
 case $cmd in
     help) usage; exit ;;
@@ -130,7 +138,9 @@ case $cmd in
         PYTHONPATH="$HARE_BASE_DIR/lib64/python3.6/site-packages:$PYTHONPATH"
         export PYTHONPATH
 
-        systemd-cat --identifier $PROG <<< "$PROG $cmd $@"
+        if $(is_systemd_enabled); then
+            systemd-cat --identifier $PROG <<< "$PROG $cmd $@"
+        fi
         exec $HARE_BASE_DIR/libexec/hare-$cmd "$@"
         ;;
     node)
@@ -150,7 +160,9 @@ case $cmd in
         PYTHONPATH="$PYTHONPATH:$CORTX_HA_PY_INCLUDES"
         export PYTHONPATH
 
-        systemd-cat --identifier $PROG <<< "$PROG $cmd $@"
+        if $(is_systemd_enabled); then
+            systemd-cat --identifier $PROG <<< "$PROG $cmd $@"
+        fi
         exec $HARE_BASE_DIR/libexec/hare-$cmd "$@"
         ;;
     *) die "Unknown command: '$cmd'" ;;
