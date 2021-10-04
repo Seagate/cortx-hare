@@ -348,10 +348,7 @@ def start(args):
 
 def start_mkfs(hostname: str, hare_config_dir: str):
     # TODO: path needs to be updated according to the new conf-store key
-    motr_config_dir = '/etc/motr'
     sysconfig_dir = '/etc/sysconfig/'
-    os.makedirs(motr_config_dir, exist_ok=True)
-    shutil.copy(f'{hare_config_dir}/confd.xc', motr_config_dir)
     src = f'{hare_config_dir}/sysconfig/motr/{hostname}'
     for file in os.listdir(src):
         shutil.copy(os.path.join(src, file), sysconfig_dir)
@@ -715,13 +712,15 @@ def save(filename: str, contents: str) -> None:
 
 
 def generate_config(url: str, path_to_cdf: str) -> None:
-    utils = Utils(ConfStoreProvider(url))
+    provider = ConfStoreProvider(url)
+    utils = Utils(provider)
     conf_dir = get_config_dir(url)
     path = os.getenv('PATH')
     if path:
         path += os.pathsep + '/opt/seagate/cortx/hare/bin/'
     python_path = os.pathsep.join(sys.path)
-    cmd = ['configure', '-c', conf_dir, path_to_cdf]
+    cmd = ['configure', '-c', conf_dir, path_to_cdf,
+           '--uuid', provider.get_machine_id()]
     execute(cmd, env={'PYTHONPATH': python_path, 'PATH': path,
                       'LC_ALL': "en_US.utf-8", 'LANG': "en_US.utf-8"})
     utils.copy_conf_files(conf_dir)

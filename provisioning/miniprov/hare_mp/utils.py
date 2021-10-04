@@ -144,6 +144,10 @@ class Utils:
         copy_tree(f'{conf_dir_path}/sysconfig/s3/{node_name}', dest_s3)
         copy_tree(f'{conf_dir_path}/sysconfig/motr/{node_name}', dest_motr)
 
+        shutil.copyfile(
+            f'{conf_dir_path}/confd.xc',
+            f'{dest_motr}/confd.xc')
+
     def copy_consul_files(self, conf_dir_path: str):
         shutil.copyfile(
             f'{conf_dir_path}/consul-server-conf/consul-server-conf.json',
