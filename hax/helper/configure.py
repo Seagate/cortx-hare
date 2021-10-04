@@ -35,6 +35,7 @@ class AppCtx:
     """
     cdf_path: str
     conf_dir: str
+    consul_server: bool
 
 
 def _setup_logging():
@@ -51,20 +52,27 @@ def _setup_logging():
               help='Target folder where Hare-related configuration will '
               'be written to.',
               show_default=True)
+@click.option('--consul-server',
+              '-s',
+              is_flag=True,
+              help='Configure given node as a consul server.')
 @click.pass_context
-def parse_opts(ctx, cdf: str, conf_dir: str):
+def parse_opts(ctx, cdf: str, conf_dir: str, consul_server: bool):
     """Generate Hare configuration according to the given CDF file.
 
     CDF   Full path to the Cluster Description File (CDF)."""
     ctx.ensure_object(dict)
-    ctx.obj['result'] = AppCtx(cdf_path=cdf, conf_dir=conf_dir)
+    ctx.obj['result'] = AppCtx(cdf_path=cdf, conf_dir=conf_dir,
+                               consul_server=consul_server)
     return ctx.obj
 
 
 class ConfGenerator:
-    def __init__(self, cdf_path: str, conf_dir: str):
+    def __init__(self, cdf_path: str, conf_dir: str,
+                 consul_server: bool):
         self.cdf_path = cdf_path
         self.conf_dir = conf_dir
+        self.consul_server = consul_server
         self.executor = Executor()
 
     def generate(self) -> None:
@@ -128,17 +136,24 @@ class ConfGenerator:
                 continue
             join_peers_opt += ['--join', ip]
 
-        self.executor.run(Program([
-            'mk-consul-env', '--mode', 'server', '--bind', join_ip,
-            *join_peers_opt, '--extra-options', '-ui -bootstrap-expect 1',
-            '--conf-dir', f'{self.conf_dir}'
-        ]),
+        mk_consul_env_cmd = ['mk-consul-env', '--bind',
+                             join_ip, *join_peers_opt, '--extra-options',
+                             '-ui -bootstrap-expect 1', '--conf-dir',
+                             f'{self.conf_dir}']
+        if self.consul_server:
+            mk_consul_env_cmd.extend(['--mode', 'server'])
+        else:
+            mk_consul_env_cmd.extend(['--mode', 'client'])
+
+        self.executor.run(Program(mk_consul_env_cmd),
                           env=self._get_pythonic_env())
 
-        self.executor.run(Program([
-            'update-consul-conf', '--conf-dir', f'{self.conf_dir}',
-            '--kv-file', f'{self.conf_dir}/consul-kv.json'
-        ]),
+        update_consul_conf_cmd = ['update-consul-conf', '--conf-dir',
+                                  f'{self.conf_dir}', '--kv-file',
+                                  f'{self.conf_dir}/consul-kv.json']
+        if self.consul_server:
+            update_consul_conf_cmd.append('--server')
+        self.executor.run(Program(update_consul_conf_cmd),
                           env=self._get_pythonic_env())
 
     def _create_node_name(self, consul_agents_file: str) -> str:

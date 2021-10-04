@@ -43,11 +43,13 @@ Create Consul agent configuration file.
 
   -n, --dry-run   Do not create configuration file, only export variables
                   and function definitions.
+  -s, --server    Configure Consul server, by default configure Consul client.
 EOF
 }
 
-TEMP=$(getopt --options hn: \
+TEMP=$(getopt --options hns: \
               --longoptions help,dry-run,conf-dir:,kv-file: \
+              --longoptions server \
               --name "$PROG" -- "$@" || true)
 
 (($? == 0)) || { usage >&2; exit 1; }
@@ -57,12 +59,14 @@ eval set -- "$TEMP"
 conf_dir=/var/lib/hare
 kv_file=/var/lib/hare/consul-kv.json
 dry_run=false
+server=false
 
 while true; do
     case "$1" in
         -h|--help)           usage; exit ;;
         -c|--conf-dir)       conf_dir=$2; shift 2 ;;
         -k|--kv-file)        kv_file=$2; shift 2 ;;
+        -s|--server)         server=true; shift ;;
         --dry-run)           dry_run=true; shift ;;
         --)                  shift; break ;;
         *)                   break ;;
@@ -184,7 +188,7 @@ fi
 mkdir -p $conf_dir/consul-server-conf/
 mkdir -p $conf_dir/consul-client-conf/
 
-if [[ $CONFD_IDs ]]; then
+if $server; then
     CONF_FILE=$conf_dir/consul-server-conf/consul-server-conf.json
 else
     CONF_FILE=$conf_dir/consul-client-conf/consul-client-conf.json
