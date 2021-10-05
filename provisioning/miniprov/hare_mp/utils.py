@@ -148,10 +148,10 @@ class Utils:
             f'{conf_dir_path}/confd.xc',
             f'{dest_motr}/confd.xc')
 
-    def copy_consul_files(self, conf_dir_path: str):
+    def copy_consul_files(self, conf_dir_path: str, mode: str):
         shutil.copyfile(
-            f'{conf_dir_path}/consul-server-conf/consul-server-conf.json',
-            f'{conf_dir_path}/consul/config/consul-server-conf.json')
+            f'{conf_dir_path}/consul-{mode}-conf/consul-{mode}-conf.json',
+            f'{conf_dir_path}/consul/config/consul-{mode}-conf.json')
 
     def stop_hare(self):
         self.hare_stop = True
