@@ -2,6 +2,11 @@
   "enable_local_script_checks": true,
   "watches": [
     {
+      "type": "key",
+      "key": "leader",
+      "args": [ "/opt/seagate/cortx/hare/libexec/elect-rc-leader", "--conf-dir", "TMP_CONF_DIR" ]
+    },
+    {
       "type": "service",
       "service": "ios",
       "handler_type": "http",

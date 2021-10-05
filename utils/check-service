@@ -33,6 +33,7 @@ Options:
   -s, --svc svc   Check another service specified as svc.
   -p, --port port Check service liveness by sending request to
                   the given port.
+  -c, --conf-dir  Configuration directory path.
   -h, --help      Show this help.
 EOF
 }
@@ -40,9 +41,10 @@ EOF
 fid=
 hax=
 svc=
+conf_dir=
 
-TEMP=$(getopt --options hxf:s:p: \
-              --longoptions help,hax,fid:,svc:,port: \
+TEMP=$(getopt --options hxf:s:p:c: \
+              --longoptions help,hax,fid:,svc:,port:,conf-dir: \
               --name "$prog" -- "$@" || true)
 
 (($? == 0)) || { usage >&2; exit 1; }
@@ -51,12 +53,13 @@ eval set -- "$TEMP"
 
 while true ; do
     case "$1" in
-        -h|--help)   usage; exit ;;
-        -x|--hax)    hax=yes; shift 1 ;;
-        -f|--fid)    fid=$2; shift 2 ;;
-        -s|--svc)    svc=$2; shift 2 ;;
-        -p|--port)   port=$2; shift 2 ;;
-        --)          shift; break ;;
+        -h|--help)       usage; exit ;;
+        -x|--hax)        hax=yes; shift 1 ;;
+        -f|--fid)        fid=$2; shift 2 ;;
+        -s|--svc)        svc=$2; shift 2 ;;
+        -p|--port)       port=$2; shift 2 ;;
+        -c|--conf-dir)   conf_dir=$2; shift 2 ;;
+        --)              shift; break ;;
         *)           echo 'getopt: internal error...'; exit 1 ;;
     esac
 done
@@ -79,7 +82,7 @@ declare -A status=(
 )
 
 get_node_name() {
-    /opt/seagate/cortx/hare/libexec/node-name
+    /opt/seagate/cortx/hare/libexec/node-name --conf-dir $conf_dir
 }
 
 # Convert fid to decimal service id (used in Consul):
