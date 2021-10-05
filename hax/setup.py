@@ -41,7 +41,7 @@ class MypyCmd(Command):
         pass
 
     def run(self):
-        report, errors, exit_code = api.run(['hax'])
+        report, errors, exit_code = api.run(['hax', 'helper'])
 
         if report:
             self.announce(report, level=INFO)

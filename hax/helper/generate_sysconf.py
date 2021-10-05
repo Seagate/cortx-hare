@@ -17,23 +17,23 @@
 #
 # Module for Hare to create motr and s3server environment files.
 
-from typing import Any, Dict, List, NamedTuple, Optional, Union
-from hax.util import repeat_if_fails, KVAdapter
-from hax.types import Fid, ObjT
+import fileinput
 import logging
 import os
 import re
-from helper.exec import Executor, Program
+from typing import Any, Dict, List, NamedTuple, Optional, Union, cast
+
 import simplejson
-import fileinput
+from hax.types import Fid, ObjT
+from hax.util import KVAdapter, repeat_if_fails
+
+from helper.exec import Executor, Program
 
 
 def reload_consul():
     executor = Executor()
     logging.debug('Reloading consul')
-    executor.run(Program([
-        'consul', 'reload'
-    ]))
+    executor.run(Program(['consul', 'reload']))
 
 
 class Service(NamedTuple):
@@ -48,7 +48,6 @@ class KVFile:
     """
     Helper class to fetch data from Hare-Motr configuration key values file.
     """
-
     def __init__(self, kv_file: str, node: str) -> None:
         self.kv_file = kv_file
         self.kv_data = self._read_file()
@@ -57,7 +56,7 @@ class KVFile:
     def _read_file(self) -> List[Dict[str, Any]]:
         with open(self.kv_file) as consul_kv_file:
             data = simplejson.load(consul_kv_file)
-        return data
+        return cast(List[Dict[str, Any]], data)
 
     def get_service_ids(self, svc_name: str) -> List[str]:
         """
@@ -92,7 +91,7 @@ class KVFile:
             match_result = re.match(regex, key['key'])
             if not match_result:
                 continue
-            return key['value']
+            return cast(str, key['value'])
         return None
 
     def get_ios_meta_data(self, proc_id: str) -> Optional[str]:
@@ -109,7 +108,7 @@ class KVFile:
             match_result = re.match(regex, key['key'])
             if not match_result:
                 continue
-            return key['value']
+            return cast(str, key['value'])
         return None
 
     def get_profile_fid(self) -> Optional[str]:
@@ -118,7 +117,7 @@ class KVFile:
             match_result = re.match(regex, key['key'])
             if not match_result:
                 continue
-            return key['key'].split('/')[-1]
+            return cast(str, key['key'].split('/')[-1])
         return None
 
 
@@ -126,7 +125,6 @@ class ConsulKV:
     """
     Helper class to fetch data from consul kv.
     """
-
     def __init__(self, node: str) -> None:
         self.kv = KVAdapter()
         self.node = node
@@ -164,7 +162,7 @@ class ConsulKV:
         key = self.kv.kv_get(
             f'm0conf/nodes/{self.node}/processes/{proc_id}/endpoint')
         if key:
-            return key['Value'].decode("utf-8")
+            return cast(bytes, key['Value']).decode("utf-8")
         return None
 
     @repeat_if_fails()
@@ -179,7 +177,7 @@ class ConsulKV:
         key = self.kv.kv_get(
             f'm0conf/nodes/{self.node}/processes/{proc_id}/meta_data')
         if key:
-            return key['Value'].decode("utf-8")
+            return cast(bytes, key['Value']).decode("utf-8")
         return None
 
     @repeat_if_fails()
@@ -187,7 +185,7 @@ class ConsulKV:
         profile_key = self.kv.kv_get('m0conf/profiles/', keys=True)
         assert profile_key
         # Get the first profile fid
-        return profile_key[0].split('/')[-1]
+        return cast(str, profile_key[0].split('/')[-1])
 
 
 class Generator:
@@ -195,8 +193,9 @@ class Generator:
     Generates system configuration files for consul-agent, motr and
     s3 services.
     """
-
-    def __init__(self, node: str, hare_conf_dir: str,
+    def __init__(self,
+                 node: str,
+                 hare_conf_dir: str,
                  kv_file: Optional[str] = None):
         # Based on the kv_file input, we choose whether to fetch data from
         # kv file or consul kv.
@@ -222,8 +221,7 @@ class Generator:
                     f"MOTR_HA_EP='{hax_ep}'\n"
                     f"MOTR_PROCESS_FID='{fid}'\n"
                     f"MOTR_CONF_XC='{motr_conf_dir}/confd.xc'\n")
-        self._write_file(motr_conf_dir + self.sysconf_dir + filename,
-                         contents)
+        self._write_file(motr_conf_dir + self.sysconf_dir + filename, contents)
 
     def generate_ios(self, svc_id: str, hax_ep: str, motr_conf_dir: str):
         fid = Fid(ObjT.PROCESS.value, int(svc_id))
@@ -235,8 +233,7 @@ class Generator:
                     f"MOTR_PROCESS_FID='{fid}'\n")
         if meta_data:
             contents += f'MOTR_BE_SEG_PATH={meta_data}\n'
-        self._write_file(motr_conf_dir + self.sysconf_dir + filename,
-                         contents)
+        self._write_file(motr_conf_dir + self.sysconf_dir + filename, contents)
 
     def generate_s3(self, svc_id: str, hax_ep: str, s3_port: int,
                     s3_conf_dir: str):
@@ -249,10 +246,13 @@ class Generator:
                     f"MOTR_HA_EP='{hax_ep}'\n"
                     f"MOTR_PROCESS_FID='{fid}'\n"
                     f"MOTR_S3SERVER_PORT={s3_port}\n")
-        self._write_file(s3_conf_dir + self.sysconf_dir + filename,
-                         contents)
+        self._write_file(s3_conf_dir + self.sysconf_dir + filename, contents)
 
-    def generate_sysconfig(self, motr_conf_dir: str, s3_conf_dir: str, ):
+    def generate_sysconfig(
+        self,
+        motr_conf_dir: str,
+        s3_conf_dir: str,
+    ):
         s3_port = 28071
 
         IDs = self.get_all_svc_ids()
@@ -290,8 +290,8 @@ class Generator:
         with fileinput.FileInput(conf_file, inplace=True,
                                  backup='.bak') as file:
             for line in file:
-                print(line.replace('http://localhost',
-                                   f'http://{ipaddr}'), end='')
+                print(line.replace('http://localhost', f'http://{ipaddr}'),
+                      end='')
 
     def get_service_addr(self, ep: str) -> str:
         return ep.rsplit('@', 1)[0]
@@ -320,7 +320,10 @@ class Generator:
             fid = Fid(ObjT.PROCESS.value, int(svc_id))
             s3svc = 's3server@' + str(fid)
             checks['args'].extend(['--svc', s3svc])
-        return Service(id=svc_id, name=name, address=addr, port=port,
+        return Service(id=svc_id,
+                       name=name,
+                       address=addr,
+                       port=port,
                        checks=[checks])
 
     def update_consul_conf(self):
@@ -373,5 +376,4 @@ class Generator:
             'ios': IDs['IOS_IDs'],
             's3': IDs['S3_IDs']
         }
-        return [str(Fid(ObjT.PROCESS.value, int(x)))
-                for x in id_map[svc_name]]
+        return [str(Fid(ObjT.PROCESS.value, int(x))) for x in id_map[svc_name]]
