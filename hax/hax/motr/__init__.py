@@ -19,7 +19,7 @@
 import ctypes as c
 import logging
 from errno import EAGAIN
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Type, Union
 
 from hax.exception import ConfdQuorumException, RepairRebalanceException
 from hax.message import (EntrypointRequest, FirstEntrypointRequest,
@@ -137,6 +137,10 @@ class Motr:
                                                    str(process_fid)) +
                   ' The request will be processed in another thread.')
         try:
+            LOG.debug('enqueue entrypoint request for %s', remote_rpc_endpoint)
+            EP = Type[EntrypointRequest]
+            FEP = Type[FirstEntrypointRequest]
+            entrypoint_type: Union[EP, FEP] = EntrypointRequest
             if (is_first_request
                     and (not self.consul_util.is_proc_client(process_fid))):
                 # This is the first start of this process or the process has
@@ -150,34 +154,19 @@ class Motr:
                 # anyway detect the failure and report the same so we exclude
                 # reporting the same during their first entrypoint request.
                 # But we need to do it for motr server processes.
-                self.planner.add_command(
-                    FirstEntrypointRequest(
-                        reply_context=reply_context,
-                        req_id=req_id,
-                        remote_rpc_endpoint=remote_rpc_endpoint,
-                        process_fid=process_fid,
-                        git_rev=git_rev,
-                        pid=pid,
-                        is_first_request=is_first_request))
-                return
+                entrypoint_type = FirstEntrypointRequest
+
+            self.planner.add_command(
+                entrypoint_type(
+                    reply_context=reply_context,
+                    req_id=req_id,
+                    remote_rpc_endpoint=remote_rpc_endpoint,
+                    process_fid=process_fid,
+                    git_rev=git_rev,
+                    pid=pid,
+                    is_first_request=is_first_request))
         except Exception:
             LOG.exception('Failed to notify failure for %s', process_fid)
-
-        LOG.debug('enqueue entrypoint request for %s', remote_rpc_endpoint)
-        entrypoint_req: EntrypointRequest = EntrypointRequest(
-            reply_context=reply_context,
-            req_id=req_id,
-            remote_rpc_endpoint=remote_rpc_endpoint,
-            process_fid=process_fid,
-            git_rev=git_rev,
-            pid=pid,
-            is_first_request=is_first_request)
-
-        # If rconfc from motr land sends an entrypoint request when
-        # the hax consumer thread is already stopping, there's no
-        # point in en-queueing the request as there's no one to process
-        # the same. Thus, invoke send_entrypoint_reply directly.
-        self.send_entrypoint_request_reply(entrypoint_req)
 
     def send_entrypoint_request_reply(self, message: EntrypointRequest):
         reply_context = message.reply_context
