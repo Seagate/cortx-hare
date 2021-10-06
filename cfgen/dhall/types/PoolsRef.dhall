@@ -18,6 +18,7 @@
 
 -}
 
-{ name : Text
+{ create_aux : Optional Bool
+, name : Text
 , pools : List Text
 }

@@ -2277,7 +2277,8 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
                             disks.append(DiskRef(path=d,
                                                  node=node['hostname']))
 
-            aux_pool_list(pool, disks, conf)
+            if cluster_desc.get('create_aux'):
+                aux_pool_list(pool, disks, conf)
         else:
             ConfPool.build(conf, root_id, pool)
 
