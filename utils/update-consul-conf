@@ -108,11 +108,14 @@ get_service_ep() {
     consul kv get m0conf/nodes/$(get_node_name)/processes/$process_fidk/endpoint
 }
 
-get_ios_meta_data() {
+get_ios_meta_data_from_kv_file() {
     local process_fidk=$1
-    consul kv export \
-           m0conf/nodes/$(get_node_name)/processes/$process_fidk/meta_data |
-        jq -r '.[].value | @base64d'
+    local key="m0conf/nodes/$(get_node_name)/processes/$process_fidk/meta_data"
+
+    local cmd="jq -r '.[] | select(.key==\"$key\") |
+                  .value' $kv_file | head -n 1"
+
+    eval $cmd || true
 }
 
 get_service_ids_from_kv_file() {
@@ -268,7 +271,7 @@ append_ios_svc() {
     local ep=$(get_service_ep_from_kv_file $id)
     local addr=$(get_service_addr $ep)
     local port=$(get_service_port $ep)
-    local meta_data=$(get_ios_meta_data $id)
+    local meta_data=$(get_ios_meta_data_from_kv_file $id)
     SVCS_CONF+="${SVCS_CONF:+,}{
       \"id\": \"$id\",
       \"name\": \"ios\",
