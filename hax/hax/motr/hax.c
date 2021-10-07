@@ -119,6 +119,17 @@ static void entrypoint_request_cb(struct m0_halon_interface *hi,
 				  bool first_request)
 {
 	struct hax_entrypoint_request *ep;
+	struct hax_link               *hxl;
+
+	M0_ALLOC_PTR(hxl);
+	M0_ASSERT(hxl != NULL);
+	hxl->hxl_req_id = *req_id;
+	hxl->hxl_ep_addr[0] = '\0';
+	strncat(hxl->hxl_ep_addr, remote_rpc_endpoint, EP_ADDR_BUF_SIZE - 1);
+
+	hax_lock(hc0);
+	hx_links_tlink_init_at_tail(hxl, &hc0->hc_links);
+	hax_unlock(hc0);
 
 	/*
 	 * XXX This is obligatory since we want to work with Python object
@@ -568,15 +579,12 @@ static void link_connected_cb(struct m0_halon_interface *hi,
 {
 	struct hax_link *hxl;
 
-	M0_ALLOC_PTR(hxl);
-	if (hxl == NULL) {
-		M0_LOG(M0_ERROR, "Cannot allocate hax_link");
-		return;
-	}
+	hax_lock(hc0);
+	hxl = m0_tl_find(hx_links, l, &hc0->hc_links,
+			 m0_uint128_eq(&l->hxl_req_id, req_id));
+	M0_ASSERT(hxl != NULL);
 	hxl->hxl_link = link;
 	hxl->hxl_is_active = true;
-	hax_lock(hc0);
-	hx_links_tlink_init_at_tail(hxl, &hc0->hc_links);
 	hax_unlock(hc0);
 }
 
@@ -594,39 +602,31 @@ static void link_absent_cb(struct m0_halon_interface *hi,
 }
 
 static void link_is_disconnecting_cb(struct m0_halon_interface *hi,
-				     struct m0_ha_link *hl)
+				     struct m0_ha_link *link)
 {
-	M0_LOG(M0_DEBUG, "disconnecting ha link to %s",
-		m0_rpc_conn_addr(&hl->hln_rpc_link.rlk_conn));
-	m0_halon_interface_disconnect(hi, hl);
+	struct hax_link *hxl;
+
+	hax_lock(hc0);
+	hxl = m0_tl_find(hx_links, l, &hc0->hc_links, l->hxl_link == link);
+	M0_ASSERT(hxl != NULL);
+	M0_LOG(M0_DEBUG, "link=%p addr=%s", hxl, (const char*)hxl->hxl_ep_addr);
+	hax_unlock(hc0);
+
+	m0_halon_interface_disconnect(hi, link);
 }
 
 static void link_disconnected_cb(struct m0_halon_interface *hi,
 				 struct m0_ha_link *link)
 {
-	struct hax_link *hxl_out = NULL;
 	struct hax_link *hxl;
-	const char *hxl_ep;
-	const char *hl_ep;
 
-	M0_LOG(M0_DEBUG, "disconnected ha link to %s",
-		m0_rpc_conn_addr(&link->hln_rpc_link.rlk_conn));
 	hax_lock(hc0);
-	m0_tl_for(hx_links, &hc0->hc_links, hxl) {
-		hxl_ep = m0_rpc_conn_addr(&hxl->hxl_link->hln_rpc_link.rlk_conn);
-                hl_ep = m0_rpc_conn_addr(&link->hln_rpc_link.rlk_conn);
-		if (m0_streq(hxl_ep, hl_ep)) {
-			hxl_out = hxl;
-			break;
-		}
-	} m0_tl_endfor;
-
-	M0_LOG(M0_DEBUG, "found %p link hxl_link for %s",
-		hxl_out,
-		m0_rpc_conn_addr(&hxl_out->hxl_link->hln_rpc_link.rlk_conn));
-	if (hxl_out != NULL) {
-		hx_links_tlink_del_fini(hxl_out);
-		m0_free(hxl_out);
+	hxl = m0_tl_find(hx_links, l, &hc0->hc_links, l->hxl_link == link);
+	if (hxl != NULL) {
+		M0_LOG(M0_DEBUG, "link=%p addr=%s", hxl,
+		       (const char*)hxl->hxl_ep_addr);
+		hx_links_tlink_del_fini(hxl);
+		m0_free(hxl);
 	}
 	hax_unlock(hc0);
 }
@@ -823,7 +823,6 @@ PyObject* m0_hax_stop(unsigned long long ctx, const struct m0_fid *process_fid,
 	struct hax_context *hc = (struct hax_context *)ctx;
 	struct m0_halon_interface *hi = hc->hc_hi;
 	struct hax_link *hxl;
-        const char *ep;
 	uint64_t tag;
 
 	M0_ALLOC_PTR(msg);
@@ -849,8 +848,7 @@ PyObject* m0_hax_stop(unsigned long long ctx, const struct m0_fid *process_fid,
 	m0_tl_for(hx_links, &hc->hc_links, hxl) {
 		if (!hxl->hxl_is_active)
 			continue;
-		ep = m0_rpc_conn_addr(&hxl->hxl_link->hln_rpc_link.rlk_conn);
-		if (m0_streq(ep, hax_endpoint)) {
+		if (m0_streq(hxl->hxl_ep_addr, hax_endpoint)) {
 			Py_BEGIN_ALLOW_THREADS
 			m0_halon_interface_send(hi, hxl->hxl_link, msg, &tag);
 			Py_END_ALLOW_THREADS
@@ -872,13 +870,10 @@ void m0_hax_link_stopped(unsigned long long ctx, const char *proc_ep)
 {
 	struct hax_context *hc = (struct hax_context *)ctx;
 	struct hax_link *hxl;
-        const char *hl_ep;
 
 	m0_tl_for(hx_links, &hc->hc_links, hxl) {
-		hl_ep = m0_rpc_conn_addr(&hxl->hxl_link->hln_rpc_link.rlk_conn);
-		if (m0_streq(proc_ep, hl_ep)) {
+		if (m0_streq(proc_ep, hxl->hxl_ep_addr))
 			hxl->hxl_is_active = false;
-		}
 	} m0_tl_endfor;
 }
 
