@@ -153,6 +153,7 @@ class ShowSchema(argparse.Action):
         print("""\
 # Cluster Description is a YAML file with the following schema:
 ---  # start of the document (optional)
+create_aux: <bool>    # optional, defaults to false if not present in CDF
 nodes:
   - hostname: <str>    # [user@]hostname; e.g., localhost, pod-c1
     data_iface: <str>  # name of network interface; e.g., eth1, eth1:c1
@@ -1257,7 +1258,8 @@ def cluster_svcs(m0conf: Dict[Oid, Any], svc_t) -> List[Oid]:
 
 
 def pool_drives(m0conf: Dict[Oid, Any],
-                pool_desc: Dict[str, Any]) -> List[Oid]:
+                pool_desc: Dict[str, Any],
+                cluster_desc: Dict[str, Any]) -> List[Oid]:
     ptype = pool_type(pool_desc)
 
     if ptype is PoolT.dix:
@@ -1308,6 +1310,20 @@ def pool_drives(m0conf: Dict[Oid, Any],
     for drive_id, node_id in drives:
         if m0conf[drive_id].pvers:  # already assigned to some pool
             over_referenced.setdefault(node_id, []).append(drive_id)
+
+    # This optional variable added in CDF file to enable/disable aux pool
+    # generation. It defaults to false(i.e. do not generate any aux pools)
+    create_aux_val = cluster_desc.get('create_aux')
+    if not create_aux_val:
+        if over_referenced:
+            err = '{} referred to by several pools:'.format(
+                'This disk is' if len(over_referenced) == 1 else
+                'These disks are')
+            for node_id in sorted(over_referenced):
+                err += '\n  ' + m0conf[node_id].name
+                for drive_id in sorted(over_referenced[node_id]):
+                    err += '\n   \\_ ' + m0conf[m0conf[drive_id].sdev].filename
+            raise AssertionError(err)
 
     return [drive_id for drive_id, _ in drives]
 
@@ -1395,7 +1411,8 @@ class ConfPool(ToDhall):
 
     @classmethod
     def gen_sns_tolerance(cls, m0conf: Dict[Oid, Any],
-                          pool_desc: Dict[str, Any]) -> Failures:
+                          pool_desc: Dict[str, Any],
+                          cluster_desc: Dict[str, Any]) -> Failures:
         encls_nr = len(cluster_encls(m0conf, SvcT.M0_CST_IOS))
         ctrls_per_encl = floor(len(cluster_ctrls(m0conf)) / encls_nr)
         data_units = pool_desc['data_units']
@@ -1404,7 +1421,7 @@ class ConfPool(ToDhall):
         total_units = data_units + parity_units + spare_units
         fault_tol_info = drives_per_node_and_ctrl(m0conf)
         min_pool_width = fault_tol_info.min_drives_per_node * encls_nr
-        actual_pool_width = len(pool_drives(m0conf, pool_desc))
+        actual_pool_width = len(pool_drives(m0conf, pool_desc, cluster_desc))
         if ((min_pool_width < actual_pool_width) and
                 (min_pool_width / total_units) > 0):
             # Pool is asymmetric, all the nodes don't have same number of
@@ -1435,7 +1452,8 @@ class ConfPool(ToDhall):
 
     @classmethod
     def build(cls, m0conf: Dict[Oid, Any], parent: Oid,
-              pool_desc: Dict[str, Any]) -> Oid:
+              pool_desc: Dict[str, Any],
+              cluster_desc: Dict[str, Any]) -> Oid:
         assert parent.type is ObjT.root
 
         pool_id = new_oid(ObjT.pool)
@@ -1450,7 +1468,7 @@ class ConfPool(ToDhall):
         if spare_units is None:
             spare_units = pool_desc.get('parity_units')
 
-        drives = pool_drives(m0conf, pool_desc)
+        drives = pool_drives(m0conf, pool_desc, cluster_desc)
         t = pool_type(pool_desc)
         assert ('data_units' in pool_desc) == ('parity_units' in pool_desc)
         if 'data_units' in pool_desc:
@@ -1482,7 +1500,8 @@ class ConfPool(ToDhall):
                 if t == PoolT.dix:
                     tolerance = ConfPool.gen_md_tolerance(m0conf, pool_desc)
                 else:
-                    tolerance = ConfPool.gen_sns_tolerance(m0conf, pool_desc)
+                    tolerance = ConfPool.gen_sns_tolerance(m0conf, pool_desc,
+                                                           cluster_desc)
         else:
             tolerance = ConfPool.gen_md_tolerance(m0conf, pool_desc)
 
@@ -2114,7 +2133,8 @@ def get_pool_diskrefs(pool_desc: Dict[str, Any]):
 
 def aux_pool_list(pool_desc: Dict[str, Any],
                   disks: List[DiskRef],
-                  m0conf: Dict[Oid, Any]) -> None:
+                  m0conf: Dict[Oid, Any],
+                  cluster_desc: Dict[str, Any]) -> None:
     pool = pool_desc
 
     # Example of encl_ref_combination :
@@ -2161,7 +2181,7 @@ def aux_pool_list(pool_desc: Dict[str, Any],
         tolerance = Failures(d['site'], d['rack'], d['encl'],
                              d['ctrl'], d['disk'])
     else:
-        tolerance = ConfPool.gen_sns_tolerance(m0conf, pool)
+        tolerance = ConfPool.gen_sns_tolerance(m0conf, pool, cluster_desc)
     # Generate the node combinations considering node failures as
     # allowed by node tolerance values
     temp_pool_nodes = []
@@ -2259,47 +2279,55 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
                         other_clients[node['hostname']] = []
                     other_clients[node['hostname']].append((node_id, proc_id))
 
-    for pool in cluster_desc['pools']:
-        pool_t = pool_type(pool)
-        if pool_t == PoolT.sns:
-            # For SNS pools create the aux pool list
-            disks: List[DiskRef] = []
-            # We need to generate disk_refs only if it is not present
-            # in pool description
-            if not get_pool_diskrefs(pool):
-                for node in cluster_desc['nodes']:
-                    if not node.get('m0_servers'):
-                        continue
-                    for m0d in node['m0_servers']:
-                        if m0d['runs_confd']:
+    create_aux_val = cluster_desc.get('create_aux')
+    if not create_aux_val:
+        for pool in cluster_desc['pools']:
+            ConfPool.build(conf, root_id, pool, cluster_desc)
+    else:
+        for pool in cluster_desc['pools']:
+            pool_t = pool_type(pool)
+            if pool_t == PoolT.sns:
+                # For SNS pools create the aux pool list
+                disks: List[DiskRef] = []
+                # We need to generate disk_refs only if it is not present
+                # in pool description
+                if not get_pool_diskrefs(pool):
+                    for node in cluster_desc['nodes']:
+                        if not node.get('m0_servers'):
                             continue
-                        for d in m0d['io_disks']['data']:
-                            disks.append(DiskRef(path=d,
-                                                 node=node['hostname']))
+                        for m0d in node['m0_servers']:
+                            if m0d['runs_confd']:
+                                continue
+                            for d in m0d['io_disks']['data']:
+                                disks.append(DiskRef(path=d,
+                                                     node=node['hostname']))
 
-            aux_pool_list(pool, disks, conf)
-        else:
-            ConfPool.build(conf, root_id, pool)
+                aux_pool_list(pool, disks, conf, cluster_desc)
+            else:
+                ConfPool.build(conf, root_id, pool, cluster_desc)
 
-    for pool in itertools.chain(cluster_desc['pools'],
-                                *aux_pools.values()):
-        pool_t = pool_type(pool)
-        if pool_t == PoolT.sns:
-            ConfPool.build(conf, root_id, pool)
+        for pool in itertools.chain(cluster_desc['pools'],
+                                    *aux_pools.values()):
+            pool_t = pool_type(pool)
+            if pool_t == PoolT.sns:
+                ConfPool.build(conf, root_id, pool, cluster_desc)
 
     if conf[root_id].imeta_pver is None:  # no DIX pool defined in the CDF
-        ConfPool.build(conf, root_id, {'type': 'dix'})
+        ConfPool.build(conf, root_id, {'type': 'dix'}, cluster_desc)
 
     if conf[root_id].mdpool is None:  # no Metadata pool defined in the CDF
-        ConfPool.build(conf, root_id, {'type': 'md'})
+        ConfPool.build(conf, root_id, {'type': 'md'}, cluster_desc)
 
     conf[root_id].mdredundancy = len(cluster_encls(conf, SvcT.M0_CST_IOS))
 
     for prof in cluster_desc['profiles']:
-        prof['pools'] += [aux_pool['name']
-                          for pool_name in prof['pools']
-                          for aux_pool in aux_pools.get(pool_name, [])]
-        ConfProfile.build(conf, root_id, prof)
+        if not create_aux_val:
+            ConfProfile.build(conf, root_id, prof)
+        else:
+            prof['pools'] += [aux_pool['name']
+                              for pool_name in prof['pools']
+                              for aux_pool in aux_pools.get(pool_name, [])]
+            ConfProfile.build(conf, root_id, prof)
 
     if 'fdmi_filters' in cluster_desc:
         if cluster_desc['fdmi_filters'] is not None:
