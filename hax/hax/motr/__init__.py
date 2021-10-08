@@ -173,7 +173,6 @@ class Motr:
             git_rev=git_rev,
             pid=pid,
             is_first_request=is_first_request)
-
         # If rconfc from motr land sends an entrypoint request when
         # the hax consumer thread is already stopping, there's no
         # point in en-queueing the request as there's no one to process
@@ -373,8 +372,8 @@ class Motr:
                   len(event.nvec))
         notes: List[HaNoteStruct] = []
         for n in event.nvec:
-            n.note.no_state = self.consul_util.get_conf_obj_status(
-                ObjT[n.obj_t], n.note.no_id.f_key, kv_cache=kv_cache)
+            n.note.no_state = self.consul_util.get_conf_obj_status_online(
+                ObjT[n.obj_t], n.note.no_id.f_key)
             notes.append(n.note)
 
         LOG.debug('Replying ha nvec of length ' + str(len(event.nvec)))
