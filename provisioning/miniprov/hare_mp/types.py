@@ -154,6 +154,7 @@ class FdmiFilterDesc(DhallTuple):
 
 @dataclass(repr=False)
 class ClusterDesc(DhallTuple):
+    create_aux: Maybe[bool]
     node_info: List[NodeDesc]
     pool_info: List[PoolDesc]
     profile_info: List[ProfileDesc]

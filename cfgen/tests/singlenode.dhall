@@ -22,7 +22,8 @@ let Prelude = ../dhall/Prelude.dhall
 let types = ../dhall/types.dhall
 
 in
-{ nodes =
+{ create_aux = Some False
+, nodes =
     [ { hostname = "localhost"
       , data_iface = "eth1"
       , data_iface_type = None types.Protocol
