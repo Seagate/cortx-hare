@@ -30,21 +30,24 @@ Elect new RC leader
 Options:
   -h, --help            Show this help and exit.
   -c, --conf-dir        config dir where config files are present
+  -l --log-dir <dir>       Log directory path
 EOF
 }
 
 TEMP=$(getopt --options h: \
-              --longoptions help,conf-dir: \
+              --longoptions help,conf-dir:,log-dir: \
               --name "$PROG" -- "$@" || true)
 
 eval set -- "$TEMP"
 
 conf_dir=/var/lib/hare
+log_dir=/var/log/seagate/hare
 
 while true; do
     case "$1" in
         -h|--help)           usage; exit ;;
         -c|--conf-dir)       conf_dir=$2; shift 2 ;;
+        -l|--log-dir)        log_dir=$2; shift 2 ;;
         --)                  shift; break ;;
         *)                   usage; exit ;;
     esac
@@ -53,7 +56,7 @@ done
 sudo mkdir -p /var/log/seagate/hare
 
 # Redirect all printouts to the log file with the timestamp prefix:
-exec &>> /var/log/seagate/hare/consul-${0##*/}.log
+exec &>> ${log_dir}/consul-${0##*/}.log
 exec &> >(stdbuf -oL gawk '{ print strftime("%Y-%m-%d %H:%M:%S"), $0 }')
 
 export SRC_DIR="$(dirname $(readlink -f $0))"
@@ -141,5 +144,5 @@ export SID
     # XXX: notify Motr about new Principal RM here
 
     # Start EQ watch:
-    consul watch -type=keyprefix -prefix eq/ $SRC_DIR/proto-rc
+    consul watch -type=keyprefix -prefix eq/ $SRC_DIR/proto-rc --log-dir $log_dir
 ) &

@@ -35,6 +35,7 @@ class AppCtx:
     """
     cdf_path: str
     conf_dir: str
+    log_dir: str
     consul_server: bool
     uuid: str
 
@@ -53,6 +54,12 @@ def _setup_logging():
               help='Target folder where Hare-related configuration will '
               'be written to.',
               show_default=True)
+@click.option('--log-dir',
+              '-l',
+              type=str,
+              default='/var/log/seagate/hare',
+              help='Target folder where log files needs to be generated',
+              show_default=True)
 @click.option('--consul-server',
               '-s',
               is_flag=True,
@@ -64,6 +71,7 @@ def _setup_logging():
 @click.pass_context
 def parse_opts(ctx, cdf: str,
                conf_dir: str,
+               log_dir: str,
                consul_server: bool,
                uuid: str):
     """Generate Hare configuration according to the given CDF file.
@@ -72,6 +80,7 @@ def parse_opts(ctx, cdf: str,
     ctx.ensure_object(dict)
     ctx.obj['result'] = AppCtx(cdf_path=cdf,
                                conf_dir=conf_dir,
+                               log_dir=log_dir,
                                consul_server=consul_server,
                                uuid=uuid)
     return ctx.obj
@@ -81,10 +90,12 @@ class ConfGenerator:
     def __init__(self,
                  cdf_path: str,
                  conf_dir: str,
+                 log_dir: str,
                  consul_server: bool,
                  uuid: str):
         self.cdf_path = cdf_path
         self.conf_dir = conf_dir
+        self.log_dir = log_dir
         self.consul_server = consul_server
         self.uuid = uuid
         self.executor = Executor()
@@ -164,7 +175,8 @@ class ConfGenerator:
 
         update_consul_conf_cmd = ['update-consul-conf', '--conf-dir',
                                   f'{self.conf_dir}', '--kv-file',
-                                  f'{self.conf_dir}/consul-kv.json']
+                                  f'{self.conf_dir}/consul-kv.json',
+                                  '--log-dir', self.log_dir]
         if self.consul_server:
             update_consul_conf_cmd.append('--server')
 
@@ -232,6 +244,7 @@ def main():
         app_context = raw_ctx['result']
         ConfGenerator(app_context.cdf_path,
                       app_context.conf_dir,
+                      app_context.log_dir,
                       app_context.consul_server,
                       app_context.uuid).generate()
     except CliException as e:

@@ -153,8 +153,8 @@ def logrotate(url: str):
                 content = f.read()
 
             log_dir = get_log_dir(url)
-            content = content.replace('/var/log/seagate/hare/*.log',
-                                      f'{log_dir}/*.log')
+            content = content.replace('TMP_LOG_PATH',
+                                      log_dir)
 
             with open('/etc/logrotate.d/hare', 'w') as f:
                 f.write(content)
@@ -198,8 +198,9 @@ def _create_consul_namespace(hare_local_dir: str):
 def _start_consul(utils: Utils,
                   stop_event: Event,
                   hare_local_dir: str,
+                  hare_log_dir: str,
                   url: str):
-    log_dir = f'{hare_local_dir}/consul/log'
+    log_dir = hare_log_dir
     data_dir = f'{hare_local_dir}/consul/data'
     config_dir = f'{hare_local_dir}/consul/config'
 
@@ -221,15 +222,16 @@ def _start_consul(utils: Utils,
     return consul_starter
 
 
-def _start_hax(utils: Utils, stop_event: Event, hare_local_dir: str):
-    home_dir = f'{hare_local_dir}'
-    log_dir = f'{hare_local_dir}/log'
-    if not os.path.exists(home_dir):
-        os.makedirs(home_dir)
-    if not os.path.exists(log_dir):
-        os.makedirs(log_dir)
+def _start_hax(utils: Utils,
+               stop_event: Event,
+               hare_local_dir: str,
+               hare_log_dir: str) -> HaxStarter:
+    if not os.path.exists(hare_local_dir):
+        os.makedirs(hare_local_dir)
+    if not os.path.exists(hare_log_dir):
+        os.makedirs(hare_log_dir)
     hax_starter = HaxStarter(utils=utils, stop_event=stop_event,
-                             home_dir=home_dir, log_dir=log_dir)
+                             home_dir=hare_local_dir, log_dir=hare_log_dir)
     hax_starter.start()
     return hax_starter
 
@@ -277,8 +279,9 @@ def prepare(args):
     utils = Utils(ConfStoreProvider(url))
     stop_event = Event()
     conf_dir = get_config_dir(url)
+    log_dir = get_log_dir(url)
     _create_consul_namespace(conf_dir)
-    consul_starter = _start_consul(utils, stop_event, conf_dir, url)
+    consul_starter = _start_consul(utils, stop_event, conf_dir, log_dir, url)
     utils.save_node_facts()
     utils.save_drives_info()
     try:
@@ -321,13 +324,20 @@ def start_hax_with_systemd():
     execute(cmd)
 
 
+def start_crond():
+    cmd = ['/usr/sbin/crond', 'start']
+    execute(cmd)
+
+
 def start_hax_and_consul_without_systemd(url: str, utils: Utils):
     conf_dir = get_config_dir(url)
+    log_dir = get_log_dir(url)
     # Event on which hare receives a notification in case consul agent or hax
     # terminates.
     hare_stop_event = Event()
-    consul_starter = _start_consul(utils, hare_stop_event, conf_dir, url)
-    hax_starter = _start_hax(utils, hare_stop_event, conf_dir)
+    consul_starter = _start_consul(utils, hare_stop_event,
+                                   conf_dir, log_dir, url)
+    hax_starter = _start_hax(utils, hare_stop_event, conf_dir, log_dir)
     hare_stop_event.wait()
     if utils.is_hare_stopping():
         consul_starter.stop()
@@ -337,6 +347,8 @@ def start_hax_and_consul_without_systemd(url: str, utils: Utils):
 def start(args):
     url = args.config[0]
     utils = Utils(ConfStoreProvider(url))
+    logrotate(url)
+    start_crond()
     if args.systemd:
         start_hax_with_systemd()
     else:
@@ -368,12 +380,14 @@ def init(args):
         url = args.config[0]
         utils = Utils(ConfStoreProvider(url))
         stop_event = Event()
-        hare_config_dir = get_config_dir(url)
+        config_dir = get_config_dir(url)
+        log_dir = get_log_dir(url)
         # Starting consul and hax
-        consul_starter = _start_consul(utils, stop_event, hare_config_dir, url)
-        hax_starter = _start_hax(utils, stop_event, hare_config_dir)
+        consul_starter = _start_consul(utils, stop_event,
+                                       config_dir, log_dir, url)
+        hax_starter = _start_hax(utils, stop_event, config_dir, log_dir)
         hostname = utils.get_local_hostname()
-        start_mkfs(hostname, hare_config_dir)
+        start_mkfs(hostname, config_dir)
         # Stopping hax and consul
         hax_starter.stop()
         consul_starter.stop()
@@ -717,6 +731,7 @@ def generate_config(url: str, path_to_cdf: str) -> None:
         path += os.pathsep + '/opt/seagate/cortx/hare/bin/'
     python_path = os.pathsep.join(sys.path)
     cmd = ['configure', '-c', conf_dir, path_to_cdf,
+           '--log-dir', get_log_dir(url),
            '--uuid', provider.get_machine_id()]
     execute(cmd, env={'PYTHONPATH': python_path, 'PATH': path,
                       'LC_ALL': "en_US.utf-8", 'LANG': "en_US.utf-8"})
@@ -742,7 +757,9 @@ def config(args):
         utils = Utils(ConfStoreProvider(url))
         stop_event = Event()
         conf_dir = get_config_dir(url)
-        consul_starter = _start_consul(utils, stop_event, conf_dir, url)
+        log_dir = get_log_dir(url)
+        consul_starter = _start_consul(utils, stop_event,
+                                       conf_dir, log_dir, url)
         if args.file:
             filename = args.file[0]
         else:

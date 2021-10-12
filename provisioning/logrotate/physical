@@ -1,4 +1,5 @@
-/var/log/seagate/hare/*.log
+TMP_LOG_PATH/*.log
+TMP_LOG_PATH/hare_deployment/*.log
 {
     rotate 10
     maxsize 50M

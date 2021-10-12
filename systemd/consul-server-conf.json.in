@@ -5,7 +5,9 @@
     {
       "type": "key",
       "key": "leader",
-      "args": [ "/opt/seagate/cortx/hare/libexec/elect-rc-leader", "--conf-dir", "TMP_CONF_DIR" ]
+      "args": [ "/opt/seagate/cortx/hare/libexec/elect-rc-leader",
+                "--conf-dir", "TMP_CONF_DIR",
+                "--log-dir", "TMP_LOG_DIR" ]
     },
     {
       "type": "keyprefix",
@@ -30,7 +32,8 @@
     {
       "type": "service",
       "service": "confd",
-      "args": [ "/opt/seagate/cortx/hare/libexec/consul-watch-handler" ]
+      "args": [ "/opt/seagate/cortx/hare/libexec/consul-watch-handler",
+                "--log-dir", "TMP_LOG_DIR" ]
     },
     {
       "type": "service",
@@ -45,7 +48,8 @@
     {
       "type": "service",
       "service": "ios",
-      "args": [ "/opt/seagate/cortx/hare/libexec/consul-watch-handler" ]
+      "args": [ "/opt/seagate/cortx/hare/libexec/consul-watch-handler",
+                "--log-dir", "TMP_LOG_DIR" ]
     },
     {
       "type": "service",
@@ -60,7 +64,8 @@
     {
       "type": "service",
       "service": "s3service",
-      "args": [ "/opt/seagate/cortx/hare/libexec/consul-watch-handler" ]
+      "args": [ "/opt/seagate/cortx/hare/libexec/consul-watch-handler",
+                "--log-dir", "TMP_LOG_DIR" ]
     }
   ],
   "enable_local_script_checks": true,

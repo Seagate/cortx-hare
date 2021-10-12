@@ -49,8 +49,36 @@ set -eu -o pipefail
 #
 #   $ consul catalog services
 
+PROG=${0##*/}
+
+usage() {
+    cat <<EOF
+Usage: . $PROG [<option>]... --log-dir <dir>
+
+Positional arguments:
+  --log-dir <dir>  Log directory path
+EOF
+}
+
+TEMP=$(getopt --options h: \
+              --longoptions help,log-dir: \
+              --name "$PROG" -- "$@" || true)
+
+eval set -- "$TEMP"
+
+log_dir=/var/log/seagate/hare
+
+while true; do
+    case "$1" in
+        -h|--help)           usage; exit ;;
+        --log-dir)           log_dir=$2; shift 2 ;;
+        --)                  shift; break ;;
+        *)                   break ;;
+    esac
+done
+
 # Redirect all printouts to the log file with the timestamp prefix:
-exec &>> /var/log/seagate/hare/${0##*/}.log
+exec &>> ${log_dir}/${0##*/}.log
 exec &> >(stdbuf -oL gawk '{ print strftime("%Y-%m-%d %H:%M:%S"), $0 }')
 
 jq '[.[] | { "Node": .Node.Node,
