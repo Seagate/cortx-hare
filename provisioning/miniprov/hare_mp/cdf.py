@@ -237,12 +237,18 @@ class CdfGenerator:
 
     def _get_cdf_dhall(self) -> str:
         dhall_path = self._get_dhall_path()
+        conf = self.provider
         nodes = self._create_node_descriptions()
         pools = self._create_pool_descriptions()
         profiles = self._create_profile_descriptions(pools)
+        create_aux = conf.get('cluster>create_aux',
+                              allow_null=True)
+        if create_aux is None:
+            create_aux = False
 
         params_text = str(
-            ClusterDesc(node_info=DList(nodes, 'List NodeInfo'),
+            ClusterDesc(create_aux=Maybe(create_aux, 'Bool'),
+                        node_info=DList(nodes, 'List NodeInfo'),
                         pool_info=DList(pools, 'List PoolInfo'),
                         profile_info=DList(profiles, 'List ProfileInfo')))
         gencdf = Template(self._gencdf()).substitute(path=dhall_path,
