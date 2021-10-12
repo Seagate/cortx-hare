@@ -38,6 +38,7 @@ Usage: . $PROG [-n | --dry-run]
 Positional arguments:
   --conf-dir <dir>  Configuration directory path to read configuration
                     from or write to.
+  --log-dir <dir>   Log directory path
   --kv-file <kv>    Hare-Motr configuration key values file path.
   --uuid <str>      UUID to be used to write in sysconfig file
 
@@ -51,6 +52,7 @@ EOF
 
 TEMP=$(getopt --options hns: \
               --longoptions help,dry-run,conf-dir:,kv-file:,uuid: \
+              --longoptions log-dir: \
               --longoptions server \
               --name "$PROG" -- "$@" || true)
 
@@ -59,6 +61,7 @@ TEMP=$(getopt --options hns: \
 eval set -- "$TEMP"
 
 conf_dir=/var/lib/hare
+log_dir=/var/log/seagate/hare
 kv_file=/var/lib/hare/consul-kv.json
 dry_run=false
 server=false
@@ -68,6 +71,7 @@ while true; do
     case "$1" in
         -h|--help)           usage; exit ;;
         -c|--conf-dir)       conf_dir=$2; shift 2 ;;
+        -l|--log-dir)        log_dir=$2; shift 2 ;;
         -k|--kv-file)        kv_file=$2; shift 2 ;;
         -s|--server)         server=true; shift ;;
         --uuid)              uuid=$2; shift 2 ;;
@@ -209,6 +213,7 @@ fi
 
 pwdesc=$(echo $conf_dir | sed 's_/_\\/_g')
 sed -i "s/TMP_CONF_DIR/$pwdesc/" $CONF_FILE
+sed -i "s|TMP_LOG_DIR|$log_dir|" $CONF_FILE
 
 SVCS_CONF=''
 
