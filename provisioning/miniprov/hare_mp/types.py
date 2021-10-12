@@ -156,6 +156,7 @@ class ProfileDesc(DhallTuple):
 
 @dataclass(repr=False)
 class ClusterDesc(DhallTuple):
+    create_aux: Maybe[bool]
     node_info: DList[NodeDesc]
     pool_info: DList[PoolDesc]
     profile_info: DList[ProfileDesc]

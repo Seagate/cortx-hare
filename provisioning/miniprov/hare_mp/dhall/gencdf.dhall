@@ -57,7 +57,8 @@ let ProfileInfo =
       }
 
 let ClusterInfo =
-      { node_info: List NodeInfo
+      { create_aux : Optional Bool
+      , node_info: List NodeInfo
       , pool_info: List PoolInfo
       , profile_info: List ProfileInfo
       }
@@ -90,7 +91,8 @@ let toPoolDesc
 let genCdf
     : ClusterInfo -> T.ClusterDesc
     =     \(cluster_info : ClusterInfo)
-      ->  { nodes = Prelude.List.map NodeInfo T.NodeDesc toNodeDesc cluster_info.node_info
+      ->  { create_aux = cluster_info.create_aux
+          , nodes = Prelude.List.map NodeInfo T.NodeDesc toNodeDesc cluster_info.node_info
           , pools = Prelude.List.map PoolInfo T.PoolDesc toPoolDesc cluster_info.pool_info
           , profiles = Some cluster_info.profile_info
           }

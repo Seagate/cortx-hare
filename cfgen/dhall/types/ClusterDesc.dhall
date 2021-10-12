@@ -25,7 +25,8 @@ let Node = ./NodeDesc.dhall
 let Pool = ./PoolDesc.dhall
 
 in
-{ nodes : List Node
+{ create_aux : Optional Bool
+, nodes : List Node
 , pools : List Pool
 , profiles : Optional (List ./PoolsRef.dhall)
 }
