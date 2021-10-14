@@ -33,6 +33,7 @@
       "cluster_id": "TMPL_CLUSTER_ID",
       "hostname": "TMPL_HOSTNAME",
       "name": "TMPL_SERVER_NODE_NAME",
+      "type": "TMPL_NODE_TYPE",
       "network": {
         "data": {
           "private_fqdn": "TMPL_PRIVATE_FQDN_1",
@@ -75,6 +76,7 @@
       "cluster_id": "TMPL_CLUSTER_ID",
       "hostname": "TMPL_HOSTNAME",
       "name": "TMPL_SERVER_NODE_NAME",
+      "type": "TMPL_NODE_TYPE",
       "network": {
         "data": {
           "private_fqdn": "TMPL_PRIVATE_FQDN_2",
@@ -117,6 +119,7 @@
       "cluster_id": "TMPL_CLUSTER_ID",
       "hostname": "TMPL_HOSTNAME",
       "name": "TMPL_SERVER_NODE_NAME",
+      "type": "TMPL_NODE_TYPE",
       "network": {
         "data": {
           "private_fqdn": "TMPL_PRIVATE_FQDN_3",
