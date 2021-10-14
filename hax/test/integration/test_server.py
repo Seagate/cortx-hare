@@ -24,11 +24,12 @@ import inject
 import pytest
 import simplejson
 from hax.common import HaxGlobalState
-from hax.message import BroadcastHAStates
+from hax.message import BroadcastHAStates, StobId, StobIoqError
 from hax.motr import WorkPlanner
 from hax.motr.delivery import DeliveryHerald
 from hax.server import ServerRunner
 from hax.types import Fid, HAState, MessageId, ServiceHealth
+from hax.util import dump_json
 
 
 @pytest.fixture
@@ -170,3 +171,56 @@ async def test_bq_stob_message_type_recognized(hax_client, planner, herald,
     planner.add_command.assert_called_once_with(
         ContainsStates(
             [HAState(fid=Fid(0x1, 0x4), status=ServiceHealth.FAILED)]))
+
+
+async def test_bq_stob_message_deserialized(hax_client, planner, herald,
+                                            consul_util, mocker):
+    def fake_get(key):
+        ret = {'bq-delivered/192.168.0.28': ''}
+        return ret[key]
+
+    mocker.patch.object(herald, 'wait_for_any')
+    #
+    # InboxFilter will try to read epoch - let's mock KV operations
+    stob = StobId(Fid(12, 13), Fid(14, 15))
+    msg = StobIoqError(fid=Fid(5, 6),
+                       conf_sdev=Fid(0x103, 0x204),
+                       stob_id=stob,
+                       fd=42,
+                       opcode=4,
+                       rc=2,
+                       offset=0xBF,
+                       size=100,
+                       bshift=4)
+
+    # Here we make sure that rea StobIoqError can be used as the payload
+    # for STOB_IOQ_ERROR bq message.
+    stob_payload = dump_json(msg)
+    parsed_stob = simplejson.loads(stob_payload)
+
+    mocker.patch.object(consul_util.kv, 'kv_put')
+    mocker.patch.object(consul_util.kv, 'kv_get', fake_get)
+    event_payload = {'message_type': 'STOB_IOQ_ERROR', 'payload': parsed_stob}
+    event_str = simplejson.dumps(event_payload)
+    b64: bytes = b64encode(event_str.encode())
+    b64_str = b64.decode()
+
+    payload = [{
+        'Key': 'bq/12',
+        'CreateIndex': 1793,
+        'ModifyIndex': 1793,
+        'LockIndex': 0,
+        'Flags': 0,
+        'Value': b64_str,
+        'Session': ''
+    }]
+    # Test execution
+    resp = await hax_client.post('/watcher/bq', json=payload)
+    # Validate now
+    if resp.status != 200:
+        resp_json = await resp.json()
+        logging.getLogger('hax').debug('Response: %s', resp_json)
+    assert resp.status == 200
+    planner.add_command.assert_called_once_with(
+        ContainsStates(
+            [HAState(fid=Fid(0x103, 0x204), status=ServiceHealth.FAILED)]))

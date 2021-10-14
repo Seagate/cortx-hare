@@ -17,7 +17,7 @@
 #
 
 import queue as q
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from queue import Queue
 from typing import Any, List, Optional
 
@@ -139,6 +139,37 @@ class StobIoqError(BaseMessage):
     offset: int
     size: int
     bshift: int
+
+    def for_json(self):
+        parts = {}
+
+        def as_str(a):
+            return str(a)
+
+        def as_repr(a):
+            return repr(a)
+
+        def as_is(a):
+            return a
+
+        for fld in fields(self):
+            f_type = fld.type
+            f_name = fld.name
+            if f_name == 'group':
+                # group is a thing used by WorkPlanner for task scheduling
+                # logic. We don't need to expose it
+                continue
+            val = getattr(self, f_name)
+            to_str = as_str
+            if f_type is Fid:
+                to_str = as_repr
+            elif f_type is StobId:
+                to_str = as_is
+            elif f_type is int or f_type is None:
+                to_str = as_is
+            parts[fld.name] = to_str(val)
+
+        return parts
 
 
 class Die(BaseMessage):
