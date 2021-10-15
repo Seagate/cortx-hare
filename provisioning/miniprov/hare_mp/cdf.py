@@ -307,23 +307,25 @@ class CdfGenerator:
         return data_devices
 
     # TBD motr
-    def _get_metadata_device(self, name: str, cvg: int, m0d: int) -> Text:
+    def _get_metadata_device(self,
+                             machine_id: str,
+                             cvg: int,
+                             m0d: int) -> Text:
         motr_store = self.motr_provider
         metadata_device = Text(motr_store.get(
-            f'server>{name}>cvg[{cvg}]>m0d[{m0d}]>md_seg1'))
+            f'server>{machine_id}>cvg[{cvg}]>m0d[{m0d}]>md_seg1'))
         return metadata_device
 
     # TBD motr
-    def _get_m0d_per_cvg(self, name: str, cvg: int) -> int:
+    def _get_m0d_per_cvg(self, machine_id: str, cvg: int) -> int:
         motr_store = self.motr_provider
-        return len(motr_store.get(f'server>{name}>cvg[{cvg}]>m0d'))
+        return len(motr_store.get(f'server>{machine_id}>cvg[{cvg}]>m0d'))
 
     def _create_node(self, machine_id: str) -> NodeDesc:
         store = self.provider
 
         hostname = self.utils.get_hostname(machine_id)
         # node>{machine-id}>name
-        name = store.get(f'node>{machine_id}>name')
         iface = self._get_iface(machine_id)
         try:
             # cortx>motr>client_instances
@@ -341,12 +343,13 @@ class CdfGenerator:
                 io_disks=DisksDesc(
                     data=self.utils.get_drives_info_for(cvg),
                     meta_data=Maybe(
-                        self._get_metadata_device(name, cvg, m0d), 'Text')),
+                        self._get_metadata_device(
+                            machine_id, cvg, m0d), 'Text')),
                 runs_confd=Maybe(False, 'Bool'))
             # node>{machine_id}>storage>cvg
             for cvg in range(len(store.get(
                 f'node>{machine_id}>storage>cvg')))
-            for m0d in range(self._get_m0d_per_cvg(name, cvg))
+            for m0d in range(self._get_m0d_per_cvg(machine_id, cvg))
         ], 'List M0ServerDesc')
 
         # Adding a Motr confd entry per server node in CDF.

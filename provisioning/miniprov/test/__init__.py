@@ -15,3 +15,7 @@
 # For any questions about this software or licensing,
 # please email opensource@seagate.com or cortx-questions@seagate.com.
 #
+import inject
+from hax.common import di_configuration
+
+inject.configure(di_configuration)

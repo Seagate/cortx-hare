@@ -360,10 +360,7 @@ def start_mkfs(hostname: str, hare_config_dir: str):
     for svc in ('confd', 'ios'):
         svc_fids = generator.get_svc_fids(svc)
         for fid in svc_fids:
-            if svc == 'ios':
-                execute([cmd, fid, '--conf'])
-            else:
-                execute([cmd, fid])
+            execute([cmd, fid, '--conf'])
 
 
 def init(args):
@@ -724,7 +721,7 @@ def generate_config(url: str, path_to_cdf: str) -> None:
     execute(cmd, env={'PYTHONPATH': python_path, 'PATH': path,
                       'LC_ALL': "en_US.utf-8", 'LANG': "en_US.utf-8"})
     utils.copy_conf_files(conf_dir)
-    utils.copy_consul_files(conf_dir)
+    utils.copy_consul_files(conf_dir, mode='client')
     utils.import_kv(conf_dir)
 
 

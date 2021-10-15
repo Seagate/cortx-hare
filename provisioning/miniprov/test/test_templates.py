@@ -91,6 +91,7 @@ def placeholders() -> Dict[str, str]:
         'TMPL_DATA_INTERFACE_TYPE': 'tcp',
         'TMPL_DATA_UNITS_COUNT': '1',
         'TMPL_HOSTNAME': 'hostname',
+        'TMPL_NODE_TYPE': 'storage_node',
         'TMPL_MACHINE_ID': 'machine-id',
         'TMPL_MACHINE_ID_1': 'machine-id',
         'TMPL_METADATA_DEVICE': '/dev/meta',
