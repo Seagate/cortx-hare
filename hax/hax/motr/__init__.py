@@ -164,19 +164,20 @@ class Motr:
             LOG.exception('Failed to notify failure for %s', process_fid)
 
         LOG.debug('enqueue entrypoint request for %s', remote_rpc_endpoint)
-        entrypoint_req: EntrypointRequest = EntrypointRequest(
+        # entrypoint_req: EntrypointRequest = EntrypointRequest(
+        self.planner.add_command(EntrypointRequest(
             reply_context=reply_context,
             req_id=req_id,
             remote_rpc_endpoint=remote_rpc_endpoint,
             process_fid=process_fid,
             git_rev=git_rev,
             pid=pid,
-            is_first_request=is_first_request)
+            is_first_request=is_first_request))
         # If rconfc from motr land sends an entrypoint request when
         # the hax consumer thread is already stopping, there's no
         # point in en-queueing the request as there's no one to process
         # the same. Thus, invoke send_entrypoint_reply directly.
-        self.send_entrypoint_request_reply(entrypoint_req)
+        # self.send_entrypoint_request_reply(entrypoint_req)
 
     def send_entrypoint_request_reply(self, message: EntrypointRequest):
         reply_context = message.reply_context

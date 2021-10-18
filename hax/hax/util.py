@@ -1292,8 +1292,8 @@ class ConsulUtil:
             local_remote_health_ret(ServiceHealth.OFFLINE,
                                     ServiceHealth.UNKNOWN),
             cur_consul_status('passing', 'Unknown'):
-            local_remote_health_ret(ServiceHealth.UNKNOWN,
-                                    ServiceHealth.UNKNOWN),
+            local_remote_health_ret(ServiceHealth.OFFLINE,
+                                    ServiceHealth.OFFLINE),
             cur_consul_status('warning', 'M0_CONF_HA_PROCESS_STOPPING'):
             local_remote_health_ret(ServiceHealth.OFFLINE,
                                     ServiceHealth.STOPPED),
@@ -1307,8 +1307,8 @@ class ConsulUtil:
             local_remote_health_ret(ServiceHealth.OFFLINE,
                                     ServiceHealth.OFFLINE),
             cur_consul_status('warning', 'Unknown'):
-            local_remote_health_ret(ServiceHealth.UNKNOWN,
-                                    ServiceHealth.UNKNOWN)}
+            local_remote_health_ret(ServiceHealth.OFFLINE,
+                                    ServiceHealth.OFFLINE)}
         try:
             node_data: List[Dict[str, Any]] = self.cns.health.node(node)[1]
             if not node_data:
