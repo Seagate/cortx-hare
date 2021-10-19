@@ -30,7 +30,7 @@ from hax.motr import Motr
 from hax.motr.delivery import DeliveryHerald
 from hax.motr.planner import WorkPlanner
 from hax.queue.publish import EQPublisher
-from hax.types import (ConfHaProcess, HaLinkMessagePromise, HAState, MessageId,
+from hax.types import (ConfHaProcess, HAState, MessageId, HaLinkMessagePromise,
                        ObjT, ServiceHealth, StoppableThread, m0HaProcessEvent,
                        m0HaProcessType)
 from hax.util import ConsulUtil, dump_json, repeat_if_fails
@@ -136,9 +136,10 @@ class ConsumerThread(StoppableThread):
                     # broadcasting failure.
                     current_status = ServiceHealth.UNKNOWN
                     planner.add_command(
-                        BroadcastHAStates(states=[
-                            HAState(fid=state.fid, status=ServiceHealth.FAILED)
-                        ],
+                         BroadcastHAStates(states=[
+                            HAState(fid=state.fid,
+                                    status=ServiceHealth.FAILED)
+                         ],
                             reply_to=None))
                 if current_status not in (ServiceHealth.UNKNOWN,
                                           ServiceHealth.OFFLINE):
