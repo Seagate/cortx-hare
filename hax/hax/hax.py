@@ -151,7 +151,8 @@ def main():
 
     # TODO make the number of threads configurable
     consumer_threads = [
-        _run_qconsumer_thread(planner, motr, herald, util, i) for i in range(4)
+        _run_qconsumer_thread(planner, motr, herald,
+                              util, i) for i in range(32)
     ]
 
     try:
