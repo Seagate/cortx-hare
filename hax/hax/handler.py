@@ -109,8 +109,8 @@ class ConsumerThread(StoppableThread):
                     if (self.consul.get_process_local_status(
                             state.fid) == 'M0_CONF_HA_PROCESS_STARTED'):
                         continue
-                elif current_status in (ServiceHealth.FAILED,
-                                        ServiceHealth.STOPPED):
+                if current_status in (ServiceHealth.FAILED,
+                                      ServiceHealth.STOPPED):
                     if (self.consul.get_process_local_status(
                             state.fid) == 'M0_CONF_HA_PROCESS_STOPPED'):
                         # Consul may report failure of a process multiple
@@ -118,7 +118,7 @@ class ConsumerThread(StoppableThread):
                         # notifications, it may cause delay in cleanup
                         # activities.
                         continue
-                elif current_status == ServiceHealth.UNKNOWN:
+                if current_status == ServiceHealth.UNKNOWN:
                     # We got service status as UNKNOWN, that means hax was
                     # notified about process failure but hax couldn't
                     # confirm if the process is in failed state or have

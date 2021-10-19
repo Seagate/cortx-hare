@@ -558,27 +558,12 @@ class ConsulUtil:
                 return True
         return False
 
-    # Presently nvec processing is taking significant time causing motr
-    # and s3 processes to timeout and fail. This nvec processing time
-    # needs to be re-visited. Meanwhile, this is a purely happy path
-    # function where instead of fetching the real object status from
-    # Consul, Hax will return online for all the configuration objects
-    # for which the status for requested. This function is invoked
-    # only during process startup and not in a runtime path. Thus
-    # Runtime state changes are not affected by this. But this affects
-    # dgread post node failure as a motr client starting with an existing
-    # node failure will not be able to start and it will receive an online
-    # status for a failed node and will keep trying to connect to the
-    # node.
-    # We are not checking node status here because node status depends
-    # on Consul agent being started and running on that node, thus in
-    # case of containers, hax container may start after motr processes
-    # which may result in node status reported as not passing, this
-    # may report invalid conf object status. Thus nvec processing must
-    # be optimized for such scenarios.
     @repeat_if_fails()
-    def get_conf_obj_status_online(self, obj_t: ObjT, fidk: int) -> int:
-        return HaNoteStruct.M0_NC_ONLINE
+    @uses_consul_cache
+    def get_conf_obj_status(self,
+                            obj_t: ObjT,
+                            fidk: int,
+                            kv_cache=None) -> int:
 
     @repeat_if_fails()
     @uses_consul_cache
