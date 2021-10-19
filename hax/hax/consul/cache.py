@@ -76,7 +76,7 @@ def supports_consul_cache(f: T) -> T:
     def wrapper(*args, **kwds):
         cache: Optional[InvocationCache] = kwds.get(kwd_cache)
         if cache is None:
-            LOG.debug('CACHE: created. fn_name=%s', f.__qualname__)
+            LOG.log(TRACE, 'CACHE: created. fn_name=%s', f.__qualname__)
             cache = InvocationCache()
 
         kwds[kwd_cache] = cache
@@ -116,7 +116,7 @@ def uses_consul_cache(f: T) -> T:
         cache: Optional[InvocationCache] = kwds.get(kwd_cache)
         fn_name = f.__qualname__
         if cache is None:
-            LOG.debug('CACHE: created. fn_name=%s', fn_name)
+            LOG.log(TRACE, 'CACHE: created. fn_name=%s', fn_name)
             cache = InvocationCache()
             kwds[kwd_cache] = cache
 
@@ -141,7 +141,7 @@ def invalidates_consul_cache(f: T) -> T:
         cache: Optional[InvocationCache] = kwds.get(kwd_cache, None)
 
         if cache:
-            LOG.debug('CACHE: cleared. fn_name=%s', f.__qualname__)
+            LOG.log(TRACE, 'CACHE: cleared. fn_name=%s', f.__qualname__)
             cache.clear()
 
         return f(*args, **kwds)
