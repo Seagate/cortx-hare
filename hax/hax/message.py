@@ -67,6 +67,9 @@ class HaNvecGetEvent(BaseMessage):
     hax_msg: int
     nvec: List[HaNote]
 
+    def __repr__(self):
+        return f'HaNvecGetEvent(<{len(self.nvec)} items>)'
+
 
 @dataclass
 class SnsOperation(BaseMessage):
