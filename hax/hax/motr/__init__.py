@@ -80,6 +80,8 @@ class Motr:
             return self.consul_util.get_rm_fid()
 
         rm_fid = _get_rm_fid()
+        # Cleanup old process states.
+        self.consul_util.cleanup_node_process_states()
         result = self._ffi.start(self._ha_ctx, make_c_str(rpc_endpoint),
                                  process.to_c(), ha_service.to_c(),
                                  rm_fid.to_c())
@@ -165,7 +167,11 @@ class Motr:
             LOG.exception('Failed to notify failure for %s', process_fid)
 
         LOG.debug('enqueue entrypoint request for %s', remote_rpc_endpoint)
-
+        # XXX Verify:
+        # If rconfc from motr land sends an entrypoint request when
+        # the hax consumer thread is already stopping, will posting the
+        # entrypoint request to planner work if there's no one to process
+        # the same?
         self.planner.add_command(EntrypointRequest(
             reply_context=reply_context,
             req_id=req_id,
