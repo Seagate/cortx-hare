@@ -28,10 +28,10 @@ from unittest.mock import Mock
 from hax.log import TRACE
 from hax.message import (BaseMessage, BroadcastHAStates, Die,
                          EntrypointRequest,
-                         HaNvecGetEvent)
+                         HaNvecGetEvent, ProcessEvent)
 from hax.motr.planner import WorkPlanner, State
 from hax.motr.util import LinkedList
-from hax.types import Fid, Uint128
+from hax.types import Fid, Uint128, ConfHaProcess
 
 LOG = logging.getLogger('hax')
 
@@ -68,6 +68,14 @@ def nvec_get():
     return HaNvecGetEvent(hax_msg=1, nvec=[])
 
 
+def process_event():
+    return ProcessEvent(
+               ConfHaProcess(chp_event=0,
+                             chp_type=0,
+                             chp_pid=0,
+                             fid=Fid(0, 0)))
+
+
 class TestMessageOrder(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -86,16 +94,16 @@ class TestMessageOrder(unittest.TestCase):
         ep2 = planner._assign_group(ep2)
         self.assertEqual([0, 0], [ep1.group, ep2.group])
 
-    def test_entrypoint_not_paralleled_with_broadcast(self):
+    def test_entrypoint_paralleled_with_broadcast(self):
         planner = WorkPlanner()
         bcast = broadcast()
         ep1 = entrypoint()
 
         bcast = planner._assign_group(bcast)
         ep1 = planner._assign_group(ep1)
-        self.assertEqual([0, 1], [bcast.group, ep1.group])
+        self.assertEqual([0, 0], [bcast.group, ep1.group])
 
-    def test_broadcast_starts_new_group(self):
+    def test_broadcast_does_not_start_new_group(self):
         planner = WorkPlanner()
 
         assign = planner._assign_group
@@ -106,7 +114,7 @@ class TestMessageOrder(unittest.TestCase):
             assign(broadcast()),
             assign(entrypoint())
         ]
-        self.assertEqual([0, 1, 2, 3], [m.group for m in msgs])
+        self.assertEqual([0, 1, 2, 2], [m.group for m in msgs])
 
     def test_group_id_cycled(self):
         def my_state():
@@ -122,11 +130,11 @@ class TestMessageOrder(unittest.TestCase):
 
         msgs = [
             assign(broadcast()),
-            assign(broadcast()),
-            assign(broadcast()),
-            assign(entrypoint())
+            assign(process_event()),
+            assign(process_event()),
+            assign(broadcast())
         ]
-        self.assertEqual([99999, 10**5, 0, 1], [m.group for m in msgs])
+        self.assertEqual([99999, 99999, 10**5, 0], [m.group for m in msgs])
 
     def test_ha_nvec_get_shares_group_always(self):
         planner = WorkPlanner()
@@ -151,9 +159,9 @@ class TestMessageOrder(unittest.TestCase):
             assign(nvec_get()),
             assign(entrypoint())
         ]
-        self.assertEqual([0, 0, 1, 2], [m.group for m in msgs_after_bc])
-        self.assertEqual([2, 2, 3, 4], [m.group for m in msgs_after_ep])
-        self.assertEqual([4, 4, 4, 4], [m.group for m in msgs_after_nvec])
+        self.assertEqual([0, 0, 1, 1], [m.group for m in msgs_after_bc])
+        self.assertEqual([1, 1, 2, 2], [m.group for m in msgs_after_ep])
+        self.assertEqual([2, 2, 2, 2], [m.group for m in msgs_after_nvec])
 
 
 class TestWorkPlanner(unittest.TestCase):
@@ -360,7 +368,7 @@ class TestWorkPlanner(unittest.TestCase):
         tracker = GroupTracker()
         thread_count = 4
         for i in range(10):
-            planner.add_command(broadcast())
+            planner.add_command(process_event())
 
         for j in range(thread_count):
             planner.add_command(Die())

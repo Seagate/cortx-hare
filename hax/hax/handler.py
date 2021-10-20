@@ -118,29 +118,17 @@ class ConsumerThread(StoppableThread):
                         # notifications, it may cause delay in cleanup
                         # activities.
                         continue
-                if current_status == ServiceHealth.UNKNOWN:
-                    # We got service status as UNKNOWN, that means hax was
-                    # notified about process failure but hax couldn't
-                    # confirm if the process is in failed state or have
-                    # failed and restarted. So, we will not loose the
-                    # event and try again to confirm the real time
-                    # process status by enqueing a broadcast event
-                    # specific to this process.
-                    # It is expected that the process status gets
-                    # eventually confirmed as either failed or passing (OK).
-                    # This situation typically arises due to delay
-                    # in receiving failure notification during which the
-                    # corresponding process might be restarting or have
-                    # already restarted. Thus it is important to confirm
-                    # the real time status of the process before
-                    # broadcasting failure.
-                    current_status = ServiceHealth.UNKNOWN
-                    planner.add_command(
-                         BroadcastHAStates(states=[
-                            HAState(fid=state.fid,
-                                    status=ServiceHealth.FAILED)
-                         ],
-                            reply_to=None))
+                # XXX:
+                # Sometime, there can be situation where Consul event is sent
+                # and can be delayed, where state reported by Consul for a
+                # given process can be in its past already, e.g. consul
+                # reported process failure but when hax received the event,
+                # process might have already restarted. In this case the event
+                # still needs to be handled. Also, it is possible that Consul
+                # reported failure but process status is not yet updated in
+                # Consul services catalog, in such a case the reported status
+                # can be true and cannot be just dropped. These scenarios must
+                # be re-visited.
                 if current_status not in (ServiceHealth.UNKNOWN,
                                           ServiceHealth.OFFLINE):
                     # We also need to account and report the failure of remote
