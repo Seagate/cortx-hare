@@ -285,9 +285,12 @@ class WorkPlanner:
             # No need to form the new group for it.
             return False
         if isinstance(cmd, AnyEntrypointRequest):
-            # if the current group has a BroadcastHAStates request,
-            # then this entrypoint request should be placed to a next group.
-            return has(BroadcastHAStates)
+            # Entrypoint requests can be processed in parallel to other
+            # requests are they are per processes. In a situation where
+            # if an entrypoint request needs to block on some other request
+            # e.g. BroadcastHAStates, then the wait needs to explicit.
+            # For example, see FirstEntrypoint request code in hax/handler.py.
+            return False
         if isinstance(cmd, BroadcastHAStates):
             return True
 

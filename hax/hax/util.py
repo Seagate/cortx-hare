@@ -1355,8 +1355,8 @@ class ConsulUtil:
             local_remote_health_ret(ServiceHealth.OFFLINE,
                                     ServiceHealth.UNKNOWN),
             cur_consul_status('passing', 'Unknown'):
-            local_remote_health_ret(ServiceHealth.OFFLINE,
-                                    ServiceHealth.OFFLINE),
+            local_remote_health_ret(ServiceHealth.UNKNOWN,
+                                    ServiceHealth.UNKNOWN),
             cur_consul_status('warning', 'M0_CONF_HA_PROCESS_STOPPING'):
             local_remote_health_ret(ServiceHealth.OFFLINE,
                                     ServiceHealth.STOPPED),
@@ -1370,8 +1370,8 @@ class ConsulUtil:
             local_remote_health_ret(ServiceHealth.OFFLINE,
                                     ServiceHealth.OFFLINE),
             cur_consul_status('warning', 'Unknown'):
-            local_remote_health_ret(ServiceHealth.OFFLINE,
-                                    ServiceHealth.OFFLINE)}
+            local_remote_health_ret(ServiceHealth.UNKNOWN,
+                                    ServiceHealth.UNKNOWN)}
         try:
             node_data: List[Dict[str, Any]] = self.get_node_health_details(
                 node, kv_cache=kv_cache)
@@ -1401,10 +1401,10 @@ class ConsulUtil:
                         status = svc_health.motr_proc_status_local
                     else:
                         status = svc_health.motr_proc_status_remote
-                    if (status == ServiceHealth.FAILED and
+                    if (status != ServiceHealth.OK and
                             cns_status.proc_type == (
                             m0HaProcessType.M0_CONF_HA_PROCESS_M0MKFS.name)):
-                        status = ServiceHealth.STOPPED
+                        status = ServiceHealth.OFFLINE
 
                     # This situation is not expected but we handle
                     # the same. Hax may end up here if the process has stopped
@@ -1558,6 +1558,17 @@ class ConsulUtil:
             value = json.loads(item['Value'])
             value['state'] = process_state_map[state]
             self.kv.kv_put(item['Key'], json.dumps(value))
+
+    @repeat_if_fails()
+    def cleanup_node_process_states(self):
+        local_node = self.get_local_nodename()
+        keys: List[KeyDelete] = [
+            KeyDelete(name=f'{local_node}/processes/', recurse=True),
+        ]
+
+        logging.info('Deleting Hare KV entries (%s)', keys)
+        if not self.kv.kv_delete_in_transaction(keys):
+            raise HAConsistencyException('KV deletion failed')
 
 
 def dump_json(obj) -> str:
