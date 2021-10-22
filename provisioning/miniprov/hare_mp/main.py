@@ -218,13 +218,6 @@ def _start_consul(utils: Utils,
                                    config_dir=config_dir, peers=peers)
     consul_starter.start()
 
-    try:
-        util: ConsulUtil = ConsulUtil()
-        sess = util.get_leader_session_no_wait()
-        util.destroy_session(sess)
-    except Exception:
-        logging.debug('No leader is elected yet')
-
     return consul_starter
 
 
@@ -288,6 +281,13 @@ def prepare(args):
     consul_starter = _start_consul(utils, stop_event, conf_dir, url)
     utils.save_node_facts()
     utils.save_drives_info()
+    try:
+        util: ConsulUtil = ConsulUtil()
+        sess = util.get_leader_session_no_wait()
+        util.destroy_session(sess)
+    except Exception:
+        logging.debug('No leader is elected yet')
+
     consul_starter.stop()
 
 

@@ -624,8 +624,9 @@ class ConsulUtil:
         else:
             pfid = create_process_fid(fidk)
         proc_node = self.get_process_node(pfid, kv_cache=kv_cache)
-        if (self.get_service_health(proc_node, fidk, kv_cache=kv_cache)
-                in (ServiceHealth.OK, ServiceHealth.UNKNOWN)):
+        if (self.get_service_health(proc_node, fidk, kv_cache=kv_cache) in
+                (ServiceHealth.OK, ServiceHealth.UNKNOWN,
+                 ServiceHealth.OFFLINE)):
             return HaNoteStruct.M0_NC_ONLINE
         else:
             return HaNoteStruct.M0_NC_FAILED
@@ -1298,6 +1299,30 @@ class ConsulUtil:
         LOG.debug('Setting disk state in KV: %s:%s', key, data)
         self.kv.kv_put(key, data, kv_cache=kv_cache)
 
+    # Containers start and stop out-of-order, especially mkfs
+    # container can complete and stop while other containers are still
+    # working, this is not a container failure. Consul agents on other
+    # nodes may detect this as a node failure. Hax does not want to send
+    # a FAILED notification to other working process for a successfully
+    # completed container(s).
+    # Thus, if consul reports node failure, we check the consul kv
+    # information for the given process and if it's a mkfs container then
+    # don't report failure if it has completed successfully.
+    @uses_consul_cache
+    def _check_process_status_node_failure(self, proc_id: int,
+                                           kv_cache=None) -> ServiceHealth:
+        pfid = create_process_fid(proc_id)
+        cns_status = self.get_process_status(pfid,
+                                             kv_cache=kv_cache)
+        if (cns_status.proc_status in ('M0_CONF_HA_PROCESS_STOPPED',
+                                       'M0_CONF_HA_PROCESS_STOPPING',
+                                       'unknown') and (
+            cns_status.proc_type in
+                (m0HaProcessType.M0_CONF_HA_PROCESS_M0MKFS.name,
+                 'unknown'))):
+            return ServiceHealth.OFFLINE
+        return ServiceHealth.FAILED
+
     # It is tricky to report a correct service status due to various
     # failure conditions. Consul notification can be delayed, the
     # corresponding process might be already restarting. Thus, following
@@ -1376,17 +1401,20 @@ class ConsulUtil:
             node_data: List[Dict[str, Any]] = self.get_node_health_details(
                 node, kv_cache=kv_cache)
             if not node_data:
-                return ServiceHealth.FAILED
+                return self._check_process_status_node_failure(
+                           svc_id, kv_cache=kv_cache)
             node_status = str(node_data[0]['Status'])
             if node_status != 'passing' or (not self.is_node_alive(
                     node, kv_cache=kv_cache)):
-                return ServiceHealth.FAILED
+                return self._check_process_status_node_failure(
+                           svc_id, kv_cache=kv_cache)
             status = ServiceHealth.UNKNOWN
             for item in node_data:
                 if item['ServiceID'] == str(svc_id):
                     LOG.log(TRACE, 'item.status %s', item['Status'])
                     if item['Status'] == 'critical':
-                        return ServiceHealth.FAILED
+                        return self._check_process_status_node_failure(
+                                        svc_id, kv_cache=kv_cache)
                     pfid = create_process_fid(svc_id)
                     cns_status = self.get_process_status(pfid,
                                                          kv_cache=kv_cache)
