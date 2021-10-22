@@ -20,7 +20,7 @@ import logging
 from collections import deque
 from dataclasses import dataclass
 from threading import Condition
-from typing import Callable, Deque, Optional, Set, Type
+from typing import Callable, Deque, Optional, Set, Type, Tuple
 
 from hax.log import TRACE
 from hax.message import (AnyEntrypointRequest, BaseMessage, BroadcastHAStates,
@@ -100,10 +100,13 @@ class WorkPlanner:
         '''Adds the given command to the execution plan. Blocking call.'''
         LOG.log(TRACE, '[WP]Before add_command: %s', command)
         with self.b_lock:
-            cmd = self._assign_group(command)
+            cmd, is_asap = self._assign_group(command)
             LOG.log(TRACE, '[WP]Cmd %s is added. Current state: %s', cmd,
                     self.state)
-            self.backlog.append(cmd)
+            if is_asap:
+                self.backlog.appendleft(cmd)
+            else:
+                self.backlog.append(cmd)
             # Some threads may be waiting because of an empty backlog - let's
             # notify them
             self.b_lock.notifyAll()
@@ -306,9 +309,12 @@ class WorkPlanner:
             return has(ProcessEvent)
         return False
 
-    def _assign_group(self, cmd: BaseMessage) -> BaseMessage:
+    def _assign_group(self, cmd: BaseMessage) -> Tuple[BaseMessage, bool]:
         ''' Sets the correct group_id to the command. Side effect: updates
         self.state.
+        Returns Tuple with the updated command and a boolean flag saying
+        whether this command must be added out of order (is_asap).
+
         Must be invoked with b_lock acquired. The method is invoked from
         add_command(cmd).
 
@@ -319,9 +325,8 @@ class WorkPlanner:
         state.next_group_id := (state.next_group_id + 1) mod MAX_GROUP_ID.
 
         Command cmd starts a new group if:
-        1. cmd is an entrypoint request AND next_group has BroadcastHAStates
-        2. cmd is BroadcastHAStates
-        3. cmd is an SNS operation AND next_group has SNS operation already
+        1. cmd is BroadcastHAStates
+        2. cmd is an SNS operation AND next_group has SNS operation already
         Otherwise command will join existing next_group.
 
         '''
@@ -335,10 +340,25 @@ class WorkPlanner:
             self.state.next_group_id = self._get_increased_group(
                 self.state.next_group_id)
 
-        if isinstance(cmd, Die):
-            return join_group(cmd)
+        if isinstance(cmd, AnyEntrypointRequest):
+            # Entrypoint and Die will always be added to the CURRENT group
+            # (the one being currently active), so they can be executed at
+            # first priority.
+            #
+            # Entrypoint is also a special case: it should not be delayed and
+            # we also know that they appear during bootstrap when a huge flow
+            # of BroadcastHAStates events appear. We just don't want to block
+            # because of them.
+            cmd.group = self.state.current_group_id
+            return (cmd, True)
+        elif isinstance(cmd, Die):
+            # Normally, no one needs to add the Die command to the backlog
+            # except for the unit tests.
+            #
+            # shutdown() mechanism generates Die command dynamically anyway.
+            return (join_group(cmd), False)
 
         if self._should_increase_group(cmd):
             next_group()
 
-        return join_group(cmd)
+        return (join_group(cmd), False)
