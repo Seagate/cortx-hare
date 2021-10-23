@@ -120,7 +120,7 @@ class TestMessageOrder(unittest.TestCase):
             assign(broadcast()),
             assign(nvec_get())
         ]
-        self.assertEqual([0, 1, 2, 2], [m.group for (m, _) in msgs])
+        self.assertEqual([0, 1, 2, 0], [m.group for (m, _) in msgs])
 
     def test_group_id_cycled(self):
         def my_state():
@@ -166,8 +166,8 @@ class TestMessageOrder(unittest.TestCase):
             assign(entrypoint())
         ]
         self.assertEqual([0, 0, 1, 0], [m.group for (m, _) in msgs_after_bc])
-        self.assertEqual([0, 1, 2, 0], [m.group for (m, _) in msgs_after_ep])
-        self.assertEqual([0, 2, 2, 0], [m.group for (m, _) in msgs_after_nvec])
+        self.assertEqual([0, 0, 2, 0], [m.group for (m, _) in msgs_after_ep])
+        self.assertEqual([0, 0, 0, 0], [m.group for (m, _) in msgs_after_nvec])
 
 
 class TestWorkPlanner(unittest.TestCase):
@@ -243,7 +243,7 @@ class TestWorkPlanner(unittest.TestCase):
         if exc:
             raise exc
         groups_processed = tracker.get_tracks()
-        self.assertEqual([0, 1, 1, 2, 2, 3, 3, 4, 4, 5], groups_processed)
+        self.assertEqual([0, 0, 0, 0, 0, 0, 0, 0, 0, 0], groups_processed)
 
 
     def test_entrypoint_request_processed_asap(self):
@@ -379,7 +379,7 @@ class TestWorkPlanner(unittest.TestCase):
         if exc:
             raise exc
         groups_processed = tracker.get_tracks()
-        self.assertEqual([0, 1, 1, 2, 2, 3, 3, 4, 4, 5], groups_processed)
+        self.assertEqual([0, 0, 0, 0, 0, 0, 0, 0, 0, 0], groups_processed)
 
     def test_no_hang_when_group_id_cycled(self):
         planner = WorkPlanner()
