@@ -71,11 +71,19 @@ class ConsulStarter(StoppableThread):
             for peer in self.peers:
                 cmd.append(f'-retry-join={peer}')
 
-            self.process = execute_no_communicate(cmd,
-                                                  working_dir=self.log_dir,
-                                                  out_file=LogWriter(LOG, fh))
-            if self.process:
-                self.process.communicate()
+            restart = True
+            while restart:
+                try:
+                    if self.process:
+                        self.process.terminate()
+                    self.process = execute_no_communicate(
+                        cmd, working_dir=self.log_dir,
+                        out_file=LogWriter(LOG, fh))
+                    if self.process:
+                        self.process.communicate()
+                        restart = False
+                except Exception:
+                    continue
         except Exception:
             LOG.exception('Aborting due to an error')
         finally:

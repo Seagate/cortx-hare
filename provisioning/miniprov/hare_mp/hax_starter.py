@@ -44,7 +44,7 @@ class HaxStarter(StoppableThread):
     def stop(self):
         try:
             if self.process:
-                self.process.terminate()
+                self.process.kill()
         except Exception:
             pass
 
@@ -63,16 +63,24 @@ class HaxStarter(StoppableThread):
             path += os.pathsep + '/opt/seagate/cortx/hare/libexec'
             python_path = os.pathsep.join(sys.path)
             cmd = ['hax']
-            self.process = execute_no_communicate(cmd,
-                                                  env={'PYTHONPATH':
-                                                       python_path,
-                                                       'PATH': path,
-                                                       'LC_ALL': "en_US.utf-8",
-                                                       'LANG': "en_US.utf-8"},
-                                                  working_dir=self.home_dir,
-                                                  out_file=LogWriter(LOG, fh))
-            if self.process:
-                self.process.communicate()
+            restart = True
+            while restart:
+                try:
+                    if self.process:
+                        self.process.terminate()
+                    self.process = execute_no_communicate(
+                        cmd, env={'PYTHONPATH':
+                                  python_path,
+                                  'PATH': path,
+                                  'LC_ALL': "en_US.utf-8",
+                                  'LANG': "en_US.utf-8"},
+                        working_dir=self.home_dir,
+                        out_file=LogWriter(LOG, fh))
+                    if self.process:
+                        self.process.communicate()
+                        restart = False
+                except Exception:
+                    continue
         except Exception:
             LOG.exception('Aborting due to an error')
         finally:
