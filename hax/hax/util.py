@@ -470,9 +470,13 @@ class ConsulUtil:
     def get_confd_list(self) -> List[ServiceData]:
         return self.get_service_data_by_name('confd')
 
+    @uses_consul_cache
     def get_services_by_parent_process(self,
-                                       process_fid: Fid) -> List[FidWithType]:
-        node_items = self.kv.kv_get('m0conf/nodes', recurse=True)
+                                       process_fid: Fid,
+                                       kv_cache=None) -> List[FidWithType]:
+        node_items = self.kv.kv_get('m0conf/nodes',
+                                    recurse=True,
+                                    kv_cache=kv_cache)
         fidk = str(process_fid.key)
 
         # This is the RegExp to match the keys in Consul KV that describe
@@ -714,7 +718,8 @@ class ConsulUtil:
                 f'Failed to get {node} node health') from e
 
     @repeat_if_fails()
-    def get_node_fid(self, node: str) -> Optional[Fid]:
+    @uses_consul_cache
+    def get_node_fid(self, node: str, kv_cache=None) -> Optional[Fid]:
         """
         Returns the fid of the given node.
 
@@ -725,7 +730,9 @@ class ConsulUtil:
         # m0conf/nodes/
         # 0x6e00000000000001:0x3:{"name": "ssc-vm-1623.colo.seagate.com",
         #                         "state": "M0_NC_UNKNOWN"}
-        node_items = self.kv.kv_get('m0conf/nodes', recurse=True)
+        node_items = self.kv.kv_get('m0conf/nodes',
+                                    recurse=True,
+                                    kv_cache=kv_cache)
         for item in node_items:
             key = item['Key']
             key_split = key.split('/')
@@ -740,12 +747,16 @@ class ConsulUtil:
         return None
 
     @repeat_if_fails()
-    def get_node_name_by_fid(self, node_fid: Fid) -> Optional[str]:
+    @uses_consul_cache
+    def get_node_name_by_fid(self,
+                             node_fid: Fid,
+                             kv_cache=None) -> Optional[str]:
         """
         Returns the node name by its FID value or None if the given FID doesn't
         correspond to any node.
         """
-        node_data = self.kv.kv_get(f'm0conf/nodes/{node_fid}')
+        node_data = self.kv.kv_get(f'm0conf/nodes/{node_fid}',
+                                   kv_cache=kv_cache)
         if node_data:
             parsed = json.loads(node_data['Value'])
             name: str = parsed['name']
@@ -753,7 +764,10 @@ class ConsulUtil:
         return None
 
     @repeat_if_fails()
-    def get_node_ctrl_fids(self, node: str) -> Optional[List[Fid]]:
+    @uses_consul_cache
+    def get_node_ctrl_fids(self,
+                           node: str,
+                           kv_cache=None) -> Optional[List[Fid]]:
         """
         Parameters:
             node : hostname of the node.
@@ -764,10 +778,10 @@ class ConsulUtil:
         #            racks/0x6100000000000001:0x2/encls/
         #            0x6500000000000001:0x4/ctrls/0x6300000000000001:0x5",
         # ]
-        encl_fid = self.get_node_encl_fid(node)
+        encl_fid = self.get_node_encl_fid(node, kv_cache=kv_cache)
         if not encl_fid:
             return None
-        ctrl_items = self.get_all_sites()
+        ctrl_items = self.get_all_sites(kv_cache=kv_cache)
         regex = re.compile(
             f'^m0conf\\/.*\\/racks\\/.*\\/encls\\/{encl_fid}\\/ctrls\\/'
             '([^/]+)$')
@@ -853,7 +867,7 @@ class ConsulUtil:
             return Fid.parse(ctrl_fid)
 
     @repeat_if_fails()
-    def all_io_services_failed(self, node: str) -> bool:
+    def all_io_services_failed(self, node: str, kv_cache=None) -> bool:
         """
         Checks if all the IO services of given node are in failed state.
 
@@ -867,7 +881,8 @@ class ConsulUtil:
         # {"name": "ios", "state": "M0_NC_UNKNOWN"}
 
         sites_items = self.kv.kv_get(f'm0conf/nodes/{node_fid}/processes',
-                                     recurse=True)
+                                     recurse=True,
+                                     kv_cache=kv_cache)
         for item in sites_items:
             if 'name' not in json.loads(item['Value']).keys():
                 continue
@@ -878,7 +893,9 @@ class ConsulUtil:
                 # {"name": "m0_server", "state": "online"}
                 p_fid = item['Key'].split('/')[4]
                 p_key = f"m0conf/nodes/{node_fid}/processes/{p_fid}"
-                process = self.kv.kv_get(p_key, recurse=False)
+                process = self.kv.kv_get(p_key,
+                                         recurse=False,
+                                         kv_cache=kv_cache)
                 if not process:
                     raise HAConsistencyException('Failed to get process key')
 
@@ -889,7 +906,8 @@ class ConsulUtil:
         return True
 
     @repeat_if_fails()
-    def get_node_encl_fid(self, node: str) -> Optional[Fid]:
+    @uses_consul_cache
+    def get_node_encl_fid(self, node: str, kv_cache=None) -> Optional[Fid]:
         """
         Returns the fid of the enclosure for the given node.
 
@@ -904,10 +922,12 @@ class ConsulUtil:
         #    "value": "{\"node\": \"0x6e00000000000001:0x3\",
         #               \"state\": \"M0_NC_UNKNOWN\"}"
         # },
-        node_fid = self.get_node_fid(node)
+        node_fid = self.get_node_fid(node, kv_cache=kv_cache)
         if not node_fid:
             return None
-        encl_items = self.kv.kv_get('m0conf/sites', recurse=True)
+        encl_items = self.kv.kv_get('m0conf/sites',
+                                    recurse=True,
+                                    kv_cache=kv_cache)
         regex = re.compile(
             '^m0conf\\/.*\\/racks\\/.*\\/encls\\/([^/]+)$')
         for encl in encl_items:
@@ -930,25 +950,29 @@ class ConsulUtil:
         return device_ha_state_map[status].name
 
     @repeat_if_fails()
-    def set_node_state(self, node_fid: Fid, status: ServiceHealth) -> None:
+    def set_node_state(self,
+                       node_fid: Fid,
+                       status: ServiceHealth,
+                       kv_cache=None) -> None:
         # Example,
         # {
         #    "key": "m0conf/nodes/0x6e00000000000001:0x3",
         #    "value": "{\"name\": \"srvnode-1.data.private\",
         #               \"state\": \"M0_NC_UNKNOWN\"}"
         # }
-        node_items = self.kv.kv_get('m0conf/nodes', recurse=True)
-        regex = re.compile(
-            f'^m0conf/nodes/{node_fid}$')
+        node_items = self.kv.kv_get('m0conf/nodes',
+                                    recurse=True,
+                                    kv_cache=kv_cache)
+        regex = re.compile(f'^m0conf/nodes/{node_fid}$')
         for node in node_items:
             match_result = re.match(regex, node['Key'])
             if not match_result:
                 continue
             value = json.loads(node['Value'])
             value['state'] = self.get_device_ha_state(status)
-            LOG.debug('Setting node=%s in KV with state=%s',
-                      node_fid, value['state'])
-            self.kv.kv_put(node['Key'], json.dumps(value))
+            LOG.debug('Setting node=%s in KV with state=%s', node_fid,
+                      value['state'])
+            self.kv.kv_put(node['Key'], json.dumps(value), kv_cache=kv_cache)
 
     @repeat_if_fails()
     def set_encl_state(self,
