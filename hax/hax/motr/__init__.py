@@ -21,7 +21,7 @@ import logging
 from errno import EAGAIN
 from typing import Any, List, Optional
 
-from hax.consul.cache import supports_consul_cache
+from hax.consul.cache import supports_consul_cache, uses_consul_cache
 from hax.exception import ConfdQuorumException, RepairRebalanceException
 from hax.message import (EntrypointRequest, FirstEntrypointRequest,
                          HaNvecGetEvent, ProcessEvent, StobIoqError)
@@ -265,9 +265,11 @@ class Motr:
                                    rm_fid.to_c(), make_c_str(rm_eps))
         LOG.debug('Entrypoint request has been replied to')
 
+    @supports_consul_cache
     def broadcast_ha_states(self,
                             ha_states: List[HAState],
-                            notify_devices=True) -> List[MessageId]:
+                            notify_devices=True,
+                            kv_cache=None) -> List[MessageId]:
         LOG.debug('Broadcasting HA states %s over ha_link', ha_states)
 
         def ha_obj_state(st):
@@ -284,8 +286,10 @@ class Motr:
             if st.fid.container == ObjT.PROCESS.value:
                 self.consul_util.set_process_state(st.fid, st.status)
 
-            notes += self._generate_sub_services(note, self.consul_util,
-                                                 notify_devices)
+            notes += self._generate_sub_services(note,
+                                                 self.consul_util,
+                                                 notify_devices,
+                                                 kv_cache=kv_cache)
             # For process failure, we report failure for the corresponding
             # node (enclosure) and CVGs if all Io services are failed.
             if (st.fid.container == ObjT.PROCESS.value
@@ -299,7 +303,7 @@ class Motr:
                 # not in failed state then we will mark node as OK
                 # If both the above conditions are not true then we will just
                 # mark controller status
-                is_node_failed = self.is_node_failed(note)
+                is_node_failed = self.is_node_failed(note, kv_cache=kv_cache)
                 if (st.status == ServiceHealth.FAILED
                         and is_node_failed):
                     notes += self.notify_node_status_by_process(note)
@@ -314,8 +318,12 @@ class Motr:
             if st.fid.container == ObjT.DRIVE.value:
                 self.consul_util.update_drive_state([st.fid], st.status)
             elif st.fid.container == ObjT.NODE.value:
-                self.consul_util.set_node_state(st.fid, st.status)
-                notes += self.add_enclosing_devices_by_node(st.fid, st.status)
+                self.consul_util.set_node_state(st.fid,
+                                                st.status,
+                                                kv_cache=kv_cache)
+                notes += self.add_enclosing_devices_by_node(st.fid,
+                                                            st.status,
+                                                            kv_cache=kv_cache)
         if not notes:
             return []
         message_ids: List[MessageId] = self._ffi.ha_broadcast(
@@ -383,13 +391,16 @@ class Motr:
         self._ffi.ha_nvec_reply(event.hax_msg, make_array(HaNoteStruct, notes),
                                 len(notes))
 
+    @supports_consul_cache
     def _generate_sub_services(self,
                                note: HaNoteStruct,
                                cns: ConsulUtil,
-                               notify_devices=True) -> List[HaNoteStruct]:
+                               notify_devices=True,
+                               kv_cache=None) -> List[HaNoteStruct]:
         new_state = note.no_state
         fid = Fid.from_struct(note.no_id)
-        service_list = cns.get_services_by_parent_process(fid)
+        service_list = cns.get_services_by_parent_process(fid,
+                                                          kv_cache=kv_cache)
         LOG.debug('Process fid=%s encloses %s services as follows: %s', fid,
                   len(service_list), service_list)
         service_notes = [
@@ -400,9 +411,12 @@ class Motr:
             service_notes += self._generate_sub_disks(note, service_list, cns)
         return service_notes
 
-    def _generate_sub_disks(self, note: HaNoteStruct,
+    @supports_consul_cache
+    def _generate_sub_disks(self,
+                            note: HaNoteStruct,
                             services: List[FidWithType],
-                            cns: ConsulUtil) -> List[HaNoteStruct]:
+                            cns: ConsulUtil,
+                            kv_cache=None) -> List[HaNoteStruct]:
         disk_list = []
         new_state = note.no_state
         proc_fid = Fid.from_struct(note.no_id)
@@ -434,8 +448,10 @@ class Motr:
                                                no_state=dstate))
         return drive_ha_notes
 
-    def _is_mkfs(self, proc_fid: Fid) -> bool:
-        status = self.consul_util.get_process_status(proc_fid)
+    @uses_consul_cache
+    def _is_mkfs(self, proc_fid: Fid, kv_cache=None) -> bool:
+        status = self.consul_util.get_process_status(proc_fid,
+                                                     kv_cache=kv_cache)
         mkfs = m0HaProcessType.M0_CONF_HA_PROCESS_M0MKFS.name
         return status.proc_type == mkfs
 
@@ -453,31 +469,36 @@ class Motr:
             HaNoteStruct(no_id=node_fid.to_c(), no_state=state_int)
         ]
 
-    def add_enclosing_devices_by_node(
-            self,
-            node_fid: Fid,
-            new_state: ServiceHealth,
-            node: Optional[str] = None) -> List[HaNoteStruct]:
+    @uses_consul_cache
+    def add_enclosing_devices_by_node(self,
+                                      node_fid: Fid,
+                                      new_state: ServiceHealth,
+                                      node: Optional[str] = None,
+                                      kv_cache=None) -> List[HaNoteStruct]:
         """
         Returns the list of HA notes with the state derived
         from the given node. The node is not included into the resulting list.
         """
 
-        node = node or self.consul_util.get_node_name_by_fid(node_fid)
-        encl_fid = self.consul_util.get_node_encl_fid(node)
-        ctrl_fids = self.consul_util.get_node_ctrl_fids(node)
+        node = node or self.consul_util.get_node_name_by_fid(node_fid,
+                                                             kv_cache=kv_cache)
+        encl_fid = self.consul_util.get_node_encl_fid(node, kv_cache=kv_cache)
+        ctrl_fids = self.consul_util.get_node_ctrl_fids(node,
+                                                        kv_cache=kv_cache)
         LOG.debug('node_fid: %s encl_fid: %s ctrl_fids: %s with state: %s',
                   node_fid, encl_fid, ctrl_fids, new_state)
 
         state_int = new_state.to_ha_note_status()
         # Update the enclosure state based on the event.
-        self.consul_util.set_encl_state(encl_fid, new_state)
+        self.consul_util.set_encl_state(encl_fid, new_state, kv_cache=kv_cache)
 
         # Update the states of all the controllers as failed, in case of
         # node failure event.
         if new_state == ServiceHealth.FAILED and ctrl_fids:
             for x in ctrl_fids:
-                self.consul_util.set_ctrl_state(x, new_state)
+                self.consul_util.set_ctrl_state(x,
+                                                new_state,
+                                                kv_cache=kv_cache)
 
         notes = []
         if encl_fid:
@@ -487,12 +508,13 @@ class Motr:
         if ctrl_fids:
             for x in ctrl_fids:
                 ctrl_state = self.consul_util.get_ctrl_state(
-                    ObjT.CONTROLLER, x.key)
+                    ObjT.CONTROLLER, x.key, kv_cache=kv_cache)
                 notes.append(HaNoteStruct(no_id=x.to_c(), no_state=ctrl_state))
         return notes
 
-    def notify_node_status_by_process(
-            self, proc_note: HaNoteStruct) -> List[HaNoteStruct]:
+    def notify_node_status_by_process(self,
+                                      proc_note: HaNoteStruct,
+                                      kv_cache=None) -> List[HaNoteStruct]:
         # proc_note.no_state is of int type
         new_state = ServiceHealth.from_ha_note_state(proc_note.no_state)
         proc_fid = Fid.from_struct(proc_note.no_id)
@@ -500,7 +522,7 @@ class Motr:
         LOG.debug('Notifying node status for process_fid=%s state=%s',
                   proc_fid, new_state)
 
-        node = self.consul_util.get_process_node(proc_fid)
+        node = self.consul_util.get_process_node(proc_fid, kv_cache=kv_cache)
 
         if new_state == ServiceHealth.OK:
             # Node can have multiple controllers. Node can be online, with
@@ -512,11 +534,12 @@ class Motr:
             if ctrl_fid:
                 self.consul_util.set_ctrl_state(ctrl_fid, new_state)
 
-        node_fid = self.consul_util.get_node_fid(node)
+        node_fid = self.consul_util.get_node_fid(node, kv_cache=kv_cache)
         notes = self.add_node_state_by_fid(node_fid, new_state)
         notes += self.add_enclosing_devices_by_node(node_fid,
                                                     new_state,
-                                                    node=node)
+                                                    node=node,
+                                                    kv_cache=kv_cache)
         return notes
 
     def get_ctrl_status(self,
@@ -537,13 +560,14 @@ class Motr:
         return None
 
     # Check if all the IO services of node are failed
-    def is_node_failed(self, proc_note: HaNoteStruct):
+    @supports_consul_cache
+    def is_node_failed(self, proc_note: HaNoteStruct, kv_cache=None):
         proc_fid = Fid.from_struct(proc_note.no_id)
         assert ObjT.PROCESS.value == proc_fid.container
 
-        node = self.consul_util.get_process_node(proc_fid)
+        node = self.consul_util.get_process_node(proc_fid, kv_cache=kv_cache)
 
-        return self.consul_util.all_io_services_failed(node)
+        return self.consul_util.all_io_services_failed(node, kv_cache=kv_cache)
 
     def notify_hax_stop(self):
         LOG.debug('Notifying hax stop')
