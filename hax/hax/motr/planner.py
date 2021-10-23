@@ -340,7 +340,8 @@ class WorkPlanner:
             self.state.next_group_id = self._get_increased_group(
                 self.state.next_group_id)
 
-        if isinstance(cmd, AnyEntrypointRequest):
+        if (isinstance(cmd, AnyEntrypointRequest)
+                or isinstance(cmd, HaNvecGetEvent)):
             # Entrypoint and Die will always be added to the CURRENT group
             # (the one being currently active), so they can be executed at
             # first priority.
