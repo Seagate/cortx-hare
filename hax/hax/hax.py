@@ -117,7 +117,11 @@ def main():
     planner = WorkPlanner()
 
     util: ConsulUtil = ConsulUtil()
-    _remove_stale_session(util)
+    # Avoid removing session on hax start as this will happen
+    # on every node, thus leader election will keep re-triggering
+    # until the final hax node starts, this will delay further
+    # bootstrapping operations.
+    # _remove_stale_session(util)
     cfg: HL_Fids = _get_motr_fids(util)
 
     LOG.info('Welcome to HaX')

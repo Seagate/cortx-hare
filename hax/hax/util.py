@@ -589,7 +589,8 @@ class ConsulUtil:
             node_name: str = json.loads(data)['name']
             if (self.get_node_health_status(node_name, kv_cache=kv_cache) !=
                     'passing'):
-                obj_state = HaNoteStruct.M0_NC_FAILED
+                obj_state = self._check_process_status_node_failure(
+                           fidk, kv_cache=kv_cache).to_ha_note_status()
 
         device_obj_types = self.object_state_getters
         if obj_t.name in (ObjT.PROCESS.name, ObjT.SERVICE.name):
@@ -1289,6 +1290,27 @@ class ConsulUtil:
         LOG.debug('Setting disk state in KV: %s:%s', key, data)
         self.kv.kv_put(key, data, kv_cache=kv_cache)
 
+    # Containers start and stop out-of-order, especially mkfs
+    # container can complete and stop while other containers are still
+    # working, this is not a container failure. Consul agents on other
+    # nodes may detect this as a node failure. Hax does not want to send
+    # a FAILED notification to other working process for a successfully
+    # completed container(s).
+    # Thus, if consul reports node failure, we check the consul kv
+    # information for the given process and if it's a mkfs container then
+    # don't report failure if it has completed successfully.
+    @uses_consul_cache
+    def _check_process_status_node_failure(self, proc_id: int,
+                                           kv_cache=None) -> ServiceHealth:
+        pfid = create_process_fid(proc_id)
+        cns_status = self.get_process_status(pfid,
+                                             kv_cache=kv_cache)
+        if (cns_status.proc_type in
+                (m0HaProcessType.M0_CONF_HA_PROCESS_M0MKFS.name,
+                 'Unknown')):
+            return ServiceHealth.OFFLINE
+        return ServiceHealth.FAILED
+
     # It is tricky to report a correct service status due to various
     # failure conditions. Consul notification can be delayed, the
     # corresponding process might be already restarting. Thus, following
@@ -1393,8 +1415,9 @@ class ConsulUtil:
                     else:
                         status = svc_health.motr_proc_status_remote
                     if (status != ServiceHealth.OK and
-                            cns_status.proc_type == (
-                            m0HaProcessType.M0_CONF_HA_PROCESS_M0MKFS.name)):
+                            cns_status.proc_type in (
+                            m0HaProcessType.M0_CONF_HA_PROCESS_M0MKFS.name,
+                            'Unknown')):
                         status = ServiceHealth.OFFLINE
 
                     # This situation is not expected but we handle
