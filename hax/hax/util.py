@@ -598,7 +598,8 @@ class ConsulUtil:
             node_name: str = json.loads(data)['name']
             if (self.get_node_health_status(node_name, kv_cache=kv_cache) !=
                     'passing'):
-                obj_state = HaNoteStruct.M0_NC_FAILED
+                obj_state = self._check_process_status_node_failure(
+                           fidk, kv_cache=kv_cache).to_ha_note_status()
 
         device_obj_types = self.object_state_getters
         if obj_t.name in (ObjT.PROCESS.name, ObjT.SERVICE.name):
@@ -1314,12 +1315,9 @@ class ConsulUtil:
         pfid = create_process_fid(proc_id)
         cns_status = self.get_process_status(pfid,
                                              kv_cache=kv_cache)
-        if (cns_status.proc_status in ('M0_CONF_HA_PROCESS_STOPPED',
-                                       'M0_CONF_HA_PROCESS_STOPPING',
-                                       'unknown') and (
-            cns_status.proc_type in
+        if (cns_status.proc_type in
                 (m0HaProcessType.M0_CONF_HA_PROCESS_M0MKFS.name,
-                 'unknown'))):
+                 'Unknown')):
             return ServiceHealth.OFFLINE
         return ServiceHealth.FAILED
 
@@ -1430,8 +1428,9 @@ class ConsulUtil:
                     else:
                         status = svc_health.motr_proc_status_remote
                     if (status != ServiceHealth.OK and
-                            cns_status.proc_type == (
-                            m0HaProcessType.M0_CONF_HA_PROCESS_M0MKFS.name)):
+                            cns_status.proc_type in (
+                            m0HaProcessType.M0_CONF_HA_PROCESS_M0MKFS.name,
+                            'Unknown')):
                         status = ServiceHealth.OFFLINE
 
                     # This situation is not expected but we handle
