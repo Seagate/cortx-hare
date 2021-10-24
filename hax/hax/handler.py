@@ -30,7 +30,7 @@ from hax.motr import Motr
 from hax.motr.delivery import DeliveryHerald
 from hax.motr.planner import WorkPlanner
 from hax.queue.publish import EQPublisher
-from hax.types import (ConfHaProcess, HAState, MessageId, HaLinkMessagePromise,
+from hax.types import (ConfHaProcess, HAState, MessageId,
                        ObjT, ServiceHealth, StoppableThread, m0HaProcessEvent,
                        m0HaProcessType)
 from hax.util import ConsulUtil, dump_json, repeat_if_fails
@@ -76,7 +76,7 @@ class ConsumerThread(StoppableThread):
                     ServiceHealth.OK),
             (m0HaProcessType.M0_CONF_HA_PROCESS_M0MKFS,
                 m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED): (
-                    ServiceHealth.STOPPED),
+                    ServiceHealth.OFFLINE),
             (m0HaProcessType.M0_CONF_HA_PROCESS_M0D,
                 m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED): (
                     ServiceHealth.OK),
@@ -166,17 +166,6 @@ class ConsumerThread(StoppableThread):
 
                     LOG.debug('Got %s message from planner', item)
                     if isinstance(item, FirstEntrypointRequest):
-                        LOG.debug('first entrypoint request, broadcast FAILED')
-                        ids: List[MessageId] = motr.broadcast_ha_states(
-                            [
-                                HAState(fid=item.process_fid,
-                                        status=ServiceHealth.FAILED)
-                            ],
-                            notify_devices=False)
-                        LOG.debug('waiting for broadcast of %s for ep: %s',
-                                  ids, item.remote_rpc_endpoint)
-                        # Wait for failure delivery.
-                        self.herald.wait_for_all(HaLinkMessagePromise(ids))
                         motr.send_entrypoint_request_reply(
                             EntrypointRequest(
                                 reply_context=item.reply_context,
