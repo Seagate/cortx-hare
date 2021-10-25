@@ -1489,7 +1489,7 @@ class ConfPool(ToDhall):
     def gen_sns_tolerance(cls, m0conf: Dict[Oid, Any],
                           pool_desc: Dict[str, Any],
                           cluster_desc: Dict[str, Any]) -> Failures:
-        
+
         encls_nr = len(cluster_encls(m0conf, SvcT.M0_CST_IOS))
         ctrls_per_encl = floor(len(cluster_ctrls(m0conf)) / encls_nr)
         data_units = pool_desc['data_units']
@@ -2382,7 +2382,7 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
 
                 aux_pool_list(pool, disks, conf, cluster_desc)
             else:
-                ConfPool.build(conf, root_id, pool, cluster_desc)    
+                ConfPool.build(conf, root_id, pool, cluster_desc)
 
         for pool in itertools.chain(cluster_desc['pools'],
                                     *aux_pools.values()):
