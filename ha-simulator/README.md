@@ -21,9 +21,10 @@ This section describes how this docker environment can be used.
 
 2.  docker-compose should be installed, see docs [here](https://docs.docker.com/compose/install/)
 
-3.  cortx-ha (with EventManager support - see `fault_tolerance` branch) must be installed:
+3.  cortx-ha (with EventManager support - see `main` branch) must be installed:
 
-    *   either install the RPM from [here](http://cortx-storage.colo.seagate.com/releases/cortx/github/integration-custom-ci/centos-7.8.2003/custom-build-2434/cortx_iso/)
+    *   either install the RPM from [here](http://cortx-storage.colo.seagate.com/releases/cortx/github/main/centos-7.9.2009/last_successful/).
+    (To install, copy link address for cortx-ha rpm and use command `yum install <rpm link>'.)
 
     *   or install cortx-ha into your virtualenv (this approach assumes that you run Hare from virtualenv environment, i.e. you had used `make devinstall`):
 
@@ -31,7 +32,7 @@ This section describes how this docker environment can be used.
 
         2.  Checkout cortx-ha sources: `git clone https://github.com/Seagate/cortx-ha.git`
 
-        3.  `cd cortx-ha && git checkout fault_tolerance`
+        3.  `cd cortx-ha`
 
         4.  `python ./setup.py develop` - this will make sure that Hare virtualenv contains cortx-ha types and modules.
 
