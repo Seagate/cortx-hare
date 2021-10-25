@@ -126,7 +126,6 @@ class TestMessageOrder(unittest.TestCase):
         def my_state():
             return State(next_group_id=99999,
                          active_commands=LinkedList(),
-                         taken_commands=LinkedList(),
                          current_group_id=99999,
                          next_group_commands=set(),
                          is_shutdown=False)
@@ -315,6 +314,78 @@ class TestWorkPlanner(unittest.TestCase):
         (cmd, ts) = tracks[0]
         self.assertTrue(isinstance(cmd, EntrypointRequest))
 
+    def test_workers_not_blocked_by_future_work(self):
+        planner = WorkPlanner()
+        group_idx = 0
+
+        tracker = TimeTracker()
+        thread_count = 2
+        # We add way more commands than we have workers now
+        for i in range(8):
+            planner.add_command(broadcast())
+
+        planner.add_command(entrypoint())
+
+        for j in range(thread_count):
+            planner.add_command(Die())
+
+        exc = None
+
+        def fn(planner: WorkPlanner):
+            nonlocal exc
+            try:
+                while True:
+                    LOG.log(TRACE, "Requesting for a work")
+                    cmd = planner.get_next_command()
+                    LOG.log(TRACE, "The command is received %s [group=%s]",
+                            type(cmd), cmd.group)
+
+                    if isinstance(cmd, BroadcastHAStates):
+                        time.sleep(1)
+
+                    if isinstance(cmd, EntrypointRequest):
+                        planner.shutdown()
+
+                    if isinstance(cmd, Die):
+                        LOG.log(TRACE,
+                                "Poison pill is received - exiting. Bye!")
+                        planner.notify_finished(cmd)
+                        break
+                    tracker.log(cmd)
+                    LOG.log(TRACE, "The job is done, notifying the planner")
+                    planner.notify_finished(cmd)
+                    LOG.log(TRACE, "Notified. ")
+
+            except Exception as e:
+                LOG.exception('*** ERROR ***')
+                exc = e
+
+        workers = [
+            Thread(target=fn, args=(planner, )) for t in range(thread_count)
+        ]
+
+        t0 = time.time()
+        for t in workers:
+            t.start()
+
+        for t in workers:
+            t.join()
+        if exc:
+            raise exc
+        tracks = tracker.get_tracks()
+
+        idx, (cmd, ts) = self.find(tracks,
+                             lambda a: isinstance(a[0], EntrypointRequest),
+                             'EntrypointRequest not processed')
+        self.assertTrue(ts - t0 < 3)
+        self.assertTrue(len(tracks) < 4)
+
+    def find(self, collection, find_by, msg_if_fail=''):
+        for (i, elem) in enumerate(collection):
+            if find_by(elem):
+                return (i, elem)
+        raise RuntimeError(f'Not found: {msg_if_fail}')
+
     def test_groups_processed_sequentially_4_threads(self):
         planner = WorkPlanner()
         group_idx = 0
@@ -387,7 +458,6 @@ class TestWorkPlanner(unittest.TestCase):
         def my_state():
             return State(next_group_id=99999,
                          active_commands=LinkedList(),
-                         taken_commands=LinkedList(),
                          current_group_id=99999,
                          next_group_commands=set(),
                          is_shutdown=False)
