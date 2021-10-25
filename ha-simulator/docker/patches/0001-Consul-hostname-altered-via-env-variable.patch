@@ -1,6 +1,6 @@
-From 94349eb7f777735e0d73fd2c64a6fdaa72c3454f Mon Sep 17 00:00:00 2001
+From b22878ef5004123799345131706eee72ef64dd41 Mon Sep 17 00:00:00 2001
 From: Konstantin Nekrasov <konstantin.nekrasov@seagate.com>
-Date: Fri, 6 Aug 2021 03:14:44 -0600
+Date: Mon, 25 Oct 2021 08:09:39 -0600
 Subject: [PATCH] Consul hostname altered via env variable
 
 Signed-off-by: Konstantin Nekrasov <konstantin.nekrasov@seagate.com>
@@ -9,18 +9,18 @@ Signed-off-by: Konstantin Nekrasov <konstantin.nekrasov@seagate.com>
  1 file changed, 3 insertions(+), 1 deletion(-)
 
 diff --git a/ha/core/config/config_manager.py b/ha/core/config/config_manager.py
-index 1ff91eb..de2b322 100644
+index 593823c..814df6f 100644
 --- a/ha/core/config/config_manager.py
 +++ b/ha/core/config/config_manager.py
-@@ -28,6 +28,7 @@ from cortx.utils.conf_store.conf_store import Conf
- from ha import const
- from ha.util.consul_kv_store import ConsulKvStore
- from ha.const import _DELIM
-+import os
+@@ -22,6 +22,7 @@
+  ****************************************************************************
+ """
  
- # TODO: redefine class as per config manager module design
- class ConfigManager:
-@@ -68,7 +69,8 @@ class ConfigManager:
++import os
+ from cortx.utils.log import Log
+ from cortx.utils.conf_store.conf_store import Conf
+ 
+@@ -69,7 +70,8 @@ class ConfigManager:
          Used by config manager methods to check and initalize confstore if needed.
          """
          if ConfigManager._cluster_confstore is None:
