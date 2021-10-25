@@ -257,7 +257,7 @@ class CdfGenerator:
                         pool_info=DList(pools, 'List PoolInfo'),
                         profile_info=DList(profiles, 'List ProfileInfo'),
                         fdmi_filter_info=fdmi_filters))
-                   
+
         gencdf = Template(self._gencdf()).substitute(path=dhall_path,
                                                      params=params_text)
         return gencdf

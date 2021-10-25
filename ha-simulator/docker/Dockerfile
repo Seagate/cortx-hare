@@ -19,10 +19,10 @@ RUN    python3 -m venv --system-site-packages .py-venv/ \
     && pip install -r ./requirements.txt
 RUN    pip3 install -r https://raw.githubusercontent.com/Seagate/cortx-utils/main/py-utils/python_requirements.txt \
     && pip3 install -r https://raw.githubusercontent.com/Seagate/cortx-utils/main/py-utils/python_requirements.ext.txt \
-    && yum install -y http://cortx-storage.colo.seagate.com/releases/cortx/github/stable/centos-7.8.2003/last_successful/cortx-py-utils-2.0.0-125_3fc14c6.noarch.rpm
+    && yum install -y http://cortx-storage.colo.seagate.com/releases/cortx/github/main/centos-7.9.2009/last_successful/$(curl --silent http://cortx-storage.colo.seagate.com/releases/cortx/github/main/centos-7.9.2009/last_successful/ | grep py-utils | sed 's/.*href="\([^"]*\)".*/\1/g')
 RUN    git config --global user.name "Konstantin Nekrasov" \
     && git config --global user.email "konstantin.nekrasov@seagate.com" \
-    && git clone --branch fault_tolerance https://github.com/Seagate/cortx-ha.git
+    && git clone --branch main https://github.com/Seagate/cortx-ha.git
 WORKDIR /app/cortx-ha/
 RUN find /app/patches -type f -print0 | xargs -0 -n1 git am
 RUN source ../.py-venv/bin/activate && python ./setup.py install
