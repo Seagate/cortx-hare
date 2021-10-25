@@ -45,11 +45,6 @@ class State:
     # Commands that are being processed now
     active_commands: LinkedList[BaseMessage]
     #
-    # The commands that have already been taken by the worker threads
-    # but not approved yet for execution (so either threads haven't invoked
-    # ensure_allowed() yet or ensure_allowed() has not succeded for them).
-    taken_commands: LinkedList[BaseMessage]
-    #
     # Types of commands that have already been added to group number
     # next_group_id.
     #
@@ -117,7 +112,6 @@ class WorkPlanner:
         '''
         return State(next_group_id=0,
                      active_commands=LinkedList(),
-                     taken_commands=LinkedList(),
                      current_group_id=0,
                      next_group_commands=set(),
                      is_shutdown=False)
@@ -151,9 +145,14 @@ class WorkPlanner:
                 return self._create_poison()
             if self.backlog:
                 cmd = self.backlog.popleft()
-                LOG.log(TRACE, '[WP]Cmd %s taken!', cmd)
-                self.state.taken_commands.add(cmd)
-                return cmd
+                if self._is_allowed(cmd):
+                    self.state.active_commands.add(cmd)
+                    LOG.log(TRACE, '[WP]Cmd %s taken!', cmd)
+                    return cmd
+                else:
+                    # Given the command is not eligble, put it back
+                    # to the same place it has been taken from.
+                    self.backlog.appendleft(cmd)
             return None
 
         while True:
@@ -161,8 +160,10 @@ class WorkPlanner:
             with self.b_lock:
                 cmd = next_cmd()
                 if cmd:
-                    return self._ensure_allowed(cmd)
-                LOG.log(TRACE, '[WP]Blocking thread: no commands in backlog')
+                    return cmd
+                LOG.log(
+                    TRACE,
+                    '[WP]Blocking thread: no eligible commands in backlog')
                 self.b_lock.wait()
 
     def shutdown(self):
@@ -174,43 +175,19 @@ class WorkPlanner:
             self.state.is_shutdown = True
             self.b_lock.notifyAll()
 
-    def _ensure_allowed(self, command: BaseMessage) -> BaseMessage:
-        ''' The method which must be invoked by every worker thread before
-        starting the command execution. If WorkPlanner allows this command
-        to be executed right now then this method will return early.
-
-        The command is allowed for execution if and only if the command has
+    def _is_allowed(self, command: BaseMessage) -> bool:
+        ''' The command is allowed for execution if and only if the command has
         group_id equal to the currently active group (see
         State.current_group_id). The command group ids are assigned just once
         when the command is being added to the WorkPlanner via add_command()
         method.
-
-        If the the given command doesn't belong to the currently active group,
-        this function blocks the current thread until the command becomes
-        eligible for execution. In other words, the caller can always assume
-        that once this function returns, the execution is allowed for sure.
-
-        Note: the method returns the command to be executed. The worker must
-        execute the command which is returned by this method!
-
-        In 'shutting down' mode WorkPlanner may return Die command instead of
-        the one provided as an argument.
         '''
         def is_current(cmd: BaseMessage, st: State) -> bool:
             return cmd.group == st.current_group_id
 
-        while True:
-            with self.b_lock:
-                state = self.state
-                if state.is_shutdown:
-                    return self._create_poison()
-                if is_current(command, state):
-                    state.taken_commands.remove(command)
-                    state.active_commands.add(command)
-                    return command
-                LOG.log(TRACE, '[WP]Cmd %s not allowed for now.'
-                        ' Current state: %s', command, self.state)
-                self.b_lock.wait()
+        with self.b_lock:
+            state = self.state
+            return is_current(command, state)
 
     def _get_increased_group(self, current: int) -> int:
         ''' Returns the next valid group_id number by the given current value.
@@ -256,9 +233,6 @@ class WorkPlanner:
             if state.active_commands:
                 return
             for c in self.backlog:
-                if c.group == state.current_group_id:
-                    return
-            for c in state.taken_commands:
                 if c.group == state.current_group_id:
                     return
             # if we're here, command was the only one belonging to group
