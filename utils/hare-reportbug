@@ -19,30 +19,66 @@
 
 set -eu -o pipefail
 export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
-# set -x
+set -x
 
 # :help: gather Hare forensic data
 
 PROG=${0##*/}
 DEFAULT_DEST_DIR=/tmp
+DEFAULT_LOG_DIR=/var/lib/hare
+DEFAULT_CONF_DIR=/var/log/seagate/hare
 
 usage() {
     cat <<EOF
-Usage: $PROG [-h | --help] [<bundle-id> <dest-dir>]
+Usage: $PROG -b <bundleid> -t <path> -c <confstore_url> --systemd_disabled
 
 Create '<dest-dir>/hare/hare_<bundle-id>.tar.gz' archive with Hare
 forensic data --- logs and configuration files, which can be used for
 reporting and researching Hare bugs.
 
 Positional arguments:
-  bundle-id   Support bundle ID; defaults to the local host name
-              (${HOSTNAME%%.*}).
-  dest-dir    Target directory; defaults to '$DEFAULT_DEST_DIR'.
+  -b                    Unique bundle-id used to identify support bundles.
+  -t                    Location at which support bundle needs to be copied.
+  -c                    Configuration directory where Hare
+                        config files are present.
+  -l                    The directory where the Hare related log files
+                        are present.
+  --no-systemd          When set, systemd facilities will not be used to
+                        generate the logs
 
 Options:
   -h, --help   Show this help and exit.
 EOF
 }
+
+bundle_id=$HOSTNAME
+dest_dir=$DEFAULT_DEST_DIR
+log_dir=$DEFAULT_LOG_DIR
+conf_dir=$DEFAULT_CONF_DIR
+use_systemd=true
+
+TEMP=$(getopt --options hm:b:t:c:l: \
+              --longoptions help,systemd-disabled \
+              --name "$PROG" -- "$@" || true)
+
+eval set -- "$TEMP"
+while true; do
+    case "$1" in
+        -h|--help)            usage; exit ;;
+        -b)                   bundle_id=$2; shift 2 ;;
+        -t)                   dest_dir=$2; shift 2 ;;
+        -c)                   conf_dir=$2; shift 2 ;;
+        -l)                   log_dir=$2; shift 2 ;;
+        --no-systemd)         use_systemd=false; shift ;;
+        --)                   shift; break ;;
+        *)                    echo 'getopt: internal error...'; exit 1 ;;
+    esac
+done
+
+echo "Bundle_id: $bundle_id"
+echo "dest_dir: $dest_dir"
+echo "conf_dir: $conf_dir"
+echo "log_dir: $log_dir"
 
 die() {
     echo "$PROG: $*" >&2
@@ -60,6 +96,10 @@ systemd_journal() {
     done
 }
 
+running_process_list() {
+    ps aux > processes.txt || true
+}
+
 case "${1:-}" in
     -h|--help) usage; exit;;
 esac
@@ -67,9 +107,6 @@ esac
 if (($? != 0 && $? != 2)); then
     die "Wrong number of arguments. Type '$PROG --help' for usage."
 fi
-
-bundle_id=${1:-${HOSTNAME%%.*}}
-dest_dir=${2:-$DEFAULT_DEST_DIR}
 
 if [[ -z $bundle_id || -z $dest_dir ]]; then
     die "Invalid argument. Type '$PROG --help' for usage."
@@ -87,13 +124,17 @@ cd "$dest_dir/hare/$HOSTNAME"
 exec 5>&2
 exec 2> >(tee _reportbug.stderr >&2)
 
-systemd_journal
+if $use_systemd; then
+    systemd_journal
 
-sudo journalctl --no-pager --full --utc --output=json --unit=pacemaker.service \
-     > syslog-pacemaker.json || true
+    sudo journalctl --no-pager --full --utc --output=json --unit=pacemaker.service \
+         > syslog-pacemaker.json || true
 
-sudo systemctl --all --full --no-pager status {hare,m0,motr,s3}\* \
-     > systemctl-status.txt || true
+    sudo systemctl --all --full --no-pager status {hare,m0,motr,s3}\* \
+         > systemctl-status.txt || true
+else
+    running_process_list
+fi
 
 # cluster status
 sudo timeout --kill-after 30 15 hctl status \
@@ -113,9 +154,9 @@ for f in ${extra_files[@]}; do
     fi
 done
 
-cp --parents /var/lib/hare/* . 2>/dev/null || true
-cp -r --parents /var/lib/hare/consul-{env,server,client}-* . 2>/dev/null || true
-cp -r --parents /var/log/seagate/hare/ . 2>/dev/null || true
+cp --parents $conf_dir/* . 2>/dev/null || true
+cp -r --parents $conf_dir/consul-{env,server,client}-* . 2>/dev/null || true
+cp -r --parents $log_dir/ . 2>/dev/null || true
 cp -r --parents /var/log/cluster/ . 2>/dev/null || true
 
 cd ..

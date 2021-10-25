@@ -575,10 +575,25 @@ def generate_support_bundle(args):
     try:
         # Default target directory is /tmp/hare
         cmd = ['hctl', 'reportbug']
-        if args.bundleid:
-            cmd.append(args.bundleid)
-        if args.destdir:
-            cmd.append(args.destdir)
+        if args.b:
+            cmd.append('-b')
+            cmd.append(args.b[0])
+        if args.t:
+            cmd.append('-t')
+            cmd.append(args.t[0])
+
+        url = args.config[0]
+        log_dir = get_log_dir(url)
+        conf_dir = get_config_dir(url)
+        cmd.append('-l')
+        cmd.append(log_dir)
+        cmd.append('-c')
+        cmd.append(conf_dir)
+
+        provider = ConfStoreProvider(url)
+        if provider.get('cortx>common>setup_type') == 'K8':
+            cmd.append('--no-systemd')
+
         execute(cmd)
     except Exception as error:
         logging.error('Error while generating support bundle (%s)', error)
@@ -790,7 +805,7 @@ def add_subcommand(subparser,
     parser = subparser.add_parser(command, help=help_str)
     parser.set_defaults(func=handler_fn)
 
-    parser.add_argument('--config',
+    parser.add_argument('--config', '-c',
                         help='Conf Store URL with cluster info',
                         required=config_required,
                         nargs=1,
@@ -839,7 +854,7 @@ def add_factory_argument(parser):
 
 
 def add_service_argument(parser):
-    parser.add_argument('--services',
+    parser.add_argument('--services', '-s',
                         help='Services to be setup.',
                         nargs=1,
                         type=Svc,
@@ -910,21 +925,22 @@ def main():
         add_subcommand(subparser,
                        'support_bundle',
                        help_str='Generates support bundle',
-                       handler_fn=generate_support_bundle,
-                       config_required=False))
+                       handler_fn=generate_support_bundle))
 
     sb_sub_parser.add_argument(
-        'bundleid',
-        metavar='bundle-id',
+        '-b',
         type=str,
-        nargs='?',
-        help='Support bundle ID; defaults to the local host name.')
+        nargs=1,
+        help='Unique bundle-id used to identify support bundles; '
+             'defaults to the local host name.',
+        action='store')
 
-    sb_sub_parser.add_argument('destdir',
-                               metavar='dest-dir',
-                               type=str,
-                               nargs='?',
-                               help='Target directory; defaults to /tmp/hare.')
+    sb_sub_parser.add_argument(
+        '-t',
+        type=str,
+        nargs=1,
+        help='Target directory; defaults to /tmp/hare.',
+        action='store')
 
     add_service_argument(
         add_file_argument(
@@ -941,8 +957,7 @@ def main():
                 'cleanup',
                 help_str='Resets Hare configuration,'
                          ' logs & formats Motr metadata',
-                handler_fn=cleanup,
-                config_required=False)))
+                handler_fn=cleanup)))
 
     add_service_argument(
         add_subcommand(subparser,
