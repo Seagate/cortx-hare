@@ -585,7 +585,8 @@ class ConsulUtil:
             # TODO [KN] This code is too cryptic. To be refactored.
             keys = getattr(self, 'get_{}_keys'.format(obj_t.name.lower()))(
                 node_items, fidk)
-            assert len(keys) == 1
+            if len(keys) != 1:
+                raise RuntimeError(f'XXX fidk:{fidk} len:{len(keys)}')
             key = keys[0].split('/')
             node_key = ('/'.join(key[:3]))
             node_val = self.kv.kv_get(node_key, kv_cache=kv_cache)
@@ -593,8 +594,15 @@ class ConsulUtil:
             node_name: str = json.loads(data)['name']
             if (self.get_node_health_status(node_name, kv_cache=kv_cache) !=
                     'passing'):
+                proc_fid_key = fidk
+                if obj_t.name == ObjT.SERVICE.name:
+                    svc_fid = create_service_fid(fidk)
+                    pfid = self.get_service_process_fid(svc_fid,
+                                                        kv_cache=kv_cache)
+                    proc_fid_key = pfid.key
                 obj_state = self._check_process_status_node_failure(
-                           fidk, kv_cache=kv_cache).to_ha_note_status()
+                                proc_fid_key,
+                                kv_cache=kv_cache).to_ha_note_status()
 
         device_obj_types = self.object_state_getters
         if obj_t.name in (ObjT.PROCESS.name, ObjT.SERVICE.name):
@@ -620,8 +628,9 @@ class ConsulUtil:
         else:
             pfid = create_process_fid(fidk)
         proc_node = self.get_process_node(pfid, kv_cache=kv_cache)
-        if (self.get_service_health(proc_node, fidk, kv_cache=kv_cache)
-                in (ServiceHealth.OK, ServiceHealth.UNKNOWN)):
+        if (self.get_service_health(proc_node, pfid.key, kv_cache=kv_cache) in
+                (ServiceHealth.OK, ServiceHealth.UNKNOWN,
+                 ServiceHealth.OFFLINE)):
             return HaNoteStruct.M0_NC_ONLINE
         else:
             return HaNoteStruct.M0_NC_FAILED
@@ -1039,10 +1048,16 @@ class ConsulUtil:
             val = json.loads(ctrl['Value'])
             state = val['state']
             LOG.debug('Controller=%s state=%s', ctrl_fid, state)
-            if state in (m0HaObjState.M0_NC_ONLINE.name,
-                         m0HaObjState.M0_NC_TRANSIENT.name,
-                         m0HaObjState.M0_NC_FAILED.name):
+            if state == m0HaObjState.M0_NC_ONLINE.name:
                 return m0HaObjState.parse(state)
+            elif state in (m0HaObjState.M0_NC_TRANSIENT.name,
+                           m0HaObjState.M0_NC_FAILED.name):
+                node = self.get_ctrl_node(ctrl_fid, kv_cache=kv_cache)
+                if (self.get_node_health_status(node, kv_cache=kv_cache) ==
+                        'passing'):
+                    return m0HaObjState.M0_NC_ONLINE
+                else:
+                    return m0HaObjState.parse(state)
         return m0HaObjState.M0_NC_ONLINE
 
     @repeat_if_fails()
@@ -1060,10 +1075,16 @@ class ConsulUtil:
             val = json.loads(encl['Value'])
             state = val['state']
             LOG.debug('Enclosure=%s state=%s', encl_fid, state)
-            if state in (m0HaObjState.M0_NC_ONLINE.name,
-                         m0HaObjState.M0_NC_TRANSIENT.name,
-                         m0HaObjState.M0_NC_FAILED.name):
+            if state == m0HaObjState.M0_NC_ONLINE.name:
                 return m0HaObjState.parse(state)
+            elif state in (m0HaObjState.M0_NC_TRANSIENT.name,
+                           m0HaObjState.M0_NC_FAILED.name):
+                node = self.get_encl_node(encl_fid, kv_cache=kv_cache)
+                if (self.get_node_health_status(node, kv_cache=kv_cache) ==
+                        'passing'):
+                    return m0HaObjState.M0_NC_ONLINE
+                else:
+                    return m0HaObjState.parse(state)
         return m0HaObjState.M0_NC_ONLINE
 
     @repeat_if_fails()
@@ -1078,10 +1099,15 @@ class ConsulUtil:
             val = json.loads(node['Value'])
             state = val['state']
             LOG.debug('Node=%s state=%s', node_fid, state)
-            if state in (m0HaObjState.M0_NC_ONLINE.name,
-                         m0HaObjState.M0_NC_TRANSIENT.name,
-                         m0HaObjState.M0_NC_FAILED.name):
+            if state == m0HaObjState.M0_NC_ONLINE.name:
                 return m0HaObjState.parse(state)
+            elif state in (m0HaObjState.M0_NC_TRANSIENT.name,
+                           m0HaObjState.M0_NC_FAILED.name):
+                if (self.get_node_health_status(node, kv_cache=kv_cache) ==
+                        'passing'):
+                    return m0HaObjState.M0_NC_ONLINE
+                else:
+                    return m0HaObjState.parse(state)
         return m0HaObjState.M0_NC_ONLINE
 
     @staticmethod
@@ -1421,12 +1447,21 @@ class ConsulUtil:
             status = ServiceHealth.UNKNOWN
             for item in node_data:
                 if item['ServiceID'] == str(svc_id):
-                    LOG.log(TRACE, 'item.status %s', item['Status'])
-                    if item['Status'] == 'critical':
-                        return ServiceHealth.FAILED
                     pfid = create_process_fid(svc_id)
                     cns_status = self.get_process_status(pfid,
                                                          kv_cache=kv_cache)
+                    LOG.debug('item.status %s', item['Status'])
+                    if item['Status'] == 'critical':
+                        if (cns_status.proc_type in
+                            (m0HaProcessType.M0_CONF_HA_PROCESS_M0MKFS.name,
+                             'Unknown')):
+                            return ServiceHealth.OFFLINE
+                        elif (cns_status.proc_status !=
+                              'M0_CONF_HA_PROCESS_STOPPED'):
+                            return ServiceHealth.OFFLINE
+                        else:
+                            return ServiceHealth.FAILED
+
                     svc_health = svc_to_motr_status_map[MotrConsulProcStatus(
                                          item['Status'],
                                          cns_status.proc_status)]
@@ -1471,13 +1506,64 @@ class ConsulUtil:
             keys = self.get_process_keys(node_items, fidk)
         elif ObjT.SERVICE.value == proc_fid.container:
             keys = self.get_service_keys(node_items, fidk)
-
-        assert len(keys) == 1
+        if len(keys) != 1:
+            raise RuntimeError(f'XXX proc_fid:{proc_fid} fidk:{fidk}'
+                               f'len:{len(keys)}')
         key = keys[0].split('/')
         node_key = ('/'.join(key[:3]))
         node_val = self.kv.kv_get(node_key, kv_cache=kv_cache)
         data = node_val['Value']
         return str(json.loads(data)['name'])
+
+    @uses_consul_cache
+    def get_encl_node(self, encl: Fid, kv_cache=None) -> str:
+        # 'node/<node_name>/process/<process_fidk>/service/type'
+        site_items = self.kv.kv_get('m0conf/sites',
+                                    recurse=True,
+                                    kv_cache=kv_cache)
+        LOG.debug('site_items: %s', site_items)
+        encl_key = [
+            x['Key'] for x in site_items
+            if f'{encl}' == x['Key'].split('/')[-1]
+        ]
+
+        LOG.debug('encl_key: %s', encl_key)
+        encl_val = self.kv.kv_get(encl_key[0], kv_cache=kv_cache)
+        data = encl_val['Value']
+        node_fid = str(json.loads(data)['node'])
+        node_val = self.kv.kv_get(f'm0conf/nodes/{node_fid}',
+                                  kv_cache=kv_cache)
+        node_data = node_val['Value']
+        node_name = str(json.loads(node_data)['name'])
+        LOG.debug('encl fid: %s node fid: %s node_name:%s',
+                  encl, node_fid, node_name)
+        return node_name
+
+    @uses_consul_cache
+    def get_ctrl_encl(self, ctrl: Fid, kv_cache=None) -> Fid:
+        site_items = self.kv.kv_get('m0conf/sites',
+                                    recurse=True,
+                                    kv_cache=kv_cache)
+        ctrl_keys = [
+            x['Key'] for x in site_items
+            if f'{ctrl}' == x['Key'].split('/')[-1]
+        ]
+        encl_fid_str = ctrl_keys[0].split('/')[6]
+        encl_fid = Fid.parse(encl_fid_str)
+
+        LOG.debug('ctrl fid: %s encl fid: %s',
+                  ctrl, encl_fid)
+        return encl_fid
+
+    @uses_consul_cache
+    def get_ctrl_node(self, ctrl: Fid, kv_cache=None) -> str:
+        # 'node/<node_name>/process/<process_fidk>/service/type'
+        encl_fid = self.get_ctrl_encl(ctrl, kv_cache=kv_cache)
+        node_name = self.get_encl_node(encl_fid, kv_cache=kv_cache)
+        LOG.debug('ctrl fid: %s encl fid: %s node_name:%s',
+                  ctrl, encl_fid, node_name)
+
+        return node_name
 
     def get_service_process_fid(self, svc_fid: Fid, kv_cache=None) -> Fid:
         assert ObjT.SERVICE.value == svc_fid.container
@@ -1485,7 +1571,8 @@ class ConsulUtil:
                                     recurse=True,
                                     kv_cache=kv_cache)
         keys = self.get_service_keys(node_items, svc_fid.key)
-        assert len(keys) == 1
+        if len(keys) != 1:
+            raise RuntimeError(f'svc_fid:{svc_fid} len:{len(keys)}')
         process_fid: str = keys[0].split('/')[4]
         pfid = Fid.parse(process_fid)
         return pfid
