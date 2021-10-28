@@ -382,8 +382,8 @@ class Motr:
                   len(event.nvec))
         notes: List[HaNoteStruct] = []
         for n in event.nvec:
-            n.note.no_state = self.consul_util.get_conf_obj_status(
-                ObjT[n.obj_t], n.note.no_id.f_key, kv_cache=kv_cache)
+            n.note.no_state = self.consul_util.get_conf_obj_status_failvec(
+                Fid.from_struct(n.note.no_id), kv_cache=kv_cache)
             notes.append(n.note)
 
         LOG.debug('Replying ha nvec of length ' + str(len(event.nvec)))

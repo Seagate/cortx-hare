@@ -564,6 +564,25 @@ class ConsulUtil:
 
     @repeat_if_fails()
     @uses_consul_cache
+    def get_conf_obj_status_failvec(self,
+                                    obj_fid: Fid,
+                                    kv_cache=None) -> int:
+        to_ha_state_map = {
+            'unknown': HaNoteStruct.M0_NC_UNKNOWN,
+            'online': HaNoteStruct.M0_NC_ONLINE,
+            'offline': HaNoteStruct.M0_NC_TRANSIENT,
+            'failed': HaNoteStruct.M0_NC_FAILED}
+
+        failvec_data = self.kv.kv_get('failvec', kv_cache=kv_cache)
+        failvec = failvec_data['Value']
+        if failvec:
+            obj_state = failvec.get(f'{obj_fid}')
+            if obj_state:
+                return to_ha_state_map[str(obj_state).lower()]
+        return HaNoteStruct.M0_NC_ONLINE
+
+    @repeat_if_fails()
+    @uses_consul_cache
     def get_conf_obj_status(self,
                             obj_t: ObjT,
                             fidk: int,

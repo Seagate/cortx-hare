@@ -2036,6 +2036,7 @@ def generate_consul_kv(cluster: Cluster, dhall_dir: str) -> str:
         ('eq-epoch', 1),
         ('leader', ''),
         ('last_fidk', _fidk_gen),
+        ('failvec', ''),
         *[('m0conf/pools/' + oid_to_fidstr(pool_id), m0conf[pool_id]._name)
           for pool_id in sns_pools()],
         *[('m0conf/profiles/' + oid_to_fidstr(prof_id),
