@@ -130,19 +130,39 @@ def _report_unsupported_features(features_unavailable):
 def get_server_type(url: str) -> str:
     try:
         provider = ConfStoreProvider(url)
-        machine_id = provider.get_machine_id()
-        server_type = provider.get(f'node>{machine_id}>type')
+        # Values supported by below key are - VM, HW, K8
+        server_type = provider.get('cortx>common>setup_type')
 
-        if server_type == 'VM':
-            return 'virtual'
-        else:
-            return 'physical'
+        # For 'server_type' of 'HW' we will consider env as 'physical' and
+        # for 'server_type' of 'VM' and 'K8' we will consider env as virtual
+        return 'physical' if server_type == 'HW' else 'virtual'
     except Exception as error:
         logging.error('Cannot get server type (%s)', error)
         return 'unknown'
 
 
+def logrotate_generic(url: str):
+    try:
+        with open('/opt/seagate/cortx/hare/conf/logrotate/hare',
+                  'r') as f:
+            content = f.read()
+
+        log_dir = get_log_dir(url)
+        content = content.replace('TMP_LOG_PATH',
+                                  log_dir)
+
+        with open('/etc/logrotate.d/hare', 'w') as f:
+            f.write(content)
+
+    except Exception as error:
+        logging.error('Cannot configure logrotate for hare (%s)', error)
+
+
 def logrotate(url: str):
+    ''' This function is kept incase needed in future.
+        This function configures logrotate based on
+        'setup_type' key from confstore
+    '''
     try:
         server_type = get_server_type(url)
         logging.info('Server type (%s)', server_type)
@@ -257,7 +277,7 @@ def post_install(args):
             unsupported_feature(args.config[0])
 
         if args.configure_logrotate:
-            logrotate(args.config[0])
+            logrotate_generic(args.config[0])
 
     except Exception as error:
         logging.error('Error while checking installed rpms (%s)', error)
@@ -347,7 +367,7 @@ def start_hax_and_consul_without_systemd(url: str, utils: Utils):
 def start(args):
     url = args.config[0]
     utils = Utils(ConfStoreProvider(url))
-    logrotate(url)
+    logrotate_generic(url)
     start_crond()
     if args.systemd:
         start_hax_with_systemd()
