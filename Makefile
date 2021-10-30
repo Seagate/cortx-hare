@@ -59,9 +59,14 @@ SETUP_PY    := $(PY_VENV); $(PYTHON) setup.py
 PY3_VERSION := 36
 PY3_VERSION_MINOR := $(shell grep -o . <<<$(PY3_VERSION) | tail -n1)
 DHALL_VERSION := 1.26.1
-DHALL_URL     := https://github.com/dhall-lang/dhall-haskell/releases/download/$(DHALL_VERSION)/dhall-$(DHALL_VERSION)-x86_64-linux.tar.bz2
 DHALL_JSON_VERSION := 1.4.1
-DHALL_JSON_URL     := https://github.com/dhall-lang/dhall-haskell/releases/download/$(DHALL_VERSION)/dhall-json-$(DHALL_JSON_VERSION)-x86_64-linux.tar.bz2
+PLATFORM := $(shell uname -p)
+DHALL_URL      := https://github.com/dhall-lang/dhall-haskell/releases/download/$(DHALL_VERSION)/dhall-$(DHALL_VERSION)-$(PLATFORM)-linux.tar.bz2
+DHALL_JSON_URL := https://github.com/dhall-lang/dhall-haskell/releases/download/$(DHALL_VERSION)/dhall-json-$(DHALL_JSON_VERSION)-$(PLATFORM)-linux.tar.bz2
+ifeq ($(PLATFORM),aarch64)
+  DHALL_URL      := https://github.com/andriytk/dhall-haskell/releases/download/$(DHALL_VERSION)-el7-arm64/dhall-$(DHALL_VERSION)-$(PLATFORM).linux.tar.bz2
+  DHALL_JSON_URL := https://github.com/andriytk/dhall-haskell/releases/download/$(DHALL_VERSION)-el7-arm64/dhall-json-$(DHALL_JSON_VERSION)-$(PLATFORM).linux.tar.bz2
+endif
 DHALL_PRELUDE_VERSION := 11.1.0
 DHALL_PRELUDE_URL     := https://github.com/dhall-lang/dhall-lang/archive/v$(DHALL_PRELUDE_VERSION).tar.gz
 
@@ -74,7 +79,7 @@ build: hax miniprov
 
 .PHONY: hax
 HARE_VERSION := $(shell cat VERSION)
-HAX_WHL      := hax/dist/hax-$(HARE_VERSION)-cp$(PY3_VERSION)-cp$(PY3_VERSION)m-linux_x86_64.whl
+HAX_WHL      := hax/dist/hax-$(HARE_VERSION)-cp$(PY3_VERSION)-cp$(PY3_VERSION)m-linux_$(PLATFORM).whl
 hax: $(HAX_WHL)
 
 HAX_SRC := $(wildcard hax/setup.py hax/hax/*.py hax/hax/motr/*.[ch] hax/hax/motr/*.py hax/hax/queue/*.py)
@@ -169,29 +174,23 @@ ETC_CRON_DIR       = $(DESTDIR)/etc/cron.hourly
 MINIPROV_TMPL_DIR  = $(DESTDIR)/$(PREFIX)/conf/
 
 # dhall-bin {{{2
-vendor/dhall-bin/$(DHALL_VERSION)/dhall-$(DHALL_VERSION)-x86_64-linux.tar.bz2:
+vendor/dhall-bin/$(DHALL_VERSION)/dhall-$(DHALL_VERSION)-$(PLATFORM)-linux.tar.bz2:
 	@$(call _log,fetching dhall $(DHALL_VERSION) archive)
-	@mkdir -p vendor/dhall-bin/$(DHALL_VERSION)
-	@cd vendor/dhall-bin/$(DHALL_VERSION) && \
-	 curl --location --remote-name $(DHALL_URL)
+	@curl --location --create-dirs $(DHALL_URL) -o $@
 
-vendor/dhall-bin/$(DHALL_VERSION)/dhall-json-$(DHALL_JSON_VERSION)-x86_64-linux.tar.bz2:
+vendor/dhall-bin/$(DHALL_VERSION)/dhall-json-$(DHALL_JSON_VERSION)-$(PLATFORM)-linux.tar.bz2:
 	@$(call _log,fetching dhall-json $(DHALL_VERSION) archive)
-	@mkdir -p vendor/dhall-bin/$(DHALL_VERSION)
-	@cd vendor/dhall-bin/$(DHALL_VERSION) && \
-	 curl --location --remote-name $(DHALL_JSON_URL)
+	@curl --location --create-dirs $(DHALL_JSON_URL) -o $@
 
 vendor/dhall-bin/$(DHALL_VERSION)/bin/dhall: \
-		vendor/dhall-bin/$(DHALL_VERSION)/dhall-$(DHALL_VERSION)-x86_64-linux.tar.bz2
+		vendor/dhall-bin/$(DHALL_VERSION)/dhall-$(DHALL_VERSION)-$(PLATFORM)-linux.tar.bz2
 	@$(call _log,unpacking dhall $(DHALL_VERSION) archive)
-	@cd vendor/dhall-bin/$(DHALL_VERSION) && \
-	 tar --no-same-owner -xmf dhall-$(DHALL_VERSION)-x86_64-linux.tar.bz2
+	@tar -C vendor/dhall-bin/$(DHALL_VERSION) --no-same-owner -xmf $<
 
 vendor/dhall-bin/$(DHALL_VERSION)/bin/dhall-to-json: \
-		vendor/dhall-bin/$(DHALL_VERSION)/dhall-json-$(DHALL_JSON_VERSION)-x86_64-linux.tar.bz2
+		vendor/dhall-bin/$(DHALL_VERSION)/dhall-json-$(DHALL_JSON_VERSION)-$(PLATFORM)-linux.tar.bz2
 	@$(call _log,unpacking dhall-json $(DHALL_VERSION) archive)
-	@cd vendor/dhall-bin/$(DHALL_VERSION) && \
-	 tar --no-same-owner -xmf dhall-json-$(DHALL_JSON_VERSION)-x86_64-linux.tar.bz2
+	@tar -C vendor/dhall-bin/$(DHALL_VERSION) --no-same-owner -xmf $<
 
 .PHONY: unpack-dhall-bin
 unpack-dhall-bin: \
