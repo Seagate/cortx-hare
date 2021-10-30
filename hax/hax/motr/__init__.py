@@ -224,12 +224,20 @@ class Motr:
             # case, so we wait until bootstrapping is done that is all the
             # motr services are up, we check the confd status and exclude
             # corresponding confd from the entrypoint reply.
-            active_confds = []
-            if self.spiel_ready:
-                for confd in confds:
-                    if not util.is_confd_failed(confd.fid):
-                        active_confds.append(confd)
-                confds = active_confds
+
+            # EOS-25726: It seems that the confds were reported as started
+            # and they failed later. This could be due to a Motr issue
+            # EOS-25695.
+            # In such a case, when processes start out of order, a wrong
+            # quorum value is reported that leads to further issues in Motr
+            # process startup. Thus commenting this for now. Need to verify
+            # if this affects hax shutdown.
+            # active_confds = []
+            # if self.spiel_ready:
+            #     for confd in confds:
+            #         if not util.is_confd_failed(confd.fid):
+            #             active_confds.append(confd)
+            #     confds = active_confds
 
             if confds:
                 rm_fid = util.get_rm_fid()
