@@ -352,7 +352,7 @@ sudo systemctl start hare-consul-agent
 
 # Wait for Consul's internal leader to be ready.
 # (Until then the KV store won't be accessible.)
-while ! consul info 2>/dev/null | grep -q 'leader.*true'; do
+while ! grep -q 'leader.*true' <<< $(consul info 2>/dev/null); do
     sleep 1
     echo -n '.'
 done
