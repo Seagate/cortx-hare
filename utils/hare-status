@@ -32,24 +32,10 @@ from typing import Any, Dict, List, NamedTuple, Optional
 from consul import Consul, ConsulException
 from hax.common import di_configuration
 from hax.exception import HAConsistencyException
-from hax.util import repeat_if_fails
+from hax.util import ConsulUtil, repeat_if_fails
+from hax.types import Fid
 from requests.exceptions import RequestException
 from urllib3.exceptions import HTTPError
-
-
-class Fid:
-    def __init__(self, container: int, key: int):
-        self.container = container
-        self.key = key
-
-    def __str__(self):
-        return f'{self.container:#x}:{self.key:#x}'
-
-    def __repr__(self):
-        return f'{self.__class__.__name__}({self.container:#x}, {self.key:#x})'
-
-    def for_json(self):
-        return self.__str__()
 
 
 Profile = NamedTuple('Profile', [
@@ -171,7 +157,8 @@ def node_name2fid(cns: Consul, node_name: str) -> Any:
     raise RuntimeError(f'Cannot find Consul KV entry for node {node_name!r}')
 
 
-def processes(cns: Consul, node_name: str) -> List[Process]:
+def processes(cns: Consul, consul_util: ConsulUtil,
+              node_name: str) -> List[Process]:
     # Get 'm0conf/nodes/<node_id>/processes/<process_fidk>/...' entries
     # from the KV.  See 'Consul KV Schema' in [4/KV](rfc/4/README.md).
     node_fid = node_name2fid(cns, node_name)
@@ -189,16 +176,22 @@ def processes(cns: Consul, node_name: str) -> List[Process]:
                     cns,
                     f'm0conf/nodes/{node_name}/processes/{k}/endpoint'
                 ) or '**ERROR**'),
-            status=process_status(cns, node_name, k))
+            status=process_status(consul_util, node_name,
+                                  Fid(0x7200000000000001, k)))
         for k in sorted(proc_fidks)
     ]
 
 
-def process_status(cns: Consul, node_id: str, fidk: int) -> str:
-    for check in cns.health.node(node_id)[1]:
-        if check['ServiceID'] and fidk == int(check['ServiceID']):
-            return 'started' if check['Status'] == 'passing' else 'offline'
-    return 'unknown'
+def process_status(consul_util: ConsulUtil, node_name, fid: Fid) -> str:
+    if (consul_util.get_node_health_status(node_name) != 'passing'):
+        return 'offline'
+    status = consul_util.get_process_status(fid, node_name)
+    if status.proc_status == 'M0_CONF_HA_PROCESS_STARTED':
+        return 'started'
+    elif status.proc_status in ('Unknown', 'UNKNOWN'):
+        return 'unknown'
+    else:
+        return 'offline'
 
 
 def cluster_online() -> bool:
@@ -227,13 +220,14 @@ def devices(cns: Consul, node_name: str) -> List[Device]:
 
 
 @repeat_if_fails(max_retries=24)
-def get_cluster_status(cns: Consul, devices_requested: bool) -> Dict[str, Any]:
+def get_cluster_status(cns: Consul, consul_util: ConsulUtil,
+                       devices_requested: bool) -> Dict[str, Any]:
     result: Dict[str, Any] = {
         'pools': [x for x in sns_pools(cns)],
         'profiles': [{'fid': x.fid, 'name': x.name, 'pools': x.pools}
                      for x in profiles(cns)],
         'filesystem': get_fs_stats(cns),
-        'nodes': [Node(name=h, svcs=processes(cns, h))
+        'nodes': [Node(name=h, svcs=processes(cns, consul_util, h))
                   for h in node_names(cns)]
     }
 
@@ -261,7 +255,8 @@ def setup_logging():
 
 
 @repeat_if_fails(max_retries=24)
-def show_text_status(cns: Consul, devices_requested: bool) -> None:
+def show_text_status(cns: Consul, consul_util: ConsulUtil,
+                     devices_requested: bool) -> None:
     # In-memory buffer required because an intermittent Consul exception can
     # happen right in the middle of printing something. It is good to postpone
     # the printing to stdout until the moment when those exceptions can't
@@ -291,7 +286,7 @@ def show_text_status(cns: Consul, devices_requested: bool) -> None:
         echo('Services:')
         for h in node_names(cns):
             echo(f'    {h} {leader_tag(cns, h)}')
-            for p in processes(cns, h):
+            for p in processes(cns, consul_util, h):
                 fid: str = f'{p.fid}'
                 echo(f'    [{p.status}]  {p.name:<9}  {fid:<23}  {p.ep}')
         if devices_requested:
@@ -312,11 +307,12 @@ def main(argv=None):
         print('Cluster is not running', file=sys.stderr)
         return 1
 
+    cns_util: ConsulUtil = ConsulUtil()
     if opts.json:
-        status = get_cluster_status(cns, opts.devices)
+        status = get_cluster_status(cns, cns_util, opts.devices)
         print(simplejson.dumps(status, indent=2, for_json=True))
     else:
-        show_text_status(cns, opts.devices)
+        show_text_status(cns, cns_util, opts.devices)
     return 0
 
 
