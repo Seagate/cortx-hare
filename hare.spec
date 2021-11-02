@@ -18,12 +18,12 @@
 # build number
 %define h_build_num  %(test -n "$build_number" && echo "$build_number" || echo 1)
 
-# motr git revision
-#   assume that Motr package release has format 'buildnum_gitid_kernelver'
-%define h_motr_gitrev %(rpm -q --whatprovides cortx-motr | xargs rpm -q --queryformat '%{RELEASE}' | cut -f2 -d_)
-
 # motr version
+%if %{rhel} < 8
 %define h_motr_version %(rpm -q --whatprovides cortx-motr | xargs rpm -q --queryformat '%{VERSION}-%{RELEASE}')
+%else
+%define h_motr_version %(rpm -q --whatprovides cortx-motr | xargs rpm -q --queryformat '%%{VERSION}-%%{RELEASE}')
+%endif
 
 # parallel build jobs
 %define h_build_jobs_opt  %(test -n "$build_jobs" && echo "-j$build_jobs" || echo '')
