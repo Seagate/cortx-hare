@@ -58,7 +58,11 @@ Requires: puppet-agent >= 6.13.0
 Requires: jq
 Requires: cortx-motr = %{h_motr_version}
 Requires: cortx-py-utils
+%if %{rhel} < 8
 Requires: python36
+%else
+Requires: python3
+%endif
 
 Conflicts: halon
 
