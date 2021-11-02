@@ -41,10 +41,17 @@ BuildRequires: cortx-motr
 BuildRequires: cortx-motr-devel
 BuildRequires: cortx-py-utils
 BuildRequires: git
+%if %{rhel} < 8
 BuildRequires: python36
 BuildRequires: python36-devel
 BuildRequires: python36-pip
 BuildRequires: python36-setuptools
+%else
+BuildRequires: python3
+BuildRequires: python3-devel
+BuildRequires: python3-pip
+BuildRequires: python3-setuptools
+%endif
 
 Requires: consul >= 1.7.0, consul < 1.10.0
 %if %{rhel} < 8
