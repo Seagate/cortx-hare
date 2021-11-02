@@ -1328,8 +1328,10 @@ class ConsulUtil:
     @uses_consul_cache
     def get_process_status(self,
                            fid: Fid,
+                           proc_node=None,
                            kv_cache=None) -> MotrConsulProcInfo:
-        proc_node = self.get_process_node(fid, kv_cache=kv_cache)
+        if not proc_node:
+            proc_node = self.get_process_node(fid, kv_cache=kv_cache)
         key = f'{proc_node}/processes/{fid}'
         status = self.kv.kv_get(key, kv_cache=kv_cache)
         if status:
