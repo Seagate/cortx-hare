@@ -17,6 +17,7 @@
 #
 
 import logging
+import os
 import sys
 
 """Custom log level which is more verbose than DEBUG"""
@@ -52,3 +53,13 @@ def setup_logging(log_level: int = logging.DEBUG):
 
     logging.getLogger('').addHandler(console)
     logging.getLogger('consul').setLevel(logging.WARN)
+
+
+def create_logger_directory(log_dir):
+    """Create log directory if not exists."""
+    if not os.path.isdir(log_dir):
+        try:
+            os.makedirs(log_dir)
+        except Exception as e:
+            logging.exception(f"{log_dir} Could not be created: {e}")
+            raise

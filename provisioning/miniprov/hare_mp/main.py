@@ -767,6 +767,7 @@ def generate_config(url: str, path_to_cdf: str) -> None:
     python_path = os.pathsep.join(sys.path)
     cmd = ['configure', '-c', conf_dir, path_to_cdf,
            '--log-dir', get_log_dir(url),
+           '--log-file', LOG_FILE,
            '--uuid', provider.get_machine_id()]
     execute(cmd, env={'PYTHONPATH': python_path, 'PATH': path,
                       'LC_ALL': "en_US.utf-8", 'LANG': "en_US.utf-8"})

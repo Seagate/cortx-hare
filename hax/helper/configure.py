@@ -20,9 +20,12 @@ import logging
 import os
 import sys
 from dataclasses import dataclass
+from logging import StreamHandler
+from logging.handlers import RotatingFileHandler
 from typing import Dict, List, Tuple
 
 import click
+from hax.log import create_logger_directory
 
 from helper.exec import CliException, Executor, Program, two_columns
 
@@ -36,12 +39,29 @@ class AppCtx:
     cdf_path: str
     conf_dir: str
     log_dir: str
+    log_file: str
     consul_server: bool
     uuid: str
 
 
-def _setup_logging():
-    logging.basicConfig(level=logging.DEBUG,
+def _setup_logging(opts: AppCtx):
+    log_dir = opts.log_dir
+    max_size = 1024 * 1024
+    handlers: List[logging.Handler] = [StreamHandler(stream=sys.stderr)]
+    if log_dir:
+        filename = opts.log_file
+        log_file = f'{log_dir}/{filename}'
+        create_logger_directory(log_dir)
+        handlers.append(
+            RotatingFileHandler(log_file,
+                                maxBytes=max_size,
+                                mode='a',
+                                backupCount=5,
+                                encoding=None,
+                                delay=False))
+
+    logging.basicConfig(level=logging.INFO,
+                        handlers=handlers,
                         format='%(asctime)s [%(levelname)s] %(message)s')
 
 
@@ -64,16 +84,15 @@ def _setup_logging():
               '-s',
               is_flag=True,
               help='Configure given node as a consul server.')
-@click.option('--uuid',
+@click.option('--uuid', type=str, help='UUID to be used', show_default=True)
+@click.option('--log-file',
               type=str,
-              help='UUID to be used',
+              default='setup.log',
+              help='File name of the log file.',
               show_default=True)
 @click.pass_context
-def parse_opts(ctx, cdf: str,
-               conf_dir: str,
-               log_dir: str,
-               consul_server: bool,
-               uuid: str):
+def parse_opts(ctx, cdf: str, conf_dir: str, log_dir: str, consul_server: bool,
+               uuid: str, log_file: str):
     """Generate Hare configuration according to the given CDF file.
 
     CDF   Full path to the Cluster Description File (CDF)."""
@@ -82,22 +101,19 @@ def parse_opts(ctx, cdf: str,
                                conf_dir=conf_dir,
                                log_dir=log_dir,
                                consul_server=consul_server,
-                               uuid=uuid)
+                               uuid=uuid,
+                               log_file=log_file)
     return ctx.obj
 
 
 class ConfGenerator:
-    def __init__(self,
-                 cdf_path: str,
-                 conf_dir: str,
-                 log_dir: str,
-                 consul_server: bool,
-                 uuid: str):
-        self.cdf_path = cdf_path
-        self.conf_dir = conf_dir
-        self.log_dir = log_dir
-        self.consul_server = consul_server
-        self.uuid = uuid
+    def __init__(self, context: AppCtx):
+        self.cdf_path = context.cdf_path
+        self.conf_dir = context.conf_dir
+        self.log_dir = context.log_dir
+        self.consul_server = context.consul_server
+        self.uuid = context.uuid
+        self.log_file = context.log_file
         self.executor = Executor()
 
     def generate(self) -> None:
@@ -106,7 +122,11 @@ class ConfGenerator:
         conf_dir = self.conf_dir
 
         env = self._get_pythonic_env()
-        executor.run(p(['cfgen', '-o', self.conf_dir, self.cdf_path]), env=env)
+        executor.run(p([
+            'cfgen', '-o', self.conf_dir, '-v', '-l', self.log_dir,
+            '--log-file', self.log_file, self.cdf_path
+        ]),
+                     env=env)
         xcode = executor.run(p(['cat', f'{conf_dir}/confd.dhall'])
                              | p(['dhall', 'text'])
                              | p(['m0confgen']),
@@ -161,10 +181,11 @@ class ConfGenerator:
                 continue
             join_peers_opt += ['--join', ip]
 
-        mk_consul_env_cmd = ['mk-consul-env', '--bind',
-                             join_ip, *join_peers_opt, '--extra-options',
-                             '-ui -bootstrap-expect 1', '--conf-dir',
-                             f'{self.conf_dir}']
+        mk_consul_env_cmd = [
+            'mk-consul-env', '--bind', join_ip, *join_peers_opt,
+            '--extra-options', '-ui -bootstrap-expect 1', '--conf-dir',
+            f'{self.conf_dir}'
+        ]
         if self.consul_server:
             mk_consul_env_cmd.extend(['--mode', 'server'])
         else:
@@ -173,10 +194,11 @@ class ConfGenerator:
         self.executor.run(Program(mk_consul_env_cmd),
                           env=self._get_pythonic_env())
 
-        update_consul_conf_cmd = ['update-consul-conf', '--conf-dir',
-                                  f'{self.conf_dir}', '--kv-file',
-                                  f'{self.conf_dir}/consul-kv.json',
-                                  '--log-dir', self.log_dir]
+        update_consul_conf_cmd = [
+            'update-consul-conf', '--conf-dir', f'{self.conf_dir}',
+            '--kv-file', f'{self.conf_dir}/consul-kv.json', '--log-dir',
+            self.log_dir
+        ]
         if self.consul_server:
             update_consul_conf_cmd.append('--server')
 
@@ -235,18 +257,14 @@ class ConfGenerator:
 
 
 def main():
-    _setup_logging()
     try:
         raw_ctx = parse_opts(args=sys.argv[1:], standalone_mode=False, obj={})
         if not isinstance(raw_ctx, dict):
             # --help was invoked
             sys.exit(1)
         app_context = raw_ctx['result']
-        ConfGenerator(app_context.cdf_path,
-                      app_context.conf_dir,
-                      app_context.log_dir,
-                      app_context.consul_server,
-                      app_context.uuid).generate()
+        _setup_logging(app_context)
+        ConfGenerator(app_context).generate()
     except CliException as e:
         logging.error('Exiting due to a failure: %s', e)
         logging.debug('Failed command: %s', e.cmd)
