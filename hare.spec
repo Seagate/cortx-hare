@@ -54,7 +54,11 @@ BuildRequires: python3-setuptools
 %endif
 
 Requires: consul >= 1.7.0, consul < 1.10.0
+%if %{rhel} < 8
 Requires: puppet-agent >= 6.13.0
+%else
+Requires: facter >= 3.14.2
+%endif
 Requires: jq
 Requires: cortx-motr = %{h_motr_version}
 Requires: cortx-py-utils
@@ -102,11 +106,13 @@ groupadd --force hare
 chgrp hare /var/lib/hare
 chmod --changes g+w /var/lib/hare
 
+%if %{rhel} < 8
 # puppet-agent provides a newer version of facter, but sometimes it might not be
 # available in /usr/bin/, so we need to fix this
 if [[ ! -e /usr/bin/facter && -e /opt/puppetlabs/bin/facter ]] ; then
     ln -vsf /opt/puppetlabs/bin/facter /usr/bin/facter
 fi
+%endif
 
 %postun
 systemctl daemon-reload
