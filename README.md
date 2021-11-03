@@ -58,7 +58,7 @@ and health-checking mechanisms.
   ```sh
   facter -v
   ```
-  Supported version is **facter >= 3.14.2**, If the facter version is **< 3.14.2** then follow the steps below: 
+  Supported version is **facter >= 3.14**, If the facter version is **< 3.14** then follow the steps below:
   ```sh
   yum erase -y $(rpm -q --whatprovides $(readlink -f /usr/bin/facter)) || rm -fv /usr/bin/facter
   ```
