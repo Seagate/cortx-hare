@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-#
 # Copyright (c) 2021 Seagate Technology LLC and/or its Affiliates
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,6 +16,7 @@
 # please email opensource@seagate.com or cortx-questions@seagate.com.
 
 import sys
+
 from tcpping import tcpping
 
 
@@ -26,11 +25,7 @@ def main():
         hostname = sys.argv[1]
         port = sys.argv[2]
         if tcpping(host=hostname, port=port, timeout=1):
-            exit(0)
+            sys.exit(0)
     except Exception:
-        exit(1)
-    exit(1)
-
-
-if __name__ == '__main__':
-    main()
+        sys.exit(1)
+    sys.exit(1)

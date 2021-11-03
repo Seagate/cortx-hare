@@ -166,6 +166,7 @@ setup(
         'console_scripts': [
             'hax=hax.hax:main', 'q=hax.queue.cli:main',
             'configure=helper.configure:main',
+            'm0ping=helper.ping:main',
             'update-conf=helper.update_conf:main'
         ]
     },

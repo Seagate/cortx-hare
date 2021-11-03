@@ -254,6 +254,7 @@ install: install-dirs install-cfgen install-hax install-miniprov install-systemd
 	@$(call _info,Altering generated executables to make Python imports work)
 	@$(call _fix_hare_imports,hare_setup)
 	@$(call _fix_hare_imports,configure)
+	@$(call _fix_hare_imports,m0ping)
 	@$(call _fix_hare_imports,update-conf)
 
 .PHONY: install-dirs
