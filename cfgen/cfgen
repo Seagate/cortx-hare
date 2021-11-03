@@ -671,11 +671,11 @@ def validate_facter(hostname: str) -> None:
     # 3.14.8 (commit 4339472f441868ecdae694ffc71e7c8ed0fc24e3)
     ver_str = ver_str.split(' ')[0]
 
-    if version(ver_str) >= version('3.14.8'):
+    if version(ver_str) >= version('3.14.2'):
         return
     raise RuntimeError(
         f'Unsupported facter version found at node {hostname}: {ver_str}. '
-        'Please use 3.14.8 or higher.')
+        'Please use 3.14.2 or higher.')
 
 
 def get_facts(hostname: str, mock_p: bool, *args: str) -> Dict[str, Any]:
