@@ -91,13 +91,19 @@ class Executor:
     CLI Executor. Abstracts from subprocess.Popen and supports single
     commands as well as piped chain of commands.
     """
-    def run(self, p: Program, env: Optional[Dict[str, str]] = None) -> str:
-        return self.run_ex(p, as_is, env=env)
+    def run(self,
+            p: Program,
+            env: Optional[Dict[str, str]] = None,
+            timeout: Optional[int] = None,
+            input: Optional[str] = None) -> str:
+        return self.run_ex(p, as_is, env=env, timeout=timeout, input=input)
 
     def run_ex(self,
                p: Program,
                converter: OutputConverter[T],
-               env: Optional[Dict[str, str]] = None) -> T:
+               env: Optional[Dict[str, str]] = None,
+               timeout: Optional[int] = None,
+               input: Optional[str] = None) -> T:
         """
         Central method of the executor. Returns either stdout of the executed
         command or raises CliException if the command didn't succeed.
@@ -138,7 +144,7 @@ class Executor:
 
             prev = proc
 
-        out, err = proc.communicate()
+        out, err = proc.communicate(input=input, timeout=timeout)
         code = proc.returncode
         if code:
             raise CliException(err, code, env, cmd=p.cmd)

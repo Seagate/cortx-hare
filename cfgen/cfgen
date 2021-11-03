@@ -9,6 +9,8 @@ import itertools
 import json
 import os
 from pprint import pprint
+from logging import StreamHandler
+from logging.handlers import RotatingFileHandler
 import psutil
 import random
 import re
@@ -16,8 +18,10 @@ import socket
 import subprocess
 import sys
 from typing import (Any, Callable, Dict, Iterable, Iterator, List, NamedTuple,
-                    Optional, Set, Tuple)
+                    Optional, Set, Type, Tuple)
 from math import floor, ceil
+from hax.log import create_logger_directory
+from helper.exec import CliException, Executor, Program
 import yaml
 import logging
 
@@ -34,8 +38,6 @@ class DiskRef():
 
 
 __version__ = '0.14'
-
-LOG = logging.getLogger('cfgen')
 
 faultToleranceInfo = NamedTuple('faultToleranceInfo', [
                             ('max_drives_per_node', int),
@@ -90,16 +92,18 @@ def repeat_on_cmd_timeout(max_retries=-1):
                 except subprocess.TimeoutExpired as e:
                     attempt_count += 1
                     if max_retries >= 0 and attempt_count > max_retries:
-                        LOG.warn(
+                        logging.warn(
                             '\nFunction %s: Too many errors happened in a row'
                             ' (max_retries = %d)', f.__name__, max_retries)
                         raise e
-                    LOG.warn(f'\nGot {e.timeout} sec timeout '
-                             f'for function {f.__name__} '
-                             f'(attempt {attempt_count}). The attempt will '
-                             f'be repeated again.'
-                             f'\nProbable cause : degraded machine '
-                             f'performance or poor network.')
+                    logging.warn(
+                        f'\nGot {e.timeout} sec timeout '
+                        f'for function {f.__name__} '
+                        f'(attempt {attempt_count}). The attempt will '
+                        f'be repeated again.'
+                        f'\nProbable cause : degraded machine '
+                        f'performance or poor network.')
+
         return wrapper
 
     return callable
@@ -120,6 +124,22 @@ def parse_opts(argv):
                    help='directory with auxiliary Dhall expressions'
                    f' (defaults to {default_dhall_dir!r})',
                    dest='dhall_dir', default=default_dhall_dir)
+    p.add_argument('-l',
+                   metavar='log-dir',
+                   help='directory to write the logs to. If not specified, '
+                   'logs will be not be written to any file',
+                   dest='log_dir',
+                   default='')
+    p.add_argument('--log-file',
+                   help='File name of the log files (applicable only when '
+                   'combined with -l parameter)',
+                   dest='log_file',
+                   default='cfgen.log')
+    p.add_argument('-v',
+                   help="be verbose (DEBUG messages will be seen)",
+                   dest='verbose',
+                   action='store_true',
+                   default=False)
     p.add_argument('-o', metavar='output-dir',
                    help="output directory (defaults to '.')",
                    dest='output_dir', default='.')
@@ -141,7 +161,8 @@ def parse_opts(argv):
     for opt, d, perm in dirs:
         if not (d and os.path.isdir(d) and os.access(d, os.X_OK | perm)):
             what = 'read' if perm == os.R_OK else 'writ'
-            die(f'{opt!r} argument must be a path to {what}able directory')
+            die(f'{opt!r} argument must be a path to {what}able directory. '
+                f'Current value: {d}')
 
     opts.dhall_dir = os.path.abspath(opts.dhall_dir)
     return opts
@@ -219,42 +240,70 @@ fdmi_filters:  # This section is optional.  If it is missing, no fdmi filters
         sys.exit()
 
 
+def setup_logging(opts: Any) -> None:
+    log_dir = opts.log_dir
+    max_size = 1024 * 1024
+    handlers: List[logging.Handler] = [StreamHandler(stream=sys.stderr)]
+    if log_dir:
+        filename = opts.log_file
+        log_file = f'{log_dir}/{filename}'
+        create_logger_directory(log_dir)
+        handlers.append(
+            RotatingFileHandler(log_file,
+                                maxBytes=max_size,
+                                mode='a',
+                                backupCount=5,
+                                encoding=None,
+                                delay=False))
+
+    verbosity = logging.INFO
+    if opts.verbose:
+        verbosity = logging.DEBUG
+
+    logging.basicConfig(level=verbosity,
+                        handlers=handlers,
+                        format='%(asctime)s [%(levelname)s] %(message)s')
+
+
 def main(argv=None):
     opts = parse_opts(argv)
+    setup_logging(opts)
 
-    check_dhall_versions()
+    try:
+        check_dhall_versions()
 
-    cdf = opts.CDF.read()
-    opts.CDF.close()
-    validate_cdf_schema(cdf,
-                        cdf_path=opts.CDF.name,
-                        schema_path=os.path.join(
-                            opts.dhall_dir, 'types', 'ClusterDesc.dhall'))
-    cluster_desc = yaml.safe_load(cdf)
+        cdf = opts.CDF.read()
+        opts.CDF.close()
+        validate_cdf_schema(cdf,
+                            cdf_path=opts.CDF.name,
+                            schema_path=os.path.join(
+                                opts.dhall_dir, 'types', 'ClusterDesc.dhall'))
+        cluster_desc = yaml.safe_load(cdf)
 
-    enrich_cluster_desc(cluster_desc, opts.mock)
-    validate_cluster_desc(cluster_desc)
+        enrich_cluster_desc(cluster_desc, opts.mock)
+        validate_cluster_desc(cluster_desc)
 
-    if opts.debug:
-        pprint(cluster_desc)
-        return
+        if opts.debug:
+            pprint(cluster_desc)
+            return
 
-    cluster = build_cluster(cluster_desc)
+        cluster = build_cluster(cluster_desc)
 
-    outs: List[Tuple[str, Callable[..., str], List[Any]]] = [
-        ('consul-agents.json', generate_consul_agents, [cluster]),
-        ('consul-kv.json', generate_consul_kv, [cluster, opts.dhall_dir]),
-        ('confd.dhall', generate_confd, [cluster.m0conf, opts.dhall_dir])]
-    for path, generate, args in outs:
-        with open(os.path.join(opts.output_dir, path), 'w') as f:
-            f.write(generate(*args))
+        outs: List[Tuple[str, Callable[..., str], List[Any]]] = [
+            ('consul-agents.json', generate_consul_agents, [cluster]),
+            ('consul-kv.json', generate_consul_kv, [cluster, opts.dhall_dir]),
+            ('confd.dhall', generate_confd, [cluster.m0conf, opts.dhall_dir])]
+        for path, generate, args in outs:
+            with open(os.path.join(opts.output_dir, path), 'w') as f:
+                f.write(generate(*args))
+    except Exception as e:
+        logging.error('Exiting with FAILURE status. Reason: %s', e)
+        logging.debug('Stacktrace can be seen below', exc_info=True)
+        sys.exit(1)
 
 
-def die(msg: str, status: int = 1):
-    assert msg
-    assert status != 0
-    print(os.path.basename(sys.argv[0]) + ': ' + msg, file=sys.stderr)
-    sys.exit(status)
+def die(msg: str):
+    raise RuntimeError(msg)
 
 
 def all_not_none(xs: Iterable) -> bool:
@@ -287,32 +336,39 @@ def version(s: str) -> Version:
 
 def check_dhall_versions() -> None:
     # See https://github.com/dhall-lang/dhall-haskell/releases
+    logging.debug('Checking dhall versions')
     versions = {'dhall': version('1.26.1'), 'yaml-to-dhall': version('1.4.1')}
 
     for exe, ver in versions.items():
         try:
-            proc = subprocess.Popen([exe, '--version'], stdout=subprocess.PIPE)
-        except FileNotFoundError as err:
-            print(str(err), file=sys.stderr)
+            out = Executor().run(Program([exe, '--version']), timeout=15)
+        except CliException:
             die(f'{exe} >= {ver} required, none found')
 
-        out = proc.communicate(timeout=15)[0]
-        if version(out.strip().decode()) < ver:
+        if version(out.strip()) < ver:
             die(f'{exe} >= {ver} required')
 
 
+def _assert(expr: bool,
+            message: str,
+            exc_type: Type[BaseException] = AssertionError):
+    if not expr:
+        raise exc_type(message)
+
+
 def validate_cdf_schema(cdf: str, cdf_path: str, schema_path: str) -> None:
-    assert os.path.isabs(schema_path)
-    proc = subprocess.Popen(['yaml-to-dhall', schema_path],
-                            stdin=subprocess.PIPE,
-                            stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE)
-    err = proc.communicate(input=cdf.encode(), timeout=15)[1]
-    if proc.returncode != 0:
-        die(f'**ERROR** {cdf_path}: Invalid cluster description\n' +
-            err.decode().strip() +
-            f"\n\nTo learn more, run '{sys.argv[0]} --help-schema'.",
-            proc.returncode)
+    logging.debug('Validating the provided CDF file structure')
+    _assert(os.path.isabs(schema_path),
+            f'Dhall schema is not found at path {schema_path}')
+
+    try:
+        Executor().run(Program(['yaml-to-dhall', schema_path]),
+                       timeout=15,
+                       input=cdf)
+    except CliException as e:
+        die(
+            f'{cdf_path}: Invalid cluster description\n' + e.stderr +
+            f"\n\nTo learn more, run '{sys.argv[0]} --help-schema'.")
 
 
 def ipaddr_key(iface: str) -> str:
@@ -320,22 +376,31 @@ def ipaddr_key(iface: str) -> str:
 
 
 def enrich_cluster_desc(desc: Dict[str, Any], mock_p: bool) -> None:
+    logging.debug('Enriching cluster description')
     for node in desc['nodes']:
         # The fact names used here correspond to version 2.4.1 of `facter`.
         # See https://puppet.com/docs/puppet/6.6/core_facts.html#legacy-facts
-        if all(key in node.keys() for key in ('processorcount',
-                                              'memorysize_mb')):
-            node['facts'] = {'_memsize_MB': int(float(node['memorysize_mb'])),
-                             'processorcount': node['processorcount'],
-                             ipaddr_key(node['data_iface']):
-                                 node['data_iface_ip_addr']}
-        else:
-            node['facts'] = get_facts(node['hostname'], mock_p,
-                                      'processorcount', 'memorysize_mb',
-                                      ipaddr_key(node['data_iface']))
-            node['facts']['_memsize_MB'] = int(float(
-                node['facts']['memorysize_mb']))
 
+        host = node['hostname']
+        if all(key in node.keys()
+               for key in ('processorcount', 'memorysize_mb')):
+
+            logging.debug(
+                'Cluster description already has facts for '
+                '[hostname=%s]. facter tool will not be used', host)
+            node['facts'] = {
+                '_memsize_MB': int(float(node['memorysize_mb'])),
+                'processorcount': node['processorcount'],
+                ipaddr_key(node['data_iface']): node['data_iface_ip_addr']
+            }
+        else:
+            node['facts'] = get_facts(host, mock_p, 'processorcount',
+                                      'memorysize_mb',
+                                      ipaddr_key(node['data_iface']))
+            node['facts']['_memsize_MB'] = int(
+                float(node['facts']['memorysize_mb']))
+
+        logging.debug('Node [hostname=%s] facts=%s', host, node['facts'])
         if 'm0_servers' not in node:
             continue
 
@@ -363,83 +428,87 @@ def validate_cluster_desc(desc: Dict[str, Any]) -> None:
         validate_profiles_desc(desc['profiles'], desc['pools'])
     if 'fdmi_filters' in desc and desc['fdmi_filters'] is not None:
         validate_fdmi_filters_desc(desc['fdmi_filters'], desc['nodes'])
+    logging.debug('Validations passed')
 
 
 def validate_nodes_desc(nodes_desc: List[Dict[str, Any]]) -> None:
+    logging.debug('Validating node descriptions')
     Node = NamedTuple('Node', [('name', str), ('ipaddr', str)])
     nodes = [Node(name=x['hostname'],
                   ipaddr=x['facts'][ipaddr_key(x['data_iface'])])
              for x in nodes_desc]
-    assert all_not_none(
-        x.name
-        for x in nodes), f'Unexpected None hostname found in list: {nodes}\n' \
-                         f'Full context: {nodes_desc}'
-    assert all_unique(x.name for x in nodes), \
-        "Node names ('hostname' values in the CDF) are not unique:\n" + \
-        '\n'.join('  ' + x.name for x in nodes)
-    assert all_not_none(
-        x.ipaddr
-        for x in nodes), f'Unexpected None ipaddr found in list: {nodes}\n' \
-                         f'Full context: {nodes_desc}'
-    assert all_unique(x.ipaddr for x in nodes), \
-        'IP addresses are not unique:\n' + \
-        '\n'.join('  ' + x.ipaddr for x in nodes)
+    _assert(all_not_none(x.name for x in nodes),
+            f'Unexpected None hostname found in list: {nodes}\n'
+            f'Full context: {nodes_desc}')
+    _assert(all_unique(x.name for x in nodes),
+            "Node names ('hostname' values in the CDF) are not unique:\n" +
+            '\n'.join('  ' + x.name for x in nodes))
+    _assert(all_not_none(x.ipaddr for x in nodes),
+            f'Unexpected None ipaddr found in list: {nodes}\n'
+            f'Full context: {nodes_desc}')
+    _assert(all_unique(x.ipaddr for x in nodes),
+            'IP addresses are not unique:\n' +
+            '\n'.join('  ' + x.ipaddr for x in nodes))
 
     total_nr_confds = total_nr_disks = 0
 
-    for node in nodes_desc:
+    for i, node in enumerate(nodes_desc):
         name = node['hostname']
-        assert name
+        _assert(name, f'Hostname not set. Node index in CDF = {i}')
         iface = node['data_iface']
-        assert iface
-        assert node['facts'][ipaddr_key(iface)], \
-            f"""{name}: {iface!r} interface has no IP address
-Make sure the value of data_iface in the CDF is correct."""
+        _assert(iface, f'iface not set at hostname = {name}')
+        _assert(node['facts'][ipaddr_key(iface)],
+                f"""{name}: {iface!r} interface has no IP address
+Make sure the value of data_iface in the CDF is correct.""")
 
         if 'm0_servers' not in node:
-            assert (node['m0_clients']['s3']
-                    + node['m0_clients']['other'] > 0), \
-                f'{name}: At least one client should be configured'
+            _assert((node['m0_clients']['s3']
+                    + node['m0_clients']['other'] > 0),
+                    f'Node {name}: At least one client should be configured')
             continue
 
         nr_confds = sum(1 for m0d in node['m0_servers'] if m0d['runs_confd'])
-        assert nr_confds < 2, f'{name}: Too many confd services'
+        _assert(nr_confds < 2,
+                f'Node {name}: Too many confd services: {nr_confds} >= 2')
         total_nr_confds += nr_confds
 
         for m0d in node['m0_servers']:
             d = m0d['io_disks']
-            assert m0d['runs_confd'] or d['data'], \
-                f"{name}: Either 'runs_confd' or" \
-                "'io_disks.data' must be set"
-            assert '' not in d['data'], \
-                f"{name}: Empty strings in 'io_disks.data' are not allowed"
+            _assert(m0d['runs_confd'] or d['data'],
+                    f"Node {name}: Either 'runs_confd' or"
+                    "'io_disks.data' must be set")
+            _assert('' not in d['data'], f"Node {name}: Empty strings "
+                    "in 'io_disks.data' are not allowed")
             if 'meta_data' in d:
-                assert d['meta_data'], f"{name}: 'io_disks.meta_data'" \
-                    "must not be an empty string"
-                assert d['meta_data'] not in d['data'], \
-                    f"{name}: Meta-data disk must not belong io_disks.data"
+                _assert(d['meta_data'], f"Node {name}: 'io_disks.meta_data'"
+                        'must not be an empty string')
+                _assert(d['meta_data'] not in d['data'], f"Node {name}: "
+                        'Meta-data disk must not belong io_disks.data')
 
         disks: List[Disk] = []
         for m0d in node['m0_servers']:
             disks.extend(m0d['_io_disks'])
-        assert all_unique(disks), \
-            f'{name}: The same disk is used by several IO services'
+        _assert(all_unique(disks),
+                f'Node {name}: The same disk is used by several IO services')
         total_nr_disks += len(disks)
 
-        assert (nr_confds + node['m0_clients']['s3']
-                + node['m0_clients']['other'] > 0), \
-            f'{name}: At least one Motr server or client is required'
+        _assert(
+            nr_confds + node['m0_clients']['s3'] + node['m0_clients']['other']
+            > 0, f'Node {name}: At least one Motr server or '
+            'client is required')
 
-    assert total_nr_confds > 0, 'At least one confd is required'
-    assert total_nr_disks > 0, 'No disks found'
+    _assert(total_nr_confds > 0, 'At least one confd is required')
+    _assert(total_nr_disks > 0, 'No disks found')
 
 
 def validate_pools_desc(pools_desc: List[Dict[str, Any]]) -> None:
+    logging.debug('Validating pool descriptions')
     pool_names = [x['name'] for x in pools_desc]
-    assert all_unique(pool_names), \
-        'Pool names are not unique:\n' + \
-        '\n'.join('  ' + x for x in pool_names)
-    assert all(s for s in pool_names), 'Pool name must not be empty'
+    _assert(
+        all_unique(pool_names),
+        'Pool names are not unique:\n' + '\n'.join('  ' + x
+                                                   for x in pool_names))
+    _assert(all(s for s in pool_names), 'Pool name must not be empty')
 
     pool_types: Set[PoolT] = set()
     for pool in pools_desc:
@@ -448,92 +517,99 @@ def validate_pools_desc(pools_desc: List[Dict[str, Any]]) -> None:
         if t is PoolT.sns:
             d = pool.get('allowed_failures')
             spare_units = pool.get('spare_units')
-            assert spare_units is None\
-                or spare_units == 0\
-                or spare_units == pool['parity_units']
-            assert d is None or d['disk'] <= pool['parity_units'], """\
-{}: Cannot allow that many disk failures ({})
-The number of allowed disk failures must not exceed the number of spare disks\
- (parity_units={}).""".format(name, d['disk'], pool['parity_units'])
+            _assert(
+                spare_units is None or spare_units == 0
+                or spare_units == pool['parity_units'],
+                f'Pool {name}: spare_units must be either not set, or '
+                "must be 0 or must be equal to 'parity_units'")
+            if d:
+                _assert(
+                    d['disk'] <= pool['parity_units'],
+                    "Pool {}: Cannot allow that many disk failures ({}). "
+                    "The number of allowed disk failures must not exceed "
+                    "the number of spare disks (parity_units={}).".format(
+                        name, d['disk'], pool['parity_units']))
         else:
             data_units = pool['data_units']
-            assert data_units == 1, f"""\
-{name}: Wrong number of data_units ({data_units})
-Pools of {t!r} type can only have 1 data unit."""
-            assert t not in pool_types, \
-                f'{name}: No more than one {t!r} pool can be defined'
+            _assert(data_units == 1,
+                    f"Pool {name}: Wrong number of data_units ({data_units}). "
+                    f"Pools of {t!r} type can only have 1 data unit.")
+            _assert(t not in pool_types,
+                    f'Pool {name}: No more than one {t!r} pool can be defined')
         pool_types.add(t)
 
         if 'disk_refs' not in pool:
             continue
 
         # XXX Do we want to support disk_refs in MD pools as well?
-        assert t in (PoolT.sns, PoolT.dix), \
-            f"{name}: disk_refs are only supported for pools of either " \
-            "'sns' or 'dix' types"
+        _assert(
+            t in (PoolT.sns, PoolT.dix),
+            f"Pool {name}: disk_refs are only supported for pools of either "
+            "'sns' or 'dix' types")
         disk_refs = pool['disk_refs']
         # Allowing diskrefs to be empty until the CDF generation is fixed.
         if disk_refs:
-            assert disk_refs, \
-                f'Pool {name!r}: disk_refs must not be empty' \
-                ' (it can be omitted though)'
-            assert all_unique(repr(x) for x in disk_refs), \
-                f'Pool {name!r}: disk_refs must be unique'
+            _assert(
+                disk_refs, f'Pool {name}: disk_refs must not be empty'
+                ' (it can be omitted though)')
+            _assert(all_unique(repr(x) for x in disk_refs),
+                    f'Pool {name}: disk_refs must be unique')
 
-    assert PoolT.sns in pool_types, \
-        "At least one pool of 'sns' type must be defined"
+    _assert(PoolT.sns in pool_types,
+            "At least one pool of 'sns' type must be defined")
 
     sns_pools = [pool for pool in pools_desc if pool_type(pool) is PoolT.sns]
     unrestricted = [pool['name'] for pool in sns_pools
                     if 'disk_refs' not in pool]
-    assert len(unrestricted) <= 1, """\
-These pools compete for disks: {}
-Leave only one of them or allot disks using disk_refs""".format(
-        ', '.join(unrestricted))
-    assert any('disk_refs' in pool for pool in sns_pools) == \
-        (not unrestricted), \
-        "'sns' pools with and without disk_refs cannot be used together"
+    _assert(len(unrestricted) <= 1,
+            'These pools compete for disks: {}. Leave only one of them '
+            'or allow disks using disk_refs'.format(
+            ', '.join(unrestricted)))
+    _assert(any('disk_refs' in pool for pool in sns_pools) ==
+            (not unrestricted),
+            "'sns' pools with and without disk_refs cannot be used together")
 
 
 def validate_profiles_desc(profiles_desc: List[Dict[str, Any]],
                            pools_desc: List[Dict[str, Any]]) -> None:
-    assert profiles_desc, \
-        'List of profiles must not be empty (it can be omitted though)'
-    assert all_unique(x['name'] for x in profiles_desc), \
-        'Profile names are not unique:\n' + \
-        '\n'.join('  ' + x['name'] for x in profiles_desc)
-    assert all(x['name'] for x in profiles_desc), \
-        'Profile name must not be empty'
+    logging.debug('Validating profile descriptions')
+    _assert(bool(profiles_desc),
+            'List of profiles must not be empty (it can be omitted though)')
+    _assert(
+        all_unique(x['name'] for x in profiles_desc),
+        'Profile names are not unique:\n' + '\n'.join('  ' + x['name']
+                                                      for x in profiles_desc))
+    _assert(all(x['name'] for x in profiles_desc),
+            'Profile name must not be empty')
 
     Pool = NamedTuple('Pool', [('name', str), ('type', PoolT)])
     all_pools = [Pool(pool['name'], pool_type(pool)) for pool in pools_desc]
 
     for prof in profiles_desc:
         name, pools = prof['name'], prof['pools']
-        assert pools, f"Profile {name!r} doesn't refer to any pools"
+        _assert(pools, f"Profile {name!r} doesn't refer to any pools")
         for case, select in [('unknown', lambda _: True)]:
             bad = [
                 s for s in pools if s not in
                 [pool.name for pool in all_pools if select(pool.type)]
             ]
-            assert not bad, \
-                'Profile {!r} refers to {} pool{}: {}'.format(
-                    name,
-                    case,
-                    's' if len(bad) > 1 else '',
-                    ', '.join(bad))
-        assert all_unique(pools), \
-            f'Profile {name!r} has non-unique pool references'
+            _assert(
+                not bad, 'Profile {!r} refers to {} pool{}: {}'.format(
+                    name, case, 's' if len(bad) > 1 else '', ', '.join(bad)))
+        _assert(all_unique(pools),
+                f'Profile {name!r} has non-unique pool references')
 
 
 def validate_fdmi_filters_desc(fdmi_filters_desc: List[Dict[str, Any]],
                                nodes_desc: List[Dict[str, Any]]) \
         -> None:
-    assert all_unique(x['name'] for x in fdmi_filters_desc), \
-        'FDMI filter names are not unique:\n' + \
-        '\n'.join('  ' + x['name'] for x in fdmi_filters_desc)
-    assert all(x['name'] for x in fdmi_filters_desc), \
-        'FDMI filter name must not be empty'
+    logging.debug('Validating FDMI filters')
+    _assert(
+        all_unique(x['name'] for x in fdmi_filters_desc),
+        'FDMI filter names are not unique:\n' +
+        '\n'.join('  ' + x['name'] for x in fdmi_filters_desc))
+    _assert(all(x['name'] for x in fdmi_filters_desc),
+            'FDMI filter name must not be empty')
 
     Node = NamedTuple('Node', [('name', str), ('clients_nr', int)])
     nodes = [Node(name=x['hostname'], clients_nr=x['m0_clients']['other'])
@@ -542,15 +618,15 @@ def validate_fdmi_filters_desc(fdmi_filters_desc: List[Dict[str, Any]],
     for fdmi_filter_desc in fdmi_filters_desc:
         node = fdmi_filter_desc['node']
         client_index = fdmi_filter_desc['client_index']
-        assert node, f"FDMI filter {fdmi_filter_desc} " \
-            "doesn't refer to any node"
+        _assert(node, f"FDMI filter {fdmi_filter_desc} "
+                "doesn't refer to any node")
         matching_nodes = [n for n in nodes if n.name == node]
-        assert len(matching_nodes) == 1, \
-            (f"FDMI filter have exactly one node: {fdmi_filter_desc}",
-             matching_nodes)
-        assert client_index < matching_nodes[0].clients_nr, \
-            "FDMI filter m0_clients index is out of bound: " \
-            f"client_index={client_index}, node={matching_nodes[0]}"
+        _assert(
+            len(matching_nodes) == 1,
+            f"FDMI filter have exactly one node: {fdmi_filter_desc}")
+        _assert(client_index < matching_nodes[0].clients_nr,
+                "FDMI filter m0_clients index is out of bound: "
+                f"client_index={client_index}, node={matching_nodes[0]}")
 
 
 @lru_cache(maxsize=1)
@@ -604,6 +680,7 @@ def validate_facter(hostname: str) -> None:
 
 def get_facts(hostname: str, mock_p: bool, *args: str) -> Dict[str, Any]:
     if mock_p:
+        logging.debug('Node facts will be fabricated because of --mock flag')
         return fabricate_facts(hostname, *args)
     validate_facter(hostname)
     result: Dict[str, Any] = json.loads(
@@ -899,7 +976,9 @@ class ConfNode(ToDhall):
         self.name = name
         self.nr_cpu = nr_cpu
         self.memsize_MB = memsize_MB
-        assert all(x.type is ObjT.process for x in processes)
+
+        _assert(all(x.type is ObjT.process for x in processes),
+                'All processes must be of ObjT.process type')
         self.processes = processes
 
     def __repr__(self):
@@ -909,7 +988,8 @@ class ConfNode(ToDhall):
         return f'{self.__class__.__name__}({args})'
 
     def to_dhall(self, oid: Oid) -> str:
-        assert oid.type is ObjT.node
+        _assert(oid.type is ObjT.node, 'The argument must be ObjT.node but '
+                f'{oid.type} was given.')
         args = ', '.join([f'id = {oid_to_dhall(oid)}',
                           f'nr_cpu = {self.nr_cpu}',
                           f'memsize_MB = {self.memsize_MB}',
@@ -919,7 +999,7 @@ class ConfNode(ToDhall):
     @classmethod
     def build(cls, m0conf: Dict[Oid, Any], parent: Oid,
               node_desc: Dict[str, Any]) -> Oid:
-        assert parent.type is ObjT.root
+        _assert(parent.type is ObjT.root, 'Parent type must be ObjT.root')
         node_id = new_oid(ObjT.node)
         facts = node_desc['facts']
         m0conf[node_id] = cls(name=node_desc['hostname'],
@@ -947,13 +1027,14 @@ class ConfProcess(ToDhall):
     def __init__(self, nr_cpu: int, memsize_MB: int,
                  endpoint: LibfabricEndpoint,
                  services: List[Oid], meta_data: str = None):
-        assert nr_cpu > 0
+        _assert(nr_cpu > 0, 'nr_cpu must be positive')
         self.nr_cpu = nr_cpu
-        assert memsize_MB > 0
+        _assert(memsize_MB > 0, 'memsize_MB must be positive')
         self.memsize_MB = memsize_MB
         self.endpoint = endpoint
         self.meta_data = meta_data
-        assert all(x.type is ObjT.service for x in services)
+        _assert(all(x.type is ObjT.service for x in services),
+                'All services must be of ObjT.service type')
         self.services = services
 
     def __repr__(self):
@@ -964,7 +1045,8 @@ class ConfProcess(ToDhall):
         return f'{self.__class__.__name__}({args})'
 
     def to_dhall(self, oid: Oid) -> str:
-        assert oid.type is ObjT.process
+        _assert(oid.type is ObjT.process,
+                f'ObjT.process expected, but {oid.type} was given')
         args = ', '.join([f'id = {oid_to_dhall(oid)}',
                           f'nr_cpu = {self.nr_cpu}',
                           f'memsize_MB = {self.memsize_MB}',
@@ -980,8 +1062,12 @@ class ConfProcess(ToDhall):
               proc_t: ProcT,
               proc_desc: Dict[str, Any] = None,
               ctrl: Optional[Oid] = None) -> Oid:
-        assert parent.type is ObjT.node
-        assert ctrl is None or ctrl.type is ObjT.controller
+        _assert(parent.type is ObjT.node,
+                f'Parent must be ObjT.node but {parent.type} was given')
+        if ctrl is not None:
+            _assert(
+                ctrl.type is ObjT.controller, 'ctrl must be of type '
+                f'Obj.controller, but {ctrl.type} was given')
 
         facts = node_desc['facts']
         proto = node_desc.get('data_iface_type', 'tcp')
@@ -1989,6 +2075,7 @@ Cluster = NamedTuple('Cluster', [('m0conf', Dict[Oid, Any]),
 
 
 def generate_consul_agents(cluster: Cluster) -> str:
+    logging.debug('Generating consul configuration')
     assert cluster.consul_servers
     return json.dumps(
         {'servers': [x._asdict() for x in cluster.consul_servers],
@@ -2060,7 +2147,7 @@ def consul_kv_sdevs(m0conf: Dict[Oid, Any]) -> Dict[str, str]:
 
 
 def generate_consul_kv(cluster: Cluster, dhall_dir: str) -> str:
-    assert os.path.isabs(dhall_dir)  # XXX DELETEME
+    logging.debug('Generating consul KV structure')
     assert all(k.type is ObjT.process and v.type is ObjT.service
                for k, v in cluster.m0_clients.items())
 
@@ -2136,7 +2223,9 @@ def generate_consul_kv(cluster: Cluster, dhall_dir: str) -> str:
 
 
 def generate_confd(m0conf: Dict[Oid, ToDhall], dhall_dir: str) -> str:
-    assert os.path.isabs(dhall_dir)
+    logging.debug('Generating confd.dhall')
+    _assert(os.path.isabs(dhall_dir),
+            f"Dhall directory doesn't exist: {dhall_dir}")
 
     def objt(obj: ToDhall) -> str:
         objt = obj.__class__.__name__
@@ -2249,7 +2338,9 @@ def aux_pool_list(pool_desc: Dict[str, Any],
 
     # Currently assumption is that, aux pools will be generated for
     # SNS pools only
-    assert pool_t == PoolT.sns
+    _assert(
+        pool_t == PoolT.sns,
+        f"Pool {pool['name']}: aux pools are supported for SNS pools only")
 
     # Calculate and create aux pool disk combinations
     # only for SNS pool type
@@ -2324,8 +2415,7 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
         node_id = ConfNode.build(conf, root_id, node)
         encl_id = ConfEnclosure.build(conf, rack_id, node_id)
         ctrl_ids: List[Tuple[Optional[Oid], Any]] = []
-        m0ds = node.get('m0_servers', [])
-        for m0d in m0ds:
+        for m0d in node.get('m0_servers', []):
             if m0d['_io_disks']:
                 ctrl_ids.append((ConfController.build(conf, encl_id), m0d))
             else:
@@ -2413,13 +2503,19 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
                 ConfFdmiFltGrp.build(conf, root_id, fdmi_filter, other_clients)
 
     validate_m0conf(conf)
-    assert cluster.consul_servers
+    _assert(
+        bool(cluster.consul_servers), 'No consul agent is required by the '
+        'current cluster description which is logically incorrect')
     names = [x.node_name
              for x in cluster.consul_servers + cluster.consul_clients]
-    assert all_unique(names)
-    assert all(re.search('[",= @]', name) is None for name in names)
-    assert all_unique(x.ipaddr
-                      for x in cluster.consul_servers + cluster.consul_clients)
+    _assert(all_unique(names), f'Consul agent names are not unique: {names}')
+    _assert(all(re.search('[",= @]', name) is None for name in names),
+            'Some consul agent names use unsupported symbols '
+            f'(check for ",= @): {names}')
+    _assert(
+        all_unique(x.ipaddr
+                   for x in cluster.consul_servers + cluster.consul_clients),
+        'Some of the consul agent IP addresses are not unique')
     return cluster
 
 
