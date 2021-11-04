@@ -19,6 +19,7 @@
 import ctypes as c
 import logging
 import os
+import platform
 
 from typing import Optional
 from hax.types import FidStruct, HaNoteStruct, Uint128Struct
@@ -47,7 +48,8 @@ def make_array(ctr, some_list):
 class HaxFFI:
     def __init__(self):
         dirname = os.path.dirname(os.path.abspath(__file__))
-        lib_path = f'{dirname}/../../libhax.cpython-36m-x86_64-linux-gnu.so'
+        arch = platform.machine()
+        lib_path = f'{dirname}/../../libhax.cpython-36m-{arch}-linux-gnu.so'
         LOG.debug('Loading library from path: %s', lib_path)
         lib = c.cdll.LoadLibrary(lib_path)
         lib.init_motr_api.argtypes = [c.py_object, c.c_char_p]

@@ -18,12 +18,12 @@
 # build number
 %define h_build_num  %(test -n "$build_number" && echo "$build_number" || echo 1)
 
-# motr git revision
-#   assume that Motr package release has format 'buildnum_gitid_kernelver'
-%define h_motr_gitrev %(rpm -q --whatprovides cortx-motr | xargs rpm -q --queryformat '%{RELEASE}' | cut -f2 -d_)
-
 # motr version
+%if %{rhel} < 8
 %define h_motr_version %(rpm -q --whatprovides cortx-motr | xargs rpm -q --queryformat '%{VERSION}-%{RELEASE}')
+%else
+%define h_motr_version %(rpm -q --whatprovides cortx-motr | xargs rpm -q --queryformat '%%{VERSION}-%%{RELEASE}')
+%endif
 
 # parallel build jobs
 %define h_build_jobs_opt  %(test -n "$build_jobs" && echo "-j$build_jobs" || echo '')
@@ -41,17 +41,32 @@ BuildRequires: cortx-motr
 BuildRequires: cortx-motr-devel
 BuildRequires: cortx-py-utils
 BuildRequires: git
+%if %{rhel} < 8
 BuildRequires: python36
 BuildRequires: python36-devel
 BuildRequires: python36-pip
 BuildRequires: python36-setuptools
+%else
+BuildRequires: python3
+BuildRequires: python3-devel
+BuildRequires: python3-pip
+BuildRequires: python3-setuptools
+%endif
 
 Requires: consul >= 1.7.0, consul < 1.10.0
+%if %{rhel} < 8
 Requires: puppet-agent >= 6.13.0
+%else
+Requires: facter >= 3.14.2
+%endif
 Requires: jq
 Requires: cortx-motr = %{h_motr_version}
 Requires: cortx-py-utils
+%if %{rhel} < 8
 Requires: python36
+%else
+Requires: python3
+%endif
 
 Conflicts: halon
 
@@ -91,11 +106,13 @@ groupadd --force hare
 chgrp hare /var/lib/hare
 chmod --changes g+w /var/lib/hare
 
+%if %{rhel} < 8
 # puppet-agent provides a newer version of facter, but sometimes it might not be
 # available in /usr/bin/, so we need to fix this
 if [[ ! -e /usr/bin/facter && -e /opt/puppetlabs/bin/facter ]] ; then
     ln -vsf /opt/puppetlabs/bin/facter /usr/bin/facter
 fi
+%endif
 
 %postun
 systemctl daemon-reload
