@@ -104,36 +104,43 @@ specific goals:
 5. A patch MUST compile cleanly and pass project self-tests on at least
    the principal target platform.
 
-6. A patch commit message SHOULD consist of a single short (less than
-   50 characters) line stating the problem ("Problem: ...") being
-   solved, followed by a blank line and then the proposed solution
-   ("Solution: ...").
+6. Referenced from the [linux kernel world](https://github.com/torvalds/subsurface-for-dirk/blob/a48494d2fbed58c751e9b7e8fbff88582f9b2d02/README#L91),
+   a typical commit message looks like,
+   ```
+   Header line: explain the commit in one line (use the imperative)
 
-<!--
-  -- The strictness of the `Problem: ` prefix requirement is controversial[1].
-  -- ZeroMQ maintainers considered the proposal of reducing the strictness
-  -- (s/MUST/SHOULD/), but decided against[2] it, stating that current style
-  -- is foundational[3].
-  --
-  --   1. https://github.com/zeromq/rfc/issues/117
-  --   2. https://github.com/zeromq/rfc/issues/117#issuecomment-249374914
-  --   3. https://github.com/zeromq/rfc/issues/117#issuecomment-249391434
-  --
-  -- | The `Problem` statement wields enormous power. At first you need to
-  -- | recognize that every bug, every feature, every change and every idea is
-  -- | essentially a problem. Thus having a list of solved problems comes
-  -- | naturally. Using the `Problem` statement also sharpens the awareness
-  -- | whether a feature, bug, change or idea is actually worth solving as it
-  -- | is really easy to see if there is a need. Further it forces developers
-  -- | to consciously fragment their work into a stream of small fixes rather
-  -- | than one big with a <censored>nonsensical</censored> commit message or
-  -- | even a listing.
-  -- |
-  -- | From a maintainers perspective it allows us to quickly examine a pull
-  -- | request and merge it in a manner of seconds or decline it if the
-  -- | problem statement is false. And probably most important it is a
-  -- | powerful tool to identify bad actors as they wont follow rules.
-  -->
+   Body of commit message is a few lines of text, explaining things
+   in more detail, possibly giving some background about the issue
+   being fixed, etc etc.
+
+   The body of the commit message can be several paragraphs, and
+   please do proper word-wrap and keep columns shorter than about
+   74 characters or so. That way "git log" will show things
+   nicely even when it's indented.
+
+   Make sure you explain your solution and why you're doing what you're
+   doing, as opposed to describing what you're doing. Reviewers and your
+   future self can read the patch, but might not understand why a
+   particular solution was implemented.
+
+   Reported-by: whoever-reported-it
+   Signed-off-by: Your Name <youremail@yourhost.com>
+
+   where that header line really should be meaningful, and really should be
+   just one line.  That header line is what is shown by tools like gitk and
+   shortlog, and should summarize the change in one readable line of text,
+   independently of the longer explanation. Please use verbs in the
+   imperative in the commit message, as in "Fix bug that...", "Add
+   file/feature ...", or "Make Subsurface..."
+   ```
+   It is of utmost important that a meaningful problem and solution description
+   is provided after a header line. It helps maintainers to quickly understand
+   the issue and have a particular vision while reviewing the implemented solution.
+   The `Problem` description helps recognize that every bug, every feature, every
+   change and every idea is essentially a problem. Thus having a list of solved
+   problems comes naturally. Using the `Problem` description also sharpens the
+   awareness whether a feature, bug, change or idea is actually worth solving as it
+   is really easy to see if there is a need.
 
 7. A "Correct Patch" is one that satisfies the above requirements.
 
