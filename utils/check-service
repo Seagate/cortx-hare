@@ -117,7 +117,7 @@ if [[ $service =~ m0d ]]; then
     fi
 fi
 
-curl $(get_node_name):$port
+/opt/seagate/cortx/hare/bin/m0ping $(get_node_name) $port
 rc=$?
 # Curl return codes that suggests that the service is active,
 # 0 -> OK, all fine. Proceed as usual.
@@ -131,7 +131,7 @@ rc=$?
 #       is received when curl request is sent to motr processes on
 #       their given ports.
 case $rc in
-    0|52|56)
+    0)
         exit ${status[passing]};;
     *)
         exit ${status[warning]};;
