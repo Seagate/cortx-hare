@@ -19,7 +19,7 @@
 import ctypes as c
 import logging
 from errno import EAGAIN
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Tuple
 
 from hax.consul.cache import supports_consul_cache, uses_consul_cache
 from hax.exception import ConfdQuorumException, RepairRebalanceException
@@ -32,7 +32,7 @@ from hax.types import (ConfHaProcess, Fid, FidStruct, FsStats,
                        HaLinkMessagePromise, HaNote, HaNoteStruct, HAState,
                        MessageId, ObjT, Profile, ReprebStatus, ServiceHealth,
                        m0HaProcessEvent, m0HaProcessType)
-from hax.util import ConsulUtil, repeat_if_fails, FidWithType
+from hax.util import ConsulUtil, repeat_if_fails, FidWithType, PutKV
 
 LOG = logging.getLogger('hax')
 
@@ -305,17 +305,23 @@ class Motr:
                 is_node_failed = self.is_node_failed(note, kv_cache=kv_cache)
                 if (st.status == ServiceHealth.FAILED
                         and is_node_failed):
-                    notes += self.notify_node_status_by_process(note)
+                    notes += self.notify_node_status_by_process(
+                        note, kv_cache=kv_cache)
                 elif (st.status == ServiceHealth.OK
                         and not is_node_failed):
-                    notes += self.notify_node_status_by_process(note)
+                    notes += self.notify_node_status_by_process(
+                        note, kv_cache=kv_cache)
                 else:
-                    ctrl_note = self.get_ctrl_status(note)
+                    ctrl_note = self.get_ctrl_status(note, kv_cache=kv_cache)
                     if ctrl_note is not None:
-                        notes.append(ctrl_note)
+                        (a_note, updates) = ctrl_note
+                        notes.append(a_note)
+                        self._write_updates(updates, kv_cache)
 
             if st.fid.container == ObjT.DRIVE.value:
-                self.consul_util.update_drive_state([st.fid], st.status)
+                self.consul_util.update_drive_state([st.fid],
+                                                    st.status,
+                                                    kv_cache=kv_cache)
             elif st.fid.container == ObjT.NODE.value:
                 self.consul_util.set_node_state(st.fid,
                                                 st.status,
@@ -493,11 +499,14 @@ class Motr:
 
         # Update the states of all the controllers as failed, in case of
         # node failure event.
+        #
         if new_state == ServiceHealth.FAILED and ctrl_fids:
+            updates: List[PutKV] = []
             for x in ctrl_fids:
-                self.consul_util.set_ctrl_state(x,
-                                                new_state,
-                                                kv_cache=kv_cache)
+                updates += self.consul_util.get_ctrl_state_updates(
+                    x, new_state, kv_cache=kv_cache)
+
+            self._write_updates(updates, kv_cache)
 
         notes = []
         if encl_fid:
@@ -523,39 +532,53 @@ class Motr:
 
         node = self.consul_util.get_process_node(proc_fid, kv_cache=kv_cache)
 
+        updates: List[PutKV] = []
         if new_state == ServiceHealth.OK:
             # Node can have multiple controllers. Node can be online, with
             # a single controller running online.
             # If we receive process 'OK', only the process state is
             # updated. So, we need to update the corresponding
             # controller state.
-            ctrl_fid = self.consul_util.get_ioservice_ctrl_fid(proc_fid)
+            ctrl_fid = self.consul_util.get_ioservice_ctrl_fid(
+                proc_fid, kv_cache=kv_cache)
             if ctrl_fid:
-                self.consul_util.set_ctrl_state(ctrl_fid, new_state)
+                updates = self.consul_util.get_ctrl_state_updates(
+                    ctrl_fid, new_state, kv_cache=kv_cache)
 
         node_fid = self.consul_util.get_node_fid(node, kv_cache=kv_cache)
+        # FIXME make these two functions to return List[PutKV] so that the
+        # write operations can be delayed to reuse the cache as long as
+        # possible
         notes = self.add_node_state_by_fid(node_fid, new_state)
         notes += self.add_enclosing_devices_by_node(node_fid,
                                                     new_state,
                                                     node=node,
                                                     kv_cache=kv_cache)
+        self._write_updates(updates, kv_cache)
         return notes
 
-    def get_ctrl_status(self,
-                        proc_note: HaNoteStruct) -> Optional[HaNoteStruct]:
+    @supports_consul_cache
+    def get_ctrl_status(
+            self,
+            proc_note: HaNoteStruct,
+            kv_cache=None) -> Optional[Tuple[HaNoteStruct, List[PutKV]]]:
         new_state = proc_note.no_state
         proc_fid = Fid.from_struct(proc_note.no_id)
         assert ObjT.PROCESS.value == proc_fid.container
         LOG.debug('Notifying ctrl status for process_fid=%s state=%s',
                   proc_fid, new_state)
 
-        ctrl_fid = self.consul_util.get_ioservice_ctrl_fid(proc_fid)
+        ctrl_fid = self.consul_util.get_ioservice_ctrl_fid(proc_fid,
+                                                           kv_cache=kv_cache)
 
         if ctrl_fid:
             # Update controller state in consul kv.
-            self.consul_util.set_ctrl_state(
-                ctrl_fid, ServiceHealth.from_ha_note_state(new_state))
-            return HaNoteStruct(no_id=ctrl_fid.to_c(), no_state=new_state)
+            updates = self.consul_util.get_ctrl_state_updates(
+                ctrl_fid,
+                ServiceHealth.from_ha_note_state(new_state),
+                kv_cache=kv_cache)
+            return (HaNoteStruct(no_id=ctrl_fid.to_c(),
+                                 no_state=new_state), updates)
         return None
 
     # Check if all the IO services of node are failed
@@ -672,3 +695,7 @@ class Motr:
                 'Failed to send SPIEL request "sns_rebalance_resume",' +
                 'please check Motr logs for more details.')
         LOG.debug('Rebalancing resumed for pool %s', pool_fid)
+
+    def _write_updates(self, updates: List[PutKV], kv_cache=None) -> None:
+        for op in updates:
+            self.consul_util.kv.kv_put(op.key, op.value, kv_cache=kv_cache)
