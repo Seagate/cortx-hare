@@ -19,11 +19,7 @@
 %define h_build_num  %(test -n "$build_number" && echo "$build_number" || echo 1)
 
 # motr version
-%if %{rhel} < 8
-%define h_motr_version %(rpm -q --whatprovides cortx-motr | xargs rpm -q --queryformat '%{VERSION}-%{RELEASE}')
-%else
 %define h_motr_version %(rpm -q --whatprovides cortx-motr | xargs rpm -q --queryformat '%%{VERSION}-%%{RELEASE}')
-%endif
 
 # parallel build jobs
 %define h_build_jobs_opt  %(test -n "$build_jobs" && echo "-j$build_jobs" || echo '')
