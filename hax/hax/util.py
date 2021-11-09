@@ -159,6 +159,11 @@ def repeat_if_fails(wait_seconds=5, max_retries=-1):
 TxPutKV = NamedTuple('TxPutKV', [('key', str), ('value', str),
                                  ('cas', Optional[Any])])
 
+PutKV = NamedTuple('PutKV', [
+    ('key', str),
+    ('value', str)
+])
+
 
 def wait_for_event(event: Event, interval_sec) -> None:
     """
@@ -823,14 +828,18 @@ class ConsulUtil:
         return list_fids
 
     @repeat_if_fails()
+    @uses_consul_cache
     def get_io_service_devices(self,
-                               ioservice_fid: Fid) -> Optional[List[str]]:
+                               ioservice_fid: Fid,
+                               kv_cache=None) -> Optional[List[str]]:
         if not ioservice_fid:
             return None
         # Example key m0conf/nodes/0x6e00000000000001:0x3/processes/
         #   0x7200000000000001:0x15/services/0x7300000000000001:0x17/sdevs/
         #   0x6400000000000001:0x18:{"path": "/dev/sdc", "state": "offline"}
-        sdev_items = self.kv.kv_get('m0conf/nodes', recurse=True)
+        sdev_items = self.kv.kv_get('m0conf/nodes',
+                                    recurse=True,
+                                    kv_cache=kv_cache)
         regex = re.compile(
             f'^m0conf\\/.*\\/processes\\/{ioservice_fid}\\/.*\\/sdevs\\/.*$')
         sdev_fids = []
@@ -849,12 +858,13 @@ class ConsulUtil:
         return self.kv.kv_get('m0conf/sites', recurse=True, kv_cache=kv_cache)
 
     @repeat_if_fails()
-    def get_device_controller(self, sdev_fid):
+    @uses_consul_cache
+    def get_device_controller(self, sdev_fid, kv_cache=None):
         # Example key m0conf/sites/0x5300000000000001:0x1/racks/
         #    0x6100000000000001:0x2/encls/0x6500000000000001:0x4/ctrls/
         #    0x6300000000000001:0x5/drives/0x6b00000000000001:0x38:
         #    {"sdev": "0x6400000000000001:0x37", "state": "M0_NC_UNKNOWN"}
-        sites_items = self.get_all_sites()
+        sites_items = self.get_all_sites(kv_cache=kv_cache)
 
         for item in sites_items:
             if 'sdev' not in json.loads(item['Value']).keys():
@@ -867,7 +877,10 @@ class ConsulUtil:
         return None
 
     @repeat_if_fails()
-    def get_ioservice_ctrl_fid(self, ioservice_fid: Fid) -> Optional[Fid]:
+    @uses_consul_cache
+    def get_ioservice_ctrl_fid(self,
+                               ioservice_fid: Fid,
+                               kv_cache=None) -> Optional[Fid]:
         """
         Returns the fid of the controller for the given IOservice.
 
@@ -880,14 +893,15 @@ class ConsulUtil:
         if not ioservice_fid:
             return None
 
-        sdev_fids = self.get_io_service_devices(ioservice_fid)
+        sdev_fids = self.get_io_service_devices(ioservice_fid,
+                                                kv_cache=kv_cache)
 
         if not sdev_fids:
             return None
 
         sdev_fid = sdev_fids[0]
 
-        ctrl_fid = self.get_device_controller(sdev_fid)
+        ctrl_fid = self.get_device_controller(sdev_fid, kv_cache=kv_cache)
 
         if ctrl_fid is None:
             return None
@@ -1029,10 +1043,10 @@ class ConsulUtil:
             self.kv.kv_put(encl['Key'], json.dumps(value), kv_cache=kv_cache)
 
     @repeat_if_fails()
-    def set_ctrl_state(self,
-                       ctrl_fid: Fid,
-                       status: ServiceHealth,
-                       kv_cache=None) -> None:
+    def get_ctrl_state_updates(self,
+                               ctrl_fid: Fid,
+                               status: ServiceHealth,
+                               kv_cache=None) -> List[PutKV]:
         # Example,
         # {
         #    "key": "m0conf/sites/0x5300000000000001:0x1/
@@ -1043,15 +1057,17 @@ class ConsulUtil:
         # }
         ctrl_items = self.get_all_sites(kv_cache=kv_cache)
         regex = re.compile(f'^m0conf\\/.*\\/ctrls/{ctrl_fid}$')
+        result: List[PutKV] = []
         for ctrl in ctrl_items:
             match_result = re.match(regex, ctrl['Key'])
             if not match_result:
                 continue
             value = json.loads(ctrl['Value'])
             value['state'] = self.get_device_ha_state(status)
-            LOG.debug('Setting ctrl=%s in KV with state=%s',
-                      ctrl_fid, value['state'])
-            self.kv.kv_put(ctrl['Key'], json.dumps(value), kv_cache=kv_cache)
+            LOG.debug('Setting ctrl=%s in KV with state=%s', ctrl_fid,
+                      value['state'])
+            result.append(PutKV(key=ctrl['Key'], value=json.dumps(value)))
+        return result
 
     @repeat_if_fails()
     @uses_consul_cache
@@ -1164,29 +1180,43 @@ class ConsulUtil:
         LOG.debug('Setting process status in KV: %s:%s', key, data)
         self.kv.kv_put(key, data)
 
+    @supports_consul_cache
     def update_drive_state(self,
                            drive_fids: List[Fid],
                            status: ServiceHealth,
-                           device_event=True) -> None:
+                           device_event=True,
+                           kv_cache=None) -> None:
         device_state_map = {
             ServiceHealth.OK: 'online',
             ServiceHealth.FAILED: 'failed',
             ServiceHealth.OFFLINE: 'offline',
         }
+        updates: List[PutKV] = []
         for drive in drive_fids:
             sdev_fid = self.drive_to_sdev_fid(drive)
-            self.set_sdev_state(sdev_fid, device_state_map[status],
-                                device_event)
+            # Note that we don't update KV values within this call
+            # but accumulate the changes until we come to the end of the
+            # current function. This helps to reuse the kv_cache as long as
+            # possible (any kv_put operation will invalidate the current cache)
+            updates += self.get_sdev_state_update(sdev_fid,
+                                                  device_state_map[status],
+                                                  device_event)
+        for op in updates:
+            self.kv.kv_put(op.key, op.value, kv_cache=kv_cache)
 
     @repeat_if_fails()
-    def set_sdev_state(self,
-                       sdev_fid: Fid,
-                       state: str,
-                       device_event=True) -> None:
+    @supports_consul_cache
+    def get_sdev_state_update(self,
+                              sdev_fid: Fid,
+                              state: str,
+                              device_event=True,
+                              kv_cache=None) -> List[PutKV]:
         LOG.debug('Setting sdev=%s in KV with state=%s', sdev_fid, state)
-        sdev_items = self.kv.kv_get('m0conf/nodes', recurse=True)
-        regex = re.compile(
-            f'^m0conf\\/.*\\/sdevs\\/{sdev_fid}$')
+        sdev_items = self.kv.kv_get('m0conf/nodes',
+                                    recurse=True,
+                                    kv_cache=kv_cache)
+        regex = re.compile(f'^m0conf\\/.*\\/sdevs\\/{sdev_fid}$')
+        result: List[PutKV] = []
         for sdev in sdev_items:
             match_result = re.match(regex, sdev['Key'])
             if not match_result:
@@ -1195,7 +1225,8 @@ class ConsulUtil:
             if not device_event and value['state'] == 'failed':
                 continue
             value['state'] = state
-            self.kv.kv_put(sdev['Key'], json.dumps(value))
+            result.append(PutKV(key=sdev['Key'], value=json.dumps(value)))
+        return result
 
     @repeat_if_fails()
     @uses_consul_cache
