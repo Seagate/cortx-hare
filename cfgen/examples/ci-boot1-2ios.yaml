@@ -1,3 +1,4 @@
+create_aux: false # optional; supported values: "false" (default), "true"
 nodes:
   - hostname: localhost
     data_iface: eth1

@@ -1,3 +1,4 @@
+create_aux: false # optional; supported values: "false" (default), "true"
 nodes:
   - hostname: ssu1
     data_iface: eth1

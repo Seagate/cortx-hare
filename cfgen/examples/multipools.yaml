@@ -1,3 +1,4 @@
+create_aux: false # optional; supported values: "false" (default), "true"
 nodes:
   - hostname: srvnode-1
     data_iface: enp175s0f1_c1
