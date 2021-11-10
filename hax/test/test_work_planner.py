@@ -126,6 +126,7 @@ class TestMessageOrder(unittest.TestCase):
         def my_state():
             return State(next_group_id=99999,
                          active_commands=LinkedList(),
+                         active_meta={},
                          current_group_id=99999,
                          next_group_commands=set(),
                          is_shutdown=False)
@@ -458,6 +459,7 @@ class TestWorkPlanner(unittest.TestCase):
         def my_state():
             return State(next_group_id=99999,
                          active_commands=LinkedList(),
+                         active_meta={},
                          current_group_id=99999,
                          next_group_commands=set(),
                          is_shutdown=False)
@@ -467,7 +469,7 @@ class TestWorkPlanner(unittest.TestCase):
         tracker = GroupTracker()
         thread_count = 1
         for i in range(10):
-            planner.add_command(process_event())
+            planner.add_command(broadcast())
 
         for j in range(thread_count):
             planner.add_command(Die())
@@ -512,3 +514,4 @@ class TestWorkPlanner(unittest.TestCase):
         groups_processed = tracker.get_tracks()
         self.assertEqual([99999, 10**5, 0, 1, 2, 3, 4,
                           5, 6, 7], groups_processed)
+
