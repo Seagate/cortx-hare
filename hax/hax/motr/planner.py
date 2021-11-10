@@ -20,17 +20,24 @@ import logging
 from collections import deque
 from dataclasses import dataclass
 from threading import Condition
-from typing import Callable, Deque, Optional, Set, Type, Tuple
+from typing import Callable, Deque, Dict, Optional, Set, Tuple, Type
 
 from hax.log import TRACE
 from hax.message import (AnyEntrypointRequest, BaseMessage, BroadcastHAStates,
                          Die, HaNvecGetEvent, ProcessEvent, SnsOperation)
 from hax.motr.util import LinkedList
+from hax.types import Fid
 
 LOG = logging.getLogger('hax')
 MAX_GROUP_ID = 100000
 
 __all__ = ['WorkPlanner']
+
+
+@dataclass
+class CommandMeta:
+    # A fid value related to a command
+    fid: Fid
 
 
 @dataclass
@@ -44,6 +51,11 @@ class State:
     #
     # Commands that are being processed now
     active_commands: LinkedList[BaseMessage]
+    #
+    # Mapping of id(active_command) -> CommandMeta
+    # the idea is that any command in active_commands collection can
+    # potentially have a metadata object stored in this Dict
+    active_meta: Dict[int, CommandMeta]
     #
     # Types of commands that have already been added to group number
     # next_group_id.
@@ -84,6 +96,7 @@ class WorkPlanner:
 
         self.state = fn()
         self.backlog: Deque[BaseMessage] = deque()
+        self.asap_list: Deque[BaseMessage] = deque()
         self.b_lock = Condition()
 
     def is_empty(self) -> bool:
@@ -98,10 +111,10 @@ class WorkPlanner:
             cmd, is_asap = self._assign_group(command)
             LOG.log(TRACE, '[WP]Cmd %s is added. Current state: %s', cmd,
                     self.state)
+            backlog = self.backlog
             if is_asap:
-                self.backlog.appendleft(cmd)
-            else:
-                self.backlog.append(cmd)
+                backlog = self.asap_list
+            backlog.append(cmd)
             # Some threads may be waiting because of an empty backlog - let's
             # notify them
             self.b_lock.notifyAll()
@@ -112,6 +125,7 @@ class WorkPlanner:
         '''
         return State(next_group_id=0,
                      active_commands=LinkedList(),
+                     active_meta={},
                      current_group_id=0,
                      next_group_commands=set(),
                      is_shutdown=False)
@@ -143,16 +157,20 @@ class WorkPlanner:
         def next_cmd() -> Optional[BaseMessage]:
             if self.state.is_shutdown:
                 return self._create_poison()
-            if self.backlog:
-                cmd = self.backlog.popleft()
-                if self._is_allowed(cmd):
-                    self.state.active_commands.add(cmd)
-                    LOG.log(TRACE, '[WP]Cmd %s taken!', cmd)
-                    return cmd
-                else:
-                    # Given the command is not eligble, put it back
-                    # to the same place it has been taken from.
-                    self.backlog.appendleft(cmd)
+
+            for backlog, is_allowed in [(self.asap_list,
+                                         self._is_allowed_asap),
+                                        (self.backlog, self._is_allowed)]:
+                if backlog:
+                    cmd = backlog.popleft()
+                    if is_allowed(cmd):
+                        self._add_active_cmd(cmd)
+                        LOG.log(TRACE, '[WP]Cmd %s taken!', cmd)
+                        return cmd
+                    else:
+                        # Given the command is not eligble, put it back
+                        # to the same place it has been taken from.
+                        backlog.appendleft(cmd)
             return None
 
         while True:
@@ -174,6 +192,41 @@ class WorkPlanner:
             LOG.debug('WorkPlanner is shutting down')
             self.state.is_shutdown = True
             self.b_lock.notifyAll()
+
+    def _remove_active_cmd(self, command: BaseMessage) -> None:
+        self.state.active_commands.remove(command)
+        key = id(command)
+        if key in self.state.active_meta:
+            del self.state.active_meta[key]
+
+    def _add_active_cmd(self, command: BaseMessage) -> None:
+        self.state.active_commands.add(command)
+        meta = self._extract_meta(command)
+        if meta:
+            key = id(command)
+            self.state.active_meta[key] = meta
+
+    def _extract_meta(self, command: BaseMessage) -> Optional[CommandMeta]:
+        if isinstance(command, ProcessEvent):
+            return CommandMeta(fid=command.evt.fid)
+        return None
+
+    def _is_allowed_asap(self, command: BaseMessage) -> bool:
+        meta = self._extract_meta(command)
+        if not meta:
+            return True
+
+        for k, v in self.state.active_meta.items():
+            # TODO in the future `==` will have to be replaced with something
+            # more command-specific.
+            # E.g. two ProcessEvents conflict if their metas contain the same
+            # fid.
+            #
+            # At this moment we support CommandMeta for ProcessEvent, so for
+            # now this 'is_conflict' logic is written like this:
+            if v.fid == meta.fid:
+                return False
+        return True
 
     def _is_allowed(self, command: BaseMessage) -> bool:
         ''' The command is allowed for execution if and only if the command has
@@ -226,7 +279,7 @@ class WorkPlanner:
 
         with self.b_lock:
             state = self.state
-            state.active_commands.remove(command)
+            self._remove_active_cmd(command)
             LOG.log(TRACE, '[WP]Cmd %s removed. Current state: %s', command,
                     state)
 
@@ -275,12 +328,6 @@ class WorkPlanner:
             # Start new group if there is another SNS operation within the
             # current group.
             return has(SnsOperation)
-        if isinstance(cmd, ProcessEvent):
-            # Two process events (like STARTING or STARTED) can't be performed
-            # in parallel.
-            # So if there is one ProcessEvent already in the group, then the
-            # new one should go to another group.
-            return has(ProcessEvent)
         return False
 
     def _assign_group(self, cmd: BaseMessage) -> Tuple[BaseMessage, bool]:
@@ -315,7 +362,8 @@ class WorkPlanner:
                 self.state.next_group_id)
 
         if (isinstance(cmd, AnyEntrypointRequest)
-                or isinstance(cmd, HaNvecGetEvent)):
+                or isinstance(cmd, HaNvecGetEvent)
+                or isinstance(cmd, ProcessEvent)):
             # Entrypoint and Die will always be added to the CURRENT group
             # (the one being currently active), so they can be executed at
             # first priority.
