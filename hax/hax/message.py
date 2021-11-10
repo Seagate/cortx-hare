@@ -21,7 +21,7 @@ from dataclasses import dataclass, field, fields
 from queue import Queue
 from typing import Any, List, Optional
 
-from hax.types import Fid, HaNote, HAState, StobId, Uint128
+from hax.types import ConfHaProcess, Fid, HaNote, HAState, StobId, Uint128
 
 
 @dataclass(unsafe_hash=True)
@@ -53,7 +53,7 @@ class FirstEntrypointRequest(AnyEntrypointRequest):
 
 @dataclass
 class ProcessEvent(BaseMessage):
-    evt: Any
+    evt: ConfHaProcess
 
 
 @dataclass
