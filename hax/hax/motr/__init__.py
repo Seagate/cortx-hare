@@ -302,7 +302,8 @@ class Motr:
             # node (enclosure) and CVGs if all Io services are failed.
             if (st.fid.container == ObjT.PROCESS.value
                     and st.status in (ServiceHealth.FAILED, ServiceHealth.OK)
-                    and (not self.consul_util.is_proc_client(st.fid))):
+                    and (not self.consul_util.is_proc_client(st.fid))
+                    and (not self._is_mkfs(st.fid))):
                 # Check if we need to mark node as failed,
                 # otherwise just mark controller as failed/OK
                 # If we receive process failure then we will check if all IO
