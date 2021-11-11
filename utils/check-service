@@ -18,6 +18,7 @@
 # please email opensource@seagate.com or cortx-questions@seagate.com.
 
 set -u -o pipefail
+# set -x
 
 prog=${0##*/}
 
@@ -29,6 +30,7 @@ Checks health of the specified service (hax or Motr).
 
 Options:
   -x, --hax       Check hax service.
+  --host          Check service on specified host.
   -f, --fid fid   Check Motr service of the specified fid.
   -s, --svc svc   Check another service specified as svc.
   -p, --port port Check service liveness by sending request to
@@ -41,10 +43,11 @@ EOF
 fid=
 hax=
 svc=
+host=
 conf_dir=
 
 TEMP=$(getopt --options hxf:s:p:c: \
-              --longoptions help,hax,fid:,svc:,port:,conf-dir: \
+              --longoptions help,hax,fid:,svc:,port:,host:,conf-dir: \
               --name "$prog" -- "$@" || true)
 
 (($? == 0)) || { usage >&2; exit 1; }
@@ -58,13 +61,14 @@ while true ; do
         -f|--fid)        fid=$2; shift 2 ;;
         -s|--svc)        svc=$2; shift 2 ;;
         -p|--port)       port=$2; shift 2 ;;
+        --host)          host=$2; shift 2 ;;
         -c|--conf-dir)   conf_dir=$2; shift 2 ;;
         --)              shift; break ;;
         *)           echo 'getopt: internal error...'; exit 1 ;;
     esac
 done
 
-[[ -n $fid || -n $hax || -n $svc || -n $port ]] || { usage >&2; exit 1; }
+[[ -n $fid || -n $hax || -n $svc || -n $port || -n $host ]] || { usage >&2; exit 1; }
 
 if [[ $hax ]]; then
     service=hare-hax
@@ -117,7 +121,7 @@ if [[ $service =~ m0d ]]; then
     fi
 fi
 
-/opt/seagate/cortx/hare/bin/m0ping $(get_node_name) $port
+/opt/seagate/cortx/hare/bin/m0ping $host $port
 rc=$?
 # Curl return codes that suggests that the service is active,
 # 0 -> OK, all fine. Proceed as usual.
