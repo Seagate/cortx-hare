@@ -411,10 +411,15 @@ done
 echo 'Consul ready on all nodes'
 
 say 'Updating Consul configuraton from the KV store...'
-update-consul-conf &
-pids=($!)
+update-consul-conf --server &
+pid=($!)
+wait4 ${pid[@]}
+
+pids=
+
 while read node _; do
-    ssh_error_info "$node" "PATH=$PATH $(which update-consul-conf)" &
+    scp -qr /var/lib/hare/consul-kv.json $node:/var/lib/hare/
+    ssh_error_info "$node" "PATH=$PATH $(which update-consul-conf)" --server &
     pids+=($!)
 done < <(get_all_nodes | grep -vw $(node-name) || true)
 wait4 ${pids[@]}
@@ -483,7 +488,7 @@ bootstrap_nodes phase1
 # Start ioservices
 bootstrap_nodes phase2
 
-. update-consul-conf --dry-run  # import S3_IDs
+. update-consul-conf --server --dry-run  # import S3_IDs
 if [[ -n $S3_IDs ]]; then
     # Now the 3rd phase (s3servers).
     say 'Starting S3 servers (phase3)...'
