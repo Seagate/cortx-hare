@@ -38,6 +38,7 @@
 #include "motr/iem.h"
 #include "ha/msg.h"
 #include "ha/link.h"
+#include "ha/ha.h"
 #include "cm/repreb/cm.h" /* CM_OP_REPAIR etc. */
 #include "conf/ha.h"
 #include "hax.h"
@@ -118,17 +119,6 @@ static void entrypoint_request_cb(struct m0_halon_interface *hi,
 				  bool first_request)
 {
 	struct hax_entrypoint_request *ep;
-	struct hax_link               *hxl;
-
-	M0_ALLOC_PTR(hxl);
-	M0_ASSERT(hxl != NULL);
-	hxl->hxl_req_id = *req_id;
-	hxl->hxl_ep_addr[0] = '\0';
-	strncat(hxl->hxl_ep_addr, remote_rpc_endpoint, EP_ADDR_BUF_SIZE - 1);
-
-	hax_lock(hc0);
-	hx_links_tlink_init_at_tail(hxl, &hc0->hc_links);
-	hax_unlock(hc0);
 
 	/*
 	 * XXX This is obligatory since we want to work with Python object
@@ -576,14 +566,17 @@ static void link_connected_cb(struct m0_halon_interface *hi,
 			      const struct m0_uint128 *req_id,
 			      struct m0_ha_link *link)
 {
+
 	struct hax_link *hxl;
 
 	hax_lock(hc0);
-	hxl = m0_tl_find(hx_links, l, &hc0->hc_links,
-			 m0_uint128_eq(&l->hxl_req_id, req_id));
+	M0_ALLOC_PTR(hxl);
 	M0_ASSERT(hxl != NULL);
+	m0_ha_link_rpc_endpoint(link, hxl->hxl_ep_addr, EP_ADDR_BUF_SIZE);
+	hxl->hxl_req_id = *req_id;
 	hxl->hxl_link = link;
 	hxl->hxl_is_active = true;
+	hx_links_tlink_init_at_tail(hxl, &hc0->hc_links);
 	hax_unlock(hc0);
 }
 
@@ -609,9 +602,8 @@ static void link_is_disconnecting_cb(struct m0_halon_interface *hi,
 	hxl = m0_tl_find(hx_links, l, &hc0->hc_links, l->hxl_link == link);
 	M0_ASSERT(hxl != NULL);
 	M0_LOG(M0_DEBUG, "link=%p addr=%s", hxl, (const char*)hxl->hxl_ep_addr);
-	hax_unlock(hc0);
-
 	m0_halon_interface_disconnect(hi, link);
+	hax_unlock(hc0);
 }
 
 static void link_disconnected_cb(struct m0_halon_interface *hi,
