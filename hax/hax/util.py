@@ -593,13 +593,6 @@ class ConsulUtil:
                             fidk: int,
                             kv_cache=None) -> int:
 
-    @repeat_if_fails()
-    @uses_consul_cache
-    def get_conf_obj_status(self,
-                            obj_t: ObjT,
-                            fidk: int,
-                            kv_cache=None) -> int:
-
         obj_state: int = HaNoteStruct.M0_NC_ONLINE
         if obj_t.name in (ObjT.PROCESS.name, ObjT.SERVICE.name):
             # 'node/<node_name>/process/<process_fidk>/service/type'
