@@ -36,6 +36,8 @@ from hax.util import ConsulUtil, repeat_if_fails, FidWithType, PutKV
 
 LOG = logging.getLogger('hax')
 
+MAX_MOTR_NVEC_UPDATE_SZ = 1024
+
 
 def log_exception(fn):
     def wrapper(*args, **kwargs):
@@ -277,6 +279,12 @@ class Motr:
             return HaNoteStruct.M0_NC_ONLINE if st.status == ServiceHealth.OK \
                 else HaNoteStruct.M0_NC_FAILED
 
+        def _update_process_tree(proc_fid: Fid, state: ServiceHealth) -> bool:
+            return (st.status in (ServiceHealth.FAILED, ServiceHealth.OK) and
+                    not self.consul_util.is_proc_client(st.fid) and
+                    not broadcast_hax_only and
+                    proc_fid != hax_fid)
+
         hax_fid = self.consul_util.get_hax_fid()
         notes = []
         for st in ha_states:
@@ -298,10 +306,7 @@ class Motr:
             # request and terminated when Motr/S3server process notifies
             # M0_CONF_HA_PROCESS_STOPPED.
             if (st.fid.container == ObjT.PROCESS.value
-                    and st.status in (ServiceHealth.FAILED, ServiceHealth.OK)
-                    and (not self.consul_util.is_proc_client(st.fid))
-                    and (not broadcast_hax_only)
-                    and (st.fid != hax_fid)):
+                    and _update_process_tree(st.fid, st.status)):
 
                 if st.fid.container == ObjT.PROCESS.value:
                     self.consul_util.set_process_state(st.fid, st.status)
@@ -347,19 +352,36 @@ class Motr:
                                                             kv_cache=kv_cache)
         if not notes:
             return []
+        message_ids = self._ha_broadcast(notes, broadcast_hax_only)
+
+        return message_ids
+
+    def _ha_broadcast(self, notes: List[HaNoteStruct],
+                      broadcast_hax_only: bool) -> List[MessageId]:
         message_ids: List[MessageId] = []
-        LOG.debug('broadcast ha states phase %s', broadcast_hax_only)
-        if broadcast_hax_only:
-            hax_endpoint = self.consul_util.get_hax_endpoint()
-            message_ids = self._ffi.ha_broadcast_hax_only(
-                self._ha_ctx, make_array(HaNoteStruct, notes), len(notes),
-                make_c_str(hax_endpoint))
-        else:
-            message_ids = self._ffi.ha_broadcast(
-                self._ha_ctx, make_array(HaNoteStruct, notes), len(notes))
-        LOG.debug(
-            'Broadcast HA state complete with the following message_ids = %s',
-            message_ids)
+        nr_notes_to_be_sent = len(notes)
+        notes_sent = 0
+        LOG.debug('Broadcasting %d notes', nr_notes_to_be_sent)
+        while notes:
+            notes_to_send = notes[0:MAX_MOTR_NVEC_UPDATE_SZ]
+            notes_to_send_len = len(notes_to_send)
+            notes_sent += notes_to_send_len
+            if broadcast_hax_only:
+                hax_endpoint = self.consul_util.get_hax_endpoint()
+                message_ids = self._ffi.ha_broadcast_hax_only(
+                    self._ha_ctx, make_array(HaNoteStruct, notes_to_send),
+                    notes_to_send_len,
+                    make_c_str(hax_endpoint))
+            else:
+                message_ids = self._ffi.ha_broadcast(
+                    self._ha_ctx, make_array(HaNoteStruct, notes_to_send),
+                    notes_to_send_len)
+            LOG.debug(
+                'Broadcast HA state complete, message_ids = %s',
+                message_ids)
+            notes = notes[MAX_MOTR_NVEC_UPDATE_SZ:]
+        assert notes_sent == nr_notes_to_be_sent
+
         return message_ids
 
     def _process_event_cb(self, fid, chp_event, chp_type, chp_pid):
