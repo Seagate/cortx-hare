@@ -20,7 +20,7 @@ import ctypes
 import inject
 import json
 import logging
-from typing import Any, Callable
+from typing import Any, Callable, List
 
 import pytest
 from hax.common import HaxGlobalState
@@ -32,7 +32,8 @@ from hax.motr.delivery import DeliveryHerald
 from hax.motr.ffi import HaxFFI
 from hax.types import (Fid, FidStruct, HaNote, HaNoteStruct, HAState, Profile,
                        ServiceHealth, Uint128)
-from hax.util import create_process_fid, create_profile_fid, dump_json
+from hax.util import (create_process_fid, create_profile_fid, create_drive_fid,
+                      dump_json)
 
 from .testutils import (AssertionPlan, FakeFFI, Invocation, TraceMatcher,
                         tr_and, tr_method, tr_not)
@@ -1027,3 +1028,169 @@ def test_bq_stob_serializeable():
     assert first == '{"domain_fid": "0xc:0xd", "fid": "0xe:0xf"}'
     second = dump_json(msg)
     assert second == '{"fid": "0x5:0x6", "conf_sdev": "0x1:0x2", "stob_id": {"domain_fid": "0xc:0xd", "fid": "0xe:0xf"}, "fd": 42, "opcode": 4, "rc": 2, "offset": 191, "size": 100, "bshift": 4}'
+
+
+def _generate_sub_disks() -> List[HaNoteStruct]:
+    drive_ha_notes: List[HaNoteStruct] = []
+    for fkey in range(2196):
+        drive_fid = create_drive_fid(fkey)
+        drive_ha_notes.append(HaNoteStruct(no_id=drive_fid.to_c(),
+                                           no_state=HaNoteStruct.M0_NC_ONLINE))
+    print(str(drive_ha_notes))
+    return drive_ha_notes
+
+
+def test_broadcast_more_than_1024_objects(mocker, planner, motr, consumer,
+                                          consul_util):
+    def new_kv(key: str, val: str):
+        return {
+            'Key': key,
+            'CreateIndex': 1793,
+            'ModifyIndex': 1793,
+            'LockIndex': 0,
+            'Flags': 0,
+            'Value': val,
+            'Session': ''
+        }
+
+    def my_get(key: str, recurse: bool = False, **kwds):
+        if key == 'm0conf/nodes' and recurse:
+            return [
+                new_kv(k, v) for k, v in
+                [('m0conf/nodes/0x6e00000000000001:0x3/processes'
+                  '/0x7200000000000001:0x15',
+                  json.dumps({
+                      "name": "m0_server",
+                      "state": "offline"
+                  })), ('m0conf/nodes/cmu/processes/6/services/rm', '16'),
+                 ('m0conf/nodes/localhost/processes/7/services/rms', '17'),
+                 ('m0conf/nodes/0x6e00000000000001:0x3/processes'
+                  '/0x7200000000000001:0x15/services'
+                  '/0x7300000000000001:0x17',
+                  json.dumps({
+                      "name": "ios",
+                      "state": "failed"
+                  })),
+                 ('m0conf/nodes/0x6e00000000000001:0x3/processes'
+                  '/0x7200000000000001:0xa/services/0x7300000000000001'
+                  ':0xc', json.dumps({
+                      "name": "ios",
+                      "state": "failed"
+                  }))]
+            ]
+        elif key == 'm0conf/sites' and recurse:
+            return [
+                new_kv(k, v) for k, v in
+                [('m0conf/sites/0x5300000000000001:0x1/racks'
+                  '/0x6100000000000001:0x2/encls/0x6500000000000001:0x4'
+                  '/ctrls/0x6300000000000001:0x5',
+                  json.dumps({"state": "M0_NC_UNKNOWN"})),
+                 ('m0conf/sites/0x5300000000000001:0x1/racks'
+                  '/0x6100000000000001:0x2/encls/0x6500000000000001:0x4'
+                  '/ctrls/0x6300000000000001:0x6',
+                  json.dumps({"state": "M0_NC_UNKNOWN"}))]
+            ]
+        elif (key == 'm0conf/nodes/0x6e00000000000001:0x3'
+              '/processes' and recurse):
+            return [
+                new_kv(k, v) for k, v in
+                [('m0conf/nodes/0x6e00000000000001:0x3/processes'
+                  '/0x7200000000000001:0x15',
+                  json.dumps({
+                      "name": "m0_server",
+                      "state": "failed"
+                  })),
+                 ('m0conf/nodes/0x6e00000000000001:0x3/processes'
+                  '/0x7200000000000001:0x15/services/0x7300000000000001'
+                  ':0x17', json.dumps({
+                      "name": "ios",
+                      "state": "failed"
+                  })),
+                 ('m0conf/nodes/0x6e00000000000001:0x3/processes'
+                  '/0x7200000000000001:0xa/services/0x7300000000000001:0xc',
+                  json.dumps({
+                      "name": "ios",
+                      "state": "failed"
+                  }))]
+            ]
+        elif (key == 'm0conf/nodes/0x6e00000000000001:0x3/processes'
+              '/0x7200000000000001:0x15' and recurse):
+            return [
+                new_kv(k, v) for k, v in
+                [('m0conf/nodes/0x6e00000000000001:0x3/processes'
+                  '/0x7200000000000001:0x15',
+                  json.dumps({
+                      "name": "m0_server",
+                      "state": "failed"
+                  })),
+                 ('m0conf/nodes/0x6e00000000000001:0x3/processes'
+                  '/0x7200000000000001:0x15/services/0x7300000000000001'
+                  ':0x17', json.dumps({
+                      "name": "ios",
+                      "state": "failed"
+                  }))]
+            ]
+        elif (key == 'm0conf/nodes/0x6e00000000000001:0x3/processes'
+              '/0x7200000000000001:0x15'):
+            return new_kv(
+                'm0conf/nodes/0x6e00000000000001:0x3/processes'
+                '/0x7200000000000001:0x15',
+                json.dumps({
+                    "name": "m0_server",
+                    "state": "failed"
+                }))
+        elif (key == 'm0conf/nodes/0x6e00000000000001:0x3/processes'
+              '/0x7200000000000001:0xa'):
+            return new_kv(
+                'm0conf/nodes/0x6e00000000000001:0x3/processes'
+                '/0x7200000000000001:0xa',
+                json.dumps({
+                    "name": "m0_server",
+                    "state": "online"
+                }))
+        elif key == 'm0conf/nodes/localhost/processes/7/services/rms':
+            return new_kv('m0conf/nodes/localhost/processes/7/services/rms',
+                          '17')
+        elif key == 'localhost/processes/0x7200000000000001:0x15':
+            return new_kv(
+                'localhost/processes/0x7200000000000001',
+                json.dumps({
+                    'type': 'M0_CONF_HA_PROCESS_OTHER',
+                    'state': 'Unknown'
+                }))
+        elif key == 'm0conf/nodes/0x6e00000000000001:0x3':
+            return new_kv(
+                'm0conf/nodes/0x6e00000000000001:0x3',
+                json.dumps({
+                    "name": "localhost",
+                    "state": "M0_NC_UNKNOWN"
+                }))
+        raise RuntimeError(f'Unexpected call: key={key}, recurse={recurse}')
+
+    mocker.patch.object(consul_util.kv, 'kv_get', side_effect=my_get)
+    # TODO: Handle 'kv_put' by updating kv returned by 'kv_get'
+    mocker.patch.object(consul_util.kv, 'kv_put', return_value=0)
+    mocker.patch.object(consul_util,
+                        'get_hax_fid',
+                        return_value=Fid(0x7200000000000001, 0x6))
+    mocker.patch.object(consul_util,
+                        'get_node_fid',
+                        return_value=Fid(0x6e00000000000001, 0x3))
+    mocker.patch.object(consul_util,
+                        'get_node_encl_fid',
+                        return_value=Fid(0x6500000000000001, 0x4))
+    mocker.patch.object(motr,
+                        '_generate_sub_disks',
+                        return_value=_generate_sub_disks())
+
+    motr.broadcast_ha_states([
+        HAState(fid=Fid(0x7200000000000001, 0x15), status=ServiceHealth.FAILED)
+    ])
+
+    traces = motr._ffi.traces
+    assert AssertionPlan(tr_and(
+        tr_method('ha_broadcast'),
+        io_service_failed())).exists(traces), 'IOservice failure not broadcast'
+    assert AssertionPlan(tr_and(tr_method('ha_broadcast'),
+                                node_fid_failed())).not_exists(traces), \
+        'Node failure should not be broadcast'
