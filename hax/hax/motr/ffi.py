@@ -97,6 +97,15 @@ class HaxFFI:
         lib.m0_ha_notify.restype = c.py_object
         self.ha_broadcast = lib.m0_ha_notify
 
+        lib.m0_ha_notify_hax_only.argtypes = [
+            c.c_void_p,  # unsigned long long ctx
+            c.POINTER(HaNoteStruct),  # struct m0_ha_note *notes
+            c.c_uint32,  # uint32_t nr_notes
+            c.c_char_p  # const char *hax_ep
+        ]
+        lib.m0_ha_notify_hax_only.restype = c.py_object
+        self.ha_broadcast_hax_only = lib.m0_ha_notify_hax_only
+
         lib.m0_ha_nvec_reply_send.argtypes = [
             c.c_void_p,  # unsigned long long  hax_msg
             c.POINTER(HaNoteStruct),  # struct m0_ha_note *notes

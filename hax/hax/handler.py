@@ -76,7 +76,7 @@ class ConsumerThread(StoppableThread):
                     ServiceHealth.OK),
             (m0HaProcessType.M0_CONF_HA_PROCESS_M0MKFS,
                 m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED): (
-                    ServiceHealth.OFFLINE),
+                    ServiceHealth.FAILED),
             (m0HaProcessType.M0_CONF_HA_PROCESS_M0D,
                 m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED): (
                     ServiceHealth.OK),
@@ -89,12 +89,27 @@ class ConsumerThread(StoppableThread):
             (m0HaProcessType.M0_CONF_HA_PROCESS_OTHER,
                 m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED): (
                     ServiceHealth.FAILED)}
-        self.consul.update_process_status(event)
         if event.chp_event in (m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED,
                                m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED):
             svc_status = motr_to_svc_status[(event.chp_type, event.chp_event)]
+            broadcast_hax_only = False
+            if ((event.chp_type ==
+                 m0HaProcessType.M0_CONF_HA_PROCESS_M0MKFS) or
+               (event.fid == self.consul.get_hax_fid())):
+                # Motr-mkfs processes do not require updates on their peer
+                # mkfs processes. Motr-mkfs is an independent and typically a
+                # one-time operation. So avoid broadcasting a motr-mkfs state
+                # to the peer motr-mkfs processes but hax still needs to be
+                # notified in-order to disconnect the hax-motr halink when
+                # motr-mkfs process stops.
+                broadcast_hax_only = True
+
+            LOG.debug('chp_type %d broadcast_hax_only %s', event.chp_type,
+                      broadcast_hax_only)
             motr.broadcast_ha_states(
-                [HAState(fid=event.fid, status=svc_status)])
+                [HAState(fid=event.fid, status=svc_status)],
+                broadcast_hax_only=broadcast_hax_only)
+        self.consul.update_process_status(event)
 
     @repeat_if_fails(wait_seconds=1)
     def update_process_failure(self, planner: WorkPlanner,
