@@ -629,6 +629,9 @@ def test_broadcast_node_failure(mocker, motr, consul_util):
     mocker.patch.object(consul_util.kv, 'kv_get', side_effect=my_get)
     mocker.patch.object(consul_util.kv, 'kv_put', return_value=0)
     mocker.patch.object(consul_util,
+                        'get_hax_fid',
+                        return_value=Fid(0x7200000000000001, 0x6))
+    mocker.patch.object(consul_util,
                         'get_node_fid',
                         return_value=Fid(0x6e00000000000001, 0x3))
 
@@ -787,6 +790,7 @@ def create_stub_get(process_type: str) -> Callable[[str, bool], Any]:
     return my_get
 
 
+# @pytest.mark.skip(reason="disabled temporarily")
 def test_mkfs_process_stopped_no_disk_marked_offline(mocker, motr,
                                                      consul_util):
     mocker.patch.object(
@@ -796,11 +800,17 @@ def test_mkfs_process_stopped_no_disk_marked_offline(mocker, motr,
     mocker.patch.object(consul_util.kv, 'kv_put', return_value=0)
     mocker.patch.object(consul_util, 'update_drive_state')
     mocker.patch.object(consul_util,
+                        'get_hax_fid',
+                        return_value=Fid(0x7200000000000001, 0x6))
+    mocker.patch.object(consul_util,
                         'get_node_fid',
                         return_value=Fid(0x6e00000000000001, 0x3))
     mocker.patch.object(consul_util,
                         'get_node_encl_fid',
                         return_value=Fid(0x6500000000000001, 0x4))
+    mocker.patch.object(consul_util,
+                        'get_hax_endpoint',
+                        return_value='endpoint')
 
     motr.broadcast_ha_states([
         HAState(fid=Fid(0x7200000000000001, 0x15), status=ServiceHealth.FAILED)
@@ -822,6 +832,9 @@ def test_nonmkfs_process_stop_causes_drive_offline(mocker, motr, consul_util):
                         side_effect=create_stub_get('M0_CONF_HA_PROCESS_M0D'))
     mocker.patch.object(consul_util.kv, 'kv_put', return_value=0)
     mocker.patch.object(consul_util, 'update_drive_state')
+    mocker.patch.object(consul_util,
+                        'get_hax_fid',
+                        return_value=Fid(0x7200000000000001, 0x6))
     mocker.patch.object(consul_util,
                         'get_node_fid',
                         return_value=Fid(0x6e00000000000001, 0x3))
@@ -973,6 +986,9 @@ def test_broadcast_io_service_failure(mocker, planner, motr, consumer,
     mocker.patch.object(consul_util.kv, 'kv_get', side_effect=my_get)
     # TODO: Handle 'kv_put' by updating kv returned by 'kv_get'
     mocker.patch.object(consul_util.kv, 'kv_put', return_value=0)
+    mocker.patch.object(consul_util,
+                        'get_hax_fid',
+                        return_value=Fid(0x7200000000000001, 0x6))
     mocker.patch.object(consul_util,
                         'get_node_fid',
                         return_value=Fid(0x6e00000000000001, 0x3))
