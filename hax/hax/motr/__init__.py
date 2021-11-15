@@ -269,13 +269,15 @@ class Motr:
     def broadcast_ha_states(self,
                             ha_states: List[HAState],
                             notify_devices=True,
-                            kv_cache=None) -> List[MessageId]:
+                            kv_cache=None,
+                            broadcast_hax_only=False) -> List[MessageId]:
         LOG.debug('Broadcasting HA states %s over ha_link', ha_states)
 
         def ha_obj_state(st):
             return HaNoteStruct.M0_NC_ONLINE if st.status == ServiceHealth.OK \
                 else HaNoteStruct.M0_NC_FAILED
 
+        hax_fid = self.consul_util.get_hax_fid()
         notes = []
         for st in ha_states:
             if st.status in (ServiceHealth.UNKNOWN, ServiceHealth.OFFLINE):
@@ -283,19 +285,31 @@ class Motr:
             note = HaNoteStruct(st.fid.to_c(), ha_obj_state(st))
             notes.append(note)
 
-            if st.fid.container == ObjT.PROCESS.value:
-                self.consul_util.set_process_state(st.fid, st.status)
-
-            notes += self._generate_sub_services(note,
-                                                 self.consul_util,
-                                                 notify_devices,
-                                                 kv_cache=kv_cache)
             # For process failure, we report failure for the corresponding
             # node (enclosure) and CVGs if all Io services are failed.
+            # We avoid broadcasting for the configuration tree corresponding
+            # to motr client processes, S3servers and hax, as the
+            # failure of them does not affect the motr storage devices.
+            # In some cases the broadcast need not be to Motr processes and
+            # s3servers, e.g. for motr-mkfs processes, but the motr-mkfs
+            # event still needs to be delivered to hax's motr land in-order
+            # to update the hax-motr halink state. hax-motr halink is
+            # established when hax responds to Motr/S3server entrypoint
+            # request and terminated when Motr/S3server process notifies
+            # M0_CONF_HA_PROCESS_STOPPED.
             if (st.fid.container == ObjT.PROCESS.value
                     and st.status in (ServiceHealth.FAILED, ServiceHealth.OK)
                     and (not self.consul_util.is_proc_client(st.fid))
-                    and (not self._is_mkfs(st.fid))):
+                    and (not broadcast_hax_only)
+                    and (st.fid != hax_fid)):
+
+                if st.fid.container == ObjT.PROCESS.value:
+                    self.consul_util.set_process_state(st.fid, st.status)
+
+                notes += self._generate_sub_services(note,
+                                                     self.consul_util,
+                                                     notify_devices,
+                                                     kv_cache=kv_cache)
                 # Check if we need to mark node as failed,
                 # otherwise just mark controller as failed/OK
                 # If we receive process failure then we will check if all IO
@@ -333,8 +347,16 @@ class Motr:
                                                             kv_cache=kv_cache)
         if not notes:
             return []
-        message_ids: List[MessageId] = self._ffi.ha_broadcast(
-            self._ha_ctx, make_array(HaNoteStruct, notes), len(notes))
+        message_ids: List[MessageId] = []
+        LOG.debug('broadcast ha states phase %s', broadcast_hax_only)
+        if broadcast_hax_only:
+            hax_endpoint = self.consul_util.get_hax_endpoint()
+            message_ids = self._ffi.ha_broadcast_hax_only(
+                self._ha_ctx, make_array(HaNoteStruct, notes), len(notes),
+                make_c_str(hax_endpoint))
+        else:
+            message_ids = self._ffi.ha_broadcast(
+                self._ha_ctx, make_array(HaNoteStruct, notes), len(notes))
         LOG.debug(
             'Broadcast HA state complete with the following message_ids = %s',
             message_ids)

@@ -602,6 +602,7 @@ static void link_is_disconnecting_cb(struct m0_halon_interface *hi,
 	hxl = m0_tl_find(hx_links, l, &hc0->hc_links, l->hxl_link == link);
 	M0_ASSERT(hxl != NULL);
 	M0_LOG(M0_DEBUG, "link=%p addr=%s", hxl, (const char*)hxl->hxl_ep_addr);
+	hxl->hxl_is_active = false;
 	m0_halon_interface_disconnect(hi, link);
 	hax_unlock(hc0);
 }
@@ -798,6 +799,49 @@ PyObject* m0_ha_notify(unsigned long long ctx, struct m0_ha_note *notes,
 							 "MessageId", "(KK)",
 							 hxl->hxl_link, tag);
 		PyList_Append(broadcast_tags, instance);
+	}
+	m0_tl_endfor;
+	Py_DECREF(hax_mod);
+	PyGILState_Release(gstate);
+	hax_unlock(hc);
+
+	return broadcast_tags;
+}
+
+PyObject* m0_ha_notify_hax_only(unsigned long long ctx,
+				struct m0_ha_note *notes,
+				uint32_t nr_notes,
+				const char *hax_endpoint)
+{
+	struct hax_context *hc = (struct hax_context *)ctx;
+	struct m0_ha_nvec nvec = { .nv_nr = nr_notes, .nv_note = notes };
+	struct m0_halon_interface *hi = hc->hc_hi;
+	struct hax_link *hxl;
+	struct m0_ha_msg *msg;
+	uint64_t tag;
+
+	msg = _ha_nvec_msg_alloc(&nvec, 0, M0_HA_NVEC_SET);
+	hax_lock(hc);
+
+	PyGILState_STATE gstate;
+	gstate = PyGILState_Ensure();
+
+	PyObject* hax_mod = getModule("hax.types");
+	PyObject* broadcast_tags = PyList_New(0);
+	m0_tl_for(hx_links, &hc->hc_links, hxl)
+	{
+		if (!hxl->hxl_is_active)
+			continue;
+		if (m0_streq(hxl->hxl_ep_addr, hax_endpoint)) {
+			Py_BEGIN_ALLOW_THREADS
+			m0_halon_interface_send(hi, hxl->hxl_link,
+						msg, &tag);
+			Py_END_ALLOW_THREADS
+			PyObject *instance = PyObject_CallMethod(hax_mod,
+							"MessageId", "(KK)",
+							hxl->hxl_link, tag);
+			PyList_Append(broadcast_tags, instance);
+		}
 	}
 	m0_tl_endfor;
 	Py_DECREF(hax_mod);

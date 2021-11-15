@@ -243,6 +243,11 @@ class FakeFFI(HaxFFI):
         return [MessageId(101, 1), MessageId(101, 2)]
 
     @trace_call
+    def ha_broadcast_hax_only(self, _ha_ctx, ha_notes, notes_len,
+                              hax_endpoint):
+        return [MessageId(101, 1), MessageId(101, 2)]
+
+    @trace_call
     def entrypoint_reply(self, *args):
         return 1
 
