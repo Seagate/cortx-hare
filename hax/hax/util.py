@@ -448,6 +448,9 @@ class ConsulUtil:
     def get_session_node(self, session_id: str) -> str:
         try:
             session = self.cns.session.info(session_id)[1]
+            if session is None or session.get('Node') is None:
+                raise HAConsistencyException('Failed to get session'
+                                             ' node')
             return str(session['Node'])  # principal RM
         except (ConsulException, HTTPError, RequestException) as e:
             raise HAConsistencyException('Failed to communicate to'
