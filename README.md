@@ -71,7 +71,7 @@ and health-checking mechanisms.
   sudo ln -sf /opt/puppetlabs/bin/facter /usr/bin/facter
   ```
 
-  On CentOS 8, just install it (if not installed already):
+  On CentOS 8, install it (if not installed already):
   
   ```sh
   sudo yum install -y facter
