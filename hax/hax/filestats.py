@@ -47,7 +47,6 @@ class FsStatsUpdater(StoppableThread):
     def _execute(self, motr: Motr):
         try:
             LOG.info('filesystem stats updater thread has started')
-            motr.adopt_motr_thread()
             while not self.stopped:
                 if not self._am_i_rc():
                     wait_for_event(self.event, self.interval_sec)
@@ -80,8 +79,6 @@ class FsStatsUpdater(StoppableThread):
         except Exception:
             LOG.exception('Aborting due to an error')
         finally:
-            LOG.debug('Releasing motr-related resources for this thread')
-            motr.shun_motr_thread()
             LOG.debug('filesystem stats updater thread exited')
 
     def _am_i_rc(self):

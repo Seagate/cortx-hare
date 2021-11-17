@@ -47,7 +47,6 @@
 #define M0_TRACE_SUBSYSTEM M0_TRACE_SUBSYS_HA
 #include "lib/trace.h"    /* M0_LOG, M0_DEBUG */
 
-static __thread struct m0_thread m0thread;
 static struct hax_context *hc0;
 
 static void __ha_failvec_reply_send(const struct hax_msg *hm,
@@ -898,21 +897,6 @@ static struct m0_ha_msg *_ha_nvec_msg_alloc(const struct m0_ha_nvec *nvec,
 	memcpy(msg->hm_data.u.hed_nvec.hmnv_arr.hmna_arr, nvec->nv_note,
 	       nvec->nv_nr * sizeof(nvec->nv_note[0]));
 	return msg;
-}
-
-void adopt_motr_thread(unsigned long long ctx)
-{
-	struct hax_context *hc = (struct hax_context *)ctx;
-	int                 rc;
-
-	rc = m0_halon_interface_thread_adopt(hc->hc_hi, &m0thread);
-	if (rc != 0)
-		M0_LOG(M0_ERROR, "Motr thread adoption failed: %d\n", rc);
-}
-
-void shun_motr_thread()
-{
-	m0_halon_interface_thread_shun();
 }
 
 /* ---------------------------- SNS operations ---------------------------- */
