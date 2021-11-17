@@ -631,14 +631,6 @@ class Motr:
                                  make_c_str(hax_endpoint))
         self.herald.wait_for_all(HaLinkMessagePromise(ids))
 
-    def adopt_motr_thread(self):
-        LOG.debug('Adopting Motr thread')
-        self._ffi.adopt_motr_thread(self._ha_ctx)
-
-    def shun_motr_thread(self):
-        LOG.debug('Shunning Motr thread')
-        self._ffi.shun_motr_thread()
-
     def get_filesystem_stats(self) -> FsStats:
         stats: FsStats = self._ffi.filesystem_stats_fetch(self._ha_ctx)
         if stats is None:

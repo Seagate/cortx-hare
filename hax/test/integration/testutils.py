@@ -239,14 +239,6 @@ class FakeFFI(HaxFFI):
         ...
 
     @trace_call
-    def adopt_motr_thread(self, ha_ctx):
-        ...
-
-    @trace_call
-    def shun_motr_thread(self):
-        ...
-
-    @trace_call
     def ha_broadcast(self, _ha_ctx, ha_notes, notes_len):
         return [MessageId(101, 1), MessageId(101, 2)]
 
