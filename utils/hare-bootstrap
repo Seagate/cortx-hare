@@ -352,6 +352,12 @@ sudo systemctl start hare-consul-agent
 
 # Wait for Consul's internal leader to be ready.
 # (Until then the KV store won't be accessible.)
+#
+# Note: the code is written this way without the pipe here on purpose.
+# With bash `set -o pipefail' setting (see above in the begginning),
+# it will return the status of the 1st failed command in the pipe,
+# which will be not of grep, but of consul, who will fail by SIGPIPE,
+# when `grep -q' process finish before consul is finished.
 while ! grep -q 'leader *= *true' <<< "$(consul info 2>/dev/null)"; do
     sleep 1
     echo -n '.'
