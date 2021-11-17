@@ -22,15 +22,16 @@ import logging
 from typing import Any, Callable
 
 import pytest
+
 from hax.handler import ConsumerThread
 from hax.message import (BaseMessage, Die, FirstEntrypointRequest,
-                         HaNvecGetEvent)
+                         HaNvecGetEvent, StobId, StobIoqError)
 from hax.motr import Motr, WorkPlanner
 from hax.motr.delivery import DeliveryHerald
 from hax.motr.ffi import HaxFFI
-from hax.types import (Fid, FidStruct, HaNoteStruct, HAState, Profile, HaNote,
+from hax.types import (Fid, FidStruct, HaNote, HaNoteStruct, HAState, Profile,
                        ServiceHealth, Uint128)
-from hax.util import create_process_fid, create_profile_fid
+from hax.util import create_process_fid, create_profile_fid, dump_json
 
 from .testutils import (AssertionPlan, FakeFFI, Invocation, TraceMatcher,
                         tr_and, tr_method, tr_not)
@@ -942,3 +943,23 @@ def test_broadcast_io_service_failure(mocker, planner, motr, consumer,
     assert AssertionPlan(tr_and(tr_method('ha_broadcast'),
                                 node_fid_failed())).not_exists(traces), \
         'Node failure should not be broadcast'
+
+
+# flake8: noqa
+
+
+def test_bq_stob_serializeable():
+    stob = StobId(Fid(12, 13), Fid(14, 15))
+    msg = StobIoqError(fid=Fid(5, 6),
+                       conf_sdev=Fid(1, 2),
+                       stob_id=stob,
+                       fd=42,
+                       opcode=4,
+                       rc=2,
+                       offset=0xBF,
+                       size=100,
+                       bshift=4)
+    first = dump_json(stob)
+    assert first == '{"domain_fid": "0xc:0xd", "fid": "0xe:0xf"}'
+    second = dump_json(msg)
+    assert second == '{"fid": "0x5:0x6", "conf_sdev": "0x1:0x2", "stob_id": {"domain_fid": "0xc:0xd", "fid": "0xe:0xf"}, "fd": 42, "opcode": 4, "rc": 2, "offset": 191, "size": 100, "bshift": 4}'

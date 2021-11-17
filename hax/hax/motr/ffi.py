@@ -118,11 +118,6 @@ class HaxFFI:
         ]
         self.hax_link_stopped = lib.m0_hax_link_stopped
 
-        lib.adopt_motr_thread.argtypes = []
-        lib.adopt_motr_thread.restype = c.c_int
-        self.adopt_motr_thread = lib.adopt_motr_thread
-        self.shun_motr_thread = lib.shun_motr_thread
-
         lib.m0_ha_filesystem_stats_fetch.argtypes = [c.c_void_p]
         lib.m0_ha_filesystem_stats_fetch.restype = c.py_object
         self.filesystem_stats_fetch = lib.m0_ha_filesystem_stats_fetch
