@@ -98,8 +98,16 @@ class ConfStoreProvider(ValueProvider):
     def get_storage_set_nodes(self) -> List[str]:
         storage_set_index = self.get_storage_set_index()
 
-        server_nodes_key = (f'cluster>storage_set[{storage_set_index}]>nodes')
-        return self.get(server_nodes_key)
+        storage_nodes_key = (f'cluster>storage_set[{storage_set_index}]>nodes')
+        storage_nodes = self.get(storage_nodes_key)
+
+        for node in storage_nodes:
+            node_type = self.get(f'node>{node}>type')
+            # Skipping controller node
+            if node_type != 'storage_node':
+                storage_nodes.remove(node)
+
+        return storage_nodes
 
 
 def get_machine_id() -> str:
