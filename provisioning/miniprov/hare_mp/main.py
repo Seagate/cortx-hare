@@ -30,7 +30,7 @@ import subprocess
 import sys
 from enum import Enum
 from sys import exit
-from time import sleep
+from time import sleep, perf_counter
 from typing import Any, Callable, Dict, List
 from threading import Event
 from urllib.parse import urlparse
@@ -49,6 +49,8 @@ from hare_mp.validator import Validator
 from hare_mp.utils import execute, Utils
 from hare_mp.consul_starter import ConsulStarter
 from hare_mp.hax_starter import HaxStarter
+
+import concurrent.futures
 
 # Logger details
 LOG_DIR_EXT = '/hare/log/'
@@ -378,7 +380,17 @@ def start(args):
         start_hax_and_consul_without_systemd(url, utils)
 
 
-def start_mkfs(hostname: str, hare_config_dir: str):
+def start_mkfs(cmd_line: List[str]) -> int:
+    try:
+        execute(cmd_line)
+        rc = 0
+    except Exception as error:
+        logging.error('Error during mkfs start (%s)', error)
+        rc = -1
+    return(rc)
+
+
+def start_mkfs_parallel(hostname: str, hare_config_dir: str):
     # TODO: path needs to be updated according to the new conf-store key
     sysconfig_dir = '/etc/sysconfig/'
     src = f'{hare_config_dir}/sysconfig/motr/{hostname}'
@@ -389,10 +401,27 @@ def start_mkfs(hostname: str, hare_config_dir: str):
                           kv_file=f'{hare_config_dir}/consul-kv.json')
     cmd = '/usr/libexec/cortx-motr/motr-mkfs'
     # start mkfs for confd, ios services
+    start = perf_counter()
+    cmd_list = []
     for svc in ('confd', 'ios'):
         svc_fids = generator.get_svc_fids(svc)
         for fid in svc_fids:
-            execute([cmd, fid, '--conf'])
+            # real command line
+            logging.info(f'fid = {str(fid)}\n')
+            cmd_line = [cmd, fid, '--conf']
+            cmd_list += [cmd_line]
+
+    ret_values = []
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        ret_values = list(executor.map(start_mkfs, cmd_list))
+    finish = perf_counter()
+    perf_result = str(finish - start)
+
+    if not all(rc == 0 for rc in ret_values):
+        logging.error('Error during mkfs start')
+    else:
+        logging.info(f'Total time taken for all mkfs on this node = '
+                     f'{perf_result}\n\n')
 
 
 def init(args):
@@ -407,7 +436,7 @@ def init(args):
                                        config_dir, log_dir, url)
         hax_starter = _start_hax(utils, stop_event, config_dir, log_dir)
         hostname = utils.get_local_hostname()
-        start_mkfs(hostname, config_dir)
+        start_mkfs_parallel(hostname, config_dir)
         # Stopping hax and consul
         hax_starter.stop()
         consul_starter.stop()
