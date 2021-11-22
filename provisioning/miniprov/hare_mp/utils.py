@@ -29,6 +29,7 @@ from distutils.dir_util import copy_tree
 import shutil
 
 from hax.util import repeat_if_fails, KVAdapter
+from helper.exec import Program, Executor
 
 from hare_mp.store import ValueProvider
 from hare_mp.types import Disk, DList, Maybe, Text
@@ -176,18 +177,8 @@ class LogWriter:
 
 
 def execute(cmd: List[str], env=None) -> str:
-    process = subprocess.Popen(cmd,
-                               stdin=subprocess.PIPE,
-                               stdout=subprocess.PIPE,
-                               stderr=subprocess.PIPE,
-                               encoding='utf8',
-                               env=env)
-    out, err = process.communicate()
-    if process.returncode:
-        raise Exception(
-            f'Command {cmd} exited with error code {process.returncode}. '
-            f'Command output: {err}')
-
+    p = Program(cmd)
+    out = Executor().run(p, env=env)
     return out
 
 
