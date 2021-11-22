@@ -21,6 +21,7 @@
 
 import argparse
 import asyncio
+from dataclasses import dataclass
 import inject
 import json
 import logging
@@ -380,14 +381,26 @@ def start(args):
         start_hax_and_consul_without_systemd(url, utils)
 
 
-def start_mkfs(cmd_line: List[str]) -> int:
+@dataclass
+class ProcessStartInfo:
+    cmd: List[str]
+    hostname: str
+    fid: str
+
+
+def start_mkfs(proc_to_start: ProcessStartInfo) -> int:
     try:
-        execute(cmd_line)
+        logging.info('Starting mkfs process [fid=%s] at hostname=%s',
+                     proc_to_start.fid, proc_to_start.hostname)
+        command = proc_to_start.cmd
+        execute(command)
+        logging.info('Started mkfs process [fid=%s]', proc_to_start.fid)
         rc = 0
     except Exception as error:
-        logging.error('Error during mkfs start (%s)', error)
+        logging.error('Error launching mkfs [fid=%s] at hostname=%s: %s',
+                      proc_to_start.fid, proc_to_start.hostname, error)
         rc = -1
-    return(rc)
+    return rc
 
 
 def start_mkfs_parallel(hostname: str, hare_config_dir: str):
@@ -397,28 +410,32 @@ def start_mkfs_parallel(hostname: str, hare_config_dir: str):
     for file in os.listdir(src):
         shutil.copy(os.path.join(src, file), sysconfig_dir)
 
-    generator = Generator(hostname, hare_config_dir,
+    generator = Generator(hostname,
+                          hare_config_dir,
                           kv_file=f'{hare_config_dir}/consul-kv.json')
     cmd = '/usr/libexec/cortx-motr/motr-mkfs'
     # start mkfs for confd, ios services
     start = perf_counter()
-    cmd_list = []
+    cmd_list: List[ProcessStartInfo] = []
     for svc in ('confd', 'ios'):
         svc_fids = generator.get_svc_fids(svc)
         for fid in svc_fids:
             # real command line
-            logging.info(f'fid = {str(fid)}\n')
             cmd_line = [cmd, fid, '--conf']
-            cmd_list += [cmd_line]
+            process = ProcessStartInfo(cmd=cmd_line,
+                                       hostname=hostname,
+                                       fid=fid)
+            cmd_list.append(process)
 
     ret_values = []
     with concurrent.futures.ProcessPoolExecutor() as executor:
         ret_values = list(executor.map(start_mkfs, cmd_list))
     finish = perf_counter()
-    perf_result = str(finish - start)
+    perf_result = finish - start
 
     if not all(rc == 0 for rc in ret_values):
-        logging.error('Error during mkfs start')
+        raise RuntimeError('One or more mkfs processes failed to start. '
+                           'Please check the logs above for details.')
     else:
         logging.info(f'Total time taken for all mkfs on this node = '
                      f'{perf_result}\n\n')
