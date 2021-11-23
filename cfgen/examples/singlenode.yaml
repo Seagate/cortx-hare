@@ -1,7 +1,6 @@
 # Cluster Description File (CDF).
 # See `cfgen --help-schema` for the format description.
 
-create_aux: false # optional; supported values: "false" (default), "true"
 nodes:
   - hostname: localhost     # [user@]hostname
     data_iface: eth1        # name of data network interface
