@@ -1445,9 +1445,49 @@ def cluster_svcs(m0conf: Dict[Oid, Any], svc_t) -> List[Oid]:
             if m0conf[svc_id].type is svc_t]
 
 
+# node-to-drives mapping
+def pool_drives_with_nodes(m0conf: Dict[Oid, Any]) -> List[Tuple[Oid, Oid]]:
+    all_drives: List[Tuple[Oid, Oid]] = [
+        (drive_id, m0conf[encl_id].node)
+        for encl_id in m0conf if encl_id.type is ObjT.enclosure
+        for ctrl_id in m0conf[encl_id].ctrls
+        for drive_id in m0conf[ctrl_id].drives
+    ]
+    assert all_drives
+    assert all(drive_id.type is ObjT.drive and node_id.type is ObjT.node
+               for drive_id, node_id in all_drives)
+
+    return all_drives
+
+
+def pool_drives_from_references(
+                m0conf: Dict[Oid, Any],
+                pool_desc: Dict[str, Any]) -> List[Tuple[Oid, Oid]]:
+    disk_refs = pool_desc.get('disk_refs')
+    drives = []
+    all_drives: List[Tuple[Oid, Oid]] = pool_drives_with_nodes(m0conf)
+
+    unique_list_of_tuples = list(set(all_drives))
+
+    if disk_refs:
+        for ref in disk_refs:
+            targets = [(drive_id, node_id)
+                       for drive_id, node_id in unique_list_of_tuples
+                       if ref['path'] == m0conf[m0conf[drive_id].sdev].filename
+                       and ref.get('node') in (None, m0conf[node_id].name)]
+            # XXX Improve validate_pools_desc() to catch this error.
+            assert len(targets) == 1, 'Check {} config line'.format(ref)
+            drives.extend(targets)
+        assert all_unique(drives), \
+            'Pool {!r}: some of disk_refs refer to the same disk'.format(
+                pool_desc['name'])
+
+    return drives
+
+
+# The job of this function is to return list of drives.
 def pool_drives(m0conf: Dict[Oid, Any],
-                pool_desc: Dict[str, Any],
-                cluster_desc: Dict[str, Any]) -> List[Oid]:
+                pool_desc: Dict[str, Any]) -> List[Oid]:
     ptype = pool_type(pool_desc)
 
     if ptype is PoolT.dix:
@@ -1466,39 +1506,32 @@ def pool_drives(m0conf: Dict[Oid, Any],
                 for ctrl_id in m0conf if ctrl_id.type is ObjT.controller]
 
     assert ptype is PoolT.sns
-    all_drives: List[Tuple[Oid, Oid]] = [
-        (drive_id, m0conf[encl_id].node)
-        for encl_id in m0conf if encl_id.type is ObjT.enclosure
-        for ctrl_id in m0conf[encl_id].ctrls
-        for drive_id in m0conf[ctrl_id].drives
-    ]
-    assert all_drives
-    assert all(drive_id.type is ObjT.drive and node_id.type is ObjT.node
-               for drive_id, node_id in all_drives)
+    drives = pool_drives_from_references(m0conf, pool_desc)
+    if not drives:
+        drives = pool_drives_with_nodes(m0conf)
 
-    disk_refs = pool_desc.get('disk_refs')
-    if disk_refs is None:
-        drives = all_drives
-    else:
-        assert disk_refs
-        drives = []
-        for ref in disk_refs:
-            targets = [(drive_id, node_id)
-                       for drive_id, node_id in all_drives
-                       if ref['path'] == m0conf[m0conf[drive_id].sdev].filename
-                       and ref.get('node') in (None, m0conf[node_id].name)]
-            # XXX Improve validate_pools_desc() to catch this error.
-            assert len(targets) == 1, 'Check {} config line'.format(ref)
-            drives.extend(targets)
-        assert all_unique(drives), \
-            'Pool {!r}: some of disk_refs refer to the same disk'.format(
-                pool_desc['name'])
+    return [drive_id for drive_id, _ in drives]
+
+
+# we don't allow overlapping pools, i.e. pools sharing physical devices
+# between them. So, this function validate list of drives for a give pools
+# and It disables disk repeation in base pools.
+def check_drive_multiple_references(
+                m0conf: Dict[Oid, Any],
+                cluster_desc: Dict[str, Any]) -> List[Tuple[Oid, Oid]]:
+
+    drives = []
+    for pool in cluster_desc['pools']:
+        drives.extend(pool_drives_from_references(m0conf, pool))
 
     over_referenced: Dict[Oid, List[Oid]] = {}  # node-to-drives mapping
-    for drive_id, node_id in drives:
-        if m0conf[drive_id].pvers:  # already assigned to some pool
-            over_referenced.setdefault(node_id, []).append(drive_id)
 
+    for drive_ref in drives:
+        if drives.count(drive_ref) > 1:
+            over_referenced.setdefault(drive_ref[1], []).append(drive_ref[0])
+
+    # This optional variable added in CDF file to enable/disable aux pool
+    # generation. It defaults to false(i.e. do not generate any aux pools)
     create_aux_val = cluster_desc.get('create_aux')
     if not create_aux_val:
         if over_referenced:
@@ -1510,8 +1543,7 @@ def pool_drives(m0conf: Dict[Oid, Any],
                 for drive_id in sorted(over_referenced[node_id]):
                     err += '\n   \\_ ' + m0conf[m0conf[drive_id].sdev].filename
             raise AssertionError(err)
-
-    return [drive_id for drive_id, _ in drives]
+    return drives
 
 
 def cluster_encls(m0conf: Dict[Oid, Any], svc_t) -> List[Oid]:
@@ -1597,8 +1629,7 @@ class ConfPool(ToDhall):
 
     @classmethod
     def gen_sns_tolerance(cls, m0conf: Dict[Oid, Any],
-                          pool_desc: Dict[str, Any],
-                          cluster_desc: Dict[str, Any]) -> Failures:
+                          pool_desc: Dict[str, Any]) -> Failures:
 
         encls_nr = len(cluster_encls(m0conf, SvcT.M0_CST_IOS))
         ctrls_per_encl = floor(len(cluster_ctrls(m0conf)) / encls_nr)
@@ -1608,7 +1639,7 @@ class ConfPool(ToDhall):
         total_units = data_units + parity_units + spare_units
         fault_tol_info = drives_per_node_and_ctrl(m0conf)
         min_pool_width = fault_tol_info.min_drives_per_node * encls_nr
-        actual_pool_width = len(pool_drives(m0conf, pool_desc, cluster_desc))
+        actual_pool_width = len(pool_drives(m0conf, pool_desc))
         if ((min_pool_width < actual_pool_width) and
                 (min_pool_width / total_units) > 0):
             # Pool is asymmetric, all the nodes don't have same number of
@@ -1655,7 +1686,7 @@ class ConfPool(ToDhall):
         if spare_units is None:
             spare_units = pool_desc.get('parity_units')
 
-        drives = pool_drives(m0conf, pool_desc, cluster_desc)
+        drives = pool_drives(m0conf, pool_desc)
         t = pool_type(pool_desc)
         assert ('data_units' in pool_desc) == ('parity_units' in pool_desc)
         if 'data_units' in pool_desc:
@@ -1687,8 +1718,7 @@ class ConfPool(ToDhall):
                 if t == PoolT.dix:
                     tolerance = ConfPool.gen_md_tolerance(m0conf, pool_desc)
                 else:
-                    tolerance = ConfPool.gen_sns_tolerance(m0conf, pool_desc,
-                                                           cluster_desc)
+                    tolerance = ConfPool.gen_sns_tolerance(m0conf, pool_desc)
         else:
             tolerance = ConfPool.gen_md_tolerance(m0conf, pool_desc)
 
@@ -2327,8 +2357,7 @@ def get_pool_diskrefs(pool_desc: Dict[str, Any]):
 
 def aux_pool_list(pool_desc: Dict[str, Any],
                   disks: List[DiskRef],
-                  m0conf: Dict[Oid, Any],
-                  cluster_desc: Dict[str, Any]) -> None:
+                  m0conf: Dict[Oid, Any]) -> None:
     pool = pool_desc
 
     # Example of encl_ref_combination :
@@ -2377,7 +2406,7 @@ def aux_pool_list(pool_desc: Dict[str, Any],
         tolerance = Failures(d['site'], d['rack'], d['encl'],
                              d['ctrl'], d['disk'])
     else:
-        tolerance = ConfPool.gen_sns_tolerance(m0conf, pool, cluster_desc)
+        tolerance = ConfPool.gen_sns_tolerance(m0conf, pool)
     # Generate the node combinations considering node failures as
     # allowed by node tolerance values
     temp_pool_nodes = []
@@ -2479,6 +2508,8 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
                         other_clients[node['hostname']] = []
                     other_clients[node['hostname']].append((node_id, proc_id))
 
+    check_drive_multiple_references(conf, cluster_desc)
+
     create_aux_val = cluster_desc.get('create_aux')
     if not create_aux_val:
         for pool in cluster_desc['pools']:
@@ -2502,7 +2533,7 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
                                 disks.append(DiskRef(path=d,
                                                      node=node['hostname']))
 
-                aux_pool_list(pool, disks, conf, cluster_desc)
+                aux_pool_list(pool, disks, conf)
             else:
                 ConfPool.build(conf, root_id, pool, cluster_desc)
 
