@@ -647,6 +647,19 @@ def generate_support_bundle(args):
         if args.t:
             cmd.append('-t')
             cmd.append(args.t[0])
+        if args.duration:
+            logging.info("Time bound log collection for %s", args.duration)
+        if args.size_limit:
+            logging.info("Collected limited sized logs: %s", args.size_limit)
+        if args.services:
+            logging.info("Logs collection limiting to a single or multiple"
+                         " service specific logs: %s", args.services)
+        if args.binlogs:
+            logging.info("Include the binary logs? %s", args.binlogs)
+        if args.coredumps:
+            logging.info("Include core dumps? %s ", args.coredumps)
+        if args.stacktrace:
+            logging.info("Include stacktraces? %s", args.stacktrace)
 
         url = args.config[0]
         log_dir = get_log_dir(url)
@@ -939,6 +952,17 @@ def add_systemd_argument(parser):
     return parser
 
 
+def str2bool(v):
+    if isinstance(v, bool):
+        return v
+    if v.lower() in ('yes', 'true', 't', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
+
+
 def main():
     inject.configure(di_configuration)
     p = argparse.ArgumentParser(description='Configure hare settings')
@@ -988,11 +1012,10 @@ def main():
                                    help_str='Tests Hare component',
                                    handler_fn=test_IVT)))))
 
-    sb_sub_parser = add_service_argument(
-        add_subcommand(subparser,
-                       'support_bundle',
-                       help_str='Generates support bundle',
-                       handler_fn=generate_support_bundle))
+    sb_sub_parser = add_subcommand(subparser,
+                                   'support_bundle',
+                                   help_str='Generates support bundle',
+                                   handler_fn=generate_support_bundle)
 
     sb_sub_parser.add_argument(
         '-b',
@@ -1007,6 +1030,60 @@ def main():
         type=str,
         nargs=1,
         help='Target directory; defaults to /tmp/hare.',
+        action='store')
+
+    sb_sub_parser.add_argument(
+        '--duration',
+        type=str,
+        nargs=1,
+        help='ISO 8061 format, "P" separates, the start datetime and duration'
+             'to be considered after that. "T" separated date and time. '
+             'Default is P5d.',
+        action='store')
+
+    sb_sub_parser.add_argument(
+        '--size_limit',
+        type=str,
+        nargs=1,
+        help='Limit set on per component for its support bundle size.'
+             'eg. "1G" for 1GB or "100M" for 100 MB. Default -> 0, '
+             'for no size limit.',
+        action='store')
+
+    sb_sub_parser.add_argument(
+        '--services',
+        type=str,
+        nargs=1,
+        help='"|" pipe separated service names for the services for '
+             'which logs needs to be collected. Default is "All".',
+        action='store')
+
+    sb_sub_parser.add_argument(
+        '--binlogs',
+        type=str2bool,
+        nargs='?',
+        const=True,
+        default=True,
+        help='Logs collection for given type of logs (text, binary,'
+             ' etc), as applicable per component',
+        action='store')
+
+    sb_sub_parser.add_argument(
+        '--coredumps',
+        type=str2bool,
+        nargs='?',
+        const=False,
+        default=False,
+        help='Include or exclude core dumps, exclude by default',
+        action='store')
+
+    sb_sub_parser.add_argument(
+        '--stacktrace',
+        type=str2bool,
+        nargs='?',
+        const=False,
+        default=False,
+        help='Include or exclude stack traces, include by default',
         action='store')
 
     add_service_argument(
