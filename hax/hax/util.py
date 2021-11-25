@@ -574,6 +574,7 @@ class ConsulUtil:
         return disks
 
     @repeat_if_fails()
+    # FIXME: add support of kv_cache
     def is_proc_client(self, process_fid: Fid) -> bool:
         node_items = self.kv.kv_get('m0conf/nodes', recurse=True)
         fidk = str(process_fid.key)
