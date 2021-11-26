@@ -1044,6 +1044,13 @@ def main():
                        help_str='Performs the Hare rpm post-upgrade tasks',
                        handler_fn=noop))
 
+    add_service_argument(
+        add_subcommand(subparser,
+                       'upgrade',
+                       help_str='Performs the Hare rpm upgrade tasks',
+                       handler_fn=noop,
+                       config_required=False))
+
     parsed = p.parse_args(sys.argv[1:])
 
     setup_logging(parsed.config[0])
