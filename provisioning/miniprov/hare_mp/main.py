@@ -70,6 +70,7 @@ class Plan(Enum):
 
 class Svc(Enum):
     All = 'all'
+    Hax = 'hax'
 
 
 def create_logger_directory(log_dir):
@@ -935,7 +936,8 @@ def add_factory_argument(parser):
 
 def add_service_argument(parser):
     parser.add_argument('--services', '-s',
-                        help='Services to be setup.',
+                        help='Services to be setup. Supported '
+                        'values: ' + str([s.value for s in Svc]),
                         nargs=1,
                         type=Svc,
                         action='store')
