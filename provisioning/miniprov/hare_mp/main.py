@@ -234,6 +234,9 @@ def _start_consul(utils: Utils,
     peers = []
     for endpoint in consul_endpoints:
         key = endpoint.split('/')
+        # Considering tcp endpoints only. Ignoring all other endpoints.
+        if key[0] != 'tcp:':
+            continue
         peer = ('/'.join(key[2:]))
         peers.append(peer)
 
