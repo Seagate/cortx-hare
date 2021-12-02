@@ -390,11 +390,11 @@ class ProcessStartInfo:
 
 def start_mkfs(proc_to_start: ProcessStartInfo) -> int:
     try:
-        logging.info('Starting mkfs process [fid=%s] at hostname=%s',
-                     proc_to_start.fid, proc_to_start.hostname)
+        logging.debug('Starting mkfs process [fid=%s] at hostname=%s',
+                      proc_to_start.fid, proc_to_start.hostname)
         command = proc_to_start.cmd
         execute(command)
-        logging.info('Started mkfs process [fid=%s]', proc_to_start.fid)
+        logging.debug('Started mkfs process [fid=%s]', proc_to_start.fid)
         rc = 0
     except Exception as error:
         logging.error('Error launching mkfs [fid=%s] at hostname=%s: %s',
@@ -437,8 +437,8 @@ def start_mkfs_parallel(hostname: str, hare_config_dir: str):
         raise RuntimeError('One or more mkfs processes failed to start. '
                            'Please check the logs above for details.')
     else:
-        logging.info(f'Total time taken for all mkfs on this node = '
-                     f'{perf_result}\n\n')
+        logging.debug(f'Total time taken for all mkfs on this node = '
+                      f'{perf_result}\n\n')
 
 
 def init(args):
