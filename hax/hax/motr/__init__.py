@@ -19,6 +19,7 @@
 import ctypes as c
 import logging
 from errno import EAGAIN
+from time import sleep
 from typing import Any, List, Optional, Tuple
 
 from hax.consul.cache import supports_consul_cache, uses_consul_cache
@@ -254,6 +255,7 @@ class Motr:
                     e_rc = 0
                 raise RuntimeError('No RM node found in Consul')
         except Exception:
+            sleep(1)
             LOG.exception('Failed to get the data from Consul.'
                           ' Replying with EAGAIN error code.')
             self._ffi.entrypoint_reply(reply_context, req_id.to_c(), e_rc, 0,
