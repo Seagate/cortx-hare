@@ -17,17 +17,20 @@
 #
 
 import logging
-from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar
+from typing import List, Tuple
 
-from hax.types import Fid, ObjT, ServiceHealth, m0HaObjState
+from hax.consul.cache import create_kv_cache
+from hax.motr import Motr
+from hax.types import Fid, HaNoteStruct, m0HaObjState
+from hax.util import TxPutKV
 
-from .action import Action
-from .exception import TransitionForbidden, TransitionNotAllowed
-from .transition import ProcessMove, TransitStrategy
+from .action import ActionHolder, ActionProvider, BroadcastState, SetKV
+from .common import ConsulHelper, Context, Pager
 
 LOG = logging.getLogger('hax')
 
-__all__ = ['ObjectWorkflow']
+MAX_CONSUL_TX_LEN = 64
+MAX_MOTR_BCAST_LEN = 1024
 
 
 class Executor:
@@ -40,93 +43,38 @@ class Executor:
     transitions - even then the actions can be grouped for the sake of
     performance.
     """
-    def execute(self, actions: List[Action]) -> None:
-        # FIXME implement the real logic
-        for i in actions:
-            logging.info('Exec: %s', i)
+    def __init__(self, cns: ConsulHelper, motr: Motr):
+        self.cns = cns
+        self.motr = motr
 
+    def execute(self, actions: ActionHolder) -> None:
+        self._run_kv(actions.kv_ops)
+        self._run_bcast(actions.bcast_ops)
 
-C = TypeVar('C')
+    def _run_kv(self, kvs: List[SetKV]):
+        pager = Pager(kvs, MAX_CONSUL_TX_LEN)
+        for page in pager.get_next():
+            tx_data = [
+                TxPutKV(key=x.key, value=str(x.state), cas=None) for x in page
+            ]
+            self.cns.put_kv(tx_data)
 
-
-class Context:
-    """ A type-safe intermittent whiteboard where some parent transitions may
-    leave some meta information for nested transitions (e.g. whether the parent
-    process is mkfs).
-    """
-    def __init__(self):
-        self.data: Dict[str, Any] = {}
-
-    def put(self, key: str, val: Any) -> 'Context':
-        """ Puts the value to the storage and returns the updated instance.
-            Note: old instance is not altered by this call.
-        """
-
-        # As the context is passed through recursive calls, we don't allow to
-        # alter an existing instnace (reason: there is a risk of dirty write
-        # somwhere deep in recursive that can affect other transitions in the
-        # sequence).
-        new_dict = dict(self.data)
-        new_dict[key] = val
-        ctx = Context()
-        ctx.data = new_dict
-        return ctx
-
-    def get(self, key: str, as_type: Type[C]) -> C:
-        """ Return the value by the key and verify that the value is of the
-        given type; if the type doesn't match, RuntimeError is thrown.
-        """
-        value = self.data.get(key)
-        if not isinstance(value, as_type):
-            raise RuntimeError(f'Business logic error: {as_type} type '
-                               f'expected but {value} is given')
-
-        return value
-
-
-class ConsulHelper:
-    # This is a kind of a bridge between the ObjectWorfklow and ConsulUtil.
-
-    def get_current_state(self, fid: Fid) -> m0HaObjState:
-        """ Reads the latest known state of the object from Consul KV.
-        """
-        raise RuntimeError('Not implemented')
-
-    def get_effective_status(self, fid: Fid) -> ServiceHealth:
-        """ Evaluates the actual effective health status of the given process.
-        """
-        raise RuntimeError('Not implemented')
-
-    def is_proc_client(self, fid: Fid) -> bool:
-        raise RuntimeError('Not implemented')
-
-    def get_hax_fid(self) -> Fid:
-        raise RuntimeError('Not implemented')
-
-    def get_services_under(self, fid: Fid) -> List[Fid]:
-        raise RuntimeError('Not implemented')
-
-    def get_disks_by_service(self, fid: Fid) -> List[Fid]:
-        raise RuntimeError('Not implemented')
-
-    def is_mkfs(self, proc_fid: Fid) -> List[Fid]:
-        raise RuntimeError('Not implemented')
-
-    def get_owning_process(self, service_fid: Fid) -> Fid:
-        raise RuntimeError('Not implemented')
+    def _run_bcast(self, actions: List[BroadcastState]):
+        to_send = [
+            HaNoteStruct(no_id=item.fid.to_c(),
+                         no_state=item.state.to_ha_note_status())
+            for item in actions
+        ]
+        # TODO: do we need this broadcast_hax_only?
+        self.motr.ha_broadcast(to_send, broadcast_hax_only=False)
 
 
 class ObjectWorkflow:
     """ Central class for changing the object state through the DTM state
     machine."""
-    def __init__(self,
-                 executor: Optional[Executor] = None,
-                 helper: Optional[ConsulHelper] = None):
-        self.movers: Dict[ObjT, TransitStrategy] = {
-            ObjT.PROCESS: ProcessMove(self)
-        }
-        self.executor = executor or Executor()
-        self.helper = helper or ConsulHelper()
+    def __init__(self, executor: Executor, helper: ConsulHelper):
+        self.executor = executor
+        self.provider = ActionProvider(helper)
 
     def transit(self, fid: Fid, new: m0HaObjState) -> None:
         """ Perform the state transition of the given object.
@@ -134,7 +82,7 @@ class ObjectWorkflow:
             - fid - Fid that identifies the object.
             - new - Target state of the transition.
         """
-        actions = self._get_actions(fid, new, Context())
+        actions = self.provider.get_actions(fid, new, self._create_ctx())
         self.executor.execute(actions)
 
     def transit_all(self, states_and_fids: List[Tuple[Fid,
@@ -146,26 +94,13 @@ class ObjectWorkflow:
             - fid - Fid that identifies the object.
             - new - Target state of the transition.
         """
-        actions: List[Action] = []
+        actions = ActionHolder()
+        p = self.provider
         for fid, state in states_and_fids:
-            actions.extend(self._get_actions(fid, state, Context()))
+            actions.extend(p.get_actions(fid, state, self._create_ctx()))
         self.executor.execute(actions)
 
-    def _get_type(self, fid: Fid) -> ObjT:
-        try:
-            return fid.get_type()
-        except KeyError:
-            raise TransitionForbidden(f'Unsupported fid type given: {fid}')
-
-    def _get_actions(self, fid, new: m0HaObjState,
-                     ctx: Context) -> List[Action]:
-        f_type = fid.get_type()
-        old = self.helper.get_current_state(fid)
-        if f_type not in self.movers:
-            # TODO it may happen that the problem is that the requested
-            # transition is obsolete (example: the object is ALREADY in new
-            # state). Do we want to ignore that transition without an
-            # exception?
-            raise TransitionNotAllowed()
-        actions = self.movers[f_type].do_transition(fid, old, new, ctx)
-        return actions
+    def _create_ctx(self) -> Context:
+        ctx = Context()
+        ctx.put('kv_cache', create_kv_cache())
+        return ctx

@@ -250,6 +250,7 @@ class ServiceHealth(Enum):
     UNKNOWN = (2, HaNoteStruct.M0_NC_UNKNOWN)
     OFFLINE = (3, HaNoteStruct.M0_NC_TRANSIENT)
     STOPPED = (4, HaNoteStruct.M0_NC_TRANSIENT)
+    RECOVERING = (5, HaNoteStruct.M0_NC_DTM_RECOVERING)
 
     def __repr__(self):
         """Return human-readable constant name (useful in log output)."""
@@ -333,10 +334,13 @@ class m0HaObjState(IntEnum):
     M0_NC_TRANSIENT = HaNoteStruct.M0_NC_TRANSIENT
     M0_NC_REPAIRED = HaNoteStruct.M0_NC_REPAIRED
     M0_NC_REBALANCE = HaNoteStruct.M0_NC_REBALANCE
-    M0_NC_NR = HaNoteStruct.M0_NC_NR
+    M0_NC_DTM_RECOVERING = HaNoteStruct.M0_NC_DTM_RECOVERING
 
     def __repr__(self):
         return self.name
+
+    def to_ha_note_status(self) -> int:
+        return int(self)
 
     @staticmethod
     def parse(state: str) -> 'm0HaObjState':
@@ -348,7 +352,7 @@ class m0HaObjState(IntEnum):
             'M0_NC_TRANSIENT': m0HaObjState.M0_NC_TRANSIENT,
             'M0_NC_REPAIRED': m0HaObjState.M0_NC_REPAIRED,
             'M0_NC_REBALANCE': m0HaObjState.M0_NC_REBALANCE,
-            'M0_NC_NR': m0HaObjState.M0_NC_NR
+            'M0_NC_DTM_RECOVERING': m0HaObjState.M0_NC_DTM_RECOVERING
         }
         return states[state]
 

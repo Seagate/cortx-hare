@@ -23,7 +23,8 @@ from typing import Any, Callable, Dict, Optional, TypeVar, cast
 from hax.log import TRACE
 
 __all__ = [
-    'supports_consul_cache', 'uses_consul_cache', 'invalidates_consul_cache'
+    'supports_consul_cache', 'uses_consul_cache', 'invalidates_consul_cache',
+    'create_kv_cache'
 ]
 
 LOG = logging.getLogger('hax')
@@ -77,7 +78,7 @@ def supports_consul_cache(f: T) -> T:
         cache: Optional[InvocationCache] = kwds.get(kwd_cache)
         if cache is None:
             LOG.log(TRACE, 'CACHE: created. fn_name=%s', f.__qualname__)
-            cache = InvocationCache()
+            cache = create_kv_cache()
 
         kwds[kwd_cache] = cache
         ret_value = f(*args, **kwds)
@@ -117,7 +118,7 @@ def uses_consul_cache(f: T) -> T:
         fn_name = f.__qualname__
         if cache is None:
             LOG.log(TRACE, 'CACHE: created. fn_name=%s', fn_name)
-            cache = InvocationCache()
+            cache = create_kv_cache()
             kwds[kwd_cache] = cache
 
         if cache.has(fn_name, *args, **kwds):
@@ -147,3 +148,12 @@ def invalidates_consul_cache(f: T) -> T:
         return f(*args, **kwds)
 
     return cast(T, wrapper)
+
+
+def create_kv_cache() -> InvocationCache:
+    """
+    Creates a correct instance of kv_cache. In the most cases this function is
+    not needed to be invoked directly. Please consider using @uses_consul_cache
+    decorator instead.
+    """
+    return InvocationCache()
