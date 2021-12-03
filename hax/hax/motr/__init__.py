@@ -293,7 +293,7 @@ class Motr:
                     not broadcast_hax_only and
                     proc_fid != hax_fid)
 
-        hax_fid = self.consul_util.get_hax_fid()
+        hax_fid = self.consul_util.get_hax_fid(kv_cache=kv_cache)
         notes = []
         for st in ha_states:
             if st.status in (ServiceHealth.UNKNOWN, ServiceHealth.OFFLINE):
@@ -360,12 +360,12 @@ class Motr:
                                                             kv_cache=kv_cache)
         if not notes:
             return []
-        message_ids = self._ha_broadcast(notes, broadcast_hax_only)
+        message_ids = self.ha_broadcast(notes, broadcast_hax_only)
 
         return message_ids
 
-    def _ha_broadcast(self, notes: List[HaNoteStruct],
-                      broadcast_hax_only: bool) -> List[MessageId]:
+    def ha_broadcast(self, notes: List[HaNoteStruct],
+                     broadcast_hax_only: bool) -> List[MessageId]:
         message_ids: List[MessageId] = []
         nr_notes_to_be_sent = len(notes)
         notes_sent = 0
