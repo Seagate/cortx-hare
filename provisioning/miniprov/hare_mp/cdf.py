@@ -68,7 +68,8 @@ class CdfGenerator:
         for machine_id in machines.keys():
             node_type = conf.get(f'node>{machine_id}>type')
             # Skipping for controller node
-            if node_type == 'storage_node':
+            if (node_type in
+                    ('storage_node', 'data_node', 'server_node')):
                 nodes.append(self._create_node(machine_id))
         return nodes
 
@@ -122,7 +123,8 @@ class CdfGenerator:
         for node in nodes:
             node_type = self.provider.get(f'node>{node}>type')
             # Skipping for controller node
-            if node_type == 'storage_node':
+            if (node_type in
+                    ('storage_node', 'data_node', 'server_node')):
                 out.append(node)
 
         return out
