@@ -414,6 +414,7 @@ def enrich_cluster_desc(desc: Dict[str, Any], mock_p: bool) -> None:
                     del m0d['io_disks']['meta_data']
             m0d['_io_disks'] = get_disks_from_cdf(node['hostname'], mock_p,
                                                   m0d['io_disks']['data'])
+
             if not m0d['_io_disks']:
                 m0d['_io_disks'] = get_disks_ssh(node['hostname'], mock_p,
                                                  m0d['io_disks']['data'])
@@ -1124,6 +1125,21 @@ class ConfProcess(ToDhall):
                     assert ctrl is not None
                     ConfDrive.build(m0conf, ctrl,
                                     ConfSdev.build(m0conf, svc_id, disk))
+
+            if stype is SvcT.M0_CST_CAS:
+                assert proc_desc is not None
+                if meta_data is None:
+                    disk = '/dev/null'
+                if meta_data:
+                    disk = proc_desc['io_disks'].get('meta_data')
+                    assert ctrl is not None
+                    ConfDrive.build(m0conf, ctrl,
+                                    ConfSdev.build(
+                                        m0conf, svc_id,
+                                        Disk(
+                                            path=disk,
+                                            size=1024,
+                                            blksize=1)))
         return proc_id
 
 
@@ -1168,11 +1184,11 @@ def service_types(proc_t: ProcT,
         if proc_desc.get('runs_confd'):
             ts.append(SvcT.M0_CST_CONFD)
         if proc_desc['_io_disks']:
-            ts.extend([SvcT.M0_CST_IOS,
+            ts.extend([SvcT.M0_CST_CAS,
+                       SvcT.M0_CST_IOS,
                        SvcT.M0_CST_SNS_REP,
                        SvcT.M0_CST_SNS_REB,
                        SvcT.M0_CST_ADDB2,
-                       SvcT.M0_CST_CAS,
                        SvcT.M0_CST_ISCS,
                        SvcT.M0_CST_FDMI])
     return ts
@@ -1463,13 +1479,13 @@ def pool_drives_with_nodes(m0conf: Dict[Oid, Any]) -> List[Tuple[Oid, Oid]]:
 def pool_drives_from_references(
                 m0conf: Dict[Oid, Any],
                 pool_desc: Dict[str, Any]) -> List[Tuple[Oid, Oid]]:
-    disk_refs = pool_desc.get('disk_refs')
     drives = []
     all_drives: List[Tuple[Oid, Oid]] = pool_drives_with_nodes(m0conf)
+    disk_refs = get_pool_diskrefs(pool_desc)
 
     unique_list_of_tuples = list(set(all_drives))
 
-    if disk_refs:
+    if disk_refs is not None:
         for ref in disk_refs:
             targets = [(drive_id, node_id)
                        for drive_id, node_id in unique_list_of_tuples
@@ -1481,7 +1497,6 @@ def pool_drives_from_references(
         assert all_unique(drives), \
             'Pool {!r}: some of disk_refs refer to the same disk'.format(
                 pool_desc['name'])
-
     return drives
 
 
@@ -1491,15 +1506,8 @@ def pool_drives(m0conf: Dict[Oid, Any],
     ptype = pool_type(pool_desc)
 
     if ptype is PoolT.dix:
-        cas = [(svc_id, m0conf[svc_id].ctrl_id)
-               for svc_id in cluster_svcs(m0conf, SvcT.M0_CST_CAS)]
-
-        return [ConfDrive.build(m0conf, ctrl_id,
-                                ConfSdev.build(m0conf, svc_id,
-                                               Disk(path='/dev/null',
-                                                    size=1024,
-                                                    blksize=1)))
-                for (svc_id, ctrl_id) in cas]
+        return [m0conf[ctrl_id].drives[0]
+                for ctrl_id in m0conf if ctrl_id.type is ObjT.controller]
 
     if ptype is PoolT.md:
         return [m0conf[ctrl_id].drives[0]
@@ -1519,19 +1527,15 @@ def pool_drives(m0conf: Dict[Oid, Any],
 def check_drive_multiple_references(
                 m0conf: Dict[Oid, Any],
                 cluster_desc: Dict[str, Any]) -> List[Tuple[Oid, Oid]]:
-
     drives = []
     for pool in cluster_desc['pools']:
         drives.extend(pool_drives_from_references(m0conf, pool))
-
     over_referenced: Dict[Oid, List[Oid]] = {}  # node-to-drives mapping
 
     for drive_ref in drives:
         if drives.count(drive_ref) > 1:
             over_referenced.setdefault(drive_ref[1], []).append(drive_ref[0])
 
-    # This optional variable added in CDF file to enable/disable aux pool
-    # generation. It defaults to false(i.e. do not generate any aux pools)
     create_aux_val = cluster_desc.get('create_aux')
     if not create_aux_val:
         if over_referenced:
@@ -1629,7 +1633,8 @@ class ConfPool(ToDhall):
 
     @classmethod
     def gen_sns_tolerance(cls, m0conf: Dict[Oid, Any],
-                          pool_desc: Dict[str, Any]) -> Failures:
+                          pool_desc: Dict[str, Any],
+                          cluster_desc: Dict[str, Any]) -> Failures:
 
         encls_nr = len(cluster_encls(m0conf, SvcT.M0_CST_IOS))
         ctrls_per_encl = floor(len(cluster_ctrls(m0conf)) / encls_nr)
@@ -1718,7 +1723,8 @@ class ConfPool(ToDhall):
                 if t == PoolT.dix:
                     tolerance = ConfPool.gen_md_tolerance(m0conf, pool_desc)
                 else:
-                    tolerance = ConfPool.gen_sns_tolerance(m0conf, pool_desc)
+                    tolerance = ConfPool.gen_sns_tolerance(m0conf, pool_desc,
+                                                           cluster_desc)
         else:
             tolerance = ConfPool.gen_md_tolerance(m0conf, pool_desc)
 
@@ -2357,7 +2363,8 @@ def get_pool_diskrefs(pool_desc: Dict[str, Any]):
 
 def aux_pool_list(pool_desc: Dict[str, Any],
                   disks: List[DiskRef],
-                  m0conf: Dict[Oid, Any]) -> None:
+                  m0conf: Dict[Oid, Any],
+                  cluster_desc: Dict[str, Any]) -> None:
     pool = pool_desc
 
     # Example of encl_ref_combination :
@@ -2406,7 +2413,7 @@ def aux_pool_list(pool_desc: Dict[str, Any],
         tolerance = Failures(d['site'], d['rack'], d['encl'],
                              d['ctrl'], d['disk'])
     else:
-        tolerance = ConfPool.gen_sns_tolerance(m0conf, pool)
+        tolerance = ConfPool.gen_sns_tolerance(m0conf, pool, cluster_desc)
     # Generate the node combinations considering node failures as
     # allowed by node tolerance values
     temp_pool_nodes = []
@@ -2533,7 +2540,7 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
                                 disks.append(DiskRef(path=d,
                                                      node=node['hostname']))
 
-                aux_pool_list(pool, disks, conf)
+                aux_pool_list(pool, disks, conf, cluster_desc)
             else:
                 ConfPool.build(conf, root_id, pool, cluster_desc)
 
