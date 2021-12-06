@@ -321,13 +321,15 @@ class CdfGenerator:
                 f'storage>cvg[{cvg}]>devices>data')], 'List Text')
         return data_devices
 
-    # TBD motr
+    # conf-store returns a list of devices, thus, the function
+    # must return a single metadata device path instead of a string of
+    # list.
     def _get_metadata_device(self,
                              machine_id: str,
                              cvg: int) -> Text:
         store = self.provider
         metadata_device = Text(store.get(
-            f'node>{machine_id}>storage>cvg[{cvg}]>devices>metadata'))
+            f'node>{machine_id}>storage>cvg[{cvg}]>devices>metadata')[0])
         return metadata_device
 
     # This function is kept as place holder with length returning 1,

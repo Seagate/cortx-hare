@@ -27,6 +27,7 @@ nodes:
     m0_clients:
       s3: 0         # number of S3 servers to start
       other: 2      # max quantity of other Motr clients this host may have
+create_aux: false # optional; supported values: "false" (default), "true"
 pools:
   - name: the pool
     type: sns  # optional; supported values: "sns" (default), "dix", "md"
