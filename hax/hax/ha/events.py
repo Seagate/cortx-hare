@@ -22,7 +22,8 @@ from typing import List, Optional
 
 from cortx.utils.message_bus import MessageBus, MessageConsumer
 
-from ha.core.event_manager.event_manager import EventManager
+# [Not needed]
+# from ha.core.event_manager.event_manager import EventManager
 from ha.core.event_manager.subscribe_event import SubscribeEvent
 
 COMPONENT_ID = 'hare'
@@ -70,11 +71,17 @@ class EventListener():
         group_id - the group_id to pass to KafkaConsumer.
         """
         logging.debug('Inside EventListener')
-        self.event_manager = EventManager.get_instance()
+        # [Not needed]
+        # self.event_manager = EventManager.get_instance()
 
-        topic = self._subscribe(event_list)
-        if topic is None:
-            raise RuntimeError('Failed to subscribe to events')
+        # topic = self._subscribe(event_list)
+        # if topic is None:
+        #     raise RuntimeError('Failed to subscribe to events')
+
+        # HA functionality won't work in containers. Hare is the only
+        # subscriber to HA's event manager, and the topic name is hardcoded,
+        # in HA code. So, hardcoded topic name.
+        topic = "ha_event_hare"
 
         message_bus = MessageBus()
         self.consumer = MessageConsumer(
@@ -86,6 +93,8 @@ class EventListener():
             auto_ack=str(False),
             offset='earliest')
 
+    # [Not needed]
+    '''
     def _subscribe(self, event_list: List[SubscribeEvent]) -> str:
         logging.info('Subscribing to events: %s', event_list)
         # TODO create a PR for cortx-ha. The type annotation seems to be wrong
@@ -96,6 +105,7 @@ class EventListener():
     def unsubscribe(self, event_list: List[str]):
         logging.info('Unsubscribing for events: %s', event_list)
         self.event_manager.unsubscribe(COMPONENT_ID, event_list)
+    '''
 
     def get_next_message(self, time_out) -> Optional[Event]:
         """

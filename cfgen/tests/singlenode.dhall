@@ -25,6 +25,7 @@ in
 { create_aux = Some False
 , nodes =
     [ { hostname = "localhost"
+      , machine_id = "8efd697708a8f7e428d3fd520c180795"
       , data_iface = "eth1"
       , data_iface_type = None types.Protocol
       , m0_servers =

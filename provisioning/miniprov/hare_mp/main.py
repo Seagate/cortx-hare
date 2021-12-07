@@ -101,7 +101,8 @@ def setup_logging(url) -> None:
                                                     delay=False)
     logging.basicConfig(level=logging.INFO,
                         handlers=[console, fhandler],
-                        format='%(asctime)s [%(levelname)s] %(message)s')
+                        format='%(asctime)s [%(levelname)s]'
+                        '{%(pathname)s:%(lineno)d} %(message)s')
 
 
 def get_data_from_provisioner_cli(method, output_format='json') -> str:
@@ -865,7 +866,7 @@ def config(args):
         machine_id = provider.get_machine_id()
         motr_md_path = config_path + '/motr/' + machine_id
         motr_md_url = 'json://' + motr_md_path + '/motr_hare_keys.json'
-
+        # import pudb; pudb.set_trace()
         save(filename, generate_cdf(url, motr_md_url))
         update_hax_unit('/usr/lib/systemd/system/hare-hax.service')
         generate_config(url, filename)

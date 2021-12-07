@@ -16,11 +16,13 @@ let genCdf = ./gencdf.dhall
 
 in  genCdf
       [ { hostname = "google"
+        , machine_id = "8efd697708a8f7e428d3fd520c180795"
         , data_iface = "eth3"
         , data_iface_type = P.tcp
         , io_disks = [ "/var/log", "/mnt/testme" ]
         }
       , { hostname = "srvnode-1"
+        , machine_id = "8efd697708a8f7e428d3fd520c180796"
         , data_iface = "eth1"
         , data_iface_type = P.o2ib
         , io_disks =

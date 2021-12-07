@@ -62,6 +62,7 @@ class CdfGenerator:
         return cluster_id
 
     def _create_node_descriptions(self) -> List[NodeDesc]:
+        # import pudb; pudb.set_trace()
         nodes: List[NodeDesc] = []
         conf = self.provider
         machines: Dict[str, Any] = conf.get('node')
@@ -240,6 +241,7 @@ class CdfGenerator:
         return Maybe(None, 'List T.FdmiFilterDesc')
 
     def _get_cdf_dhall(self) -> str:
+        # import pudb; pudb.set_trace()
         dhall_path = self._get_dhall_path()
         conf = self.provider
         nodes = self._create_node_descriptions()
@@ -331,6 +333,7 @@ class CdfGenerator:
 
     # TBD motr
     def _get_m0d_per_cvg(self, machine_id: str, cvg: int) -> int:
+        # import pudb; pudb.set_trace()
         motr_store = self.motr_provider
         return len(motr_store.get(f'server>{machine_id}>cvg[{cvg}]>m0d'))
 
@@ -377,6 +380,7 @@ class CdfGenerator:
         node_facts = self.utils.get_node_facts()
         return NodeDesc(
             hostname=Text(hostname),
+            machine_id=Text(machine_id),
             processorcount=Maybe(node_facts['processorcount'], 'Natural'),
             memorysize_mb=Maybe(node_facts['memorysize_mb'], 'Double'),
             data_iface=Text(iface),

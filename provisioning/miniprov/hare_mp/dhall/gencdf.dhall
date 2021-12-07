@@ -23,6 +23,7 @@ let M0ServerDesc =
 
 let NodeInfo =
       { hostname : Text
+      , machine_id : Text
       , processorcount : Optional Natural
       , memorysize_mb : Optional Double
       , data_iface : Text
@@ -68,6 +69,7 @@ let toNodeDesc
     : NodeInfo -> T.NodeDesc
     =     \(n : NodeInfo)
       ->  { hostname = n.hostname
+          , machine_id = n.machine_id
           , processorcount = n.processorcount
           , memorysize_mb = n.memorysize_mb
           , data_iface_ip_addr = n.data_iface_ip_addr

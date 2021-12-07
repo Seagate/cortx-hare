@@ -1,5 +1,6 @@
 nodes:
   - hostname: ssu1
+    machine_id: 8efd697708a8f7e428d3fd520c180795
     data_iface: eth1
     m0_servers:
       - runs_confd: true
@@ -17,6 +18,7 @@ nodes:
         s3: 0
         other: 2
   - hostname: ssu2
+    machine_id: 8efd697708a8f7e428d3fd520c180792
     data_iface: eth1
     m0_servers:
       - runs_confd: true

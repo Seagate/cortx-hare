@@ -382,6 +382,8 @@ def enrich_cluster_desc(desc: Dict[str, Any], mock_p: bool) -> None:
         # See https://puppet.com/docs/puppet/6.6/core_facts.html#legacy-facts
 
         host = node['hostname']
+        machine_id = node['machine_id']
+        print('Shreya', machine_id)
         if all(key in node.keys()
                for key in ('processorcount', 'memorysize_mb')):
 
@@ -433,12 +435,17 @@ def validate_cluster_desc(desc: Dict[str, Any]) -> None:
 
 def validate_nodes_desc(nodes_desc: List[Dict[str, Any]]) -> None:
     logging.debug('Validating node descriptions')
-    Node = NamedTuple('Node', [('name', str), ('ipaddr', str)])
+    Node = NamedTuple('Node', [('name', str), ('ipaddr', str),
+                               ('machine_id', str)])
     nodes = [Node(name=x['hostname'],
-                  ipaddr=x['facts'][ipaddr_key(x['data_iface'])])
+                  ipaddr=x['facts'][ipaddr_key(x['data_iface'])],
+                  machine_id=x['machine_id'])
              for x in nodes_desc]
     _assert(all_not_none(x.name for x in nodes),
             f'Unexpected None hostname found in list: {nodes}\n'
+            f'Full context: {nodes_desc}')
+    _assert(all_not_none(x.machine_id for x in nodes),
+            f'Unexpected None machine id found in list: {nodes}\n'
             f'Full context: {nodes_desc}')
     _assert(all_unique(x.name for x in nodes),
             "Node names ('hostname' values in the CDF) are not unique:\n" +
@@ -971,12 +978,13 @@ class ConfNode(ToDhall):
     _objt = ObjT.node
     _downlinks = {Downlink('processes', ObjT.process)}
 
-    def __init__(self, name: str, nr_cpu: int, memsize_MB: int,
-                 processes: List[Oid]):
+    def __init__(self, name: str, machine_id: str, nr_cpu: int,
+                 memsize_MB: int, processes: List[Oid]):
         self.name = name
+        self.machine_id = machine_id
         self.nr_cpu = nr_cpu
         self.memsize_MB = memsize_MB
-
+        print('in confnode=', self.machine_id)
         _assert(all(x.type is ObjT.process for x in processes),
                 'All processes must be of ObjT.process type')
         self.processes = processes
@@ -1003,6 +1011,7 @@ class ConfNode(ToDhall):
         node_id = new_oid(ObjT.node)
         facts = node_desc['facts']
         m0conf[node_id] = cls(name=node_desc['hostname'],
+                              machine_id=node_desc['machine_id'],
                               nr_cpu=facts['processorcount'],
                               memsize_MB=facts['_memsize_MB'],
                               processes=[])
@@ -2157,7 +2166,10 @@ def generate_consul_kv(cluster: Cluster, dhall_dir: str) -> str:
     del fidk_gen
 
     m0conf = cluster.m0conf
-
+    for node_id, node in m0conf.items():
+        if node_id.type is ObjT.node:
+            print(f'{node_id}')
+            print(node.machine_id, ' ', node.name)
     ConsulService = NamedTuple('ConsulService', [
         ('node_name', str), ('proc_id', Oid), ('ep', LibfabricEndpoint),
         ('svc_id', Oid), ('stype', str), ('meta_data', Optional[str])])
@@ -2201,6 +2213,8 @@ def generate_consul_kv(cluster: Cluster, dhall_dir: str) -> str:
         ('leader', ''),
         ('last_fidk', _fidk_gen),
         ('failvec', ''),
+        *[(node.machine_id, node.name)
+          for node_id, node in m0conf.items() if node_id.type is ObjT.node],
         *[('m0conf/pools/' + oid_to_fidstr(pool_id), m0conf[pool_id]._name)
           for pool_id in sns_pools()],
         *[('m0conf/profiles/' + oid_to_fidstr(prof_id),
@@ -2412,6 +2426,8 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
     other_clients: Dict[str, List[Tuple[Oid, Oid]]] = {}
 
     for node in cluster_desc['nodes']:
+        machine_id = node['machine_id']
+        print('inside build cluster', machine_id)
         node_id = ConfNode.build(conf, root_id, node)
         encl_id = ConfEnclosure.build(conf, rack_id, node_id)
         ctrl_ids: List[Tuple[Optional[Oid], Any]] = []

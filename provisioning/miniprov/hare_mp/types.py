@@ -112,6 +112,7 @@ class M0ServerDesc(DhallTuple):
 @dataclass(repr=False)
 class NodeDesc(DhallTuple):
     hostname: Text
+    machine_id: Text
     processorcount: Maybe[int]
     memorysize_mb: Maybe[int]
     data_iface: Text

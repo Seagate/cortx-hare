@@ -26,7 +26,7 @@ from hax.ha.handler.node import NodeEventHandler
 from hax.motr.planner import WorkPlanner
 from hax.types import StoppableThread
 from hax.util import ConsulUtil, InterruptedException, wait_for_event
-
+# [Not needed]
 from ha.core.event_manager.subscribe_event import SubscribeEvent
 
 LOG = logging.getLogger('hax')
@@ -118,6 +118,7 @@ class EventPollingThread(StoppableThread):
         # the messages that another hax instance receives (so every hax reads
         # the whole history of messages even if they process the messages with
         # different speed).
+        # [Not needed] for subscribe events.
         return EventListener(
             [SubscribeEvent('node', ['offline', 'online', 'failed'])],
             group_id=group)
