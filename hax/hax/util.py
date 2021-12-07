@@ -261,6 +261,21 @@ class CatalogAdapter:
     def __init__(self, cns: Optional[Consul] = None):
         self.cns: Consul = cns or Consul()
 
+    def get_node_names(self) -> List[str]:
+        """
+        Return full list of service names currently registered in Consul
+        server.
+        """
+        try:
+            node_names: List[str] = []
+            nodes: List[Dict[str, Any]] = self.cns.catalog.nodes()[1]
+            for node in nodes:
+                node_names.append(str(node['Node']))
+            return node_names
+        except (ConsulException, HTTPError, RequestException) as e:
+            raise HAConsistencyException(
+                'Cannot access Consul catalog') from e
+
     def get_service_names(self) -> List[str]:
         """
         Return full list of service names currently registered in Consul
@@ -819,6 +834,24 @@ class ConsulUtil:
             ctrl_fid: str = match_result.group(1)
             list_fids.append(Fid.parse(ctrl_fid))
         return list_fids
+
+    def get_node_hare_motr_s3_fids(self, node: str) -> List[Fid]:
+        """
+        Parameters:
+            node : hostname of the node
+        response:
+            returns list of fids for hax, ioservices, confd and s3services
+            configured and running on @node.
+        """
+        services = ['hax', 'ios', 'confd', 's3service']
+        node_data: List[Dict[str, Any]] = self.get_node_health_details(node)
+        fids: List[Fid] = []
+        if not node_data:
+            return []
+        for item in node_data:
+            if item['ServiceName'] in services:
+                fids.append(mk_fid(ObjT.PROCESS, int(item['ServiceID'])))
+        return fids
 
     @repeat_if_fails()
     @uses_consul_cache
