@@ -39,7 +39,7 @@ from urllib.parse import urlparse
 import yaml
 from cortx.utils.product_features import unsupported_features
 from hax.common import di_configuration
-from hax.types import KeyDelete
+from hax.types import KeyDelete, Fid
 from hax.util import ConsulUtil, repeat_if_fails, KVAdapter
 from helper.generate_sysconf import Generator
 
@@ -319,6 +319,14 @@ def prepare(args):
         logging.debug('No leader is elected yet')
 
     consul_starter.stop()
+
+
+def get_hare_motr_s3_processes(utils: ConsulUtil) -> Dict[str, List[Fid]]:
+    nodes = utils.catalog.get_node_names()
+    processes: Dict[str, List[Fid]] = {}
+    for node in nodes:
+        processes[node] = utils.get_node_hare_motr_s3_fids(node)
+    return processes
 
 
 def init_with_bootstrap(args):
@@ -723,19 +731,21 @@ def nr_services() -> int:
 
 
 @repeat_if_fails()
-def all_services_started(url: str, nr_svcs: int) -> bool:
-    utils = Utils(ConfStoreProvider(url))
-    hostname = utils.get_local_hostname()
+def all_services_started(url: str, processes: Dict[str, List[Fid]]) -> bool:
     kv = KVAdapter()
-    status_data = kv.kv_get(f'{hostname}/processes', recurse=True)
-    statuses = []
-    for val in status_data:
-        state = val['Value']
-        statuses.append(json.loads(state.decode('utf8'))['state'])
-    started = [status == 'M0_CONF_HA_PROCESS_STARTED' for status in statuses]
-    if len(started) != nr_svcs:
+    if not processes:
         return False
-    return all(started)
+    for key in processes.keys():
+        for proc_fid in processes[key]:
+            proc_state = kv.kv_get(f'{key}/processes/{proc_fid}', recurse=True)
+            if proc_state:
+                proc_state_val = proc_state[0]['Value']
+                state = json.loads(proc_state_val.decode('utf8'))['state']
+                if state != 'M0_CONF_HA_PROCESS_STARTED':
+                    return False
+            else:
+                return False
+    return True
 
 
 def bootstrap_cluster(path_to_cdf: str, domkfs=False):
@@ -747,8 +757,11 @@ def bootstrap_cluster(path_to_cdf: str, domkfs=False):
 
 
 def wait_for_cluster_start(url: str):
-    nr_svcs = nr_services()
-    while not all_services_started(url, nr_svcs):
+    util: ConsulUtil = ConsulUtil()
+    processes: Dict[str, List[Fid]] = {}
+    while not processes:
+        processes = get_hare_motr_s3_processes(util)
+    while not all_services_started(url, processes):
         logging.info('Waiting for all the processes to start..')
         sleep(2)
 
