@@ -972,10 +972,11 @@ class ConfNode(ToDhall):
     _downlinks = {Downlink('processes', ObjT.process)}
 
     def __init__(self, name: str, nr_cpu: int, memsize_MB: int,
-                 processes: List[Oid]):
+                 processes: List[Oid], machine_id: str = None):
         self.name = name
         self.nr_cpu = nr_cpu
         self.memsize_MB = memsize_MB
+        self.machine_id = machine_id
 
         _assert(all(x.type is ObjT.process for x in processes),
                 'All processes must be of ObjT.process type')
@@ -1005,7 +1006,8 @@ class ConfNode(ToDhall):
         m0conf[node_id] = cls(name=node_desc['hostname'],
                               nr_cpu=facts['processorcount'],
                               memsize_MB=facts['_memsize_MB'],
-                              processes=[])
+                              processes=[],
+                              machine_id=node_desc.get('machine_id'))
         m0conf[parent].nodes.append(node_id)
         return node_id
 
@@ -2201,6 +2203,9 @@ def generate_consul_kv(cluster: Cluster, dhall_dir: str) -> str:
         ('leader', ''),
         ('last_fidk', _fidk_gen),
         ('failvec', ''),
+        *[(node.machine_id, node.name)
+          for node_id, node in m0conf.items() if (node_id.type is ObjT.node
+                                                  and node.machine_id)],
         *[('m0conf/pools/' + oid_to_fidstr(pool_id), m0conf[pool_id]._name)
           for pool_id in sns_pools()],
         *[('m0conf/profiles/' + oid_to_fidstr(prof_id),

@@ -19,6 +19,7 @@
 -}
 
 { hostname : Text
+, machine_id : Optional Text
 , processorcount: Optional Natural
 , memorysize_mb: Optional Double
 , data_iface : Text
