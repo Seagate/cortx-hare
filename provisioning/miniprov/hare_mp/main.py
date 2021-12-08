@@ -29,6 +29,7 @@ import os
 import shutil
 import subprocess
 import sys
+import re
 from enum import Enum
 from sys import exit
 from time import sleep, perf_counter
@@ -38,6 +39,7 @@ from urllib.parse import urlparse
 
 import yaml
 from cortx.utils.product_features import unsupported_features
+from cortx.utils.cortx import Const
 from hax.common import di_configuration
 from hax.types import KeyDelete, Fid
 from hax.util import ConsulUtil, repeat_if_fails, KVAdapter
@@ -143,6 +145,28 @@ def get_server_type(url: str) -> str:
     except Exception as error:
         logging.error('Cannot get server type (%s)', error)
         return 'unknown'
+
+
+def is_mkfs_required(url: str) -> bool:
+    try:
+        provider = ConfStoreProvider(url)
+        machine_id = provider.get_machine_id()
+        # Query results into a list of keys where, Const.SERVICE_MOTR_IO
+        # is found as one of the services under `services`.
+        # e.g.
+        # node>aaa120a9e051d103c164f605615c32a4>components[1]>services[0]
+        # node>bbb340f79047df9bb52fa460615c32a5>components[1]>services[0]
+        # node>ccc8700fe6797ed532e311b0615c32a7>components[1]>services[0]
+        # We try to find this node's machine id in the query result.
+        services = provider.search_val('node', 'services',
+                                       Const.SERVICE_MOTR_IO.value)
+        check_id = re.compile(f".*{machine_id}.*")
+        return any(check_id.match(service) for service in services)
+    except Exception as error:
+        logging.warn('Failed to get pod type (%s). Current stage will '
+                     'be assumed as not required by default', error)
+
+        return False
 
 
 def logrotate_generic(url: str):
@@ -462,6 +486,10 @@ def set_mkfs_done_for(node: str, cns_utils: ConsulUtil):
 def init(args):
     try:
         url = args.config[0]
+
+        if not is_mkfs_required(url):
+            return
+
         utils = Utils(ConfStoreProvider(url))
         cns_utils = ConsulUtil()
         stop_event = Event()
