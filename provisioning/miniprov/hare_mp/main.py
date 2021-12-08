@@ -78,10 +78,10 @@ def create_logger_directory(log_dir):
     if not os.path.isdir(log_dir):
         try:
             os.makedirs(log_dir)
-        except Exception:
+        except Exception as e:
             logging.exception(f"{log_dir} Could not be created")
             shutdown_cluster()
-            exit(-1)
+            raise RuntimeError("Failed to create log directory " + str(e))
 
 
 def setup_logging(url) -> None:
@@ -93,7 +93,7 @@ def setup_logging(url) -> None:
 
     create_logger_directory(log_dir)
 
-    console = logging.StreamHandler(stream=sys.stderr)
+    console = logging.StreamHandler(stream=sys.stdout)
     fhandler = logging.handlers.RotatingFileHandler(log_file,
                                                     maxBytes=LOG_FILE_SIZE,
                                                     mode='a',
@@ -264,31 +264,18 @@ def _start_hax(utils: Utils,
 
 
 def post_install(args):
-    try:
-        if checkRpm('cortx-motr') != 0:
-            logging.error('\'cortx-motr\' is not installed')
-            exit(-1)
-        if checkRpm('consul') != 0:
-            logging.error('\'consul\' is not installed')
-            exit(-1)
-        if checkRpm('cortx-hare') != 0:
-            logging.error('\'cortx-hare\' is not installed')
-            exit(-1)
-        if checkRpm('cortx-py-utils') != 0:
-            logging.error('\'cortx-py-utils\' is not installed')
-            exit(-1)
-        if checkRpm('cortx-s3server') != 0:
-            logging.warning('\'cortx-s3server\' is not installed')
 
-        if args.report_unavailable_features:
-            unsupported_feature(args.config[0])
+    checkRpm('cortx-motr')
+    checkRpm('consul')
+    checkRpm('cortx-hare')
+    checkRpm('cortx-py-utils')
+    checkRpm('cortx-s3server')
 
-        if args.configure_logrotate:
-            logrotate_generic(args.config[0])
+    if args.report_unavailable_features:
+        unsupported_feature(args.config[0])
 
-    except Exception as error:
-        logging.error('Error while checking installed rpms (%s)', error)
-        exit(-1)
+    if args.configure_logrotate:
+        logrotate_generic(args.config[0])
 
 
 def enable_hare_consul_agent() -> None:
@@ -330,28 +317,21 @@ def get_hare_motr_s3_processes(utils: ConsulUtil) -> Dict[str, List[Fid]]:
 
 
 def init_with_bootstrap(args):
-    try:
-        rc = 0
-        url = args.config[0]
-        validator = Validator(ConfStoreProvider(url))
-        disable_hare_consul_agent()
-        if validator.is_first_node_in_cluster():
-            if args.file:
-                path_to_cdf = args.file[0]
-            else:
-                path_to_cdf = get_config_dir(url) + '/cluster.yaml'
-            if not is_cluster_running() and bootstrap_cluster(
-                    path_to_cdf, True):
-                logging.error('Failed to bootstrap the cluster')
-                rc = -1
-            if rc == 0:
-                wait_for_cluster_start(url)
-            shutdown_cluster()
-        enable_hare_consul_agent()
-        exit(rc)
-    except Exception as error:
+    url = args.config[0]
+    validator = Validator(ConfStoreProvider(url))
+    disable_hare_consul_agent()
+    if validator.is_first_node_in_cluster():
+        if args.file:
+            path_to_cdf = args.file[0]
+        else:
+            path_to_cdf = get_config_dir(url) + '/cluster.yaml'
+        if not is_cluster_running() and bootstrap_cluster(
+                path_to_cdf, True):
+            raise RuntimeError('Failed to bootstrap the cluster')
+
+        wait_for_cluster_start(url)
         shutdown_cluster()
-        raise RuntimeError(f'Error while initializing cluster :key={error}')
+    enable_hare_consul_agent()
 
 
 def start_hax_with_systemd():
@@ -516,7 +496,6 @@ def init(args):
 
 def test(args):
     try:
-        rc = 0
         url = args.config[0]
         validator = Validator(ConfStoreProvider(url))
         if validator.is_first_node_in_cluster():
@@ -525,46 +504,35 @@ def test(args):
             else:
                 path_to_cdf = get_config_dir(url) + '/cluster.yaml'
             if not is_cluster_running() and bootstrap_cluster(path_to_cdf):
-                logging.error('Failed to bootstrap the cluster')
-                rc = -1
+                raise RuntimeError("Failed to bootstrap the cluster")
             cluster_status = check_cluster_status(path_to_cdf)
-            if rc == 0:
-                wait_for_cluster_start(url)
-            shutdown_cluster()
+
+            wait_for_cluster_start(url)
             if cluster_status:
-                logging.error('Cluster status reports failure')
-                rc = -1
-        exit(rc)
-    except Exception as error:
-        logging.error('Error while checking cluster status (%s)', error)
+                raise RuntimeError(f'Cluster status reports failure :'
+                                   f' {cluster_status}')
+
+    finally:
         shutdown_cluster()
-        exit(-1)
 
 
 def test_IVT(args):
-    try:
-        rc = 0
-        if args.file:
-            path_to_cdf = args.file[0]
-        else:
-            path_to_cdf = get_config_dir(args.config[0]) + '/cluster.yaml'
+    if args.file:
+        path_to_cdf = args.file[0]
+    else:
+        path_to_cdf = get_config_dir(args.config[0]) + '/cluster.yaml'
 
-        logging.info('Running test plan: ' + str(args.plan[0].value))
-        # TODO We need to handle plan type and execute test cases accordingly
-        if not is_cluster_running():
-            logging.error('Cluster is not running. Cluster must be running '
-                          'for executing tests')
-            exit(-1)
-        cluster_status = check_cluster_status(path_to_cdf)
-        if cluster_status:
-            logging.error('Cluster status reports failure')
-            rc = -1
+    logging.info('Running test plan: ' + str(args.plan[0].value))
+    # TODO We need to handle plan type and execute test cases accordingly
+    if not is_cluster_running():
+        raise RuntimeError('Cluster is not running. '
+                           'Cluster must be running for executing tests')
+    cluster_status = check_cluster_status(path_to_cdf)
+    if cluster_status:
+        raise RuntimeError(f'Cluster status reports failure : '
+                           f' {cluster_status}')
 
-        logging.info('Tests executed successfully')
-        exit(rc)
-    except Exception as error:
-        logging.error('Error while running Hare tests (%s)', error)
-        exit(-1)
+    logging.info('Tests executed successfully')
 
 
 def reset(args):
@@ -575,10 +543,8 @@ def reset(args):
         # motr wants hare to start it through hare init.
         # So its not actually cluster start but it is services start.
         init(args)
-        exit(0)
     except Exception as error:
-        logging.error('Error during reset (%s)', error)
-        exit(-1)
+        raise RuntimeError(f'Error during reset : {error}')
 
 
 def kv_cleanup():
@@ -633,10 +599,8 @@ def cleanup(args):
         if args.pre_factory:
             pre_factory(url)
 
-        exit(0)
     except Exception as error:
-        logging.error('Error during cleanup (%s)', error)
-        exit(-1)
+        raise RuntimeError(f'Error during cleanup : {error}')
 
 
 def logs_cleanup(url):
@@ -725,12 +689,11 @@ def generate_support_bundle(args):
 
         execute(cmd)
     except Exception as error:
-        logging.error('Error while generating support bundle (%s)', error)
-        exit(-1)
+        raise RuntimeError(f'Error while generating support bundle : {error}')
 
 
 def noop(args):
-    exit(0)
+    pass
 
 
 def checkRpm(rpm_name):
@@ -747,8 +710,8 @@ def checkRpm(rpm_name):
     out, err = rpm_search.communicate()
     logging.debug("Output: {}".format(out))
     logging.debug("stderr: {}".format(err))
-
-    return rpm_search.returncode
+    if rpm_search.returncode != 0:
+        raise RuntimeError(f"rpm {rpm_name} is missing")
 
 
 def is_cluster_running() -> bool:
@@ -926,10 +889,9 @@ def config(args):
         generate_config(url, filename)
         consul_starter.stop()
     except Exception as error:
-        logging.error('Error performing configuration (%s)', error)
         if consul_starter:
             consul_starter.stop()
-        exit(-1)
+        raise RuntimeError(f'Error performing configuration : {error}')
 
 
 def add_subcommand(subparser,
@@ -1019,8 +981,13 @@ def str2bool(v):
         raise argparse.ArgumentTypeError('Boolean value expected.')
 
 
-def main():
-    inject.configure(di_configuration)
+def check_parsed_command(cmd):
+    if not hasattr(cmd, 'func'):
+        raise RuntimeError('Error: No valid command passed.'
+                           'Please check "--help"')
+
+
+def create_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description='Configure hare settings')
     subparser = p.add_subparsers()
 
@@ -1183,19 +1150,20 @@ def main():
                        help_str='Performs the Hare rpm upgrade tasks',
                        handler_fn=noop,
                        config_required=False))
+    return p
 
-    parsed = p.parse_args(sys.argv[1:])
 
-    setup_logging(parsed.config[0])
-
-    if not hasattr(parsed, 'func'):
-        logging.error('Error: No valid command passed. Please check "--help"')
-        exit(1)
-
+def main():
     try:
+        inject.configure(di_configuration)
+        p = create_parser()
+        parsed = p.parse_args(sys.argv[1:])
+
+        setup_logging(parsed.config[0])
+
+        check_parsed_command(parsed)
         parsed.func(parsed)
     except Exception as e:
-        # TODO refactor all other code to raise exception rather than exitin.
         logging.error(str(e))
         logging.debug('Exiting with FAILED result', exc_info=True)
         exit(1)
