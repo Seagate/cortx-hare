@@ -377,6 +377,7 @@ class CdfGenerator:
         node_facts = self.utils.get_node_facts()
         return NodeDesc(
             hostname=Text(hostname),
+            machine_id=Maybe(Text(machine_id), 'Text'),
             processorcount=Maybe(node_facts['processorcount'], 'Natural'),
             memorysize_mb=Maybe(node_facts['memorysize_mb'], 'Double'),
             data_iface=Text(iface),
