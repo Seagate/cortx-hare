@@ -194,12 +194,18 @@ EOF
     exit 1
 }
 
+getip() {
+    ping -c 1 -t 1 $1 | head -1 | cut -d ' ' -f 3 | tr -d '()'
+}
+
 is_localhost() {
     (($# == 1)) && [[ -n $1 ]] || die "${FUNCNAME[0]}: Invalid usage"
     local node=$1
     case $node in
         localhost|127.0.0.1|$(hostname)|$(hostname --fqdn)) return 0;;
     esac
+    local all_ips=$(hostname -I)
+    [[ " ${all_ips[@]} " =~ " $(getip $node) " ]] && return 0
     local path=/etc/salt/minion_id
     [[ -e $path && $(cat $path) == $node ]] && return 0 || return 1
 }
@@ -346,7 +352,13 @@ sudo systemctl start hare-consul-agent
 
 # Wait for Consul's internal leader to be ready.
 # (Until then the KV store won't be accessible.)
-while ! consul info 2>/dev/null | grep -q 'leader.*true'; do
+#
+# Note: the code is written this way without the pipe here on purpose.
+# With bash `set -o pipefail' setting (see above in the begginning),
+# it will return the status of the 1st failed command in the pipe,
+# which will be not of grep, but of consul, who will fail by SIGPIPE,
+# when `grep -q' process finish before consul is finished.
+while ! grep -q 'leader *= *true' <<< "$(consul info 2>/dev/null)"; do
     sleep 1
     echo -n '.'
 done

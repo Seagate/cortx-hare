@@ -19,6 +19,7 @@
 #
 
 import logging
+import re
 from typing import List, NamedTuple
 
 from hax.filestats import FsStatsUpdater
@@ -30,8 +31,9 @@ from hax.motr.ffi import HaxFFI
 from hax.motr.planner import WorkPlanner
 from hax.motr.rconfc import RconfcStarter
 from hax.server import ServerRunner
-from hax.types import Fid, Profile
+from hax.types import Fid, Profile, StoppableThread
 from hax.util import ConsulUtil, repeat_if_fails
+from hax.ha import create_ha_thread
 
 __all__ = ['main']
 
@@ -41,19 +43,43 @@ HL_Fids = NamedTuple('HL_Fids', [('hax_ep', str), ('hax_fid', Fid),
 LOG = logging.getLogger('hax')
 
 
-def _run_qconsumer_thread(planner: WorkPlanner, motr: Motr,
-                          herald: DeliveryHerald, consul: ConsulUtil,
-                          idx: int) -> ConsumerThread:
-    thread = ConsumerThread(planner, motr, herald, consul, idx)
+def _run_thread(thread: StoppableThread) -> StoppableThread:
     thread.start()
     return thread
+
+
+def _run_qconsumer_thread(planner: WorkPlanner, motr: Motr,
+                          herald: DeliveryHerald, consul: ConsulUtil,
+                          idx: int) -> StoppableThread:
+    return _run_thread(ConsumerThread(planner, motr, herald, consul, idx))
 
 
 def _run_stats_updater_thread(motr: Motr,
-                              consul_util: ConsulUtil) -> FsStatsUpdater:
-    thread = FsStatsUpdater(motr, consul_util, interval_sec=30)
-    thread.start()
-    return thread
+                              consul_util: ConsulUtil) -> StoppableThread:
+    return _run_thread(FsStatsUpdater(motr, consul_util, interval_sec=30))
+
+
+@repeat_if_fails()
+def _remove_stale_session(util: ConsulUtil) -> None:
+    '''Destroys a stale RC leader session if it exists or does nothing otherwise.
+
+    An RC leader session may survive 'hctl shutdown'. In such a case 'leader'
+    key will contain a garbage value 'elect2805' but the session will be alive
+    and thus RC leader will not be re-elected.
+    '''
+    if not util.kv.kv_get_raw('leader'):
+        # No leader key means that there can be no stale RC leader session for
+        # sure. We're starting for the first time against a fresh Consul KV.
+        return
+
+    sess = util.get_leader_session_no_wait()
+    node = util.get_leader_node()
+    if re.match(r'^elect[\d]+$', node):
+        LOG.debug(
+            'Stale leader session found: RC leader session %s is '
+            'found while the leader node seems to be stub: %s', sess, node)
+        util.destroy_session(sess)
+        LOG.debug('Stale session %s destroyed to enable RC re-election', sess)
 
 
 @repeat_if_fails()
@@ -91,6 +117,11 @@ def main():
     planner = WorkPlanner()
 
     util: ConsulUtil = ConsulUtil()
+    # Avoid removing session on hax start as this will happen
+    # on every node, thus leader election will keep re-triggering
+    # until the final hax node starts, this will delay further
+    # bootstrapping operations.
+    # _remove_stale_session(util)
     cfg: HL_Fids = _get_motr_fids(util)
 
     LOG.info('Welcome to HaX')
@@ -108,7 +139,8 @@ def main():
 
     # TODO make the number of threads configurable
     consumer_threads = [
-        _run_qconsumer_thread(planner, motr, herald, util, i) for i in range(4)
+        _run_qconsumer_thread(planner, motr, herald,
+                              util, i) for i in range(32)
     ]
 
     try:
@@ -121,12 +153,14 @@ def main():
         rconfc_starter = _run_rconfc_starter_thread(motr, consul_util=util)
 
         stats_updater = _run_stats_updater_thread(motr, consul_util=util)
+        event_poller = _run_thread(create_ha_thread(planner, util))
         # [KN] This is a blocking call. It will work until the program is
         # terminated by signal
 
         server = ServerRunner(planner, herald, consul_util=util)
-        server.run(
-            threads_to_wait=[*consumer_threads, stats_updater, rconfc_starter])
+        server.run(threads_to_wait=[
+            *consumer_threads, stats_updater, rconfc_starter, event_poller
+        ])
     except Exception:
         LOG.exception('Exiting due to an exception')
     finally:

@@ -125,7 +125,7 @@ def get_motr_cflags():
 
     return [
         '-g', '-Werror', '-Wall', '-Wextra', '-Wno-attributes',
-        '-Wno-unused-parameter'
+        '-Wno-unused-parameter', '-include', 'config.h'
     ]
 
 

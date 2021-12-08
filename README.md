@@ -52,6 +52,39 @@ and health-checking mechanisms.
   sudo yum -y install python3 python3-devel
   ```
 
+* Install puppet-agent (&ge; 6.13.0)
+  
+  Check facter version details, if already installed / exist in system
+  ```sh
+  facter -v
+  ```
+  Supported version is **facter >= 3.14.8**, If the facter version is **< 3.14.8** then follow the steps below: 
+  ```sh
+  yum erase -y $(rpm -q --whatprovides $(readlink -f /usr/bin/facter)) || rm -fv /usr/bin/facter
+  ```
+  Now install puppet-agent
+  ```sh
+  facter -v
+  ```
+  
+  On CentOS 7, if the facter version is less than 3.14 or not installed, then run the following commands to update/install it:
+  
+  ```sh
+  sudo yum erase -y $(rpm -q --whatprovides $(readlink -f /usr/bin/facter)) || sudo rm -fv /usr/bin/facter
+  sudo yum localinstall -y https://yum.puppetlabs.com/puppet/el/7/x86_64/puppet-agent-7.0.0-1.el7.x86_64.rpm
+  sudo ln -sf /opt/puppetlabs/bin/facter /usr/bin/facter
+  ```
+
+  On CentOS 8, install it (if not installed already):
+  
+  ```sh
+  sudo yum install -y facter
+  ```
+  Create symlink to facter binary, if not
+  ```sh
+  [ ! -f /usr/bin/facter ] && sudo ln -s /opt/puppetlabs/bin/facter /usr/bin/facter
+  ```
+
 * Install Consul.
   ```sh
   sudo yum -y install yum-utils
@@ -296,3 +329,4 @@ Solution: install cortx-py-utils RPM and retry.
 
 * [Hare RFCs](rfc/README.md)
 * [Hare wiki](https://github.com/Seagate/cortx-hare/wiki)
+* [QSG_Test_History](Testing_Verification_History.md)

@@ -35,12 +35,12 @@ in
       , named.Oid "mdpool" x.mdpool
       , named.TextUnquoted "imeta_pver"
             (Optional/fold types.Oid x.imeta_pver Text renderOid "(0,0)")
-      , named.Natural "mdredundancy" (List/length types.Oid x.nodes)
+      , named.Natural "mdredundancy" x.mdredundancy
       , "params=[]"
       , named.Oids "nodes" x.nodes
       , named.Oids "sites" x.sites
       , named.Oids "pools" x.pools
       , named.Oids "profiles" x.profiles
-      , "fdmi_flt_grps=[]"
+      , named.Oids "fdmi_flt_grps" x.fdmi_flt_grps
       ]
  ++ ")"

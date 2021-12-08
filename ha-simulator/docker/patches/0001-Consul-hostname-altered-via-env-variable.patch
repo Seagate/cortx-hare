@@ -1,0 +1,35 @@
+From b22878ef5004123799345131706eee72ef64dd41 Mon Sep 17 00:00:00 2001
+From: Konstantin Nekrasov <konstantin.nekrasov@seagate.com>
+Date: Mon, 25 Oct 2021 08:09:39 -0600
+Subject: [PATCH] Consul hostname altered via env variable
+
+Signed-off-by: Konstantin Nekrasov <konstantin.nekrasov@seagate.com>
+---
+ ha/core/config/config_manager.py | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/ha/core/config/config_manager.py b/ha/core/config/config_manager.py
+index 593823c..814df6f 100644
+--- a/ha/core/config/config_manager.py
++++ b/ha/core/config/config_manager.py
+@@ -22,6 +22,7 @@
+  ****************************************************************************
+ """
+ 
++import os
+ from cortx.utils.log import Log
+ from cortx.utils.conf_store.conf_store import Conf
+ 
+@@ -69,7 +70,8 @@ class ConfigManager:
+         Used by config manager methods to check and initalize confstore if needed.
+         """
+         if ConfigManager._cluster_confstore is None:
+-            ConfigManager._cluster_confstore = ConsulKvStore(prefix=const.CLUSTER_CONFSTORE_PREFIX)
++            host = os.environ.get('CONSUL_HOSTNAME') or 'localhost'
++            ConfigManager._cluster_confstore = ConsulKvStore(host=host, prefix=const.CLUSTER_CONFSTORE_PREFIX)
+         return ConfigManager._cluster_confstore
+ 
+     @staticmethod
+-- 
+1.8.3.1
+

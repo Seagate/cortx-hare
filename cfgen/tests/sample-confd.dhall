@@ -115,10 +115,12 @@ let root = types.Obj.Root
   { id = ids.root
   , mdpool = ids.pool_1
   , imeta_pver = Some ids.pver_2
+  , mdredundancy = 1
   , nodes = [ids.node]
   , sites = [ids.site]
   , pools = [ids.pool_69, ids.pool_48, ids.pool_1]
   , profiles = [ids.profile]
+  , fdmi_flt_grps = [] : List types.Oid
   }
 
 let node = types.Obj.Node

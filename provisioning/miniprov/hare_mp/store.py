@@ -27,7 +27,7 @@ class ValueProvider:
     def get(self, key: str, allow_null: bool = False) -> Any:
         ret = self._raw_get(key)
         if ret is None and not allow_null:
-            raise MissingKeyError(key)
+            raise MissingKeyError(key, self.url)
         return ret
 
     def _raw_get(self, key: str) -> str:
@@ -47,7 +47,7 @@ class ValueProvider:
 
 
 class ConfStoreProvider(ValueProvider):
-    def __init__(self, url: str):
+    def __init__(self, url: str, index='hare'):
         self.url = url
         # Note that we don't instantiate Conf class on purpose.
         #
@@ -64,11 +64,12 @@ class ConfStoreProvider(ValueProvider):
         # That state is also static...
 
         conf = Conf
-        conf.load('hare', url, fail_reload=False)
+        conf.load(index, url, fail_reload=False)
         self.conf = conf
+        self.index = index
 
     def _raw_get(self, key: str) -> str:
-        return self.conf.get('hare', key)
+        return self.conf.get(self.index, key)
 
     def get_machine_id(self) -> str:
         with open('/etc/machine-id', 'r') as f:
@@ -96,7 +97,8 @@ class ConfStoreProvider(ValueProvider):
 
     def get_hostname(self) -> str:
         machine_id = self.get_machine_id()
-        hostname = self._raw_get(f'server_node>{machine_id}>hostname')
+        hostname = self._raw_get(
+            f'server_node>{machine_id}>network>data>private_fqdn')
         return hostname
 
     def get_storage_set_nodes(self) -> List[str]:

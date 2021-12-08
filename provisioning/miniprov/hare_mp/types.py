@@ -12,7 +12,7 @@ class Maybe(Generic[A]):
 
     def __str__(self):
         if self.value is None:
-            return f'None {self.comment}'
+            return f'None ({self.comment})'
 
         return f'Some ({self.value})'
 
@@ -145,18 +145,29 @@ class ProfileDesc(DhallTuple):
 
 
 @dataclass(repr=False)
+class FdmiFilterDesc(DhallTuple):
+    client_index: int
+    name: Text
+    node: Text
+    substrings: DList[Text]
+
+
+@dataclass(repr=False)
 class ClusterDesc(DhallTuple):
+    create_aux: Maybe[bool]
     node_info: List[NodeDesc]
     pool_info: List[PoolDesc]
     profile_info: List[ProfileDesc]
+    fdmi_filter_info: Maybe[List[FdmiFilterDesc]]
 
 
 @dataclass(repr=False)
 class MissingKeyError(Exception):
     key: str
+    url: str
 
     def __str__(self):
-        return f"Required key '{self.key}' not found"
+        return f"Required key '{self.key}' not found in '{self.url}'"
 
 
 @dataclass(repr=False)

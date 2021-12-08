@@ -20,17 +20,24 @@ import logging
 from collections import deque
 from dataclasses import dataclass
 from threading import Condition
-from typing import Callable, Deque, Optional, Set, Type
+from typing import Callable, Deque, Dict, Optional, Set, Tuple, Type
 
 from hax.log import TRACE
 from hax.message import (AnyEntrypointRequest, BaseMessage, BroadcastHAStates,
                          Die, HaNvecGetEvent, ProcessEvent, SnsOperation)
 from hax.motr.util import LinkedList
+from hax.types import Fid
 
 LOG = logging.getLogger('hax')
 MAX_GROUP_ID = 100000
 
 __all__ = ['WorkPlanner']
+
+
+@dataclass
+class CommandMeta:
+    # A fid value related to a command
+    fid: Fid
 
 
 @dataclass
@@ -45,10 +52,10 @@ class State:
     # Commands that are being processed now
     active_commands: LinkedList[BaseMessage]
     #
-    # The commands that have already been taken by the worker threads
-    # but not approved yet for execution (so either threads haven't invoked
-    # ensure_allowed() yet or ensure_allowed() has not succeded for them).
-    taken_commands: LinkedList[BaseMessage]
+    # Mapping of id(active_command) -> CommandMeta
+    # the idea is that any command in active_commands collection can
+    # potentially have a metadata object stored in this Dict
+    active_meta: Dict[int, CommandMeta]
     #
     # Types of commands that have already been added to group number
     # next_group_id.
@@ -89,6 +96,7 @@ class WorkPlanner:
 
         self.state = fn()
         self.backlog: Deque[BaseMessage] = deque()
+        self.asap_list: Deque[BaseMessage] = deque()
         self.b_lock = Condition()
 
     def is_empty(self) -> bool:
@@ -100,10 +108,13 @@ class WorkPlanner:
         '''Adds the given command to the execution plan. Blocking call.'''
         LOG.log(TRACE, '[WP]Before add_command: %s', command)
         with self.b_lock:
-            cmd = self._assign_group(command)
+            cmd, is_asap = self._assign_group(command)
             LOG.log(TRACE, '[WP]Cmd %s is added. Current state: %s', cmd,
                     self.state)
-            self.backlog.append(cmd)
+            backlog = self.backlog
+            if is_asap:
+                backlog = self.asap_list
+            backlog.append(cmd)
             # Some threads may be waiting because of an empty backlog - let's
             # notify them
             self.b_lock.notifyAll()
@@ -114,7 +125,7 @@ class WorkPlanner:
         '''
         return State(next_group_id=0,
                      active_commands=LinkedList(),
-                     taken_commands=LinkedList(),
+                     active_meta={},
                      current_group_id=0,
                      next_group_commands=set(),
                      is_shutdown=False)
@@ -146,11 +157,20 @@ class WorkPlanner:
         def next_cmd() -> Optional[BaseMessage]:
             if self.state.is_shutdown:
                 return self._create_poison()
-            if self.backlog:
-                cmd = self.backlog.popleft()
-                LOG.log(TRACE, '[WP]Cmd %s taken!', cmd)
-                self.state.taken_commands.add(cmd)
-                return cmd
+
+            for backlog, is_allowed in [(self.asap_list,
+                                         self._is_allowed_asap),
+                                        (self.backlog, self._is_allowed)]:
+                if backlog:
+                    cmd = backlog.popleft()
+                    if is_allowed(cmd):
+                        self._add_active_cmd(cmd)
+                        LOG.log(TRACE, '[WP]Cmd %s taken!', cmd)
+                        return cmd
+                    else:
+                        # Given the command is not eligble, put it back
+                        # to the same place it has been taken from.
+                        backlog.appendleft(cmd)
             return None
 
         while True:
@@ -158,8 +178,10 @@ class WorkPlanner:
             with self.b_lock:
                 cmd = next_cmd()
                 if cmd:
-                    return self._ensure_allowed(cmd)
-                LOG.log(TRACE, '[WP]Blocking thread: no commands in backlog')
+                    return cmd
+                LOG.log(
+                    TRACE,
+                    '[WP]Blocking thread: no eligible commands in backlog')
                 self.b_lock.wait()
 
     def shutdown(self):
@@ -171,43 +193,54 @@ class WorkPlanner:
             self.state.is_shutdown = True
             self.b_lock.notifyAll()
 
-    def _ensure_allowed(self, command: BaseMessage) -> BaseMessage:
-        ''' The method which must be invoked by every worker thread before
-        starting the command execution. If WorkPlanner allows this command
-        to be executed right now then this method will return early.
+    def _remove_active_cmd(self, command: BaseMessage) -> None:
+        self.state.active_commands.remove(command)
+        key = id(command)
+        if key in self.state.active_meta:
+            del self.state.active_meta[key]
 
-        The command is allowed for execution if and only if the command has
+    def _add_active_cmd(self, command: BaseMessage) -> None:
+        self.state.active_commands.add(command)
+        meta = self._extract_meta(command)
+        if meta:
+            key = id(command)
+            self.state.active_meta[key] = meta
+
+    def _extract_meta(self, command: BaseMessage) -> Optional[CommandMeta]:
+        if isinstance(command, ProcessEvent):
+            return CommandMeta(fid=command.evt.fid)
+        return None
+
+    def _is_allowed_asap(self, command: BaseMessage) -> bool:
+        meta = self._extract_meta(command)
+        if not meta:
+            return True
+
+        for k, v in self.state.active_meta.items():
+            # TODO in the future `==` will have to be replaced with something
+            # more command-specific.
+            # E.g. two ProcessEvents conflict if their metas contain the same
+            # fid.
+            #
+            # At this moment we support CommandMeta for ProcessEvent, so for
+            # now this 'is_conflict' logic is written like this:
+            if v.fid == meta.fid:
+                return False
+        return True
+
+    def _is_allowed(self, command: BaseMessage) -> bool:
+        ''' The command is allowed for execution if and only if the command has
         group_id equal to the currently active group (see
         State.current_group_id). The command group ids are assigned just once
         when the command is being added to the WorkPlanner via add_command()
         method.
-
-        If the the given command doesn't belong to the currently active group,
-        this function blocks the current thread until the command becomes
-        eligible for execution. In other words, the caller can always assume
-        that once this function returns, the execution is allowed for sure.
-
-        Note: the method returns the command to be executed. The worker must
-        execute the command which is returned by this method!
-
-        In 'shutting down' mode WorkPlanner may return Die command instead of
-        the one provided as an argument.
         '''
         def is_current(cmd: BaseMessage, st: State) -> bool:
             return cmd.group == st.current_group_id
 
-        while True:
-            with self.b_lock:
-                state = self.state
-                if state.is_shutdown:
-                    return self._create_poison()
-                if is_current(command, state):
-                    state.taken_commands.remove(command)
-                    state.active_commands.add(command)
-                    return command
-                LOG.log(TRACE, '[WP]Cmd %s not allowed for now.'
-                        ' Current state: %s', command, self.state)
-                self.b_lock.wait()
+        with self.b_lock:
+            state = self.state
+            return is_current(command, state)
 
     def _get_increased_group(self, current: int) -> int:
         ''' Returns the next valid group_id number by the given current value.
@@ -246,16 +279,13 @@ class WorkPlanner:
 
         with self.b_lock:
             state = self.state
-            state.active_commands.remove(command)
+            self._remove_active_cmd(command)
             LOG.log(TRACE, '[WP]Cmd %s removed. Current state: %s', command,
                     state)
 
             if state.active_commands:
                 return
             for c in self.backlog:
-                if c.group == state.current_group_id:
-                    return
-            for c in state.taken_commands:
                 if c.group == state.current_group_id:
                     return
             # if we're here, command was the only one belonging to group
@@ -285,9 +315,12 @@ class WorkPlanner:
             # No need to form the new group for it.
             return False
         if isinstance(cmd, AnyEntrypointRequest):
-            # if the current group has a BroadcastHAStates request,
-            # then this entrypoint request should be placed to a next group.
-            return has(BroadcastHAStates)
+            # Entrypoint requests can be processed in parallel to other
+            # requests are they are per processes. In a situation where
+            # if an entrypoint request needs to block on some other request
+            # e.g. BroadcastHAStates, then the wait needs to explicit.
+            # For example, see FirstEntrypoint request code in hax/handler.py.
+            return False
         if isinstance(cmd, BroadcastHAStates):
             return True
 
@@ -295,17 +328,14 @@ class WorkPlanner:
             # Start new group if there is another SNS operation within the
             # current group.
             return has(SnsOperation)
-        if isinstance(cmd, ProcessEvent):
-            # Two process events (like STARTING or STARTED) can't be performed
-            # in parallel.
-            # So if there is one ProcessEvent already in the group, then the
-            # new one should go to another group.
-            return has(ProcessEvent)
         return False
 
-    def _assign_group(self, cmd: BaseMessage) -> BaseMessage:
+    def _assign_group(self, cmd: BaseMessage) -> Tuple[BaseMessage, bool]:
         ''' Sets the correct group_id to the command. Side effect: updates
         self.state.
+        Returns Tuple with the updated command and a boolean flag saying
+        whether this command must be added out of order (is_asap).
+
         Must be invoked with b_lock acquired. The method is invoked from
         add_command(cmd).
 
@@ -316,9 +346,8 @@ class WorkPlanner:
         state.next_group_id := (state.next_group_id + 1) mod MAX_GROUP_ID.
 
         Command cmd starts a new group if:
-        1. cmd is an entrypoint request AND next_group has BroadcastHAStates
-        2. cmd is BroadcastHAStates
-        3. cmd is an SNS operation AND next_group has SNS operation already
+        1. cmd is BroadcastHAStates
+        2. cmd is an SNS operation AND next_group has SNS operation already
         Otherwise command will join existing next_group.
 
         '''
@@ -332,10 +361,27 @@ class WorkPlanner:
             self.state.next_group_id = self._get_increased_group(
                 self.state.next_group_id)
 
-        if isinstance(cmd, Die):
-            return join_group(cmd)
+        if (isinstance(cmd, AnyEntrypointRequest)
+                or isinstance(cmd, HaNvecGetEvent)
+                or isinstance(cmd, ProcessEvent)):
+            # Entrypoint and Die will always be added to the CURRENT group
+            # (the one being currently active), so they can be executed at
+            # first priority.
+            #
+            # Entrypoint is also a special case: it should not be delayed and
+            # we also know that they appear during bootstrap when a huge flow
+            # of BroadcastHAStates events appear. We just don't want to block
+            # because of them.
+            cmd.group = self.state.current_group_id
+            return (cmd, True)
+        elif isinstance(cmd, Die):
+            # Normally, no one needs to add the Die command to the backlog
+            # except for the unit tests.
+            #
+            # shutdown() mechanism generates Die command dynamically anyway.
+            return (join_group(cmd), False)
 
         if self._should_increase_group(cmd):
             next_group()
 
-        return join_group(cmd)
+        return (join_group(cmd), False)

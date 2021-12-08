@@ -47,7 +47,9 @@ ObjT = Enum(
         ('CONTROLLER', 0x6300000000000001),
         ('ROOT', 0x7400000000000001),
         ('POOL', 0x6f00000000000001),
-        ('PVER', 0x7600000000000001)
+        ('PVER', 0x7600000000000001),
+        ('FDMI_FILTER', 0x6c00000000000001),
+        ('FDMI_FLT_GRP', 0x6700000000000001),
     ])
 ObjT.__doc__ = 'Motr conf object types and their m0_fid.f_container values'
 
@@ -216,15 +218,35 @@ class HaLinkMessagePromise:
 
 
 class ServiceHealth(Enum):
-    FAILED = 0
-    OK = 1
-    UNKNOWN = 2
-    OFFLINE = 3
-    STOPPED = 4
+    FAILED = (0, HaNoteStruct.M0_NC_FAILED)
+    OK = (1, HaNoteStruct.M0_NC_ONLINE)
+    UNKNOWN = (2, HaNoteStruct.M0_NC_UNKNOWN)
+    OFFLINE = (3, HaNoteStruct.M0_NC_TRANSIENT)
+    STOPPED = (4, HaNoteStruct.M0_NC_TRANSIENT)
 
     def __repr__(self):
         """Return human-readable constant name (useful in log output)."""
         return self.name
+
+    @staticmethod
+    def from_ha_note_state(state: int) -> 'ServiceHealth':
+        """
+        Converts the int constant from HaNoteStruct into the corresponding
+        ServiceHealth.
+        """
+        for i in list(ServiceHealth):
+            (_, note) = i.value
+            if note == state:
+                return i
+        return ServiceHealth.UNKNOWN
+
+    def to_ha_note_status(self) -> int:
+        """
+        Converts the given ServiceHealth to the most suitable HaNoteStruct
+        status.
+        """
+        ha_note: int = self.value[1]
+        return ha_note
 
 
 HAState = NamedTuple('HAState', [('fid', Fid), ('status', ServiceHealth)])
@@ -275,6 +297,33 @@ class m0HaProcessType(IntEnum):
 
     def __repr__(self):
         return self.name
+
+
+class m0HaObjState(IntEnum):
+    M0_NC_UNKNOWN = HaNoteStruct.M0_NC_UNKNOWN
+    M0_NC_ONLINE = HaNoteStruct.M0_NC_ONLINE
+    M0_NC_FAILED = HaNoteStruct.M0_NC_FAILED
+    M0_NC_TRANSIENT = HaNoteStruct.M0_NC_TRANSIENT
+    M0_NC_REPAIRED = HaNoteStruct.M0_NC_REPAIRED
+    M0_NC_REBALANCE = HaNoteStruct.M0_NC_REBALANCE
+    M0_NC_NR = HaNoteStruct.M0_NC_NR
+
+    def __repr__(self):
+        return self.name
+
+    @staticmethod
+    def parse(state: str) -> 'm0HaObjState':
+
+        states = {
+            'M0_NC_UNKNOWN': m0HaObjState.M0_NC_UNKNOWN,
+            'M0_NC_ONLINE': m0HaObjState.M0_NC_ONLINE,
+            'M0_NC_FAILED': m0HaObjState.M0_NC_FAILED,
+            'M0_NC_TRANSIENT': m0HaObjState.M0_NC_TRANSIENT,
+            'M0_NC_REPAIRED': m0HaObjState.M0_NC_REPAIRED,
+            'M0_NC_REBALANCE': m0HaObjState.M0_NC_REBALANCE,
+            'M0_NC_NR': m0HaObjState.M0_NC_NR
+        }
+        return states[state]
 
 
 class Profile(NamedTuple):

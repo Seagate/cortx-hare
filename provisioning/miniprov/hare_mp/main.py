@@ -31,10 +31,11 @@ from enum import Enum
 from sys import exit
 from time import sleep
 from typing import Any, Callable, Dict, List
+from urllib.parse import urlparse
 
 import yaml
 from cortx.utils.product_features import unsupported_features
-from hax.types import KeyDelete
+from hax.types import KeyDelete, Fid
 from hax.util import ConsulUtil, repeat_if_fails, KVAdapter
 
 from hare_mp.cdf import CdfGenerator
@@ -43,8 +44,8 @@ from hare_mp.systemd import HaxUnitTransformer
 from hare_mp.validator import Validator
 
 # Logger details
-LOG_DIR = "/var/log/seagate/hare/"
-LOG_FILE = "/var/log/seagate/hare/setup.log"
+LOG_DIR = "/var/log/seagate/hare/hare_deployment/"
+LOG_FILE = "/var/log/seagate/hare/hare_deployment/setup.log"
 LOG_FILE_SIZE = 5 * 1024 * 1024
 
 
@@ -56,12 +57,13 @@ class Plan(Enum):
     Scalability = 'scalability'
 
 
-def execute(cmd: List[str]) -> str:
+def execute(cmd: List[str], env=None) -> str:
     process = subprocess.Popen(cmd,
                                stdin=subprocess.PIPE,
                                stdout=subprocess.PIPE,
                                stderr=subprocess.PIPE,
-                               encoding='utf8')
+                               encoding='utf8',
+                               env=env)
     out, err = process.communicate()
     if process.returncode:
         raise Exception(
@@ -207,6 +209,14 @@ def disable_hare_consul_agent() -> None:
     execute(cmd)
 
 
+def get_hare_motr_s3_processes(utils: ConsulUtil) -> Dict[str, List[Fid]]:
+    nodes = utils.catalog.get_node_names()
+    processes: Dict[str, List[Fid]] = {}
+    for node in nodes:
+        processes[node] = utils.get_node_hare_motr_s3_fids(node)
+    return processes
+
+
 def init(args):
     try:
         rc = 0
@@ -225,9 +235,8 @@ def init(args):
         enable_hare_consul_agent()
         exit(rc)
     except Exception as error:
-        logging.error('Error while initializing the cluster (%s)', error)
         shutdown_cluster()
-        exit(-1)
+        raise RuntimeError(f'Error while initializing cluster :key={error}')
 
 
 def test(args):
@@ -279,42 +288,55 @@ def test_IVT(args):
 
 def reset(args):
     try:
-        rc = 0
-        util: ConsulUtil = ConsulUtil()
-
-        if is_cluster_running():
-            logging.info('Cluster is running, shutting down')
-            shutdown_cluster()
-
-        keys: List[KeyDelete] = [
-            KeyDelete(name='epoch', recurse=False),
-            KeyDelete(name='eq-epoch', recurse=False),
-            KeyDelete(name='last_fidk', recurse=False),
-            KeyDelete(name='leader', recurse=False),
-            KeyDelete(name='m0conf/', recurse=True),
-            KeyDelete(name='processes/', recurse=True),
-            KeyDelete(name='stats/', recurse=True)
-        ]
-
-        logging.info('Deleting Hare KV entries (%s)', keys)
-        if not util.kv.kv_delete_in_transaction(keys):
-            logging.error('Error during key delete in transaction')
-            rc = -1
-
-        exit(rc)
+        # In motr reset, motr clean up the motr and IO tests generated data.
+        # But to restart the cluster, hare init needed to be called.
+        # As a part of motr reset, we need to mkfs and start m0d services,
+        # motr wants hare to start it through hare init.
+        # So its not actually cluster start but it is services start.
+        init(args)
+        exit(0)
     except Exception as error:
         logging.error('Error during reset (%s)', error)
         exit(-1)
 
 
+def kv_cleanup():
+    util: ConsulUtil = ConsulUtil()
+
+    if is_cluster_running():
+        logging.info('Cluster is running, shutting down')
+        shutdown_cluster()
+
+    keys: List[KeyDelete] = [
+        KeyDelete(name='epoch', recurse=False),
+        KeyDelete(name='eq-epoch', recurse=False),
+        KeyDelete(name='last_fidk', recurse=False),
+        KeyDelete(name='leader', recurse=False),
+        KeyDelete(name='m0conf/', recurse=True),
+        KeyDelete(name='processes/', recurse=True),
+        KeyDelete(name='stats/', recurse=True)
+    ]
+
+    logging.info('Deleting Hare KV entries (%s)', keys)
+    if not util.kv.kv_delete_in_transaction(keys):
+        raise RuntimeError('Error during key delete in transaction')
+
+
+def pre_factory():
+    logging.info('Executing pre-factory cleanup command...')
+    deployment_logs_cleanup()
+    motr_cleanup()
+
+
 def cleanup(args):
     try:
-        rc = -1
+        kv_cleanup()
+        logs_cleanup()
+        config_cleanup()
+        if args.pre_factory:
+            pre_factory()
 
-        if config_cleanup() == 0 and logs_cleanup() == 0:
-            rc = 0
-
-        exit(rc)
+        exit(0)
     except Exception as error:
         logging.error('Error during cleanup (%s)', error)
         exit(-1)
@@ -322,13 +344,11 @@ def cleanup(args):
 
 def logs_cleanup():
     try:
-        logging.info('Cleaning up hare log directory(/var/log/seagate/hare)')
-        os.system('rm -rf /var/log/seagate/hare')
+        logging.info('Cleaning up hare log directory(/var/log/seagate/hare/*)')
+        os.system('rm -f /var/log/seagate/hare/*')
 
-        return 0
     except Exception as error:
-        logging.error('Error during logs cleanup (%s)', error)
-        return -1
+        raise RuntimeError(f'Error during logs cleanup : key={error}')
 
 
 def config_cleanup():
@@ -336,10 +356,31 @@ def config_cleanup():
         logging.info('Cleaning up hare config directory(/var/lib/hare)')
         os.system('rm -rf /var/lib/hare/*')
 
-        return 0
     except Exception as error:
-        logging.error('Error during config cleanup (%s)', error)
-        return -1
+        raise RuntimeError(f'Error during config cleanup : key={error}')
+
+
+def deployment_logs_cleanup():
+    try:
+        logging.info('''Cleaning up hare deployment log directory
+            (/var/log/seagate/hare/hare_deployment)''')
+        os.system('rm -rf /var/log/seagate/hare/hare_deployment')
+
+    except Exception as error:
+        raise RuntimeError(f'Error during deployment log cleanup: key={error}')
+
+
+def motr_cleanup():
+    try:
+        logging.info('Cleaning up motr directory(/var/motr/hax)')
+        os.system('rm -rf /var/motr/hax')
+        logging.info('Cleaning up sysconfig files(/etc/sysconfig/m0d-*)')
+        os.system('rm -rf /etc/sysconfig/m0d-0x7200000000000001*')
+        logging.info('Cleaning up sysconfig files(/etc/sysconfig/s3server-*)')
+        os.system('rm -rf /etc/sysconfig/s3server-0x7200000000000001*')
+
+    except Exception as error:
+        raise RuntimeError(f'Error during motr cleanup: key={error}')
 
 
 def generate_support_bundle(args):
@@ -396,19 +437,21 @@ def nr_services() -> int:
 
 
 @repeat_if_fails()
-def all_services_started(url: str, nr_svcs: int) -> bool:
-    conf = ConfStoreProvider(url)
-    hostname = conf.get_hostname()
+def all_services_started(url: str, processes: Dict[str, List[Fid]]) -> bool:
     kv = KVAdapter()
-    status_data = kv.kv_get(f'{hostname}/processes', recurse=True)
-    statuses = []
-    for val in status_data:
-        state = val['Value']
-        statuses.append(json.loads(state.decode('utf8'))['state'])
-    started = [status == 'M0_CONF_HA_PROCESS_STARTED' for status in statuses]
-    if len(started) != nr_svcs:
+    if not processes:
         return False
-    return all(started)
+    for key in processes.keys():
+        for proc_fid in processes[key]:
+            proc_state = kv.kv_get(f'{key}/processes/{proc_fid}', recurse=True)
+            if proc_state:
+                proc_state_val = proc_state[0]['Value']
+                state = json.loads(proc_state_val.decode('utf8'))['state']
+                if state != 'M0_CONF_HA_PROCESS_STARTED':
+                    return False
+            else:
+                return False
+    return True
 
 
 def bootstrap_cluster(path_to_cdf: str, domkfs=False):
@@ -420,8 +463,11 @@ def bootstrap_cluster(path_to_cdf: str, domkfs=False):
 
 
 def wait_for_cluster_start(url: str):
-    nr_svcs = nr_services()
-    while not all_services_started(url, nr_svcs):
+    util: ConsulUtil = ConsulUtil()
+    processes: Dict[str, List[Fid]] = {}
+    while not processes:
+        processes = get_hare_motr_s3_processes(util)
+    while not all_services_started(url, processes):
         logging.info('Waiting for all the processes to start..')
         sleep(2)
 
@@ -476,8 +522,13 @@ def check_cluster_status(path_to_cdf: str):
     return 0
 
 
-def generate_cdf(url: str) -> str:
-    generator = CdfGenerator(ConfStoreProvider(url))
+def generate_cdf(url: str, motr_md_url: str) -> str:
+    # ConfStoreProvider creates an empty file, if file does not exist.
+    # So, we are validating the file is present or not.
+    if not os.path.isfile(urlparse(motr_md_url).path):
+        raise FileNotFoundError(f'config file: {motr_md_url} does not exist')
+    motr_provider = ConfStoreProvider(motr_md_url, index='motr_md')
+    generator = CdfGenerator(ConfStoreProvider(url), motr_provider)
     return generator.generate()
 
 
@@ -488,9 +539,13 @@ def save(filename: str, contents: str) -> None:
 
 def generate_config(url: str, path_to_cdf: str) -> None:
     conf_dir = '/var/lib/hare'
-    os.environ['PATH'] += os.pathsep + '/opt/seagate/cortx/hare/bin/'
+    path = os.getenv('PATH')
+    if path:
+        path += os.pathsep + '/opt/seagate/cortx/hare/bin/'
+    python_path = os.pathsep.join(sys.path)
     cmd = ['cfgen', '-o', conf_dir, path_to_cdf]
-    execute(cmd)
+    execute(cmd, env={'PYTHONPATH': python_path, 'PATH': path})
+
     conf = ConfStoreProvider(url)
     hostname = conf.get_hostname()
     save(f'{conf_dir}/node-name', hostname)
@@ -510,7 +565,9 @@ def config(args):
     try:
         url = args.config[0]
         filename = args.file[0] or '/var/lib/hare/cluster.yaml'
-        save(filename, generate_cdf(url))
+        motr_md_path = '/opt/seagate/cortx/motr/conf/motr_hare_keys.json'
+        motr_md_url = 'json://' + motr_md_path
+        save(filename, generate_cdf(url, motr_md_url))
         update_hax_unit('/usr/lib/systemd/system/hare-hax.service')
         generate_config(url, filename)
     except Exception as error:
@@ -562,6 +619,16 @@ def add_param_argument(parser):
                         nargs=1,
                         type=str,
                         action='store')
+    return parser
+
+
+def add_factory_argument(parser):
+    parser.add_argument('--pre-factory',
+                        help="""Deletes contents of /var/log/seagate/hare,
+                        /var/lib/hare and /var/motr. Undoes everything that
+                        is done in post-install stage of hare provisioner""",
+                        required=False,
+                        action='store_true')
     return parser
 
 
@@ -620,18 +687,19 @@ def main():
                                nargs='?',
                                help='Target directory; defaults to /tmp/hare.')
 
-    add_subcommand(subparser,
-                   'reset',
-                   help_str='Resets temporary Hare data and configuration',
-                   handler_fn=reset,
-                   config_required=False)
+    add_file_argument(
+        add_subcommand(subparser,
+                       'reset',
+                       help_str='Resets temporary Hare data and configuration',
+                       handler_fn=reset))
 
-    add_subcommand(
-        subparser,
-        'cleanup',
-        help_str='Resets Hare configuration, logs and formats Motr metadata',
-        handler_fn=cleanup,
-        config_required=False)
+    add_factory_argument(
+        add_subcommand(
+            subparser,
+            'cleanup',
+            help_str='Resets Hare configuration, logs & formats Motr metadata',
+            handler_fn=cleanup,
+            config_required=False))
 
     add_subcommand(subparser,
                    'prepare',

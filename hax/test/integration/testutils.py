@@ -44,6 +44,8 @@ def trace_call(fn):
         ts = time.time()
         args_copy = [i for i in args]
         name = fn.__name__
+        if not hasattr(self, 'traces'):
+            self.traces = []
         self.traces.append(Invocation(name, args_copy, ts))
         return fn(self, *args, **kwargs)
 
@@ -95,7 +97,7 @@ class AssertionPlan:
         self.steps.append((self._after(), self._exec(predicate)))
         return self
 
-    def run(self, traces: List[Invocation]) -> bool:
+    def exists(self, traces: List[Invocation]) -> bool:
         '''
         Evaluates the steps in this AssertionPlan and returns the final result
         of the assertion.
@@ -109,6 +111,45 @@ class AssertionPlan:
             if res >= 0:
                 state = AssertionState(state.traces, True, res)
         return state.result
+
+    def count(self, traces: List[Invocation]) -> int:
+        """
+        Counts how many traces in the list correspond to the given criteria.
+        """
+        def _eval(state: AssertionState, steps: List[Tuple[StateTransformer,
+                                                           TracePredicate]],
+                  count: int) -> int:
+            if not steps:
+                return count
+
+            transformer, predicate = steps[0]
+            xs = steps[1:]
+
+            while True:
+                state = transformer(state)
+                res = predicate(state.traces)
+                if res < 0:
+                    break
+
+                state = AssertionState(state.traces[res + 1:], True, -1)
+                count = max(_eval(state, xs, count + 1), count)
+            return count
+
+        state = AssertionState(traces, False, -1)
+        return _eval(state, self.steps, 0)
+
+    def not_exists(self, traces: List[Invocation]) -> bool:
+        '''
+        Evaluates the steps in this AssertionPlan and returns True if
+        match is not found.
+        '''
+        state = AssertionState(traces, False, -1)
+        for transformer, predicate in self.steps:
+            state = transformer(state)
+            res = predicate(state.traces)
+            if res >= 0:
+                return False
+        return True
 
     def _id(self):
         def fn(state: AssertionState) -> AssertionState:
@@ -143,6 +184,16 @@ def tr_method(name: str) -> TraceMatcher:
     '''
     def fn(trace: Invocation) -> bool:
         return trace.method_name == name
+
+    return fn
+
+
+def tr_not(matcher: TraceMatcher) -> TraceMatcher:
+    '''
+    Inverts the result of the nested matcher.
+    '''
+    def fn(trace: Invocation) -> bool:
+        return not matcher(trace)
 
     return fn
 
@@ -188,15 +239,12 @@ class FakeFFI(HaxFFI):
         ...
 
     @trace_call
-    def adopt_motr_thread(self, ha_ctx):
-        ...
-
-    @trace_call
-    def shun_motr_thread(self):
-        ...
-
-    @trace_call
     def ha_broadcast(self, _ha_ctx, ha_notes, notes_len):
+        return [MessageId(101, 1), MessageId(101, 2)]
+
+    @trace_call
+    def ha_broadcast_hax_only(self, _ha_ctx, ha_notes, notes_len,
+                              hax_endpoint):
         return [MessageId(101, 1), MessageId(101, 2)]
 
     @trace_call
@@ -206,3 +254,7 @@ class FakeFFI(HaxFFI):
     @trace_call
     def hax_stop(self, *args):
         return [MessageId(111, 1)]
+
+    @trace_call
+    def ha_nvec_reply(self, _ha_ctx, ha_notes, notes_len):
+        return [MessageId(101, 1), MessageId(101, 2)]

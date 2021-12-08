@@ -9,7 +9,8 @@ import pkg_resources
 from hare_mp.store import ValueProvider
 from hare_mp.types import (ClusterDesc, DiskRef, DList, Maybe, NodeDesc,
                            PoolDesc, PoolType, ProfileDesc, Protocol, Text,
-                           M0ServerDesc, DisksDesc, AllowedFailures, Layout)
+                           M0ServerDesc, DisksDesc, AllowedFailures, Layout,
+                           FdmiFilterDesc)
 
 DHALL_PATH = '/opt/seagate/cortx/hare/share/cfgen/dhall'
 DHALL_EXE = '/opt/seagate/cortx/hare/bin/dhall'
@@ -30,9 +31,12 @@ class PoolHandle:
 
 
 class CdfGenerator:
-    def __init__(self, provider: ValueProvider):
+    def __init__(self,
+                 provider: ValueProvider,
+                 motr_provider: ValueProvider):
         super().__init__()
         self.provider = provider
+        self.motr_provider = motr_provider
 
     def _get_dhall_path(self) -> str:
         if P.exists(DHALL_PATH):
@@ -176,7 +180,8 @@ class CdfGenerator:
                         DiskRef(
                             path=Text(device),
                             node=Maybe(
-                                Text(conf.get(f'server_node>{node}>hostname')),
+                                Text(conf.get(f'server_node>{node}>'
+                                              'network>data>private_fqdn')),
                                 'Text'))
                         for node in self._get_server_nodes(pool)
                         for device in self._get_devices(pool, node)
@@ -215,16 +220,28 @@ class CdfGenerator:
 
         return profiles
 
+    def _create_fdmi_filter_descriptions(
+            self, nodes: List[NodeDesc]) -> Maybe[List[FdmiFilterDesc]]:
+        return Maybe(None, 'List T.FdmiFilterDesc')
+
     def _get_cdf_dhall(self) -> str:
         dhall_path = self._get_dhall_path()
+        conf = self.provider
         nodes = self._create_node_descriptions()
         pools = self._create_pool_descriptions()
         profiles = self._create_profile_descriptions(pools)
+        fdmi_filters = self._create_fdmi_filter_descriptions(nodes)
+        create_aux = conf.get('cluster>create_aux',
+                              allow_null=True)
+        if create_aux is None:
+            create_aux = False
 
         params_text = str(
-            ClusterDesc(node_info=nodes,
+            ClusterDesc(create_aux=Maybe(create_aux, 'Bool'),
+                        node_info=nodes,
                         pool_info=pools,
-                        profile_info=profiles))
+                        profile_info=profiles,
+                        fdmi_filter_info=fdmi_filters))
         gencdf = Template(self._gencdf()).substitute(path=dhall_path,
                                                      params=params_text)
         return gencdf
@@ -276,14 +293,20 @@ class CdfGenerator:
                 f'storage>cvg[{cvg}]>data_devices')], 'List Text')
         return data_devices
 
-    def _get_metadata_device(self, name: str, cvg: int) -> Text:
-        metadata_device = Text(f'/dev/vg_{name}_md{cvg+1}'
-                               f'/lv_raw_md{cvg+1}')
+    def _get_metadata_device(self, name: str, cvg: int, m0d: int) -> Text:
+        motr_store = self.motr_provider
+        metadata_device = Text(motr_store.get(
+            f'server>{name}>cvg[{cvg}]>m0d[{m0d}]>md_seg1'))
         return metadata_device
+
+    def _get_m0d_per_cvg(self, name: str, cvg: int) -> int:
+        motr_store = self.motr_provider
+        return len(motr_store.get(f'server>{name}>cvg[{cvg}]>m0d'))
 
     def _create_node(self, machine_id: str) -> NodeDesc:
         store = self.provider
-        hostname = store.get(f'server_node>{machine_id}>hostname')
+        hostname = store.get(
+            f'server_node>{machine_id}>network>data>private_fqdn')
         name = store.get(f'server_node>{machine_id}>name')
         iface = self._get_iface(machine_id)
         try:
@@ -292,18 +315,20 @@ class CdfGenerator:
                 allow_null=True))
         except TypeError:
             no_m0clients = 2
+        # Currently, there is 1 m0d per cvg.
         # We will create 1 IO service entry in CDF per cvg.
         # An IO service entry will use data devices from corresponding cvg.
-        # meta data device is currently hardcoded.
+        # meta data device is taken from motr-hare shared store.
         servers = DList([
             M0ServerDesc(
                 io_disks=DisksDesc(
-                    data=self._get_data_devices(machine_id, i),
+                    data=self._get_data_devices(machine_id, cvg),
                     meta_data=Maybe(
-                        self._get_metadata_device(name, i), 'Text')),
+                        self._get_metadata_device(name, cvg, m0d), 'Text')),
                 runs_confd=Maybe(False, 'Bool'))
-            for i in range(len(store.get(
+            for cvg in range(len(store.get(
                 f'server_node>{machine_id}>storage>cvg')))
+            for m0d in range(self._get_m0d_per_cvg(name, cvg))
         ], 'List M0ServerDesc')
 
         # Adding a Motr confd entry per server node in CDF.
@@ -325,5 +350,5 @@ class CdfGenerator:
             # TODO in the future the value must be taken from a correct
             # ConfStore key (it doesn't exist now).
             s3_instances=int(
-                store.get(f'server_node>{machine_id}>s3_instances')),
+                store.get('cortx>software>s3>service>instances')),
             client_instances=no_m0clients)

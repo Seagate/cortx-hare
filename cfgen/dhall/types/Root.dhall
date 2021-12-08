@@ -25,8 +25,10 @@ in
 { id : Oid
 , mdpool : Oid
 , imeta_pver : Optional Oid
+, mdredundancy : Natural
 , nodes : List Oid
 , sites : List Oid
 , pools : List Oid
 , profiles : List Oid
+, fdmi_flt_grps : List Oid
 }

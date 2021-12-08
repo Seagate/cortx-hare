@@ -19,6 +19,7 @@
 import ctypes as c
 import logging
 import os
+import platform
 
 from typing import Optional
 from hax.types import FidStruct, HaNoteStruct, Uint128Struct
@@ -47,7 +48,8 @@ def make_array(ctr, some_list):
 class HaxFFI:
     def __init__(self):
         dirname = os.path.dirname(os.path.abspath(__file__))
-        lib_path = f'{dirname}/../../libhax.cpython-36m-x86_64-linux-gnu.so'
+        arch = platform.machine()
+        lib_path = f'{dirname}/../../libhax.cpython-36m-{arch}-linux-gnu.so'
         LOG.debug('Loading library from path: %s', lib_path)
         lib = c.cdll.LoadLibrary(lib_path)
         lib.init_motr_api.argtypes = [c.py_object, c.c_char_p]
@@ -95,6 +97,15 @@ class HaxFFI:
         lib.m0_ha_notify.restype = c.py_object
         self.ha_broadcast = lib.m0_ha_notify
 
+        lib.m0_ha_notify_hax_only.argtypes = [
+            c.c_void_p,  # unsigned long long ctx
+            c.POINTER(HaNoteStruct),  # struct m0_ha_note *notes
+            c.c_uint32,  # uint32_t nr_notes
+            c.c_char_p  # const char *hax_ep
+        ]
+        lib.m0_ha_notify_hax_only.restype = c.py_object
+        self.ha_broadcast_hax_only = lib.m0_ha_notify_hax_only
+
         lib.m0_ha_nvec_reply_send.argtypes = [
             c.c_void_p,  # unsigned long long  hax_msg
             c.POINTER(HaNoteStruct),  # struct m0_ha_note *notes
@@ -115,11 +126,6 @@ class HaxFFI:
             c.c_char_p  # const char *hax_ep
         ]
         self.hax_link_stopped = lib.m0_hax_link_stopped
-
-        lib.adopt_motr_thread.argtypes = []
-        lib.adopt_motr_thread.restype = c.c_int
-        self.adopt_motr_thread = lib.adopt_motr_thread
-        self.shun_motr_thread = lib.shun_motr_thread
 
         lib.m0_ha_filesystem_stats_fetch.argtypes = [c.c_void_p]
         lib.m0_ha_filesystem_stats_fetch.restype = c.py_object

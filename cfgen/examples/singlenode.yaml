@@ -1,6 +1,7 @@
 # Cluster Description File (CDF).
 # See `cfgen --help-schema` for the format description.
 
+create_aux: false # optional; supported values: "false" (default), "true"
 nodes:
   - hostname: localhost     # [user@]hostname
     data_iface: eth1        # name of data network interface
@@ -28,18 +29,18 @@ nodes:
       other: 2      # max quantity of other Motr clients this host may have
 pools:
   - name: the pool
-    #type: sns  # optional; supported values: "sns" (default), "dix", "md"
-    #disk_refs:
-    #  - { path: /dev/loop0, node: localhost }
-    #  - path: /dev/loop1
-    #  - path: /dev/loop2
-    #  - path: /dev/loop3
-    #  - path: /dev/loop4
-    #  - path: /dev/loop5
-    #  - path: /dev/loop6
-    #  - path: /dev/loop7
-    #  - path: /dev/loop8
-    #  - path: /dev/loop9
+    type: sns  # optional; supported values: "sns" (default), "dix", "md"
+    disk_refs:
+      - { path: /dev/loop0, node: localhost }
+      - { path: /dev/loop1, node: localhost }
+      - { path: /dev/loop2, node: localhost }
+      - { path: /dev/loop3, node: localhost }
+      - { path: /dev/loop4, node: localhost }
+      - { path: /dev/loop5, node: localhost }
+      - { path: /dev/loop6, node: localhost }
+      - { path: /dev/loop7, node: localhost }
+      - { path: /dev/loop8, node: localhost }
+      - { path: /dev/loop9, node: localhost }
     data_units: 1
     parity_units: 0
     spare_units: 0
@@ -47,3 +48,8 @@ pools:
 #profiles:
 #  - name: default
 #    pools: [ the pool ]
+#fdmi_filters:
+#  - name: test
+#    node: localhost
+#    client_index: 1
+#    substrings: ["Bucket-Name", "Object-Name", "Object-URI"]

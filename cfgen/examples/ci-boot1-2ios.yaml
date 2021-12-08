@@ -25,6 +25,17 @@ nodes:
         other: 2
 pools:
   - name: the pool
+    disk_refs:
+      - { path: /dev/loop0, node: localhost }
+      - { path: /dev/loop1, node: localhost }
+      - { path: /dev/loop2, node: localhost }
+      - { path: /dev/loop3, node: localhost }
+      - { path: /dev/loop4, node: localhost }
+      - { path: /dev/loop5, node: localhost }
+      - { path: /dev/loop6, node: localhost }
+      - { path: /dev/loop7, node: localhost }
+      - { path: /dev/loop8, node: localhost }
+      - { path: /dev/loop9, node: localhost }
     #type: sns  # optional; supported values: "sns" (default), "dix", "md"
     data_units: 1
     parity_units: 0

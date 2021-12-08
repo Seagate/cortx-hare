@@ -9,6 +9,7 @@ import itertools
 import json
 import os
 from pprint import pprint
+import psutil
 import random
 import re
 import socket
@@ -16,13 +17,53 @@ import subprocess
 import sys
 from typing import (Any, Callable, Dict, Iterable, Iterator, List, NamedTuple,
                     Optional, Set, Tuple)
+from math import floor, ceil
 import yaml
 import logging
+
+from dataclasses import dataclass
+
+
+# This class will hold info for disks mentioned in CDF file
+# One use case is to generate list of all disks present in CDF
+# file
+@dataclass
+class DiskRef():
+    node: str
+    path: str
 
 
 __version__ = '0.14'
 
 LOG = logging.getLogger('cfgen')
+
+faultToleranceInfo = NamedTuple('faultToleranceInfo', [
+                            ('max_drives_per_node', int),
+                            ('max_drives_per_ctrl', int),
+                            ('min_drives_per_node', int)])
+
+
+# Global variable aux_pools is used for storing aux pools list
+# Example of aux pool variable info :
+# {'the pool':
+#   [
+#     {
+#       'name': 'the pool-aux001',
+#       'data_units': 2,
+#       'parity_units': 2,
+#       'spare_units': 0,
+#       'disk_refs': [
+#         {'path': '/dev/sdb', 'node': 'ssc-vm-6327.colo.seagate.com'},
+#         {'path': '/dev/sdc', 'node': 'ssc-vm-6327.colo.seagate.com'},
+#         {'path': '/dev/sdb', 'node': 'ssc-vm-2493.colo.seagate.com'},
+#         {'path': '/dev/sdc', 'node': 'ssc-vm-2493.colo.seagate.com'}
+#       ]
+#     },
+#     { .. Similarly for 'the pool-aux002' and so on.
+#     }
+#   ]
+# }
+aux_pools: Dict[str, List[Dict[str, List[Dict[str, Any]]]]] = {}
 
 
 def repeat_on_cmd_timeout(max_retries=-1):
@@ -112,6 +153,7 @@ class ShowSchema(argparse.Action):
         print("""\
 # Cluster Description is a YAML file with the following schema:
 ---  # start of the document (optional)
+create_aux: <bool>    # optional, defaults to false if not present in CDF
 nodes:
   - hostname: <str>    # [user@]hostname; e.g., localhost, pod-c1
     data_iface: <str>  # name of network interface; e.g., eth1, eth1:c1
@@ -155,6 +197,24 @@ profiles:  # This section is optional.  If it is missing, a single "default"
            # profile referring to all pools will be created.
   - name: <str>
     pools: [ <str> ]
+
+# FDMI filter defines if an FDMI record would be sent from FDMI source to FDMI
+# plugin. Only M0_FDMI_FILTER_TYPE_KV_SUBSTRING filters are supported.
+#
+fdmi_filters:  # This section is optional.  If it is missing, no fdmi filters
+               # would be defined
+  - name: <str>  # Human-readable name of the filter
+    node: <str>  # Hostname of the node that hosts FDMI plugin
+                 # that would receive every FDMI record this filter matches
+    client_index: <int>  # 0-based index of the client that would be
+                         # the FDMI plugin. Only "other" clients could be FDMI
+                         # plugins. "s3" clients are not used to for this
+                         # index.
+                         # The client has to be defined in m0_clients section
+                         # already.
+    substrings: [ <str> ]  # List of strings for FDMI plugin to match
+                           # See m0_conf_fdmi_filter::ff_substrings
+                           # for the reference. May be empty or absent.
 ...  # end of the document (optional)""")
         sys.exit()
 
@@ -291,6 +351,8 @@ def validate_cluster_desc(desc: Dict[str, Any]) -> None:
     validate_pools_desc(desc['pools'])
     if 'profiles' in desc:
         validate_profiles_desc(desc['profiles'], desc['pools'])
+    if 'fdmi_filters' in desc and desc['fdmi_filters'] is not None:
+        validate_fdmi_filters_desc(desc['fdmi_filters'], desc['nodes'])
 
 
 def validate_nodes_desc(nodes_desc: List[Dict[str, Any]]) -> None:
@@ -453,6 +515,33 @@ def validate_profiles_desc(profiles_desc: List[Dict[str, Any]],
             f'Profile {name!r} has non-unique pool references'
 
 
+def validate_fdmi_filters_desc(fdmi_filters_desc: List[Dict[str, Any]],
+                               nodes_desc: List[Dict[str, Any]]) \
+        -> None:
+    assert all_unique(x['name'] for x in fdmi_filters_desc), \
+        'FDMI filter names are not unique:\n' + \
+        '\n'.join('  ' + x['name'] for x in fdmi_filters_desc)
+    assert all(x['name'] for x in fdmi_filters_desc), \
+        'FDMI filter name must not be empty'
+
+    Node = NamedTuple('Node', [('name', str), ('clients_nr', int)])
+    nodes = [Node(name=x['hostname'], clients_nr=x['m0_clients']['other'])
+             for x in nodes_desc]
+
+    for fdmi_filter_desc in fdmi_filters_desc:
+        node = fdmi_filter_desc['node']
+        client_index = fdmi_filter_desc['client_index']
+        assert node, f"FDMI filter {fdmi_filter_desc} " \
+            "doesn't refer to any node"
+        matching_nodes = [n for n in nodes if n.name == node]
+        assert len(matching_nodes) == 1, \
+            (f"FDMI filter have exactly one node: {fdmi_filter_desc}",
+             matching_nodes)
+        assert client_index < matching_nodes[0].clients_nr, \
+            "FDMI filter m0_clients index is out of bound: " \
+            f"client_index={client_index}, node={matching_nodes[0]}"
+
+
 @lru_cache(maxsize=1)
 def minion_id() -> Optional[str]:
     path = '/etc/salt/minion_id'
@@ -462,10 +551,23 @@ def minion_id() -> Optional[str]:
         return f.readline().strip()
 
 
+def get_all_local_addrs() -> List[str]:
+    interface_details = psutil.net_if_addrs()
+    ips = []
+    for iface in interface_details.values():
+        ips.append(iface[0].address)
+    return ips
+
+
 def is_localhost(hostname: str) -> bool:
     assert hostname
-    return hostname in ('localhost', '127.0.0.1', minion_id(),
-                        socket.gethostname(), socket.getfqdn())
+    m_id = minion_id()
+    ids = [m_id] if m_id is not None else []
+    ids.extend(get_all_local_addrs())
+    for item in socket.gethostbyname_ex(hostname):
+        if any(x in item for x in ids):
+            return True
+    return False
 
 
 @repeat_on_cmd_timeout(max_retries=-1)
@@ -476,9 +578,23 @@ def run_command(hostname: str, *args: str) -> str:
                                    timeout=15).decode()
 
 
+def validate_facter(hostname: str) -> None:
+    ver_str = run_command(hostname, 'facter', '--version')
+    # The output may contain commit id like this:
+    # 3.14.8 (commit 4339472f441868ecdae694ffc71e7c8ed0fc24e3)
+    ver_str = ver_str.split(' ')[0]
+
+    if version(ver_str) >= version('3.14.2'):
+        return
+    raise RuntimeError(
+        f'Unsupported facter version found at node {hostname}: {ver_str}. '
+        'Please use 3.14.2 or higher.')
+
+
 def get_facts(hostname: str, mock_p: bool, *args: str) -> Dict[str, Any]:
     if mock_p:
         return fabricate_facts(hostname, *args)
+    validate_facter(hostname)
     result: Dict[str, Any] = json.loads(
         run_command(hostname, 'facter', '--json', *args))
     return result
@@ -649,15 +765,18 @@ class ConfRoot(ToDhall):
     _downlinks = {Downlink('nodes', ObjT.node),
                   Downlink('sites', ObjT.site),
                   Downlink('pools', ObjT.pool),
-                  Downlink('profiles', ObjT.profile)}  # XXX + fdmi_flt_grps
+                  Downlink('profiles', ObjT.profile),
+                  Downlink('fdmi_flt_grps', ObjT.fdmi_flt_grp)}
 
     def __init__(self, nodes: List[Oid], sites: List[Oid], pools: List[Oid],
-                 profiles: List[Oid], mdpool: Oid = None,
-                 imeta_pver: Oid = None):
+                 profiles: List[Oid],
+                 fdmi_flt_grps: List[Oid], mdpool: Oid = None,
+                 mdredundancy: int = 0, imeta_pver: Oid = None):
         assert all(x.type is ObjT.node for x in nodes)
         assert all(x.type is ObjT.site for x in sites)
         assert all(x.type is ObjT.pool for x in pools)
         assert all(x.type is ObjT.profile for x in profiles)
+        assert all(x.type is ObjT.fdmi_flt_grp for x in fdmi_flt_grps)
         assert mdpool is None or mdpool.type is ObjT.pool
         assert imeta_pver is None or imeta_pver.type is ObjT.pver
 
@@ -665,7 +784,9 @@ class ConfRoot(ToDhall):
         self.sites = sites
         self.pools = pools
         self.profiles = profiles
+        self.fdmi_flt_grps = fdmi_flt_grps
         self.mdpool = mdpool
+        self.mdredundancy = mdredundancy
         self.imeta_pver = imeta_pver
 
     def __repr__(self):
@@ -673,7 +794,9 @@ class ConfRoot(ToDhall):
                           f'sites={self.sites}',
                           f'pools={self.pools}',
                           f'profiles={self.profiles}',
+                          f'fdmi_flt_grps={self.fdmi_flt_grps}',
                           f'mdpool={self.mdpool}',
+                          f'mdredundancy={self.mdredundancy}',
                           f'imeta_pver={self.imeta_pver}'])
         return f'{self.__class__.__name__}({args})'
 
@@ -684,18 +807,20 @@ class ConfRoot(ToDhall):
         args = ', '.join([
             f'id = {oid_to_dhall(oid)}',
             f'mdpool = {oid_to_dhall(self.mdpool)}',
+            f'mdredundancy = {self.mdredundancy}',
             f'imeta_pver = Some ({oid_to_dhall(self.imeta_pver)})',
             f'nodes = {oids_to_dhall(self.nodes)}',
             f'sites = {oids_to_dhall(self.sites)}',
             f'pools = {oids_to_dhall(self.pools)}',
-            f'profiles = {oids_to_dhall(self.profiles)}'
-        ])
+            f'profiles = {oids_to_dhall(self.profiles)}',
+            f'fdmi_flt_grps = {oids_to_dhall(self.fdmi_flt_grps)}'])
         return '{ %s }' % args
 
     @classmethod
     def build(cls, m0conf: Dict[Oid, Any]) -> Oid:
         root_id = new_oid(ObjT.root)
-        m0conf[root_id] = cls(nodes=[], sites=[], pools=[], profiles=[])
+        m0conf[root_id] = cls(nodes=[], sites=[], pools=[], profiles=[],
+                              fdmi_flt_grps=[])
         return root_id
 
 
@@ -1124,19 +1249,22 @@ def pool_type(pool_desc: Dict[str, Any]) -> PoolT:
     return PoolT[pool_desc.get('type', 'sns')]
 
 
+def cluster_svcs(m0conf: Dict[Oid, Any], svc_t) -> List[Oid]:
+    return [svc_id
+            for encl_id in m0conf if encl_id.type is ObjT.enclosure
+            for proc_id in m0conf[m0conf[encl_id].node].processes
+            for svc_id in m0conf[proc_id].services
+            if m0conf[svc_id].type is svc_t]
+
+
 def pool_drives(m0conf: Dict[Oid, Any],
-                pool_desc: Dict[str, Any]) -> List[Oid]:
+                pool_desc: Dict[str, Any],
+                cluster_desc: Dict[str, Any]) -> List[Oid]:
     ptype = pool_type(pool_desc)
 
     if ptype is PoolT.dix:
-        cas = []
-        for item in m0conf:
-            if item.type is ObjT.enclosure:
-                encl_id = item
-                for proc_id in m0conf[m0conf[encl_id].node].processes:
-                    for svc_id in m0conf[proc_id].services:
-                        if m0conf[svc_id].type is SvcT.M0_CST_CAS:
-                            cas.append((svc_id, m0conf[svc_id].ctrl_id))
+        cas = [(svc_id, m0conf[svc_id].ctrl_id)
+               for svc_id in cluster_svcs(m0conf, SvcT.M0_CST_CAS)]
 
         return [ConfDrive.build(m0conf, ctrl_id,
                                 ConfSdev.build(m0conf, svc_id,
@@ -1182,24 +1310,58 @@ def pool_drives(m0conf: Dict[Oid, Any],
     for drive_id, node_id in drives:
         if m0conf[drive_id].pvers:  # already assigned to some pool
             over_referenced.setdefault(node_id, []).append(drive_id)
-    if over_referenced:
-        err = '{} referred to by several pools:'.format(
-            'This disk is' if len(over_referenced) == 1 else 'These disks are')
-        for node_id in sorted(over_referenced):
-            err += '\n  ' + m0conf[node_id].name
-            for drive_id in sorted(over_referenced[node_id]):
-                err += '\n   \\_ ' + m0conf[m0conf[drive_id].sdev].filename
-        raise AssertionError(err)
+
+    # This optional variable added in CDF file to enable/disable aux pool
+    # generation. It defaults to false(i.e. do not generate any aux pools)
+    create_aux_val = cluster_desc.get('create_aux')
+    if not create_aux_val:
+        if over_referenced:
+            err = '{} referred to by several pools:'.format(
+                'This disk is' if len(over_referenced) == 1 else
+                'These disks are')
+            for node_id in sorted(over_referenced):
+                err += '\n  ' + m0conf[node_id].name
+                for drive_id in sorted(over_referenced[node_id]):
+                    err += '\n   \\_ ' + m0conf[m0conf[drive_id].sdev].filename
+            raise AssertionError(err)
 
     return [drive_id for drive_id, _ in drives]
 
 
-def cluster_encls(m0conf: Dict[Oid, Any]) -> List[Oid]:
-    encls: List[Oid] = []
-    for item in m0conf:
-        if item.type is ObjT.enclosure:
-            encls.append(item)
-    return encls
+def cluster_encls(m0conf: Dict[Oid, Any], svc_t) -> List[Oid]:
+    return list({encl_id
+                 for encl_id in m0conf if encl_id.type is ObjT.enclosure
+                 for proc_id in m0conf[m0conf[encl_id].node].processes
+                 for svc_id in m0conf[proc_id].services
+                 if m0conf[svc_id].type is svc_t})
+
+
+def cluster_ctrls(m0conf: Dict[Oid, Any]) -> List[Oid]:
+    return [m0conf[encl_id].ctrls
+            for encl_id in cluster_encls(m0conf, SvcT.M0_CST_IOS)]
+
+
+def drives_per_node_and_ctrl(m0conf: Dict[Oid, Any]) -> faultToleranceInfo:
+    max_drives_per_node = 0
+    max_drives_per_ctrl = 0
+    min_drives_per_node = 0
+    drives_per_node = 0
+    for encl_id in m0conf:
+        if encl_id.type is ObjT.enclosure:
+            for ctrl_id in m0conf[encl_id].ctrls:
+                drives_per_ctrl = len(m0conf[ctrl_id].drives)
+                drives_per_node += drives_per_ctrl
+                if max_drives_per_ctrl < drives_per_ctrl:
+                    max_drives_per_ctrl = drives_per_ctrl
+            if max_drives_per_node < drives_per_node:
+                max_drives_per_node = drives_per_node
+            if (min_drives_per_node == 0 or
+                    min_drives_per_node > drives_per_node):
+                min_drives_per_node = drives_per_node
+            drives_per_node = 0
+    return faultToleranceInfo(max_drives_per_node=max_drives_per_node,
+                              max_drives_per_ctrl=max_drives_per_ctrl,
+                              min_drives_per_node=min_drives_per_node)
 
 
 Failures = NamedTuple('Failures', [('site', int),
@@ -1248,8 +1410,50 @@ class ConfPool(ToDhall):
         return '{ %s }' % args
 
     @classmethod
+    def gen_sns_tolerance(cls, m0conf: Dict[Oid, Any],
+                          pool_desc: Dict[str, Any],
+                          cluster_desc: Dict[str, Any]) -> Failures:
+        encls_nr = len(cluster_encls(m0conf, SvcT.M0_CST_IOS))
+        ctrls_per_encl = floor(len(cluster_ctrls(m0conf)) / encls_nr)
+        data_units = pool_desc['data_units']
+        parity_units = pool_desc['parity_units']
+        spare_units = pool_desc.get('spare_units', 0)
+        total_units = data_units + parity_units + spare_units
+        fault_tol_info = drives_per_node_and_ctrl(m0conf)
+        min_pool_width = fault_tol_info.min_drives_per_node * encls_nr
+        actual_pool_width = len(pool_drives(m0conf, pool_desc, cluster_desc))
+        if ((min_pool_width < actual_pool_width) and
+                (min_pool_width / total_units) > 0):
+            # Pool is asymmetric, all the nodes don't have same number of
+            # drives.
+            # if (min_pool_width / total_units) > 0 means that one of the
+            # nodes can probably get more than K units of a parity group.
+            # Thus we cannot allow node failures.
+            enc_failure_allowed = 0
+            if fault_tol_info.max_drives_per_ctrl > parity_units:
+                ctrl_failure_allowed = 0
+        else:
+            enc_failure_allowed_FP = parity_units / ceil(total_units /
+                                                         encls_nr)
+            enc_failure_allowed = floor(enc_failure_allowed_FP)
+            temp = ctrls_per_encl * enc_failure_allowed
+            ctrl_failure_allowed = min(temp, parity_units)
+        return Failures(0, 0, enc_failure_allowed, ctrl_failure_allowed,
+                        parity_units)
+
+    @classmethod
+    def gen_md_tolerance(cls, m0conf: Dict[Oid, Any],
+                         pool_desc: Dict[str, Any]) -> Failures:
+        encls_nr = len(cluster_encls(m0conf, SvcT.M0_CST_IOS))
+        ctrls_per_encl = floor(len(cluster_ctrls(m0conf)) / encls_nr)
+        encl_failures = encls_nr - 1
+        ctrl_failures = min(encl_failures, (ctrls_per_encl * encl_failures))
+        return Failures(0, 0, encl_failures, ctrl_failures, encl_failures)
+
+    @classmethod
     def build(cls, m0conf: Dict[Oid, Any], parent: Oid,
-              pool_desc: Dict[str, Any]) -> Oid:
+              pool_desc: Dict[str, Any],
+              cluster_desc: Dict[str, Any]) -> Oid:
         assert parent.type is ObjT.root
 
         pool_id = new_oid(ObjT.pool)
@@ -1264,7 +1468,7 @@ class ConfPool(ToDhall):
         if spare_units is None:
             spare_units = pool_desc.get('parity_units')
 
-        drives = pool_drives(m0conf, pool_desc)
+        drives = pool_drives(m0conf, pool_desc, cluster_desc)
         t = pool_type(pool_desc)
         assert ('data_units' in pool_desc) == ('parity_units' in pool_desc)
         if 'data_units' in pool_desc:
@@ -1279,23 +1483,27 @@ class ConfPool(ToDhall):
                 # indivisible pieces of data, the whole CAS record is
                 # always stored on one node.
                 data_units = 1
-                parity_units = len(cluster_encls(m0conf)) - 1
+                parity_units = len(cluster_encls(m0conf, SvcT.M0_CST_CAS)) - 1
             else:
                 assert t is PoolT.md
-                data_units = 1  # len(drives)
-                parity_units = len(cluster_encls(m0conf)) - 1
-            pd_attrs = PDClustAttrs0(
-                data_units=data_units, parity_units=parity_units,
-                spare_units=0)
+                data_units = 1
+                parity_units = len(cluster_encls(m0conf, SvcT.M0_CST_IOS)) - 1
+            pd_attrs = PDClustAttrs0(data_units=data_units,
+                                     parity_units=parity_units,
+                                     spare_units=0)
         d = pool_desc.get('allowed_failures')
-        if t in (PoolT.sns, PoolT.dix) and d:
-            tolerance = Failures(d['site'], d['rack'], d['encl'], d['ctrl'],
-                                 d['disk'])
+        if t in (PoolT.sns, PoolT.dix):
+            if d:
+                tolerance = Failures(d['site'], d['rack'], d['encl'],
+                                     d['ctrl'], d['disk'])
+            else:
+                if t == PoolT.dix:
+                    tolerance = ConfPool.gen_md_tolerance(m0conf, pool_desc)
+                else:
+                    tolerance = ConfPool.gen_sns_tolerance(m0conf, pool_desc,
+                                                           cluster_desc)
         else:
-            md_allowed_failures = len(cluster_encls(m0conf)) - 1
-            tolerance = Failures(0, 0, min(1, md_allowed_failures),
-                                 min(1, md_allowed_failures),
-                                 md_allowed_failures)
+            tolerance = ConfPool.gen_md_tolerance(m0conf, pool_desc)
 
         pver = ConfPver.build(m0conf, pool_id, pd_attrs, drives, tolerance)
         if t is PoolT.dix:
@@ -1306,13 +1514,7 @@ class ConfPool(ToDhall):
             m0conf[parent].mdpool = pool_id
         else:
             assert t is PoolT.sns
-            d = pool_desc.get('allowed_failures')
-            for v in gen_allowances(Failures(0, 0, 0, 0, 0) if d is None else
-                                    Failures(d['site'],
-                                             d['rack'],
-                                             d['encl'],
-                                             d['ctrl'],
-                                             d['disk'])):
+            for v in gen_allowances(tolerance):
                 ConfPverF.build(m0conf, pool_id, base=pver, allowance=v)
 
         return pool_id
@@ -1614,6 +1816,93 @@ class ConfProfile(ToDhall):
         return prof_id
 
 
+class ConfFdmiFltGrp(ToDhall):
+    _objt = ObjT.fdmi_flt_grp
+    _downlinks: Set[Downlink] = set()
+
+    def __init__(self, rec_type: int, fdmi_filters: List[Oid]):
+        assert all(x.type is ObjT.fdmi_filter for x in fdmi_filters)
+        self.rec_type = rec_type
+        self.fdmi_filters = fdmi_filters
+
+    def __repr__(self):
+        args = ', '.join([f'rec_type={self.rec_type}',
+                          f'fdmi_filters={self.fdmi_filters!r}'])
+        return f'{self.__class__.__name__}({args})'
+
+    def to_dhall(self, oid: Oid) -> str:
+        assert oid.type is ObjT.fdmi_flt_grp
+        args = ', '.join([f'id = {oid_to_dhall(oid)}',
+                          f'rec_type = {self.rec_type}',
+                          f'filters = {oids_to_dhall(self.fdmi_filters)}'])
+        return f'{{ {args} }}'
+
+    @classmethod
+    def build(cls, m0conf: Dict[Oid, Any], parent: Oid,
+              fdmi_filter_desc: Dict[str, Any],
+              other_clients: Dict[str, List[Tuple[Oid, Oid]]]) -> Oid:
+        assert parent.type is ObjT.root
+
+        fdmi_flt_grp_id = new_oid(ObjT.fdmi_flt_grp)
+        fdmi_filter_oid = ConfFdmiFilter.build(
+            m0conf, parent, fdmi_flt_grp_id, fdmi_filter_desc, other_clients)
+        # rec_type=0x1000 is M0_FDMI_REC_TYPE_FOL
+        m0conf[fdmi_flt_grp_id] = cls(rec_type=0x1000,
+                                      fdmi_filters=[fdmi_filter_oid])
+        m0conf[parent].fdmi_flt_grps.append(fdmi_flt_grp_id)
+        return fdmi_flt_grp_id
+
+
+class ConfFdmiFilter(ToDhall):
+    _objt = ObjT.fdmi_filter
+    _downlinks: Set[Downlink] = set()
+
+    def __init__(self, dix_pver: Oid, node: Oid,
+                 substrings: List[str], endpoint: str):
+        self.dix_pver = dix_pver
+        self.node = node
+        self.substrings = substrings
+        self.endpoint = endpoint
+
+    def __repr__(self):
+        args = ', '.join([f'dix_pver={self.dix_pver}',
+                          f'substrings={self.substrings}]',
+                          f'endpoint={self.endpoint}'])
+        return f'{self.__class__.__name__}({args})'
+
+    def to_dhall(self, oid: Oid) -> str:
+        assert oid.type is ObjT.fdmi_filter
+
+        substrings = '[' + ', '.join([f'"{s}"' for s in self.substrings]) + ']'
+        args = ', '.join([f'id = {oid_to_dhall(oid)}',
+                          # 2 is M0_FDMI_FILTER_TYPE_KV_SUBSTRING
+                          'filter_type = 2',
+                          f'filter_id = {oid_to_dhall(oid)}',
+                          'filter_root = ""',
+                          f'node = {oid_to_dhall(self.node)}',
+                          f'dix_pver = {oid_to_dhall(self.dix_pver)}',
+                          f'substrings = {substrings} : List Text',
+                          f'endpoints = ["{self.endpoint}"]'])
+        return f'{{ {args} }}'
+
+    @classmethod
+    def build(cls, m0conf: Dict[Oid, Any], root: Oid, parent: Oid,
+              fdmi_filter_desc: Dict[str, Any],
+              other_clients: Dict[str, List[Tuple[Oid, Oid]]]) -> Oid:
+        assert parent.type is ObjT.fdmi_flt_grp
+
+        fdmi_filter_oid = new_oid(ObjT.fdmi_filter)
+        node_oid, process_oid = other_clients[
+            fdmi_filter_desc['node']][int(fdmi_filter_desc['client_index'])]
+        process = m0conf[process_oid]
+        m0conf[fdmi_filter_oid] = cls(
+            dix_pver=m0conf[root].imeta_pver,
+            node=node_oid,
+            substrings=fdmi_filter_desc['substrings'],
+            endpoint=str(process.endpoint))
+        return fdmi_filter_oid
+
+
 ConsulAgent = NamedTuple('ConsulAgent', [('node_name', str), ('ipaddr', str)])
 
 Cluster = NamedTuple('Cluster', [('m0conf', Dict[Oid, Any]),
@@ -1747,6 +2036,7 @@ def generate_consul_kv(cluster: Cluster, dhall_dir: str) -> str:
         ('eq-epoch', 1),
         ('leader', ''),
         ('last_fidk', _fidk_gen),
+        ('failvec', ''),
         *[('m0conf/pools/' + oid_to_fidstr(pool_id), m0conf[pool_id]._name)
           for pool_id in sns_pools()],
         *[('m0conf/profiles/' + oid_to_fidstr(prof_id),
@@ -1812,6 +2102,136 @@ def validate_m0conf(m0conf: Dict[Oid, Any]) -> None:
                for _rel, children in rel_children.items())
 
 
+# This function will return list of disks present in provided pool
+# It will return None if 'disk_refs' is not present in pool
+def get_pool_diskrefs(pool_desc: Dict[str, Any]):
+    return pool_desc.get('disk_refs')
+
+
+# AUX Pools :
+# This feature is developed considering the node (enclosure) failure
+# case. If a node in the cluster fails, it means that all the disks
+# in that node become inaccessible. As this feature considers only
+# node failures, it keeps the spare pools ready considering the
+# other alive nodes from the cluster.
+# The feature works using the mathematical combinations formula
+# C(n, r) = (n! / (r!(n-r)!)).
+# It basically creates combinations of all the nodes in case of
+# failures of nodes from 1 to the allowed number of nodes to be
+# failed, by allowance vector.
+# For each and every such generated combinations of (alive) nodes,
+# it creates the sets of the disks and assigns a pool to each of
+# them. Such spare pools created considering allowed node failures
+# are called as aux pools.
+
+# Function : aux_pool_list() :
+# Description : Generate the aux pools sets
+# Inputs :
+# pool_desc : Pools in the cluster description
+# m0conf : Configuration
+# Outputs : None
+# Saves generated aux pools list in aux_pools[]
+
+def aux_pool_list(pool_desc: Dict[str, Any],
+                  disks: List[DiskRef],
+                  m0conf: Dict[Oid, Any],
+                  cluster_desc: Dict[str, Any]) -> None:
+    pool = pool_desc
+
+    # Example of encl_ref_combination :
+    # [
+    #   ['ssc-vm-6327.colo.seagate.com', 'ssc-vm-2493.colo.seagate.com'],
+    #   ['ssc-vm-6327.colo.seagate.com', 'ssc-vm-6328.colo.seagate.com'],
+    #   ['ssc-vm-2493.colo.seagate.com', 'ssc-vm-6328.colo.seagate.com']
+    # ]
+    encl_ref_combination: List[List[str]] = []
+
+    # Example of disk_ref_combinations :
+    # [
+    #   [
+    #     {'path': '/dev/sdb', 'node': 'ssc-vm-6327.colo.seagate.com'},
+    #     {'path': '/dev/sdc', 'node': 'ssc-vm-6327.colo.seagate.com'},
+    #     {'path': '/dev/sdb', 'node': 'ssc-vm-2493.colo.seagate.com'},
+    #     {'path': '/dev/sdc', 'node': 'ssc-vm-2493.colo.seagate.com'}
+    #   ],
+    #   [ ... Similarly for other sets.
+    #   ]
+    # ]
+    disk_ref_combinations: List[List[Dict[str, Any]]] = []
+
+    # Example of pool_nodes :
+    # [
+    #  'ssc-vm-6327.colo.seagate.com',
+    #  'ssc-vm-2493.colo.seagate.com',
+    #  'ssc-vm-6328.colo.seagate.com'
+    # ]
+    pool_nodes: List[str] = []
+
+    tolerance: Failures
+    pool_t = pool_type(pool)
+
+    # Currently assumption is that, aux pools will be generated for
+    # SNS pools only
+    assert pool_t == PoolT.sns
+
+    # Calculate and create aux pool disk combinations
+    # only for SNS pool type
+    d = pool.get('allowed_failures')
+    # Calculate the tolerance in case of SNS pools
+    if d:
+        tolerance = Failures(d['site'], d['rack'], d['encl'],
+                             d['ctrl'], d['disk'])
+    else:
+        tolerance = ConfPool.gen_sns_tolerance(m0conf, pool, cluster_desc)
+    # Generate the node combinations considering node failures as
+    # allowed by node tolerance values
+    temp_pool_nodes = []
+
+    disk_refs = get_pool_diskrefs(pool)
+    if disk_refs is None:
+        for disk in disks:
+            temp_pool_nodes += [
+                disk.node]
+    else:
+        for nodes in disk_refs:
+            temp_pool_nodes += [
+                nodes['node']]
+    pool_nodes = list(set(temp_pool_nodes))
+    for encl_failures in range(tolerance.enclosure, 0, -1):
+        encl_ref_combination += [
+            list(x) for x in itertools.combinations(
+                pool_nodes,
+                (len(pool_nodes) - encl_failures))
+        ]
+
+    # Create the disk references for the generated
+    # node combinations
+    for encl in encl_ref_combination:
+        single_aux_comb: List[Dict[str, Any]] = []
+        for encl_x in encl:
+            if disk_refs is None:
+                for disk in disks:
+                    if disk.node == encl_x:
+                        data = {}
+                        data['node'] = disk.node
+                        data['path'] = disk.path
+                        single_aux_comb += [data]
+            else:
+                for dr in disk_refs:
+                    if dr['node'] == encl_x:
+                        single_aux_comb += [dr]
+        disk_ref_combinations += [single_aux_comb]
+    # Create list of auxilary pools
+    aux_pools[pool['name']] = [
+        {'name':         pool['name'] + f'-aux{i:003}',
+         'data_units':   pool['data_units'] - pool['parity_units'],
+         'parity_units': pool['parity_units'],
+         'spare_units':  pool['spare_units'],
+         'disk_refs':    comb}
+        for i, comb in enumerate(disk_ref_combinations, start=1)
+    ]
+
+
 def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
     cluster = Cluster(m0conf={}, consul_servers=[], consul_clients=[],
                       m0_clients={})
@@ -1820,6 +2240,8 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
     # XXX Move all the logic into ConfRoot.build?
 
     rack_id = ConfRack.build(conf, ConfSite.build(conf, root_id))
+
+    other_clients: Dict[str, List[Tuple[Oid, Oid]]] = {}
 
     for node in cluster_desc['nodes']:
         node_id = ConfNode.build(conf, root_id, node)
@@ -1853,18 +2275,65 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
             for _ in range(node['m0_clients'][client_t]):
                 proc_id = ConfProcess.build(conf, node_id, node, proc_t)
                 cluster.m0_clients[proc_id] = new_oid(ObjT.service)
+                if client_t == 'other':
+                    if node['hostname'] not in other_clients:
+                        other_clients[node['hostname']] = []
+                    other_clients[node['hostname']].append((node_id, proc_id))
 
-    for pool in cluster_desc['pools']:
-        ConfPool.build(conf, root_id, pool)
+    create_aux_val = cluster_desc.get('create_aux')
+    if not create_aux_val:
+        for pool in cluster_desc['pools']:
+            ConfPool.build(conf, root_id, pool, cluster_desc)
+    else:
+        for pool in cluster_desc['pools']:
+            pool_t = pool_type(pool)
+            if pool_t == PoolT.sns:
+                # For SNS pools create the aux pool list
+                disks: List[DiskRef] = []
+                # We need to generate disk_refs only if it is not present
+                # in pool description
+                if not get_pool_diskrefs(pool):
+                    for node in cluster_desc['nodes']:
+                        if not node.get('m0_servers'):
+                            continue
+                        for m0d in node['m0_servers']:
+                            if m0d['runs_confd']:
+                                continue
+                            for d in m0d['io_disks']['data']:
+                                disks.append(DiskRef(path=d,
+                                                     node=node['hostname']))
+
+                aux_pool_list(pool, disks, conf, cluster_desc)
+            else:
+                ConfPool.build(conf, root_id, pool, cluster_desc)
+
+        for pool in itertools.chain(cluster_desc['pools'],
+                                    *aux_pools.values()):
+            pool_t = pool_type(pool)
+            if pool_t == PoolT.sns:
+                ConfPool.build(conf, root_id, pool, cluster_desc)
 
     if conf[root_id].imeta_pver is None:  # no DIX pool defined in the CDF
-        ConfPool.build(conf, root_id, {'type': 'dix'})
+        ConfPool.build(conf, root_id, {'type': 'dix'}, cluster_desc)
 
     if conf[root_id].mdpool is None:  # no Metadata pool defined in the CDF
-        ConfPool.build(conf, root_id, {'type': 'md'})
+        ConfPool.build(conf, root_id, {'type': 'md'}, cluster_desc)
+
+    conf[root_id].mdredundancy = len(cluster_encls(conf, SvcT.M0_CST_IOS))
 
     for prof in cluster_desc['profiles']:
-        ConfProfile.build(conf, root_id, prof)
+        if not create_aux_val:
+            ConfProfile.build(conf, root_id, prof)
+        else:
+            prof['pools'] += [aux_pool['name']
+                              for pool_name in prof['pools']
+                              for aux_pool in aux_pools.get(pool_name, [])]
+            ConfProfile.build(conf, root_id, prof)
+
+    if 'fdmi_filters' in cluster_desc:
+        if cluster_desc['fdmi_filters'] is not None:
+            for fdmi_filter in cluster_desc['fdmi_filters']:
+                ConfFdmiFltGrp.build(conf, root_id, fdmi_filter, other_clients)
 
     validate_m0conf(conf)
     assert cluster.consul_servers

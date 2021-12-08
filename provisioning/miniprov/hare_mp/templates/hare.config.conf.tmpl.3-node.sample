@@ -11,6 +11,11 @@
               "data": "4",
               "parity": "2",
               "spare": "2"
+            },
+            "dix": {
+              "data": "1",
+              "parity": "2",
+              "spare": "0"
             }
           },
           "name": "storage1",
@@ -29,9 +34,14 @@
         "service": {
           "client_instances": "2"
         }
+      },
+      "s3": {
+        "service": {
+          "instances": "1"
+        }
       }
     }
-  },      
+  },   
   "server_node": {
     "1114a50a6bf6f9c93ebd3c49d07d3fd4": {
       "cluster_id": "my-cluster",
@@ -40,13 +50,13 @@
       "network": {
         "data": {
           "interface_type": "tcp",
+          "private_fqdn": "srvnode-1.data.private",
           "private_interfaces": [
             "eth0",
             "eno2"
           ]
         }
       },
-      "s3_instances": "1",
       "storage_set_id": "storage1",
       "storage": {
         "cvg_count": "2",
@@ -81,13 +91,13 @@
       "network": {
         "data": {
           "interface_type": "tcp",
+          "private_fqdn": "srvnode-2.data.private",
           "private_interfaces": [
             "eth0",
             "eno2"
           ]
         }
       },
-      "s3_instances": "1",
       "storage_set_id": "storage1",
       "storage": {
         "cvg_count": "2",
@@ -122,13 +132,13 @@
       "network": {
         "data": {
           "interface_type": "tcp",
+          "private_fqdn": "srvnode-3.data.private",
           "private_interfaces": [
             "eth0",
             "eno2"
           ]
         }
       },
-      "s3_instances": "1",
       "storage_set_id": "storage1",
       "storage": {
         "cvg_count": "2",

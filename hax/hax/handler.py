@@ -30,7 +30,7 @@ from hax.motr import Motr
 from hax.motr.delivery import DeliveryHerald
 from hax.motr.planner import WorkPlanner
 from hax.queue.publish import EQPublisher
-from hax.types import (ConfHaProcess, HaLinkMessagePromise, HAState, MessageId,
+from hax.types import (ConfHaProcess, HAState, MessageId,
                        ObjT, ServiceHealth, StoppableThread, m0HaProcessEvent,
                        m0HaProcessType)
 from hax.util import ConsulUtil, dump_json, repeat_if_fails
@@ -76,7 +76,7 @@ class ConsumerThread(StoppableThread):
                     ServiceHealth.OK),
             (m0HaProcessType.M0_CONF_HA_PROCESS_M0MKFS,
                 m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED): (
-                    ServiceHealth.STOPPED),
+                    ServiceHealth.FAILED),
             (m0HaProcessType.M0_CONF_HA_PROCESS_M0D,
                 m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED): (
                     ServiceHealth.OK),
@@ -89,12 +89,27 @@ class ConsumerThread(StoppableThread):
             (m0HaProcessType.M0_CONF_HA_PROCESS_OTHER,
                 m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED): (
                     ServiceHealth.FAILED)}
-        self.consul.update_process_status(event)
         if event.chp_event in (m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED,
                                m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED):
             svc_status = motr_to_svc_status[(event.chp_type, event.chp_event)]
+            broadcast_hax_only = False
+            if ((event.chp_type ==
+                 m0HaProcessType.M0_CONF_HA_PROCESS_M0MKFS) or
+               (event.fid == self.consul.get_hax_fid())):
+                # Motr-mkfs processes do not require updates on their peer
+                # mkfs processes. Motr-mkfs is an independent and typically a
+                # one-time operation. So avoid broadcasting a motr-mkfs state
+                # to the peer motr-mkfs processes but hax still needs to be
+                # notified in-order to disconnect the hax-motr halink when
+                # motr-mkfs process stops.
+                broadcast_hax_only = True
+
+            LOG.debug('chp_type %d broadcast_hax_only %s', event.chp_type,
+                      broadcast_hax_only)
             motr.broadcast_ha_states(
-                [HAState(fid=event.fid, status=svc_status)])
+                [HAState(fid=event.fid, status=svc_status)],
+                broadcast_hax_only=broadcast_hax_only)
+        self.consul.update_process_status(event)
 
     @repeat_if_fails(wait_seconds=1)
     def update_process_failure(self, planner: WorkPlanner,
@@ -118,28 +133,17 @@ class ConsumerThread(StoppableThread):
                         # notifications, it may cause delay in cleanup
                         # activities.
                         continue
-                if current_status == ServiceHealth.UNKNOWN:
-                    # We got service status as UNKNOWN, that means hax was
-                    # notified about process failure but hax couldn't
-                    # confirm if the process is in failed state or have
-                    # failed and restarted. So, we will not loose the
-                    # event and try again to confirm the real time
-                    # process status by enqueing a broadcast event
-                    # specific to this process.
-                    # It is expected that the process status gets
-                    # eventually confirmed as either failed or passing (OK).
-                    # This situation typically arises due to delay
-                    # in receiving failure notification during which the
-                    # corresponding process might be restarting or have
-                    # already restarted. Thus it is important to confirm
-                    # the real time status of the process before
-                    # broadcasting failure.
-                    current_status = ServiceHealth.UNKNOWN
-                    planner.add_command(
-                        BroadcastHAStates(states=[
-                            HAState(fid=state.fid, status=ServiceHealth.FAILED)
-                        ],
-                            reply_to=None))
+                # XXX:
+                # Sometime, there can be situation where Consul event is sent
+                # and can be delayed, where state reported by Consul for a
+                # given process can be in its past already, e.g. consul
+                # reported process failure but when hax received the event,
+                # process might have already restarted. In this case the event
+                # still needs to be handled. Also, it is possible that Consul
+                # reported failure but process status is not yet updated in
+                # Consul services catalog, in such a case the reported status
+                # can be true and cannot be just dropped. These scenarios must
+                # be re-visited.
                 if current_status not in (ServiceHealth.UNKNOWN,
                                           ServiceHealth.OFFLINE):
                     # We also need to account and report the failure of remote
@@ -167,7 +171,6 @@ class ConsumerThread(StoppableThread):
 
     def _do_work(self, planner: WorkPlanner, motr: Motr):
         LOG.info('Handler thread has started')
-        motr.adopt_motr_thread()
 
         try:
             while True:
@@ -178,17 +181,6 @@ class ConsumerThread(StoppableThread):
 
                     LOG.debug('Got %s message from planner', item)
                     if isinstance(item, FirstEntrypointRequest):
-                        LOG.debug('first entrypoint request, broadcast FAILED')
-                        ids: List[MessageId] = motr.broadcast_ha_states(
-                            [
-                                HAState(fid=item.process_fid,
-                                        status=ServiceHealth.FAILED)
-                            ],
-                            notify_devices=False)
-                        LOG.debug('waiting for broadcast of %s for ep: %s',
-                                  ids, item.remote_rpc_endpoint)
-                        # Wait for failure delivery.
-                        self.herald.wait_for_all(HaLinkMessagePromise(ids))
                         motr.send_entrypoint_request_reply(
                             EntrypointRequest(
                                 reply_context=item.reply_context,
@@ -279,6 +271,5 @@ class ConsumerThread(StoppableThread):
             LOG.info('Consumer Stopped')
             if self.idx == 0:
                 motr.stop()
-            motr.shun_motr_thread()
         finally:
             LOG.info('Handler thread has exited')
