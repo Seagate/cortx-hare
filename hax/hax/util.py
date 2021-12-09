@@ -825,6 +825,21 @@ class ConsulUtil:
 
     @repeat_if_fails()
     @uses_consul_cache
+    def get_node_name_by_machineid(self,
+                                   machineid: str,
+                                   kv_cache=None) -> Optional[str]:
+        """
+        Returns the node name by its machine id value or None if the given
+        machine id doesn't correspond to any node.
+        """
+        mid_key = self.kv.kv_get(machineid, kv_cache=kv_cache)
+        if mid_key:
+            name: bytes = mid_key['Value']
+            return name.decode('utf-8')
+        return None
+
+    @repeat_if_fails()
+    @uses_consul_cache
     def get_node_ctrl_fids(self,
                            node: str,
                            kv_cache=None) -> Optional[List[Fid]]:

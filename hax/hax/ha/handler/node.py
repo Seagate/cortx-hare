@@ -50,12 +50,16 @@ class NodeEventHandler(EventHandler):
         self.planner = planner
 
     def handle(self, msg: Event) -> None:
-        node_fid = self.cns.get_node_fid(msg.node_id)
-        if not node_fid:
-            LOG.warn('Unknown [node_id=%s] provided. HA event is ignored',
-                     msg.node_id)
+        node_name = self.cns.get_node_name_by_machineid(msg.resource_id)
+        if not node_name:
+            LOG.warn('Unknown [resource_id=%s] provided. HA event is ignored',
+                     msg.resource_id)
             return
-
+        node_fid = self.cns.get_node_fid(node_name)
+        if not node_fid:
+            LOG.warn('Unknown [node_name=%s] provided. HA event is ignored',
+                     node_name)
+            return
         get_health = self._get_status_by_text
 
         self.planner.add_command(

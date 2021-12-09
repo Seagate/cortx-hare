@@ -22,8 +22,8 @@ from typing import List, Optional
 
 from cortx.utils.message_bus import MessageBus, MessageConsumer
 
-from ha.core.event_manager.event_manager import EventManager
 from ha.core.event_manager.subscribe_event import SubscribeEvent
+from ha.core.event_manager.const import EVENT_MANAGER_KEYS
 
 COMPONENT_ID = 'hare'
 
@@ -70,7 +70,6 @@ class EventListener():
         group_id - the group_id to pass to KafkaConsumer.
         """
         logging.debug('Inside EventListener')
-        self.event_manager = EventManager.get_instance()
 
         topic = self._subscribe(event_list)
         if topic is None:
@@ -89,13 +88,17 @@ class EventListener():
     def _subscribe(self, event_list: List[SubscribeEvent]) -> str:
         logging.info('Subscribing to events: %s', event_list)
         # TODO create a PR for cortx-ha. The type annotation seems to be wrong
-        kafka_topic_name = str(
-            self.event_manager.subscribe(COMPONENT_ID, event_list))
-        return kafka_topic_name
+
+        # HA functionality won't work in containers. Hare is the only
+        # subscriber to HA's event manager, and the topic name is hardcoded,
+        # in HA code. So, topic prefix is imported which is in format
+        # 'ha_event_<component_id>'
+        ha_topic_prefix = str(EVENT_MANAGER_KEYS.MESSAGE_TYPE_VALUE.value)
+        topic = ha_topic_prefix.replace("<component_id>", COMPONENT_ID)
+        return topic
 
     def unsubscribe(self, event_list: List[str]):
         logging.info('Unsubscribing for events: %s', event_list)
-        self.event_manager.unsubscribe(COMPONENT_ID, event_list)
 
     def get_next_message(self, time_out) -> Optional[Event]:
         """
@@ -104,7 +107,14 @@ class EventListener():
         acknowledge that message is already processed
         """
         logging.debug('Listening......')
-        message = self.consumer.receive(time_out)
+        try:
+            # HA container may come up later than hax container, and then
+            # register the topic online. We need to wait for it to be
+            # available.
+            message = self.consumer.receive(time_out)
+        except Exception:
+            logging.warning('Subscribed topic not available. Waiting...')
+            return None
         # FIXME: it seems like receive() returns bytes, not str
         # ..while it is annotated as returning 'list'. Funny.
         if message is not None:
