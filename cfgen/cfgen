@@ -972,7 +972,7 @@ class ConfNode(ToDhall):
     _downlinks = {Downlink('processes', ObjT.process)}
 
     def __init__(self, name: str, nr_cpu: int, memsize_MB: int,
-                 processes: List[Oid], machine_id: str = None):
+                 processes: List[Oid], machine_id: Optional[str] = None):
         self.name = name
         self.nr_cpu = nr_cpu
         self.memsize_MB = memsize_MB
