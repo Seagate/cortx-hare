@@ -40,7 +40,7 @@ class StubEventThread(StoppableThread):
 
     def _execute(self):
         LOG.info('cortx-ha component is not present. HaX will '
-                 'contunie working without HA integration')
+                 'continue working without HA integration')
 
 
 def create_ha_thread(planner: WorkPlanner,
