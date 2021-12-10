@@ -18,6 +18,8 @@
 
 import asyncio
 import logging
+import os
+import sys
 from json.decoder import JSONDecodeError
 from queue import Queue
 from typing import Any, Callable, Dict, List, Type, Union
@@ -39,12 +41,41 @@ from hax.queue.confobjutil import ConfObjUtil
 from hax.queue.offset import InboxFilter, OffsetStorage
 from hax.types import Fid, HAState, ServiceHealth, StoppableThread
 from hax.util import ConsulUtil, create_process_fid, dump_json
-
+from helper.exec import Executor, Program
 LOG = logging.getLogger('hax')
 
 
 async def hello_reply(request):
     return json_response(text="I'm alive! Sincerely, HaX")
+
+
+def get_python_env():
+    path = os.environ['PATH']
+    py_path = ':'.join(sys.path)
+    if 'PYTHONPATH' in os.environ:
+        env_var = os.environ['PYTHONPATH']
+        py_path = f'{env_var}:{py_path}'
+    env = {
+        'PATH':
+        ':'.join([
+            '/opt/seagate/cortx/hare/bin',
+            '/opt/seagate/cortx/hare/libexec', path
+        ]),
+        'PYTHONPATH':
+        py_path
+    }
+    return env
+
+
+def hctl_stat(request):
+    """This function calls the hare-status script from the hax-server in order
+    to provide CSM with an endpoint to get the hctl status --json data.
+    """
+    exec = Executor()
+    env = get_python_env()
+    result = exec.run(Program(["/opt/seagate/cortx/hare/libexec/hare-status",
+                      "--json"]), env=env)
+    return json_response(text=result)
 
 
 def to_ha_states(data: Any, consul_util: ConsulUtil) -> List[HAState]:
@@ -233,6 +264,7 @@ class ServerRunner:
         app = self._create_server()
         app.add_routes([
             web.get('/', hello_reply),
+            web.get('/cluster/status', hctl_stat),
             web.post('/', process_ha_states(planner, consul_util)),
             web.post(
                 '/watcher/bq',
