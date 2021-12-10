@@ -257,6 +257,169 @@ $ hctl status --json
 }
 ```
 
+In order to fetch cluster status via http, an endpoint has been added in hax server which returns the cluster status in json format.
+The endpoint is /cluster/status and can be accessed using a curl command.
+```
+$ curl http://172.16.140.156:8008/cluster/status
+{
+  "pools": [
+    {
+      "fid": "0x6f00000000000001:0x81",
+      "name": "storage-set-1__sns"
+    }
+  ],
+  "profiles": [
+    {
+      "fid": "0x7000000000000001:0xcc",
+      "name": "Profile_the_pool",
+      "pools": [
+        "storage-set-1__sns",
+        "storage-set-1__dix",
+        null
+      ]
+    }
+  ],
+  "filesystem": {
+    "stats": {
+      "fs_free_seg": 429501495192,
+      "fs_total_seg": 429502830880,
+      "fs_free_disk": 858993459200,
+      "fs_avail_disk": 858993459200,
+      "fs_total_disk": 858993459200,
+      "fs_svc_total": 12,
+      "fs_svc_replied": 12
+    },
+    "timestamp": 1639393339.165318,
+    "date": "2021-12-13T11:02:19.165318"
+  },
+  "nodes": [
+    {
+      "name": "cortx-data-headless-svc-ssc-vm-g2-rhev4-1910",
+      "svcs": [
+        {
+          "name": "hax",
+          "fid": "0x7200000000000001:0x31",
+          "ep": "inet:tcp:cortx-data-headless-svc-ssc-vm-g2-rhev4-1910@2001",
+          "status": "started"
+        },
+        {
+          "name": "ioservice",
+          "fid": "0x7200000000000001:0x34",
+          "ep": "inet:tcp:cortx-data-headless-svc-ssc-vm-g2-rhev4-1910@3001",
+          "status": "started"
+        },
+        {
+          "name": "ioservice",
+          "fid": "0x7200000000000001:0x41",
+          "ep": "inet:tcp:cortx-data-headless-svc-ssc-vm-g2-rhev4-1910@3002",
+          "status": "started"
+        },
+        {
+          "name": "confd",
+          "fid": "0x7200000000000001:0x4e",
+          "ep": "inet:tcp:cortx-data-headless-svc-ssc-vm-g2-rhev4-1910@3003",
+          "status": "started"
+        },
+        {
+          "name": "s3server",
+          "fid": "0x7200000000000001:0x51",
+          "ep": "inet:tcp:cortx-data-headless-svc-ssc-vm-g2-rhev4-1910@4001",
+          "status": "started"
+        },
+        {
+          "name": "s3server",
+          "fid": "0x7200000000000001:0x54",
+          "ep": "inet:tcp:cortx-data-headless-svc-ssc-vm-g2-rhev4-1910@4002",
+          "status": "started"
+        }
+	  ]
+    },
+    {
+      "name": "cortx-data-headless-svc-ssc-vm-g2-rhev4-2493",
+      "svcs": [
+        {
+          "name": "hax",
+          "fid": "0x7200000000000001:0x7",
+          "ep": "inet:tcp:cortx-data-headless-svc-ssc-vm-g2-rhev4-2493@2001",
+          "status": "started"
+        },
+        {
+          "name": "ioservice",
+          "fid": "0x7200000000000001:0xa",
+          "ep": "inet:tcp:cortx-data-headless-svc-ssc-vm-g2-rhev4-2493@3001",
+          "status": "started"
+        },
+        {
+          "name": "ioservice",
+          "fid": "0x7200000000000001:0x17",
+          "ep": "inet:tcp:cortx-data-headless-svc-ssc-vm-g2-rhev4-2493@3002",
+          "status": "started"
+        },
+        {
+          "name": "confd",
+          "fid": "0x7200000000000001:0x24",
+          "ep": "inet:tcp:cortx-data-headless-svc-ssc-vm-g2-rhev4-2493@3003",
+          "status": "started"
+        },
+        {
+          "name": "s3server",
+          "fid": "0x7200000000000001:0x27",
+          "ep": "inet:tcp:cortx-data-headless-svc-ssc-vm-g2-rhev4-2493@4001",
+          "status": "started"
+        },
+		{
+          "name": "s3server",
+          "fid": "0x7200000000000001:0x2a",
+          "ep": "inet:tcp:cortx-data-headless-svc-ssc-vm-g2-rhev4-2493@4002",
+          "status": "started"
+        }
+      ]
+    },
+    {
+      "name": "cortx-data-headless-svc-ssc-vm-g2-rhev4-2494",
+      "svcs": [
+        {
+          "name": "hax",
+          "fid": "0x7200000000000001:0x5b",
+          "ep": "inet:tcp:cortx-data-headless-svc-ssc-vm-g2-rhev4-2494@2001",
+          "status": "started"
+        },
+		{
+          "name": "ioservice",
+          "fid": "0x7200000000000001:0x5e",
+          "ep": "inet:tcp:cortx-data-headless-svc-ssc-vm-g2-rhev4-2494@3001",
+          "status": "started"
+        },
+        {
+          "name": "ioservice",
+          "fid": "0x7200000000000001:0x6b",
+          "ep": "inet:tcp:cortx-data-headless-svc-ssc-vm-g2-rhev4-2494@3002",
+          "status": "started"
+        },
+        {
+          "name": "confd",
+          "fid": "0x7200000000000001:0x78",
+          "ep": "inet:tcp:cortx-data-headless-svc-ssc-vm-g2-rhev4-2494@3003",
+          "status": "started"
+        },
+        {
+          "name": "s3server",
+          "fid": "0x7200000000000001:0x7b",
+          "ep": "inet:tcp:cortx-data-headless-svc-ssc-vm-g2-rhev4-2494@4001",
+          "status": "started"
+        },
+        {
+          "name": "s3server",
+          "fid": "0x7200000000000001:0x7e",
+          "ep": "inet:tcp:cortx-data-headless-svc-ssc-vm-g2-rhev4-2494@4002",
+          "status": "started"
+        }
+      ]
+    }
+  ]
+}
+```
+
 ## Fetch FIDs
 
 ### Fetches the fids for motr services (m0d and s3server) in cluster or node
