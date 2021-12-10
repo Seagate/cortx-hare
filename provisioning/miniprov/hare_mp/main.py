@@ -453,10 +453,37 @@ def start_mkfs_parallel(hostname: str, hare_config_dir: str):
                       f'{perf_result}\n\n')
 
 
+@repeat_if_fails()
+def is_mkfs_done_on_all_nodes(utils: Utils,
+                              cns_utils: ConsulUtil,
+                              nodes: List[str]) -> bool:
+    for node in nodes:
+        if not cns_utils.kv.kv_get(f'mkfs_done/{node}', recurse=True):
+            return False
+    return True
+
+
+@repeat_if_fails()
+def cleanup_mkfs_state(utils: Utils, cns_utils: ConsulUtil):
+    hostname = utils.get_local_hostname()
+    keys: List[KeyDelete] = [
+        KeyDelete(name=f'mkfs_done/{hostname}', recurse=True),
+    ]
+
+    if not cns_utils.kv.kv_delete_in_transaction(keys):
+        logging.error('Delete transaction failed for %s', keys)
+
+
+@repeat_if_fails()
+def set_mkfs_done_for(node: str, cns_utils: ConsulUtil):
+    cns_utils.kv.kv_put(f'mkfs_done/{node}', 'true')
+
+
 def init(args):
     try:
         url = args.config[0]
         utils = Utils(ConfStoreProvider(url))
+        cns_utils = ConsulUtil()
         stop_event = Event()
         config_dir = get_config_dir(url)
         log_dir = get_log_dir(url)
@@ -465,7 +492,17 @@ def init(args):
                                        config_dir, log_dir, url)
         hax_starter = _start_hax(utils, stop_event, config_dir, log_dir)
         hostname = utils.get_local_hostname()
+        # Cleanup old mkfs state
+        cleanup_mkfs_state(utils, cns_utils)
         start_mkfs_parallel(hostname, config_dir)
+        # Update mkfs state
+        set_mkfs_done_for(hostname, cns_utils)
+        nodes = utils.get_io_nodes()
+        # Wait for other nodes to complete.
+        # This will block.
+        while not is_mkfs_done_on_all_nodes(utils, cns_utils,
+                                            nodes):
+            sleep(5)
         # Stopping hax and consul
         hax_starter.stop()
         consul_starter.stop()
@@ -558,7 +595,8 @@ def kv_cleanup():
         KeyDelete(name='leader', recurse=False),
         KeyDelete(name='m0conf/', recurse=True),
         KeyDelete(name='processes/', recurse=True),
-        KeyDelete(name='stats/', recurse=True)
+        KeyDelete(name='stats/', recurse=True),
+        KeyDelete(name='mkfs/', recurse=True)
     ]
 
     logging.info('Deleting Hare KV entries (%s)', keys)
