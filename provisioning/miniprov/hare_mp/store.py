@@ -48,6 +48,10 @@ class ValueProvider:
     def get_storage_set_nodes(self) -> List[str]:
         raise NotImplementedError()
 
+    def search_val(self, parent_key: str, search_key: str,
+                   search_val: str) -> List[str]:
+        raise NotImplementedError()
+
 
 class ConfStoreProvider(ValueProvider):
     def __init__(self, url: str, index='hare'):
@@ -108,6 +112,13 @@ class ConfStoreProvider(ValueProvider):
                 storage_nodes.remove(node)
 
         return storage_nodes
+
+    def search_val(self, parent_key: str, search_key: str,
+                   search_val: str) -> List[str]:
+        """
+        Searches a given key value under the given parent key.
+        """
+        return self.conf.search(self.index, parent_key, search_key, search_val)
 
 
 def get_machine_id() -> str:
