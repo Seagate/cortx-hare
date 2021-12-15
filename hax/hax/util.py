@@ -16,18 +16,18 @@
 # please email opensource@seagate.com or cortx-questions@seagate.com.
 #
 
-import inject
 import json
 import logging
 import os
 import re
 from base64 import b64encode
 from functools import wraps
-from typing import Any, Dict, List, NamedTuple, Optional, Tuple
-from hax.log import TRACE
 from threading import Event
 from time import sleep
+from typing import (Any, Callable, Dict, List, NamedTuple, Optional, Tuple,
+                    TypeVar, cast)
 
+import inject
 import simplejson
 from consul import Consul, ConsulException
 from consul.base import ClientError
@@ -35,14 +35,13 @@ from requests.exceptions import RequestException
 from urllib3.exceptions import HTTPError
 
 from hax.common import HaxGlobalState
+from hax.consul.cache import (invalidates_consul_cache, supports_consul_cache,
+                              uses_consul_cache)
 from hax.exception import HAConsistencyException, InterruptedException
-from hax.types import (ConfHaProcess, Fid, FsStatsWithTime,
-                       ObjT, ServiceHealth, Profile, m0HaProcessEvent,
-                       m0HaProcessType, KeyDelete, HaNoteStruct,
-                       m0HaObjState)
-
-from hax.consul.cache import (uses_consul_cache, invalidates_consul_cache,
-                              supports_consul_cache)
+from hax.log import TRACE
+from hax.types import (ConfHaProcess, Fid, FsStatsWithTime, HaNoteStruct,
+                       KeyDelete, ObjT, Profile, ServiceHealth, m0HaObjState,
+                       m0HaProcessEvent, m0HaProcessType)
 
 __all__ = ['ConsulUtil', 'create_process_fid', 'create_service_fid',
            'create_sdev_fid', 'create_drive_fid']
@@ -119,8 +118,10 @@ ha_conf_obj_states = ('M0_NC_UNKNOWN',
                       'M0_NC_REPAIRED',
                       'M0_NC_REBALANCE')
 
+T = TypeVar('T', bound=Callable[..., Any])
 
-def repeat_if_fails(wait_seconds=5, max_retries=-1):
+
+def repeat_if_fails(wait_seconds=5, max_retries=-1) -> Callable[[T], T]:
     """
     Ensures that the wrapped function gets re-invoked if
     HAConsistencyException gets raised. In other words, this wrapper
@@ -133,7 +134,8 @@ def repeat_if_fails(wait_seconds=5, max_retries=-1):
     max_retries - how many attempts the wrapper will perform until finally
          re-raising the exception. -1 means 'repeat forever'.
     """
-    def callable(f):
+
+    def callable(f: T) -> T:
         @wraps(f)
         def wrapper(*args, **kwds):
             attempt_count = 0
@@ -160,7 +162,7 @@ def repeat_if_fails(wait_seconds=5, max_retries=-1):
                         f'repeated in {wait_seconds} seconds')
                     sleep(wait_seconds)
 
-        return wrapper
+        return cast(T, wrapper)
 
     return callable
 
