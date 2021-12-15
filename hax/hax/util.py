@@ -16,18 +16,18 @@
 # please email opensource@seagate.com or cortx-questions@seagate.com.
 #
 
-import inject
 import json
 import logging
 import os
 import re
 from base64 import b64encode
 from functools import wraps
-from typing import Any, Dict, List, NamedTuple, Optional, Tuple
-from hax.log import TRACE
 from threading import Event
 from time import sleep
+from typing import (Any, Callable, Dict, List, NamedTuple, Optional, Tuple,
+                    TypeVar, cast)
 
+import inject
 import simplejson
 from consul import Consul, ConsulException
 from consul.base import ClientError
@@ -35,14 +35,13 @@ from requests.exceptions import RequestException
 from urllib3.exceptions import HTTPError
 
 from hax.common import HaxGlobalState
+from hax.consul.cache import (invalidates_consul_cache, supports_consul_cache,
+                              uses_consul_cache)
 from hax.exception import HAConsistencyException, InterruptedException
-from hax.types import (ConfHaProcess, Fid, FsStatsWithTime,
-                       ObjT, ServiceHealth, Profile, m0HaProcessEvent,
-                       m0HaProcessType, KeyDelete, HaNoteStruct,
-                       m0HaObjState)
-
-from hax.consul.cache import (uses_consul_cache, invalidates_consul_cache,
-                              supports_consul_cache)
+from hax.log import TRACE
+from hax.types import (ConfHaProcess, Fid, FsStatsWithTime, HaNoteStruct,
+                       KeyDelete, ObjT, Profile, ServiceHealth, m0HaObjState,
+                       m0HaProcessEvent, m0HaProcessType)
 
 __all__ = ['ConsulUtil', 'create_process_fid', 'create_service_fid',
            'create_sdev_fid', 'create_drive_fid']
@@ -119,8 +118,10 @@ ha_conf_obj_states = ('M0_NC_UNKNOWN',
                       'M0_NC_REPAIRED',
                       'M0_NC_REBALANCE')
 
+T = TypeVar('T', bound=Callable[..., Any])
 
-def repeat_if_fails(wait_seconds=5, max_retries=-1):
+
+def repeat_if_fails(wait_seconds=5, max_retries=-1) -> Callable[[T], T]:
     """
     Ensures that the wrapped function gets re-invoked if
     HAConsistencyException gets raised. In other words, this wrapper
@@ -133,7 +134,8 @@ def repeat_if_fails(wait_seconds=5, max_retries=-1):
     max_retries - how many attempts the wrapper will perform until finally
          re-raising the exception. -1 means 'repeat forever'.
     """
-    def callable(f):
+
+    def callable(f: T) -> T:
         @wraps(f)
         def wrapper(*args, **kwds):
             attempt_count = 0
@@ -160,7 +162,7 @@ def repeat_if_fails(wait_seconds=5, max_retries=-1):
                         f'repeated in {wait_seconds} seconds')
                     sleep(wait_seconds)
 
-        return wrapper
+        return cast(T, wrapper)
 
     return callable
 
@@ -780,7 +782,7 @@ class ConsulUtil:
 
     @repeat_if_fails()
     @uses_consul_cache
-    def get_node_fid(self, node: str, kv_cache=None) -> Optional[Fid]:
+    def get_node_fid(self, node: str, kv_cache=None) -> Fid:
         """
         Returns the fid of the given node.
 
@@ -805,16 +807,16 @@ class ConsulUtil:
             if 'name' in item_value and item_value['name'] == node:
                 node_fid: str = str(key_split[2])
                 return Fid.parse(node_fid)
-        return None
+        raise KeyError(f'Node "{node}" not found in KV')
 
     @repeat_if_fails()
     @uses_consul_cache
     def get_node_name_by_fid(self,
                              node_fid: Fid,
-                             kv_cache=None) -> Optional[str]:
+                             kv_cache=None) -> str:
         """
-        Returns the node name by its FID value or None if the given FID doesn't
-        correspond to any node.
+        Returns the node name by its FID value. Raises KeyError None if the
+        given FID doesn't correspond to any node.
         """
         node_data = self.kv.kv_get(f'm0conf/nodes/{node_fid}',
                                    kv_cache=kv_cache)
@@ -822,7 +824,7 @@ class ConsulUtil:
             parsed = json.loads(node_data['Value'])
             name: str = parsed['name']
             return name
-        return None
+        raise KeyError(f'Node not found [fid={node_fid}]')
 
     @repeat_if_fails()
     @uses_consul_cache
@@ -854,8 +856,9 @@ class ConsulUtil:
         #            racks/0x6100000000000001:0x2/encls/
         #            0x6500000000000001:0x4/ctrls/0x6300000000000001:0x5",
         # ]
-        encl_fid = self.get_node_encl_fid(node, kv_cache=kv_cache)
-        if not encl_fid:
+        try:
+            encl_fid = self.get_node_encl_fid(node, kv_cache=kv_cache)
+        except KeyError:
             return None
         ctrl_items = self.get_all_sites(kv_cache=kv_cache)
         regex = re.compile(
@@ -1010,7 +1013,7 @@ class ConsulUtil:
 
     @repeat_if_fails()
     @uses_consul_cache
-    def get_node_encl_fid(self, node: str, kv_cache=None) -> Optional[Fid]:
+    def get_node_encl_fid(self, node: str, kv_cache=None) -> Fid:
         """
         Returns the fid of the enclosure for the given node.
 
@@ -1026,8 +1029,6 @@ class ConsulUtil:
         #               \"state\": \"M0_NC_UNKNOWN\"}"
         # },
         node_fid = self.get_node_fid(node, kv_cache=kv_cache)
-        if not node_fid:
-            return None
         encl_items = self.kv.kv_get('m0conf/sites',
                                     recurse=True,
                                     kv_cache=kv_cache)
@@ -1041,7 +1042,7 @@ class ConsulUtil:
             if 'node' in encl_value and encl_value['node'] == str(node_fid):
                 encl_fid: str = match_result.group(1)
                 return Fid.parse(encl_fid)
-        return None
+        raise KeyError(f'Node enclosure for node={node} not found in KV')
 
     def get_device_ha_state(self, status: ServiceHealth) -> str:
 
