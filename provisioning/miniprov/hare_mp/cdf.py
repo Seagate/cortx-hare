@@ -33,11 +33,9 @@ class PoolHandle:
 
 class CdfGenerator:
     def __init__(self,
-                 provider: ValueProvider,
-                 motr_provider: ValueProvider):
+                 provider: ValueProvider):
         super().__init__()
         self.provider = provider
-        self.motr_provider = motr_provider
         self.utils = Utils(provider)
 
     def _get_dhall_path(self) -> str:
@@ -68,7 +66,8 @@ class CdfGenerator:
         for machine_id in machines.keys():
             node_type = conf.get(f'node>{machine_id}>type')
             # Skipping for controller node
-            if node_type == 'storage_node':
+            if (node_type in
+                    ('storage_node', 'data_node', 'server_node')):
                 nodes.append(self._create_node(machine_id))
         return nodes
 
@@ -115,14 +114,14 @@ class CdfGenerator:
         return all_cvg_devices
 
     # cluster>storage_set[N]>nodes
-    def _get_server_nodes(self, pool: PoolHandle) -> List[str]:
+    def _get_data_nodes(self, pool: PoolHandle) -> List[str]:
         i = pool.storage_ndx
         nodes = self.provider.get(f'cluster>storage_set[{i}]>nodes')
         out = []
         for node in nodes:
             node_type = self.provider.get(f'node>{node}>type')
-            # Skipping for controller node
-            if node_type == 'storage_node':
+            # Skipping for controller, ha and server nodes
+            if (node_type in ('storage_node', 'data_node')):
                 out.append(node)
 
         return out
@@ -140,7 +139,7 @@ class CdfGenerator:
             f'cluster>storage_set[{i}]>name')
 
         data_devices_count: int = 0
-        for node in self._get_server_nodes(pool):
+        for node in self._get_data_nodes(pool):
             data_devices_count += len(self._get_devices(pool, node))
 
         (data, parity, spare) = (layout.data, layout.parity, layout.spare)
@@ -159,7 +158,9 @@ class CdfGenerator:
     def _calculate_allowed_failure(self, layout: Layout) -> AllowedFailures:
         conf = self.provider
         machine_id = conf.get_machine_id()
-        node_count = len(conf.get_storage_set_nodes())
+        data_nodes = conf.get_storage_set_nodes()
+        node_count = len(data_nodes)
+        machine_id = data_nodes[0]
         # node>{machine-id}>storage>cvg_count
         cvg_per_node = int(conf.get(
             f'node>{machine_id}>storage>cvg_count'))
@@ -197,7 +198,7 @@ class CdfGenerator:
                         DiskRef(path=Text(device),
                                 node=Maybe(Text(self.utils.get_hostname(node)),
                                            'Text'))
-                        for node in self._get_server_nodes(pool)
+                        for node in self._get_data_nodes(pool)
                         for device in self._get_devices(pool, node)
                     ], 'List DiskRef'), 'List DiskRef'),
                 data_units=layout.data,
@@ -322,17 +323,16 @@ class CdfGenerator:
     # TBD motr
     def _get_metadata_device(self,
                              machine_id: str,
-                             cvg: int,
-                             m0d: int) -> Text:
-        motr_store = self.motr_provider
-        metadata_device = Text(motr_store.get(
-            f'server>{machine_id}>cvg[{cvg}]>m0d[{m0d}]>md_seg1'))
+                             cvg: int) -> Text:
+        store = self.provider
+        metadata_device = Text(store.get(
+            f'node>{machine_id}>storage>cvg[{cvg}]>devices>metadata'))
         return metadata_device
 
     # TBD motr
     def _get_m0d_per_cvg(self, machine_id: str, cvg: int) -> int:
-        motr_store = self.motr_provider
-        return len(motr_store.get(f'server>{machine_id}>cvg[{cvg}]>m0d'))
+        length = 1
+        return length
 
     def _create_node(self, machine_id: str) -> NodeDesc:
         store = self.provider
@@ -340,39 +340,43 @@ class CdfGenerator:
         hostname = self.utils.get_hostname(machine_id)
         # node>{machine-id}>name
         iface = self._get_iface(machine_id)
-        try:
-            # cortx>motr>client_instances
-            no_m0clients = int(store.get(
-                'cortx>motr>client_instances',
-                allow_null=True))
-        except TypeError:
-            no_m0clients = 2
-        # Currently, there is 1 m0d per cvg.
-        # We will create 1 IO service entry in CDF per cvg.
-        # An IO service entry will use data devices from corresponding cvg.
-        # meta data device is taken from motr-hare shared store.
-        servers = DList([
-            M0ServerDesc(
-                io_disks=DisksDesc(
-                    data=self.utils.get_drives_info_for(cvg),
-                    meta_data=Maybe(
-                        self._get_metadata_device(
-                            machine_id, cvg, m0d), 'Text')),
-                runs_confd=Maybe(False, 'Bool'))
-            # node>{machine_id}>storage>cvg
-            for cvg in range(len(store.get(
-                f'node>{machine_id}>storage>cvg')))
-            for m0d in range(self._get_m0d_per_cvg(machine_id, cvg))
-        ], 'List M0ServerDesc')
+        # servers: DList[M0ServerDesc] = None
+        servers = None
+        no_m0clients = 0
+        if(self.utils.is_motr_component(machine_id)):
+            try:
+                # cortx>motr>client_instances
+                no_m0clients = int(store.get(
+                    'cortx>motr>client_instances',
+                    allow_null=True))
+            except TypeError:
+                no_m0clients = 2
+            # Currently, there is 1 m0d per cvg.
+            # We will create 1 IO service entry in CDF per cvg.
+            # An IO service entry will use data  and metadat devices
+            # from corresponding cvg.
+            servers = DList([
+                M0ServerDesc(
+                    io_disks=DisksDesc(
+                        data=self.utils.get_drives_info_for(cvg, machine_id),
+                        meta_data=Maybe(
+                            self._get_metadata_device(
+                                machine_id, cvg), 'Text')),
+                    runs_confd=Maybe(False, 'Bool'))
+                # node>{machine_id}>storage>cvg
+                for cvg in range(len(store.get(
+                    f'node>{machine_id}>storage>cvg')))
+                for m0d in range(self._get_m0d_per_cvg(machine_id, cvg))
+            ], 'List M0ServerDesc')
 
-        # Adding a Motr confd entry per server node in CDF.
-        # The `runs_confd` value (true/false) determines if Motr confd process
-        # will be started on the node or not.
-        servers.value.append(M0ServerDesc(
-            io_disks=DisksDesc(
-                data=DList([], 'List Disk'),
-                meta_data=Maybe(None, 'Text')),
-            runs_confd=Maybe(True, 'Bool')))
+            # Adding a Motr confd entry per server node in CDF.
+            # The `runs_confd` value (true/false) determines
+            # if Motr confd process will be started on the node or not.
+            servers.value.append(M0ServerDesc(
+                io_disks=DisksDesc(
+                    data=DList([], 'List Disk'),
+                    meta_data=Maybe(None, 'Text')),
+                runs_confd=Maybe(True, 'Bool')))
 
         node_facts = self.utils.get_node_facts()
         return NodeDesc(

@@ -105,13 +105,13 @@ class ConfStoreProvider(ValueProvider):
         storage_nodes_key = (f'cluster>storage_set[{storage_set_index}]>nodes')
         storage_nodes = self.get(storage_nodes_key)
 
+        data_nodes: List[Any] = []
         for node in storage_nodes:
             node_type = self.get(f'node>{node}>type')
             # Skipping controller node
-            if node_type != 'storage_node':
-                storage_nodes.remove(node)
-
-        return storage_nodes
+            if (node_type == 'storage_node' or node_type == 'data_node'):
+                data_nodes += [node]
+        return data_nodes
 
     def search_val(self, parent_key: str, search_key: str,
                    search_val: str) -> List[str]:
