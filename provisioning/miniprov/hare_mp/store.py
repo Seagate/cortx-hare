@@ -16,10 +16,9 @@
 # please email opensource@seagate.com or cortx-questions@seagate.com.
 #
 
-from typing import Any, List
-
 from cortx.utils.conf_store import Conf
-
+from typing import List, Dict, Any
+from cortx.utils.cortx import Const
 from hare_mp.types import MissingKeyError
 
 
@@ -45,7 +44,7 @@ class ValueProvider:
     def get_storage_set_index(self) -> int:
         raise NotImplementedError()
 
-    def get_storage_set_nodes(self) -> List[str]:
+    def get_data_nodes(self) -> List[str]:
         raise NotImplementedError()
 
     def search_val(self, parent_key: str, search_key: str,
@@ -99,18 +98,16 @@ class ConfStoreProvider(ValueProvider):
 
         raise RuntimeError('No storage set found. Is ConfStore data valid?')
 
-    def get_storage_set_nodes(self) -> List[str]:
-        storage_set_index = self.get_storage_set_index()
-
-        storage_nodes_key = (f'cluster>storage_set[{storage_set_index}]>nodes')
-        storage_nodes = self.get(storage_nodes_key)
-
-        for node in storage_nodes:
-            node_type = self.get(f'node>{node}>type')
-            # Skipping controller node
-            if node_type != 'storage_node':
-                storage_nodes.remove(node)
-
+    def get_data_nodes(self) -> List[str]:
+        machines: Dict[str, Any] = self.get('node')
+        storage_nodes: List[str] = []
+        services = self.search_val('node', 'services',
+                                   Const.SERVICE_MOTR_IO.value)
+        for machine_id in machines.keys():
+            result = [svc for svc in services if machine_id in svc]
+            # Skipping for controller HA and server pod
+            if result:
+                storage_nodes.append(machine_id)
         return storage_nodes
 
     def search_val(self, parent_key: str, search_key: str,
