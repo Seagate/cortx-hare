@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from math import floor, ceil
 import pkg_resources
 
+from cortx.utils.cortx import Const
 from hare_mp.store import ValueProvider
 from hare_mp.types import (ClusterDesc, DiskRef, DList, Maybe, NodeDesc,
                            PoolDesc, PoolType, ProfileDesc, Protocol, Text,
@@ -64,11 +65,15 @@ class CdfGenerator:
     def _create_node_descriptions(self) -> List[NodeDesc]:
         nodes: List[NodeDesc] = []
         conf = self.provider
+        services = conf.search_val('node', 'services',
+                                   Const.SERVICE_MOTR_IO.value)
+        services.extend(conf.search_val('node', 'services',
+                                        Const.SERVICE_S3_SERVER.value))
         machines: Dict[str, Any] = conf.get('node')
         for machine_id in machines.keys():
-            node_type = conf.get(f'node>{machine_id}>type')
-            # Skipping for controller node
-            if node_type == 'storage_node':
+            result = [svc for svc in services if machine_id in svc]
+            # Skipping for controller and HA pod
+            if result:
                 nodes.append(self._create_node(machine_id))
         return nodes
 
@@ -115,14 +120,17 @@ class CdfGenerator:
         return all_cvg_devices
 
     # cluster>storage_set[N]>nodes
-    def _get_server_nodes(self, pool: PoolHandle) -> List[str]:
+    def _get_data_nodes(self, pool: PoolHandle) -> List[str]:
         i = pool.storage_ndx
-        nodes = self.provider.get(f'cluster>storage_set[{i}]>nodes')
+        conf = self.provider
+        nodes = conf.get(f'cluster>storage_set[{i}]>nodes')
         out = []
+        services = conf.search_val('node', 'services',
+                                   Const.SERVICE_MOTR_IO.value)
         for node in nodes:
-            node_type = self.provider.get(f'node>{node}>type')
-            # Skipping for controller node
-            if node_type == 'storage_node':
+            result = [svc for svc in services if node in svc]
+            # skipped controller , HA and server pod
+            if result:
                 out.append(node)
 
         return out
@@ -140,7 +148,7 @@ class CdfGenerator:
             f'cluster>storage_set[{i}]>name')
 
         data_devices_count: int = 0
-        for node in self._get_server_nodes(pool):
+        for node in self._get_data_nodes(pool):
             data_devices_count += len(self._get_devices(pool, node))
 
         (data, parity, spare) = (layout.data, layout.parity, layout.spare)
@@ -159,7 +167,7 @@ class CdfGenerator:
     def _calculate_allowed_failure(self, layout: Layout) -> AllowedFailures:
         conf = self.provider
         machine_id = conf.get_machine_id()
-        node_count = len(conf.get_storage_set_nodes())
+        node_count = len(conf.get_data_nodes())
         # node>{machine-id}>storage>cvg_count
         cvg_per_node = int(conf.get(
             f'node>{machine_id}>storage>cvg_count'))
@@ -197,7 +205,7 @@ class CdfGenerator:
                         DiskRef(path=Text(device),
                                 node=Maybe(Text(self.utils.get_hostname(node)),
                                            'Text'))
-                        for node in self._get_server_nodes(pool)
+                        for node in self._get_data_nodes(pool)
                         for device in self._get_devices(pool, node)
                     ], 'List DiskRef'), 'List DiskRef'),
                 data_units=layout.data,
