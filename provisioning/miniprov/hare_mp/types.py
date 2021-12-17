@@ -118,6 +118,7 @@ class NodeDesc(DhallTuple):
     data_iface: Text
     data_iface_ip_addr: Maybe[Text]
     data_iface_type: Maybe[Protocol]
+    transport_type: Text
     m0_servers: Maybe[DList[M0ServerDesc]]
     s3_instances: int
     client_instances: int

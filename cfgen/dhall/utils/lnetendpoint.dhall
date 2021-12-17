@@ -18,20 +18,19 @@
 
 -}
 
-let Prelude = ../Prelude.dhall
-
 let types = ../types.dhall
 
-let named = ./RNamed.dhall
-
 in
-\(x : types.Service) ->
-    "("
- ++ Prelude.Text.concatSep " "
-      [ ./Oid.dhall x.id
-      , named.TextUnquoted "type" ("@" ++ ./SvcT.dhall x.type)
-      , named.Texts "endpoints" [x.endpoint]
-      , "params=[]"
-      , named.Oids "sdevs" x.sdevs
-      ]
- ++ ")"
+    \(proto : types.Protocol)
+ -> \(ipaddr : Text)
+ -> \(portal : Natural)
+ -> \(tmid : Natural)
+ ->
+    let addr = { ipaddr = ipaddr, mdigit = None Natural }
+    in
+      { nid = merge { tcp = types.NetId.tcp { tcp = addr }
+                    , o2ib = types.NetId.o2ib { o2ib = addr }
+                    } proto
+      , portal = portal
+      , tmid = tmid
+      } : types.LnetEndpoint

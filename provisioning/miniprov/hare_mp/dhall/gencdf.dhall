@@ -29,6 +29,7 @@ let NodeInfo =
       , data_iface : Text
       , data_iface_ip_addr : Optional Text
       , data_iface_type : Optional T.Protocol
+      , transport_type : Text
       , m0_servers : Optional (List M0ServerDesc)
       , s3_instances : Natural
       , client_instances : Natural
@@ -75,6 +76,7 @@ let toNodeDesc
           , data_iface_ip_addr = n.data_iface_ip_addr
           , data_iface = n.data_iface
           , data_iface_type = n.data_iface_type
+          , transport_type = n.transport_type
           , m0_clients = { other = n.client_instances, s3 = n.s3_instances }
           , m0_servers = n.m0_servers
           }

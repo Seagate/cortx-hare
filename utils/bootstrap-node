@@ -38,6 +38,8 @@ The required parameter is one of the following:
 Options:
   --mkfs-only   Do m0mkfs only (CAUTION: wipes Motr data).
   --mkfs        Do m0mkfs (CAUTION: wipes Motr data) and start Motr servers.
+  --xprt        Use given motr transport type to generate corresponding motr
+                process endpoints. Supported transport types are lnet and libfab.
   --m0d         Skip m0mkfs, start Motr servers.
   -h, --help    Show this help and exit.
 EOF
@@ -50,9 +52,10 @@ die() {
 
 do_mkfs=
 phase=-
+xprt='lnet'
 
 TEMP=$(getopt --options hp: \
-              --longoptions help,mkfs,mkfs-only,m0d,phase: \
+              --longoptions help,mkfs,mkfs-only,m0d,phase:,xprt: \
               --name "$PROG" -- "$@" || true)
 
 (($? == 0)) || { usage >&2; exit 1; }
@@ -75,6 +78,8 @@ done
 if [[ $do_mkfs ]] && [[ $phase == 'phase3' ]]; then
     die '--mkfs conflicts with --phase3'
 fi
+
+[[ $xprt == 'lnet' ]] || [[ $xprt == 'libfab' ]] || die "Invalid transport type $xprt"
 
 # If motr-kernel.service is not installed, the script will fail
 # anyway, with or without this check.  The purpose of the check is to
@@ -112,7 +117,7 @@ EOF
     die "'motr-kernel' systemd service is not installed"
 fi
 
-. update-consul-conf --dry-run  # import CONFD_IDs, IOS_IDs, S3_IDs, id2fid()
+. update-consul-conf --dry-run --xprt $xprt # import CONFD_IDs, IOS_IDs, S3_IDs, id2fid()
 
 sysconfig_dir='/etc/sysconfig'
 [ -d $sysconfig_dir ] || sysconfig_dir='/etc/default'

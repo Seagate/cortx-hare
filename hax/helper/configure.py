@@ -42,6 +42,7 @@ class AppCtx:
     log_file: str
     consul_server: bool
     uuid: str
+    transport: str
 
 
 def _setup_logging(opts: AppCtx):
@@ -74,6 +75,13 @@ def _setup_logging(opts: AppCtx):
               help='Target folder where Hare-related configuration will '
               'be written to.',
               show_default=True)
+@click.option('--transport',
+              '-t',
+              type=str,
+              default='libfab',
+              help='Transport type to be used, '
+              'presently supported are lnet and libfabric',
+              show_default=True)
 @click.option('--log-dir',
               '-l',
               type=str,
@@ -91,14 +99,15 @@ def _setup_logging(opts: AppCtx):
               help='File name of the log file.',
               show_default=True)
 @click.pass_context
-def parse_opts(ctx, cdf: str, conf_dir: str, log_dir: str, consul_server: bool,
-               uuid: str, log_file: str):
+def parse_opts(ctx, cdf: str, conf_dir: str, transport: str, log_dir: str,
+               consul_server: bool, uuid: str, log_file: str):
     """Generate Hare configuration according to the given CDF file.
 
     CDF   Full path to the Cluster Description File (CDF)."""
     ctx.ensure_object(dict)
     ctx.obj['result'] = AppCtx(cdf_path=cdf,
                                conf_dir=conf_dir,
+                               transport=transport,
                                log_dir=log_dir,
                                consul_server=consul_server,
                                uuid=uuid,
@@ -110,6 +119,7 @@ class ConfGenerator:
     def __init__(self, context: AppCtx):
         self.cdf_path = context.cdf_path
         self.conf_dir = context.conf_dir
+        self.transport = context.transport
         self.log_dir = context.log_dir
         self.consul_server = context.consul_server
         self.uuid = context.uuid
@@ -134,7 +144,7 @@ class ConfGenerator:
         self._write_file(f'{conf_dir}/confd.xc', xcode)
 
         node_name = self._create_node_name(f'{conf_dir}/consul-agents.json')
-        self._update_consul_conf(node_name)
+        self._update_consul_conf(node_name, self.transport)
 
     def _get_pythonic_env(self) -> Dict[str, str]:
         path = os.environ['PATH']
@@ -164,7 +174,7 @@ class ConfGenerator:
         with open(path, 'r') as f:
             return f.read()
 
-    def _update_consul_conf(self, node_name) -> None:
+    def _update_consul_conf(self, node_name, transport: str) -> None:
         cns_file = f'{self.conf_dir}/consul-agents.json'
 
         def get_join_ip() -> str:
@@ -196,9 +206,11 @@ class ConfGenerator:
 
         update_consul_conf_cmd = [
             'update-consul-conf', '--conf-dir', f'{self.conf_dir}',
+            '--xprt', f'{transport}',
             '--kv-file', f'{self.conf_dir}/consul-kv.json', '--log-dir',
             self.log_dir
         ]
+
         if self.consul_server:
             update_consul_conf_cmd.append('--server')
 

@@ -18,7 +18,7 @@
 
 -}
 
-{ Endpoint   = ./render/Endpoint.dhall
+{ LnetEndpoint   = ./render/LnetEndpoint.dhall
 , NetId      = ./render/NetId.dhall
 
 , LibfabricEndpoint = ./render/LibfabricEndpoint.dhall

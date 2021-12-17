@@ -18,20 +18,9 @@
 
 -}
 
-let Prelude = ../Prelude.dhall
-
 let types = ../types.dhall
 
-let named = ./RNamed.dhall
-
 in
-\(x : types.Service) ->
-    "("
- ++ Prelude.Text.concatSep " "
-      [ ./Oid.dhall x.id
-      , named.TextUnquoted "type" ("@" ++ ./SvcT.dhall x.type)
-      , named.Texts "endpoints" [x.endpoint]
-      , "params=[]"
-      , named.Oids "sdevs" x.sdevs
-      ]
- ++ ")"
+\(x : types.LnetEndpoint) ->
+    let nat = Natural/show
+    in "${./NetId.dhall x.nid}:12345:${nat x.portal}:${nat x.tmid}"

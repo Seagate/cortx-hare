@@ -18,7 +18,7 @@
 
 -}
 
-{ endpoint = ./utils/endpoint.dhall
+{ lnetendpoint = ./utils/lnetendpoint.dhall
 , libfabricendpoint = ./utils/libfabricendpoint.dhall
 , zoid = ./utils/zoid.dhall
 }

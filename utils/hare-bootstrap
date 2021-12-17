@@ -40,6 +40,8 @@ Positional arguments:
 Options:
   --debug      Print commands and their arguments as they are executed.
   --mkfs       Execute m0mkfs.  *CAUTION* This wipes all Motr data!
+  --xprt       Use given motr transport type to generate corresponding motr
+               process endpoints. Supported transport types are lnet and libfab.
   -h, --help   Show this help and exit.
 EOF
 }
@@ -225,7 +227,7 @@ check_consul_failure() {
 # main
 
 TEMP=$(getopt --options hc: \
-              --longoptions help,mkfs,conf-dir:,debug \
+              --longoptions help,mkfs,xprt:,conf-dir:,debug \
               --name "$PROG" -- "$@" || true)
 
 (($? == 0)) || { usage >&2; exit 1; }
@@ -235,11 +237,13 @@ eval set -- "$TEMP"
 conf_dir=
 opt_mkfs=
 debug_p=false
+xprt='lnet'
 
 while true; do
     case "$1" in
         -h|--help)           usage; exit ;;
         --mkfs)              opt_mkfs=--mkfs; shift ;;
+        --xprt)              xprt=$2; shift 2 ;;
         -c|--conf-dir)       conf_dir=$2; shift 2 ;;
         --debug)             debug_p=true; shift ;;
         --)                  shift; break ;;
@@ -256,6 +260,8 @@ esac
 $debug_p && set -x
 
 cdf=${1:-}
+
+[[ $xprt == 'lnet' ]] || [[ $xprt == 'libfab' ]] || die "Invalid transport type $xprt"
 
 if sudo systemctl --quiet is-active hare-hax; then
     die 'hare-hax is active ==> cluster is already running'
@@ -411,7 +417,7 @@ done
 echo 'Consul ready on all nodes'
 
 say 'Updating Consul configuraton from the KV store...'
-update-consul-conf --server &
+update-consul-conf --server --xprt $xprt &
 pid=($!)
 wait4 ${pid[@]}
 
@@ -419,7 +425,7 @@ pids=
 
 while read node _; do
     scp -qr /var/lib/hare/consul-kv.json $node:/var/lib/hare/
-    ssh_error_info "$node" "PATH=$PATH $(which update-consul-conf)" --server &
+    ssh_error_info "$node" "PATH=$PATH $(which update-consul-conf)" --server --xprt $xprt &
     pids+=($!)
 done < <(get_all_nodes | grep -vw $(node-name) || true)
 wait4 ${pids[@]}
@@ -461,11 +467,11 @@ start_motr() {
 
     say "Starting Motr ($phase, $op)..."
     [[ $op == 'mkfs' ]] && op='--mkfs-only' || op=
-    bootstrap-node $op --phase $phase &
+    bootstrap-node $op --phase $phase --xprt $xprt &
     pids=($!)
 
     while read node _; do
-        ssh_error_info "$node" "PATH=$PATH $(which bootstrap-node) $op --phase $phase" &
+        ssh_error_info "$node" "PATH=$PATH $(which bootstrap-node) $op --phase $phase --xprt $xprt" &
         pids+=($!)
     done < <(get_nodes $phase | grep -vw $(node-name) || true)
     wait4 ${pids[@]}
@@ -488,15 +494,15 @@ bootstrap_nodes phase1
 # Start ioservices
 bootstrap_nodes phase2
 
-. update-consul-conf --server --dry-run  # import S3_IDs
+. update-consul-conf --server --dry-run --xprt $xprt # import S3_IDs
 if [[ -n $S3_IDs ]]; then
     # Now the 3rd phase (s3servers).
     say 'Starting S3 servers (phase3)...'
-    bootstrap-node --phase phase3 &
+    bootstrap-node --phase phase3 --xprt $xprt &
     pids=($!)
 
     while read node _; do
-        ssh_error_info "$node" "PATH=$PATH $(which bootstrap-node) --phase phase3" &
+        ssh_error_info "$node" "PATH=$PATH $(which bootstrap-node) --phase phase3 --xprt $xprt" &
         pids+=($!)
     done < <(get_all_nodes | grep -vw $(node-name) || true)
     wait4 ${pids[@]}

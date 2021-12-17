@@ -210,6 +210,14 @@ class Utils:
                 nodes.append(conf.get(f'node>{machine_id}>hostname'))
         return nodes
 
+    def get_transport_type(self) -> str:
+        transport_type = self.provider.get(
+            'cortx>motr>transport_type',
+            allow_null=True)
+        if transport_type is None:
+            return 'libfab'
+        return transport_type
+
 
 class LogWriter:
     def __init__(self, logger: logging.Logger, logging_handler):

@@ -402,6 +402,7 @@ class CdfGenerator:
             data_iface=Text(iface),
             data_iface_ip_addr=Maybe(Text(hostname), 'Text'),
             data_iface_type=Maybe(self._get_iface_type(machine_id), 'P'),
+            transport_type=Text(self.utils.get_transport_type()),
             m0_servers=Maybe(servers, 'List M0ServerDesc'),
             #
             # [KN] This is a hotfix for singlenode deployment

@@ -24,6 +24,6 @@ in
 -- m0_confx_service
 { id : Oid
 , type : ./SvcT.dhall
-, endpoint : ./LibfabricEndpoint.dhall
+, endpoint : Text
 , sdevs : List Oid
 }
