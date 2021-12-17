@@ -18,19 +18,18 @@
 
 -}
 
-let types = ../types.dhall
+{-
+   LNet endpoint address.
 
-in
-    \(proto : types.Protocol)
- -> \(ipaddr : Text)
- -> \(portal : Natural)
- -> \(tmid : Natural)
- ->
-    let addr = { ipaddr = ipaddr, mdigit = None Natural }
-    in
-      { nid = merge { tcp = types.NetId.tcp { tcp = addr }
-                    , o2ib = types.NetId.o2ib { o2ib = addr }
-                    } proto
-      , portal = portal
-      , tmid = tmid
-      } : types.Endpoint
+   Endpoint address format (ABNF):
+
+   endpoint = nid ":12345:" DIGIT+ ":" DIGIT+
+   ; <network id>:<process id>:<portal number>:<transfer machine id>
+   ;
+   nid      = "0@lo" / (ipv4addr  "@" ("tcp" / "o2ib") [DIGIT])
+   ipv4addr = 1*3DIGIT "." 1*3DIGIT "." 1*3DIGIT "." 1*3DIGIT ; 0..255
+-}
+{ nid : ./NetId.dhall
+, portal : Natural
+, tmid : Natural
+}

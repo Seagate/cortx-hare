@@ -39,10 +39,11 @@ get_leader() {
 start_motr() {
     local op=$1
     local phase=$2
+    local xprt=$3
 
     say "Starting Motr ($phase, $op)..."
     [[ $op == 'mkfs' ]] && op='--mkfs-only' || op=
-    bootstrap-node $op --phase $phase &
+    bootstrap-node $op --phase $phase --xprt $xprt &
     pids=($!)
     wait4 ${pids[@]}
     echo ' OK'
@@ -50,7 +51,7 @@ start_motr() {
 
 start_s3server() {
     say 'Starting S3 servers (phase3)...'
-    bootstrap-node --phase phase3 &
+    bootstrap-node --phase phase3 --xprt $xprt&
     pids=($!)
     wait4 ${pids[@]}
     echo ' OK'

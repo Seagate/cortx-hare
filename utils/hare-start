@@ -38,6 +38,8 @@ Starts Hare and Motr services on local or all the nodes in the cluster.
 
 Options:
   --node       Starts hare and motr services on current node only.
+  --xprt       Use given motr transport type to generate corresponding motr
+               process endpoints. Supported transport types are lnet and libfab.
   -h, --help   Shows this help and exit.
 EOF
 
@@ -45,18 +47,20 @@ EOF
 }
 
 TEMP=$(getopt --options h \
-              --longoptions help,node \
+              --longoptions help,node,xprt: \
               --name "$PROG" -- "$@" || true)
 
 eval set -- "$TEMP"
 
 conf_dir=/var/lib/hare
 node=false
+xprt='lnet'
 
 while true; do
     case "$1" in
         -h|--help)           usage ;;
         --node)              node=true; shift ;;
+        --xprt)              xprt=$2; shift 2 ;;
         --)                  shift; break ;;
         *)                   break ;;
     esac
@@ -70,9 +74,11 @@ if  hctl status > /dev/null 2>&1; then
     die 'Cluster is up and running.'
 fi
 
+[[ $xprt == 'lnet' ]] || [[ $xprt == 'libfab' ]] || die "Invalid transport type $xprt"
+
 if $node; then
     start-node
 else
-    hctl bootstrap -c $conf_dir
+    hctl bootstrap -c $conf_dir --xprt $xprt
 fi
 

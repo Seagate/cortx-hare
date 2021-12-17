@@ -33,10 +33,11 @@
     import for all available types.
 -}
 
-{ Addr        = ./types/Addr.dhall
-, Endpoint    = ./types/Endpoint.dhall
-, NetId       = ./types/NetId.dhall
-, Protocol    = ./types/Protocol.dhall
+{ Addr         = ./types/Addr.dhall
+, Endpoint     = ./types/Endpoint.dhall
+, LnetEndpoint = ./types/LnetEndpoint.dhall
+, NetId        = ./types/NetId.dhall
+, Protocol     = ./types/Protocol.dhall
 
 , LibfabricEndpoint = ./types/LibfabricEndpoint.dhall
 , NetFamily   = ./types/NetFamily.dhall

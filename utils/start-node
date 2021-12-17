@@ -38,6 +38,50 @@ is_server_node() {
     get_server_nodes | grep -w $(node-name) > /dev/null
 }
 
+usage() {
+    cat <<EOF
+Usage: $PROG [<option>]...
+
+Starts Hare and Motr services on local node.
+
+Options:
+  --xprt       Use given motr transport type to generate corresponding motr
+               process endpoints. Supported transport types are lnet and libfab.
+  -h, --help   Shows this help and exit.
+EOF
+
+    exit 1;
+}
+
+TEMP=$(getopt --options h \
+              --longoptions help,xprt: \
+              --name "$PROG" -- "$@" || true)
+
+eval set -- "$TEMP"
+
+conf_dir=/var/lib/hare
+xprt='lnet'
+
+while true; do
+    case "$1" in
+        -h|--help)           usage ;;
+        --xprt)              xprt=$2; shift 2 ;;
+        --)                  shift; break ;;
+        *)                   break ;;
+    esac
+done
+
+if ! [[ -d $conf_dir ]]; then
+    die 'Cluster is not configured on this node.'
+fi
+
+if  hctl status > /dev/null 2>&1; then
+    die 'Cluster is up and running.'
+fi
+
+[[ $xprt == 'lnet' ]] || [[ $xprt == 'libfab' ]] || die "Invalid transport type $xprt"
+
+
 if sudo systemctl --quiet is-active hare-consul-agent; then
     die 'hare-consul-agent is active ==> cluster is already running'
 fi
@@ -57,16 +101,16 @@ echo ' OK'
 
 if is_server_node; then
     # Starting phase 1 (confd servers)
-    start_motr m0d phase1
+    start_motr m0d phase1 $xprt
 fi
 
 # Starting phase 2 (ios)
-start_motr m0d phase2
+start_motr m0d phase2 $xprt
 
-. update-consul-conf --dry-run  # import S3_IDs
+. update-consul-conf --dry-run  --xprt $xprt # import S3_IDs
 if [[ -n $S3_IDs ]]; then
     # Starting phase 3 (s3servers).
-    start_s3server
+    start_s3server $xprt
 fi
 
 say 'Checking health of services...'

@@ -42,6 +42,8 @@ Positional arguments:
   --consul-port <port>   Active Consul server port.
 Options:
   -h, --help    Show this help and exit.
+  --xprt        Use given motr transport type to generate corresponding motr
+                endpoints. Supported transport types are lnet and libfab.
 EOF
 }
 
@@ -143,7 +145,7 @@ is_localhost() {
 
 TEMP=$(getopt --options hc: \
               --longoptions help,conf-dir:,consul-addr:,consul-port: \
-              --longoptions mkfs,conf-create,debug \
+              --longoptions mkfs,conf-create,debug,xprt: \
               --name "$PROG" -- "$@" || true)
 
 (($? == 0)) || { usage >&2; exit 1; }
@@ -154,6 +156,7 @@ conf_dir=
 debug_p=false
 conf_create=false
 opt_mkfs=
+xprt='libfab'
 
 while true; do
     case "$1" in
@@ -162,6 +165,7 @@ while true; do
         --consul-addr)  CONSUL_ADDR=$2; shift 2 ;;
         --consul-port)  CONSUL_PORT=$2; shift 2 ;;
         --mkfs)         opt_mkfs=--mkfs; shift ;;
+        --xprt)         xprt=$2; shift 2 ;;
         --conf-create)  conf_create=true; shift ;;
         --)             shift; break ;;
         *)              break ;;
@@ -182,6 +186,7 @@ if sudo systemctl --quiet is-active hare-consul-agent; then
     die 'hare-consul-agent is active ==> cluster is already running'
 fi
 
+[[ $xprt == 'lnet' ]] || [[ $xprt == 'libfab' ]] || die "Invalid transport type $xprt"
 
 if [[ -z $conf_dir ]]; then
     conf_dir=/var/lib/hare
@@ -282,7 +287,7 @@ done
 
 if $conf_create; then
     say 'Updating Consul agents configs from the KV store...'
-    update-consul-conf &
+    update-consul-conf --xprt $xprt &
     pids=($!)
     echo ' OK'
 fi
@@ -318,7 +323,7 @@ start_motr() {
 
     say "Starting Motr ($phase, $op)..."
     [[ $op == 'mkfs' ]] && op='--mkfs-only' || op=
-    bootstrap-node $op --phase $phase &
+    bootstrap-node $op --phase $phase --xprt $xprt &
     pids=($!)
     wait4 ${pids[@]}
     echo ' OK'
@@ -340,11 +345,11 @@ bootstrap_nodes phase1
 # Start ioservices
 bootstrap_nodes phase2
 
-. update-consul-conf --dry-run  # import S3_IDs
+. update-consul-conf --dry-run --xprt $xprt # import S3_IDs
 if [[ -n $S3_IDs ]]; then
     # Now the 3rd phase (s3servers).
     say 'Starting S3 servers (phase3)...'
-    bootstrap-node --phase phase3 &
+    bootstrap-node --phase phase3 --xprt $xprt &
     pids=($!)
     wait4 ${pids[@]}
     echo ' OK'

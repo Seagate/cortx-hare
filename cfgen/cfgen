@@ -825,6 +825,10 @@ NetProtocol = Enum('NetProtocol', 'tcp o2ib')
 
 
 class Endpoint:
+    pass
+
+
+class LnetEndpoint(Endpoint):
     _tmids: Dict[Tuple[str, int], int] = {}
 
     def __init__(self, proto: NetProtocol, ipaddr: str, portalgroup: int,
@@ -849,7 +853,7 @@ class Endpoint:
         return f'{self.__class__.__name__}({args})'
 
     def to_dhall(self):
-        return f'utils.endpoint types.Protocol.{self.proto.name}' \
+        return f'utils.lnetendpoint types.Protocol.{self.proto.name}' \
             f' "{self.ipaddr}" {self.portalgroup} {self.tmid}'
 
     def __str__(self):
@@ -858,7 +862,7 @@ class Endpoint:
         return f'{ip}@{proto}:12345:{self.portalgroup}:{self.tmid}'
 
 
-class LibfabricEndpoint:
+class LibfabricEndpoint(Endpoint):
     ep_map: Dict[Tuple[str, int], int] = {}
 
     def __init__(self, NetFamily: str, proto: NetProtocol, ipaddr: str,
@@ -1027,7 +1031,7 @@ class ConfProcess(ToDhall):
     _downlinks = {Downlink('services', ObjT.service)}
 
     def __init__(self, nr_cpu: int, memsize_MB: int,
-                 endpoint: LibfabricEndpoint,
+                 endpoint,
                  services: List[Oid], meta_data: str = None):
         _assert(nr_cpu > 0, 'nr_cpu must be positive')
         self.nr_cpu = nr_cpu
@@ -1052,7 +1056,7 @@ class ConfProcess(ToDhall):
         args = ', '.join([f'id = {oid_to_dhall(oid)}',
                           f'nr_cpu = {self.nr_cpu}',
                           f'memsize_MB = {self.memsize_MB}',
-                          f'endpoint = {self.endpoint.to_dhall()}',
+                          f'endpoint = "{self.endpoint}"',
                           f'services = {oids_to_dhall(self.services)}'])
         return '{ %s }' % args
 
@@ -1073,16 +1077,19 @@ class ConfProcess(ToDhall):
 
         facts = node_desc['facts']
         proto = node_desc.get('data_iface_type', 'tcp')
-        # Creates Lnet endpoint, remove once deprecated.
-        # ep = Endpoint(proto=NetProtocol[proto],
-        #               ipaddr=facts[ipaddr_key(node_desc['data_iface'])],
-        #              portal=proc_t.value)
-        ep = LibfabricEndpoint(NetFamily='inet', proto=NetProtocol[proto],
-                               ipaddr=facts[ipaddr_key(
-                                            node_desc['data_iface'])],
-                               portalgroup=proc_t.value)
+        transport_type = node_desc.get('transport_type', 'libfab')
+        ep: Any = (
+            LibfabricEndpoint(NetFamily='inet', proto=NetProtocol[proto],
+                              ipaddr=facts[ipaddr_key(
+                                           node_desc['data_iface'])],
+                              portalgroup=proc_t.value))
+        if transport_type == 'lnet':
+            # Creates Lnet endpoint, remove once deprecated.
+            ep = LnetEndpoint(proto=NetProtocol[proto],
+                              ipaddr=facts[ipaddr_key(
+                                           node_desc['data_iface'])],
+                              portalgroup=proc_t.value)
         proc_id = new_oid(ObjT.process)
-
         meta_data = None
         if proc_desc is not None and proc_t is ProcT.m0_server:
             meta_data = proc_desc['io_disks'].get('meta_data')
@@ -1160,7 +1167,7 @@ class ConfService(ToDhall):
     _objt = ObjT.service
     _downlinks = {Downlink('sdevs', ObjT.sdev)}
 
-    def __init__(self, stype: SvcT, endpoint: LibfabricEndpoint,
+    def __init__(self, stype: SvcT, endpoint,
                  sdevs: List[Oid], ctrl_id: Oid = None):
         self.type = stype
         self.endpoint = endpoint
@@ -1178,13 +1185,13 @@ class ConfService(ToDhall):
         assert oid.type is ObjT.service
         args = ', '.join([f'id = {oid_to_dhall(oid)}',
                           f'type = {self.type.to_dhall()}',
-                          f'endpoint = {self.endpoint.to_dhall()}',
+                          f'endpoint = "{self.endpoint}"',
                           f'sdevs = {oids_to_dhall(self.sdevs)}'])
         return '{ %s }' % args
 
     @classmethod
     def build(cls, m0conf: Dict[Oid, Any], parent: Oid,
-              stype: SvcT, endpoint: LibfabricEndpoint,
+              stype: SvcT, endpoint,
               ctrl: Optional[Oid] = None) -> Oid:
         assert parent.type is ObjT.process
         svc_id = new_oid(ObjT.service)
@@ -2161,7 +2168,7 @@ def generate_consul_kv(cluster: Cluster, dhall_dir: str) -> str:
     m0conf = cluster.m0conf
 
     ConsulService = NamedTuple('ConsulService', [
-        ('node_name', str), ('proc_id', Oid), ('ep', LibfabricEndpoint),
+        ('node_name', str), ('proc_id', Oid), ('ep', Any),
         ('svc_id', Oid), ('stype', str), ('meta_data', Optional[str])])
 
     def processes() -> Iterator[ConsulService]:

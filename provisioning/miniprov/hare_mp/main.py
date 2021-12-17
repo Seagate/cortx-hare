@@ -842,7 +842,9 @@ def generate_config(url: str, path_to_cdf: str) -> None:
     if path:
         path += os.pathsep + '/opt/seagate/cortx/hare/bin/'
     python_path = os.pathsep.join(sys.path)
+    transport_type = utils.get_transport_type()
     cmd = ['configure', '-c', conf_dir, path_to_cdf,
+           '--transport', transport_type,
            '--log-dir', get_log_dir(url),
            '--log-file', LOG_FILE,
            '--uuid', provider.get_machine_id()]
