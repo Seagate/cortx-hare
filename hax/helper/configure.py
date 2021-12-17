@@ -168,7 +168,7 @@ class ConfGenerator:
         cns_file = f'{self.conf_dir}/consul-agents.json'
 
         def get_join_ip() -> str:
-            for node, ip in self._get_server_nodes(cns_file):
+            for node, ip in self._get_data_nodes(cns_file):
                 if node == node_name:
                     return ip
             raise RuntimeError(f'Logic error: node_name={node_name}'
@@ -176,7 +176,7 @@ class ConfGenerator:
 
         join_ip = get_join_ip()
         join_peers_opt: List[str] = []
-        for node, ip in self._get_server_nodes(cns_file):
+        for node, ip in self._get_data_nodes(cns_file):
             if node == node_name:
                 continue
             join_peers_opt += ['--join', ip]
@@ -237,8 +237,8 @@ class ConfGenerator:
 
         return hostname == self._read_file(minion_file).strip()
 
-    def _get_server_nodes(self,
-                          consul_agents_file: str) -> List[Tuple[str, str]]:
+    def _get_data_nodes(self,
+                        consul_agents_file: str) -> List[Tuple[str, str]]:
         return self._get_nodes_ex(consul_agents_file,
                                   '.servers[] | "\\(.node_name) \\(.ipaddr)"')
 
