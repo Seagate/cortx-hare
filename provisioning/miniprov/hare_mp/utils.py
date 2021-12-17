@@ -28,7 +28,7 @@ from typing import List, Dict, Any
 from distutils.dir_util import copy_tree
 import shutil
 
-from cortx.utils.cortx import Const
+# from cortx.utils.cortx import Const
 from hax.util import repeat_if_fails, KVAdapter
 from helper.exec import Program, Executor
 
@@ -99,7 +99,6 @@ class Utils:
         self.kv.kv_put(f'{hostname}/{disk_key}', drive_info)
 
     def is_motr_component(self, machine_id: str) -> bool:
-        logging.info(f'1.is_motr_component : machine_id = {machine_id}')
         comp_names = self.provider.get(f'node>{machine_id}>'
                                        f'components')
         for component in comp_names:
@@ -182,12 +181,14 @@ class Utils:
         # e.g.
         # node>0b9cf99f07574422a45f9b61d2f5b746>components[1]>services[0]
         # node>0b9cf99f07574422a45f9b61d2f5b746>components[3]>services[0]
-        services = conf.search_val('node', 'services',
-                                   Const.SERVICE_MOTR_IO.value)
+        # services = conf.search_val('node', 'services',
+        #                            Const.SERVICE_MOTR_IO.value)
         for machine_id in machines.keys():
-            result = list(filter(lambda svc: machine_id in svc, services))
-            if result:
-                nodes.append(conf.get(f'node>{machine_id}>hostname'))
+            # result = list(filter(lambda svc: machine_id in svc, services))
+            # if result:
+            #     nodes.append(conf.get(f'node>{machine_id}>hostname'))
+            if(self.is_motr_component(machine_id)):
+                nodes += [self.get_hostname(machine_id)]
         return nodes
 
 

@@ -113,12 +113,15 @@ class ConfStoreProvider(ValueProvider):
                 data_nodes += [node]
         return data_nodes
 
+
+'''
     def search_val(self, parent_key: str, search_key: str,
                    search_val: str) -> List[str]:
         """
         Searches a given key value under the given parent key.
         """
         return self.conf.search(self.index, parent_key, search_key, search_val)
+'''
 
 
 def get_machine_id() -> str:

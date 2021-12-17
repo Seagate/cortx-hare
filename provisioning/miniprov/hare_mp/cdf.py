@@ -123,7 +123,6 @@ class CdfGenerator:
             # Skipping for controller, ha and server nodes
             if (node_type in ('storage_node', 'data_node')):
                 out.append(node)
-
         return out
 
     def _validate_pool(self, pool: PoolHandle) -> None:
@@ -343,6 +342,7 @@ class CdfGenerator:
         # servers: DList[M0ServerDesc] = None
         servers = None
         no_m0clients = 0
+        nr_s3_instances = int(store.get('cortx>s3>service_instances'))
         if(self.utils.is_motr_component(machine_id)):
             try:
                 # cortx>motr>client_instances
@@ -377,6 +377,7 @@ class CdfGenerator:
                     data=DList([], 'List Disk'),
                     meta_data=Maybe(None, 'Text')),
                 runs_confd=Maybe(True, 'Bool')))
+            nr_s3_instances = 0
 
         node_facts = self.utils.get_node_facts()
         return NodeDesc(
@@ -393,6 +394,5 @@ class CdfGenerator:
             # TODO in the future the value must be taken from a correct
             # ConfStore key (it doesn't exist now).
             # cortx>s3>service_instances
-            s3_instances=int(
-                store.get('cortx>s3>service_instances')),
+            s3_instances=nr_s3_instances,
             client_instances=no_m0clients)
