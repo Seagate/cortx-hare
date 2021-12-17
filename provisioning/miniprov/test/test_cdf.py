@@ -110,7 +110,7 @@ class TestCDF(unittest.TestCase):
 
 
             store.get_machine_id = Mock(return_value='1114a50a6bf6f9c93ebd3c49d07d3fd4')
-            store.get_storage_set_nodes = Mock(return_value=['1114a50a6bf6f9c93ebd3c49d07d3fd4'])
+            store.get_data_nodes = Mock(return_value=['1114a50a6bf6f9c93ebd3c49d07d3fd4'])
             utils = Utils(store)
             kv = KVAdapter()
             def my_get(key: str, recurse: bool = False):
@@ -231,7 +231,7 @@ class TestCDF(unittest.TestCase):
 
         store._raw_get = Mock(side_effect=ret_values)
         store.get_machine_id = Mock(return_value='MACH_ID')
-        store.get_storage_set_nodes = Mock(return_value=['MACH_ID'])
+        store.get_data_nodes = Mock(return_value=['MACH_ID'])
         utils = Utils(store)
         kv = KVAdapter()
         def my_get(key: str, recurse: bool = False):
@@ -325,7 +325,7 @@ class TestCDF(unittest.TestCase):
 
         store._raw_get = Mock(side_effect=ret_values)
         store.get_machine_id = Mock(return_value='MACH_ID')
-        store.get_storage_set_nodes = Mock(return_value=['MACH_ID'])
+        store.get_data_nodes = Mock(return_value=['MACH_ID'])
         utils = Utils(store)
         kv = KVAdapter()
         def my_get(key: str, recurse: bool = False):
@@ -510,7 +510,7 @@ class TestCDF(unittest.TestCase):
 
         store._raw_get = Mock(side_effect=ret_values)
         store.get_machine_id = Mock(return_value='MACH_ID1')
-        store.get_storage_set_nodes = Mock(return_value=['MACH_ID1', 'MACH_ID2', 'MACH_ID3'])
+        store.get_data_nodes = Mock(return_value=['MACH_ID1', 'MACH_ID2', 'MACH_ID3'])
 
         ret = CdfGenerator(provider=store,
                            motr_provider=Mock())._create_pool_descriptions()
@@ -579,7 +579,7 @@ class TestCDF(unittest.TestCase):
 
         store._raw_get = Mock(side_effect=ret_values)
         store.get_machine_id = Mock(return_value='MACH_ID')
-        store.get_storage_set_nodes = Mock(return_value=['srvnode_1'])
+        store.get_data_nodes = Mock(return_value=['srvnode_1'])
         cdf = CdfGenerator(provider=store, motr_provider=Mock())
         cdf._get_m0d_per_cvg = Mock(return_value=1)
         utils = Utils(store)
@@ -769,7 +769,7 @@ class TestCDF(unittest.TestCase):
 
         store._raw_get = Mock(side_effect=ret_values)
         store.get_machine_id = Mock(return_value='MACH_ID')
-        store.get_storage_set_nodes = Mock(return_value=['MACH_ID'])
+        store.get_data_nodes = Mock(return_value=['MACH_ID'])
         ret = CdfGenerator(provider=store,
                            motr_provider=Mock())._create_pool_descriptions()
         self.assertEqual(1, len(ret))
@@ -835,7 +835,7 @@ class TestCDF(unittest.TestCase):
 
         store._raw_get = Mock(side_effect=ret_values)
         store.get_machine_id = Mock(return_value='MACH_ID')
-        store.get_storage_set_nodes = Mock(return_value=['MACH_ID'])
+        store.get_data_nodes = Mock(return_value=['MACH_ID'])
         ret = CdfGenerator(provider=store,
                            motr_provider=Mock())._create_pool_descriptions()
         self.assertEqual(['sns', 'dix'], [t.type.name for t in ret])
@@ -896,7 +896,7 @@ class TestCDF(unittest.TestCase):
 
         store._raw_get = Mock(side_effect=ret_values)
         store.get_machine_id = Mock(return_value='MACH_ID')
-        store.get_storage_set_nodes = Mock(return_value=['MACH_ID'])
+        store.get_data_nodes = Mock(return_value=['MACH_ID'])
         utils = Utils(store)
         kv = KVAdapter()
         def my_get(key: str, recurse: bool = False):
@@ -1011,7 +1011,7 @@ class TestCDF(unittest.TestCase):
         store._raw_get = Mock(side_effect=ret_values)
 
         store.get_machine_id = Mock(return_value='MACH_ID')
-        store.get_storage_set_nodes = Mock(return_value=['MACH_ID'])
+        store.get_data_nodes = Mock(return_value=['MACH_ID'])
         utils = Utils(store)
         kv = KVAdapter()
         def my_get(key: str, recurse: bool = False):
@@ -1095,7 +1095,7 @@ class TestCDF(unittest.TestCase):
 
         store._raw_get = Mock(side_effect=ret_values)
         store.get_machine_id = Mock(return_value='MACH_ID')
-        store.get_storage_set_nodes = Mock(return_value=['srvnode_1'])
+        store.get_data_nodes = Mock(return_value=['srvnode_1'])
         cdf = CdfGenerator(provider=store, motr_provider=Mock())
         utils = Utils(store)
         kv = KVAdapter()
