@@ -3,6 +3,9 @@ import sys
 from typing import NamedTuple
 
 import click
+import inject
+
+from hax.common import di_configuration
 from hax.queue.publish import BQPublisher, EQPublisher, Publisher
 
 AppCtx = NamedTuple('AppCtx', [('payload', str), ('type', str),
@@ -46,6 +49,7 @@ def parse_opts(ctx, queue: str, type: str, payload: str):
 
 def main():
     _setup_logging()
+    inject.configure(di_configuration)
     try:
         raw_ctx = parse_opts(args=sys.argv[1:],
                              standalone_mode=False,
