@@ -411,7 +411,12 @@ done
 echo 'Consul ready on all nodes'
 
 say 'Updating Consul configuraton from the KV store...'
-update-consul-conf --server &
+runs_server=''
+if get_server_nodes | grep -w $(node-name) >/dev/null 2>&1; then
+    runs_server='--server'
+fi
+update-consul-conf $runs_server &
+
 pid=($!)
 wait4 ${pid[@]}
 
