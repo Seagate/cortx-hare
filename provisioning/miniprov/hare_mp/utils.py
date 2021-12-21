@@ -98,17 +98,50 @@ class Utils:
         disk_key = path.strip('/')
         self.kv.kv_put(f'{hostname}/{disk_key}', drive_info)
 
+    def is_motr_component(self, machine_id: str) -> bool:
+        """
+        Returns True if motr component is present in the components list
+        for the given node>{machine_id} according to the
+        ConfStore (ValueProvider).
+        """
+        comp_names = self.provider.get(f'node>{machine_id}>'
+                                       f'components')
+        for component in comp_names:
+            if(component.get('name') == Const.COMPONENT_MOTR.value):
+                rc = True
+                break
+            else:
+                rc = False
+        return rc
+
+    def is_s3_component(self, machine_id: str) -> bool:
+        """
+        Returns True if s3 component is present in the components list
+        for the given node>{machine_id} according to the
+        ConfStore (ValueProvider).
+        """
+        comp_names = self.provider.get(f'node>{machine_id}>'
+                                       f'components')
+        for component in comp_names:
+            if(component.get('name') == Const.COMPONENT_S3.value):
+                rc = True
+                break
+            else:
+                rc = False
+        return rc
+
     def save_drives_info(self):
         machine_id = self.provider.get_machine_id()
-        cvgs_key: str = f'node>{machine_id}>storage>cvg'
-        for cvg in range(len(self.provider.get(cvgs_key))):
-            data_devs = self.get_data_devices(machine_id, cvg)
-            for dev_path in data_devs.value:
-                self._save_drive_info(dev_path.s)
+        if(self.is_motr_component(machine_id)):
+            cvgs_key: str = f'node>{machine_id}>storage>cvg'
+            for cvg in range(len(self.provider.get(cvgs_key))):
+                data_devs = self.get_data_devices(machine_id, cvg)
+                for dev_path in data_devs.value:
+                    self._save_drive_info(dev_path.s)
 
     @repeat_if_fails()
-    def get_drive_info_from_consul(self, path: Text) -> Disk:
-        hostname = self.get_local_hostname()
+    def get_drive_info_from_consul(self, path: Text, machine_id: str) -> Disk:
+        hostname = self.get_hostname(machine_id)
         disk_path = json.loads(str(path)).lstrip(os.sep)
         drive_data = self.kv.kv_get(f'{hostname}/{disk_path}')
         drive_info = json.loads(drive_data['Value'])
@@ -116,10 +149,9 @@ class Utils:
                      size=Maybe(drive_info['size'], 'Natural'),
                      blksize=Maybe(drive_info['blksize'], 'Natural')))
 
-    def get_drives_info_for(self, cvg: int) -> DList[Disk]:
-        machine_id = self.provider.get_machine_id()
+    def get_drives_info_for(self, cvg: int, machine_id: str) -> DList[Disk]:
         data_devs = self.get_data_devices(machine_id, cvg)
-        return DList([self.get_drive_info_from_consul(dev_path)
+        return DList([self.get_drive_info_from_consul(dev_path, machine_id)
                       for dev_path in data_devs.value], 'List Disk')
 
     def import_kv(self, conf_dir_path: str):
