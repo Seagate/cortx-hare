@@ -164,7 +164,7 @@ def processes(cns: Consul, consul_util: ConsulUtil,
 
 def process_status(node_health: str, proc_states: Dict[str, str],
                    fid: Fid) -> str:
-    if node_health != 'passing':
+    if node_health != 'passing' or proc_states is None:
         return 'offline'
     if str(fid) in proc_states:
         return proc_states[str(fid)]
@@ -176,6 +176,10 @@ def get_node_process_states(cns: Consul, node_name: str) -> Dict[str, str]:
     key = f'{node_name}/processes/'
     proc_list = kv_item(cns, key, recurse=True)
     process_states: Dict[str, str] = {}
+
+    if proc_list is None:
+        return process_states
+
     for proc in proc_list:
         key_split = proc['Key'].split('/')
         if len(key_split) != 3:
