@@ -77,11 +77,21 @@ def _remove_stale_session(util: ConsulUtil) -> None:
         return
 
     sess = util.get_leader_session_no_wait()
-    node = util.get_leader_node()
-    if re.match(r'^elect[\d]+$', node):
-        LOG.debug(
-            'Stale leader session found: RC leader session %s is '
-            'found while the leader node seems to be stub: %s', sess, node)
+    # We might face situation where we have stale session such that we have
+    # 'session' present but 'value' is not present for leader key.
+    # In such situation we need to destroy the session so that RC re-election
+    # can be triggered automatically
+    if util.is_leader_value_present_for_session():
+        node = util.get_leader_node()
+        if re.match(r'^elect[\d]+$', node):
+            LOG.debug(
+                'Stale leader session found: RC leader session %s is '
+                'found while the leader node seems to be '
+                'stub: %s', sess, node)
+            util.destroy_session(sess)
+            LOG.debug('Stale session %s destroyed '
+                      'to enable RC re-election', sess)
+    else:
         util.destroy_session(sess)
         LOG.debug('Stale session %s destroyed to enable RC re-election', sess)
 
@@ -137,7 +147,7 @@ def main():
     # on every node, thus leader election will keep re-triggering
     # until the final hax node starts, this will delay further
     # bootstrapping operations.
-    # _remove_stale_session(util)
+    _remove_stale_session(util)
     cfg: HL_Fids = _get_motr_fids(util)
 
     LOG.info('Welcome to HaX')
