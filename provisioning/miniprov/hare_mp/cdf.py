@@ -34,11 +34,9 @@ class PoolHandle:
 
 class CdfGenerator:
     def __init__(self,
-                 provider: ValueProvider,
-                 motr_provider: ValueProvider):
+                 provider: ValueProvider):
         super().__init__()
         self.provider = provider
-        self.motr_provider = motr_provider
         self.utils = Utils(provider)
 
     def _get_dhall_path(self) -> str:
@@ -132,7 +130,6 @@ class CdfGenerator:
             # skipped controller , HA and server pod
             if result:
                 out.append(node)
-
         return out
 
     def _validate_pool(self, pool: PoolHandle) -> None:
@@ -167,7 +164,12 @@ class CdfGenerator:
     def _calculate_allowed_failure(self, layout: Layout) -> AllowedFailures:
         conf = self.provider
         machine_id = conf.get_machine_id()
-        node_count = len(conf.get_data_nodes())
+        # This is a workaround for getting cvg by looking at one data node
+        # only. The implementation here needs to be corrected using a
+        # different task (EOS-27063).
+        data_nodes = conf.get_data_nodes()
+        node_count = len(data_nodes)
+        machine_id = data_nodes[0]
         # node>{machine-id}>storage>cvg_count
         cvg_per_node = int(conf.get(
             f'node>{machine_id}>storage>cvg_count'))
@@ -330,17 +332,19 @@ class CdfGenerator:
     # TBD motr
     def _get_metadata_device(self,
                              machine_id: str,
-                             cvg: int,
-                             m0d: int) -> Text:
-        motr_store = self.motr_provider
-        metadata_device = Text(motr_store.get(
-            f'server>{machine_id}>cvg[{cvg}]>m0d[{m0d}]>md_seg1'))
+                             cvg: int) -> Text:
+        store = self.provider
+        metadata_device = Text(store.get(
+            f'node>{machine_id}>storage>cvg[{cvg}]>devices>metadata'))
         return metadata_device
 
-    # TBD motr
+    # This function is kept as place holder with length returning 1,
+    # as policy needs to be decided for a commong solution that is
+    # applicable for LR and LC. This function can be used or removed
+    # in that task (EOS-26849)
     def _get_m0d_per_cvg(self, machine_id: str, cvg: int) -> int:
-        motr_store = self.motr_provider
-        return len(motr_store.get(f'server>{machine_id}>cvg[{cvg}]>m0d'))
+        length = 1
+        return length
 
     def _create_node(self, machine_id: str) -> NodeDesc:
         store = self.provider
@@ -348,39 +352,46 @@ class CdfGenerator:
         hostname = self.utils.get_hostname(machine_id)
         # node>{machine-id}>name
         iface = self._get_iface(machine_id)
-        try:
-            # cortx>motr>client_instances
-            no_m0clients = int(store.get(
-                'cortx>motr>client_instances',
-                allow_null=True))
-        except TypeError:
-            no_m0clients = 2
-        # Currently, there is 1 m0d per cvg.
-        # We will create 1 IO service entry in CDF per cvg.
-        # An IO service entry will use data devices from corresponding cvg.
-        # meta data device is taken from motr-hare shared store.
-        servers = DList([
-            M0ServerDesc(
-                io_disks=DisksDesc(
-                    data=self.utils.get_drives_info_for(cvg),
-                    meta_data=Maybe(
-                        self._get_metadata_device(
-                            machine_id, cvg, m0d), 'Text')),
-                runs_confd=Maybe(False, 'Bool'))
-            # node>{machine_id}>storage>cvg
-            for cvg in range(len(store.get(
-                f'node>{machine_id}>storage>cvg')))
-            for m0d in range(self._get_m0d_per_cvg(machine_id, cvg))
-        ], 'List M0ServerDesc')
+        servers = None
+        no_m0clients = 0
+        nr_s3_instances = 0
+        if(self.utils.is_motr_component(machine_id)):
+            try:
+                # cortx>motr>client_instances
+                no_m0clients = int(store.get(
+                    'cortx>motr>client_instances',
+                    allow_null=True))
+            except TypeError:
+                no_m0clients = 2
+            # Currently, there is 1 m0d per cvg.
+            # We will create 1 IO service entry in CDF per cvg.
+            # An IO service entry will use data  and metadat devices
+            # from corresponding cvg.
+            servers = DList([
+                M0ServerDesc(
+                    io_disks=DisksDesc(
+                        data=self.utils.get_drives_info_for(cvg, machine_id),
+                        meta_data=Maybe(
+                            self._get_metadata_device(
+                                machine_id, cvg), 'Text')),
+                    runs_confd=Maybe(False, 'Bool'))
+                # node>{machine_id}>storage>cvg
+                for cvg in range(len(store.get(
+                    f'node>{machine_id}>storage>cvg')))
+                for m0d in range(self._get_m0d_per_cvg(machine_id, cvg))
+            ], 'List M0ServerDesc')
 
-        # Adding a Motr confd entry per server node in CDF.
-        # The `runs_confd` value (true/false) determines if Motr confd process
-        # will be started on the node or not.
-        servers.value.append(M0ServerDesc(
-            io_disks=DisksDesc(
-                data=DList([], 'List Disk'),
-                meta_data=Maybe(None, 'Text')),
-            runs_confd=Maybe(True, 'Bool')))
+            # Adding a Motr confd entry per server node in CDF.
+            # The `runs_confd` value (true/false) determines
+            # if Motr confd process will be started on the node or not.
+            servers.value.append(M0ServerDesc(
+                io_disks=DisksDesc(
+                    data=DList([], 'List Disk'),
+                    meta_data=Maybe(None, 'Text')),
+                runs_confd=Maybe(True, 'Bool')))
+
+        if (self.utils.is_s3_component(machine_id)):
+            nr_s3_instances = int(store.get('cortx>s3>service_instances'))
 
         node_facts = self.utils.get_node_facts()
         return NodeDesc(
@@ -397,6 +408,5 @@ class CdfGenerator:
             # TODO in the future the value must be taken from a correct
             # ConfStore key (it doesn't exist now).
             # cortx>s3>service_instances
-            s3_instances=int(
-                store.get('cortx>s3>service_instances')),
+            s3_instances=nr_s3_instances,
             client_instances=no_m0clients)
