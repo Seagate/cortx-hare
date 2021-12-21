@@ -449,6 +449,16 @@ class ConsulUtil:
             raise HAConsistencyException(
                 'Could not get the leader from Consul')
 
+    def is_leader_value_present_for_session(self) -> bool:
+        leader = self.kv.kv_get('leader')
+        if leader is None:
+            return False
+
+        node: bytes = leader['Value']
+        if node is None:
+            return False
+        return True
+
     def destroy_session(self, session: str) -> None:
         """
         Destroys the given Consul Session by name.

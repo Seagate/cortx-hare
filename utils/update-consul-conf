@@ -239,10 +239,6 @@ else
     CONF_FILE=$conf_dir/consul-client-conf/consul-client-conf.json
 fi
 
-pwdesc=$(echo $conf_dir | sed 's_/_\\/_g')
-sed -i "s/TMP_CONF_DIR/$pwdesc/" $CONF_FILE
-sed -i "s|TMP_LOG_DIR|$log_dir|" $CONF_FILE
-
 SVCS_CONF=''
 
 append_hax_svc() {
@@ -400,6 +396,20 @@ done
 tmpfile=$(mktemp /tmp/${CONF_FILE##*/}.XXXXXX)
 trap "rm -f $tmpfile" EXIT # delete automatically on exit
 jq ".services = [$SVCS_CONF]" <$CONF_FILE >$tmpfile
+
+if [[ $CONFD_IDs ]]; then
+    jq '.watches += [{"type": "key",
+                      "key": "leader",
+                      "args": [ "/opt/seagate/cortx/hare/libexec/elect-rc-leader",
+                                "--conf-dir",
+                                "TMP_CONF_DIR",
+                                "--log-dir",
+                                "TMP_LOG_DIR" ]}]' $tmpfile > $tmpfile.tmp && mv -f $tmpfile.tmp $tmpfile
+fi
+
+sed -i "s|TMP_CONF_DIR|$conf_dir|" $tmpfile
+sed -i "s|TMP_LOG_DIR|$log_dir|" $tmpfile
+
 sudo cp $tmpfile $CONF_FILE
 # Copy consul-server-conf for this node to consul dir.
 mkdir -p /etc/consul.d/
