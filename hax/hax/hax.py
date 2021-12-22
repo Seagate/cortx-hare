@@ -35,6 +35,7 @@ from hax.motr.delivery import DeliveryHerald
 from hax.motr.ffi import HaxFFI
 from hax.motr.planner import WorkPlanner
 from hax.motr.rconfc import RconfcStarter
+from hax.rc import RCProcessorThread, Synchronizer
 from hax.server import ServerRunner
 from hax.types import Fid, Profile, StoppableThread
 from hax.util import ConsulUtil, repeat_if_fails
@@ -155,8 +156,8 @@ def main():
 
     # TODO make the number of threads configurable
     consumer_threads = [
-        _run_qconsumer_thread(planner, motr, herald,
-                              util, i) for i in range(32)
+        _run_qconsumer_thread(planner, motr, herald, util, i)
+        for i in range(32)
     ]
 
     try:
@@ -173,12 +174,16 @@ def main():
         # [KN] This is a blocking call. It will work until the program is
         # terminated by signal
 
+        synch = Synchronizer()
+        rc_thread = _run_thread(RCProcessorThread(synch, util.kv))
         server = ServerRunner(planner,
                               herald,
                               consul_util=util,
-                              hax_state=state)
+                              hax_state=state,
+                              rc_synch=synch)
         server.run(threads_to_wait=[
-            *consumer_threads, stats_updater, rconfc_starter, event_poller
+            *consumer_threads, stats_updater, rconfc_starter, event_poller,
+            rc_thread
         ])
     except Exception:
         LOG.exception('Exiting due to an exception')

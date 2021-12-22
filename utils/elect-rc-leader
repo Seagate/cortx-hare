@@ -144,5 +144,6 @@ export SID
     # XXX: notify Motr about new Principal RM here
 
     # Start EQ watch:
-    consul watch -type=keyprefix -prefix eq/ $SRC_DIR/proto-rc --log-dir $log_dir
+    #consul watch -type=keyprefix -prefix eq/ $SRC_DIR/proto-rc --log-dir $log_dir
+    sleep infinity
 ) &

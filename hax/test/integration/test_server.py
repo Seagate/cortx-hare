@@ -27,6 +27,7 @@ from hax.common import HaxGlobalState
 from hax.message import BroadcastHAStates, StobId, StobIoqError
 from hax.motr import WorkPlanner
 from hax.motr.delivery import DeliveryHerald
+from hax.rc import Synchronizer
 from hax.server import ServerRunner
 from hax.types import Fid, HAState, MessageId, ServiceHealth
 from hax.util import dump_json
@@ -53,6 +54,11 @@ def hax_state() -> HaxGlobalState:
     return HaxGlobalState()
 
 
+@pytest.fixture
+def rc_synchronizer():
+    return Synchronizer()
+
+
 @pytest.fixture(autouse=True)
 async def logging_support(hax_state: HaxGlobalState):
     def configure(binder: inject.Binder):
@@ -65,9 +71,9 @@ async def logging_support(hax_state: HaxGlobalState):
 
 @pytest.fixture
 async def hax_client(mocker, aiohttp_client, herald, planner, consul_util,
-                     loop):
+                     loop, rc_synchronizer: Synchronizer):
     state = inject.instance(HaxGlobalState)
-    srv = ServerRunner(planner, herald, consul_util, state)
+    srv = ServerRunner(planner, herald, consul_util, state, rc_synchronizer)
     srv._configure()
     return await aiohttp_client(srv.app)
 
