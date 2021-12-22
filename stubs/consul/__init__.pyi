@@ -101,6 +101,14 @@ class KV:
         token: str = None,
         dc: str = None,
     ) -> bool: ...
+    def delete(
+        self,
+        key: str,
+        recurse: bool = False,
+        cas: int = None,
+        token: str = None,
+        dc: str = None,
+    ) -> bool: ...
 
 class Session:
     def info(

@@ -17,6 +17,7 @@
 #
 
 import asyncio
+import base64
 import logging
 import os
 import sys
@@ -27,21 +28,23 @@ from typing import Any, Callable, Dict, List, Type, Union
 from aiohttp import web
 from aiohttp.web import HTTPError, HTTPNotFound
 from aiohttp.web_response import json_response
+from helper.exec import Executor, Program
 
+from hax.common import HaxGlobalState
 from hax.message import (BaseMessage, BroadcastHAStates, SnsDiskAttach,
                          SnsDiskDetach, SnsRebalancePause, SnsRebalanceResume,
                          SnsRebalanceStart, SnsRebalanceStatus,
                          SnsRebalanceStop, SnsRepairPause, SnsRepairResume,
                          SnsRepairStart, SnsRepairStatus, SnsRepairStop)
-from hax.common import HaxGlobalState
 from hax.motr.delivery import DeliveryHerald
 from hax.motr.planner import WorkPlanner
 from hax.queue import BQProcessor
 from hax.queue.confobjutil import ConfObjUtil
 from hax.queue.offset import InboxFilter, OffsetStorage
+from hax.rc import Synchronizer
 from hax.types import Fid, HAState, ServiceHealth, StoppableThread
 from hax.util import ConsulUtil, create_process_fid, dump_json
-from helper.exec import Executor, Program
+
 LOG = logging.getLogger('hax')
 
 
@@ -199,6 +202,28 @@ def process_bq_update(inbox_filter: InboxFilter, processor: BQProcessor):
     return _process
 
 
+def process_leader_change(my_node: str, rc_synch: Synchronizer):
+    async def _process_leader(request):
+        data = await request.json()
+        if not data:
+            return web.Response()
+
+        def fn():
+            # session_id = data['Session']
+            leader_node = base64.b64decode(data['Value'])
+            LOG.debug('XXX RC updated: %s', data)
+            rc_synch.set_leader(leader_node == my_node)
+
+            return web.Response()
+
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, fn)
+
+        return web.Response()
+
+    return _process_leader
+
+
 @web.middleware
 async def encode_exception(request, handler):
     def error_response(e: Exception, code=500, reason=""):
@@ -229,12 +254,14 @@ class ServerRunner:
         planner: WorkPlanner,
         herald: DeliveryHerald,
         consul_util: ConsulUtil,
-        hax_state: HaxGlobalState
+        hax_state: HaxGlobalState,
+        rc_synch: Synchronizer
     ):
         self.consul_util = consul_util
         self.herald = herald
         self.planner = planner
         self.hax_state = hax_state
+        self.rc_synch = rc_synch
 
     def _create_server(self) -> web.Application:
         return web.Application(middlewares=[encode_exception])
@@ -260,6 +287,8 @@ class ServerRunner:
         planner = self.planner
         herald = self.herald
         consul_util = self.consul_util
+        synch = self.rc_synch
+        my_node = consul_util.get_local_nodename()
 
         app = self._create_server()
         app.add_routes([
@@ -270,6 +299,9 @@ class ServerRunner:
                 '/watcher/bq',
                 process_bq_update(inbox_filter,
                                   BQProcessor(planner, herald, conf_obj))),
+            web.post(
+                '/watcher/leader',
+                process_leader_change(my_node, synch)),
             web.post('/api/v1/sns/{operation}',
                      process_sns_operation(planner)),
             web.get('/api/v1/sns/repair-status',

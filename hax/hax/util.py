@@ -214,9 +214,23 @@ class KVAdapter:
         """
         assert key
         try:
+            LOG.debug('KVPUT key=%s, kwargs=%s', key, kwargs)
             return self.cns.kv.put(key, data, **kwargs)
         except (ConsulException, HTTPError, RequestException) as e:
             raise HAConsistencyException('Failed to put value to KV') from e
+
+    @invalidates_consul_cache
+    def kv_del(self, key: str, kv_cache=None) -> bool:
+        """
+        Helper method that should be used by default in this class whenver
+        we want to invoke Consul.kv.delete()
+        """
+        assert key
+        try:
+            LOG.debug('KVDEL key=%s', key)
+            return self.cns.kv.delete(key)
+        except (ConsulException, HTTPError, RequestException) as e:
+            raise HAConsistencyException(f'Failed to delete value: {e}')
 
     def kv_put_in_transaction(self, tx_payload: List[TxPutKV]) -> bool:
         def to_payload(v: TxPutKV) -> Dict[str, Any]:

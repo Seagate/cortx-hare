@@ -19,6 +19,16 @@
       }
     },
     {
+      "type": "key",
+      "key": "leader",
+      "handler_type": "http",
+      "http_handler_config": {
+        "path": "http://localhost:8008/watcher/leader",
+        "method": "POST",
+        "timeout": "10s"
+      }
+    },
+    {
       "type": "keyprefix",
       "prefix": "bq/",
       "handler_type": "http",
