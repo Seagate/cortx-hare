@@ -351,7 +351,6 @@ class CdfGenerator:
         # We will create 1 IO service entry in CDF per cvg.
         # An IO service entry will use data devices from corresponding cvg.
         # meta data device is taken from motr-hare shared store.
-        data_drives_info = self.utils.get_drives_info()
         servers = DList([
             M0ServerDesc(
                 io_disks=DisksDesc(
