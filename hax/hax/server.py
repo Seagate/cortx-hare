@@ -210,7 +210,7 @@ def process_leader_change(my_node: str, rc_synch: Synchronizer):
 
         def fn():
             # session_id = data['Session']
-            leader_node = base64.b64decode(data['Value'])
+            leader_node = base64.b64decode(data['Value']).decode()
             LOG.debug('XXX RC updated: %s', data)
             rc_synch.set_leader(leader_node == my_node)
 

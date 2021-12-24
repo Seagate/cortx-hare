@@ -99,6 +99,13 @@ def _get_motr_fids(util: ConsulUtil) -> HL_Fids:
     return HL_Fids(hax_ep, hax_fid, ha_fid, profiles)
 
 
+@repeat_if_fails()
+def _check_if_leader(util: ConsulUtil, synch: Synchronizer):
+    my_node = util.get_local_nodename()
+    leader = util.get_leader_node()
+    synch.set_leader(my_node == leader)
+
+
 def _run_rconfc_starter_thread(motr: Motr,
                                consul_util: ConsulUtil) -> RconfcStarter:
     rconfc_starter = RconfcStarter(motr, consul_util)
@@ -171,16 +178,20 @@ def main():
 
         stats_updater = _run_stats_updater_thread(motr, consul_util=util)
         event_poller = _run_thread(create_ha_thread(planner, util))
-        # [KN] This is a blocking call. It will work until the program is
-        # terminated by signal
-
         synch = Synchronizer()
         rc_thread = _run_thread(RCProcessorThread(synch, util.kv))
+
+        _check_if_leader(util, synch)
+
         server = ServerRunner(planner,
                               herald,
                               consul_util=util,
                               hax_state=state,
                               rc_synch=synch)
+
+        # [KN] This is a blocking call. It will work until the program is
+        # terminated by signal
+
         server.run(threads_to_wait=[
             *consumer_threads, stats_updater, rconfc_starter, event_poller,
             rc_thread

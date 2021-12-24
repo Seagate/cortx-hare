@@ -46,7 +46,7 @@ def create_eq(values: List[Tuple[int, str]]) -> List[Dict[str, str]]:
 
 def eq(values: List[Tuple[int, str]]):
     def f(key, **kwargs):
-        if key == 'eq':
+        if key == 'eq/':
             return create_eq(values)
         raise RuntimeError(f'Unexpected key requested: {key}')
 

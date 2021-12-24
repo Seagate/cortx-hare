@@ -16,12 +16,12 @@
 # please email opensource@seagate.com or cortx-questions@seagate.com.
 #
 
+import base64
+import json
 import logging
 import re
 from threading import Condition
 from typing import Dict, List, Optional, Tuple
-import json
-import base64
 
 from hax.exception import InterruptedException
 from hax.types import StoppableThread
@@ -57,7 +57,9 @@ class Synchronizer:
                 if self.stopping:
                     raise InterruptedException('Application is shutting down')
                 if self.leader:
+                    LOG.debug('I am RC leader')
                     if self.pause_needed:
+                        self.pause_needed = False
                         # TODO revisit this logic
                         # This implementation assumes that any time the new RC
                         # leader starts working, it must wait for 2 seconds
@@ -67,7 +69,11 @@ class Synchronizer:
                         # RC leaders that are finishing their job. If we think
                         # of the way how to learn that, then we can avoid extra
                         # pauses.
+                        LOG.debug(
+                            "I'll sleep for %s seconds to allow former "
+                            'RC leader to finish the work', self.wait_timeout)
                         self.lock.wait(self.wait_timeout)
+                        LOG.debug("Fine, let me check if I'm still a leader")
                         continue
                     return
                 self.lock.wait()
@@ -87,7 +93,13 @@ class Synchronizer:
             self.leader = is_leader
             if is_leader:
                 self.pause_needed = not was
+                if not was:
+                    LOG.debug('Unblocking RC leader thread: the leadership '
+                              'is now acquired!')
             else:
+                if was:
+                    LOG.debug('Current node is not an RC leader anymore. RC '
+                              'leader thread will be blocked')
                 self.pause_needed = True
             self.lock.notify()
 
@@ -112,7 +124,10 @@ class MessageProvider:
     def get_next_message(self) -> Optional[Tuple[int, Dict[str, str]]]:
         """ Returns the next unprocessed EQ message.
         """
-        messages: List[Dict[str, str]] = self.kv.kv_get('eq', recurse=True)
+        # Note that we intentionally leave trailing slash at the end.
+        # If we request 'eq' with recurse flag, by some reason 'eq-epoch' key
+        # may be returned.
+        messages: List[Dict[str, str]] = self.kv.kv_get('eq/', recurse=True)
 
         def get_key(item: Dict[str, str]) -> int:
             key = item['Key']
@@ -164,6 +179,8 @@ class RCProcessorThread(StoppableThread):
 
         except InterruptedException:
             LOG.debug('Shutting down gracefully')
+        except Exception:
+            LOG.exception('Unexpected error')
         finally:
             LOG.debug('RC processing thread exited')
 
@@ -188,5 +205,6 @@ class RCProcessorThread(StoppableThread):
             LOG.debug('XXX parsed message payload: %s', parsed_obj)
             # TODO implement rule invocation here
         except Exception as e:
-            LOG.warn('Failed to process EQ message [offset=%s]: %s. '
-                     'Skipped.', msg['Key'], e)
+            LOG.warn(
+                'Failed to process EQ message [offset=%s]: %s. '
+                'Skipped.', msg['Key'], e)
