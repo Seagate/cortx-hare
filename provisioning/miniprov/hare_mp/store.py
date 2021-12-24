@@ -44,6 +44,12 @@ class ValueProvider:
     def get_storage_set_index(self) -> int:
         raise NotImplementedError()
 
+    def get_machine_ids_for_service(self, service_type: str) -> List[str]:
+        raise NotImplementedError()
+
+    def get_hostnames_for_service(self, service_type: str) -> List[str]:
+        raise NotImplementedError()
+
     def get_data_nodes(self) -> List[str]:
         raise NotImplementedError()
 
@@ -77,6 +83,33 @@ class ConfStoreProvider(ValueProvider):
     def _raw_get(self, key: str) -> str:
         return self.conf.get(self.index, key)
 
+    def get_machine_ids_for_service(self, service_type: str) -> List[str]:
+        """
+        Return a list of pod's machine_id w.r.t service_type.
+        service_type will be like Const.SERVICE_MOTR_IO.value,
+        Const.SERVICE_S3_SERVER.value etc
+        """
+        nodes: List[str] = []
+        machines: Dict[str, Any] = self.get('node')
+        services = self.search_val('node', 'services', service_type)
+        for machine_id in machines.keys():
+            result = [srv for srv in services if machine_id in srv]
+            if result:
+                nodes.append(machine_id)
+        return nodes
+
+    def get_hostnames_for_service(self, service_type: str) -> List[str]:
+        """
+        Return a list of pod's hostname w.r.t service_type.
+        service_type will be like Const.SERVICE_MOTR_IO.value,
+        Const.SERVICE_S3_SERVER.value etc
+        """
+        nodes: List[str] = []
+        machines = self.get_machine_ids_for_service(service_type)
+        for machine_id in machines:
+            nodes.append(self.get(f'node>{machine_id}>hostname'))
+        return nodes
+
     def get_cluster_id(self) -> str:
         machine_id = self.get_machine_id()
         cluster_id = self.get(f'node>{machine_id}>cluster_id')
@@ -99,16 +132,7 @@ class ConfStoreProvider(ValueProvider):
         raise RuntimeError('No storage set found. Is ConfStore data valid?')
 
     def get_data_nodes(self) -> List[str]:
-        machines: Dict[str, Any] = self.get('node')
-        storage_nodes: List[str] = []
-        services = self.search_val('node', 'services',
-                                   Const.SERVICE_MOTR_IO.value)
-        for machine_id in machines.keys():
-            result = [svc for svc in services if machine_id in svc]
-            # Skipping for controller HA and server pod
-            if result:
-                storage_nodes.append(machine_id)
-        return storage_nodes
+        return self.get_machine_ids_for_service(Const.SERVICE_MOTR_IO.value)
 
     def search_val(self, parent_key: str, search_key: str,
                    search_val: str) -> List[str]:
