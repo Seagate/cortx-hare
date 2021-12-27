@@ -36,7 +36,7 @@ def hax_state() -> HaxGlobalState:
 
 
 @pytest.fixture
-def bq_pub(mocker) -> BQPublisher:
+def bq_pub(mocker):
     return mocker.create_autospec(BQPublisher)
 
 
