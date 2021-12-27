@@ -15,19 +15,19 @@
 # For any questions about this software or licensing,
 # please email opensource@seagate.com or cortx-questions@seagate.com.
 #
+import hax.common as C
+import hax.queue.publish as P
+import hax.util as U
+import inject
 
 
-class HaxGlobalState:
+def di_configuration(binder: inject.Binder):
     """
-    Global state of whole HaX application.
+    Configures Dependency Injection (DI) engine.
     """
-    def __init__(self):
-        self.stopping: bool = False
+    binder.bind(C.HaxGlobalState, C.HaxGlobalState())
 
-    def is_stopping(self) -> bool:
-        """Whether the application is stopping now"""
-        return self.stopping
-
-    def set_stopping(self):
-        """Switches the current state to 'stopping' state"""
-        self.stopping = True
+    cns_util = U.ConsulUtil()
+    binder.bind(U.ConsulUtil, cns_util)
+    binder.bind(P.BQPublisher, P.BQPublisher(kv=cns_util.kv))
+    binder.bind(P.EQPublisher, P.EQPublisher(kv=cns_util.kv))

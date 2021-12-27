@@ -25,7 +25,7 @@ import argparse
 from typing import Dict, List, Tuple
 
 from consul import Consul
-from hax.common import di_configuration
+from hax.common.config import di_configuration
 from hax.util import ConsulUtil, repeat_if_fails
 
 import utils

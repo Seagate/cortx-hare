@@ -31,7 +31,7 @@ from subprocess import PIPE, Popen
 from typing import Any, Dict, List, NamedTuple, Optional
 
 from consul import Consul, ConsulException
-from hax.common import di_configuration
+from hax.common.config import di_configuration
 from hax.exception import HAConsistencyException
 from hax.util import ConsulUtil, repeat_if_fails
 from hax.types import Fid

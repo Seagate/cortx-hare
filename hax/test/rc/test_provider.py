@@ -18,9 +18,29 @@
 
 from typing import Dict, List, Tuple
 
+import inject
 import pytest
+from hax.common import HaxGlobalState
+from hax.queue.publish import BQPublisher, EQPublisher
 from hax.rc import MessageProvider
 from hax.util import KVAdapter
+
+
+@pytest.fixture
+def hax_state() -> HaxGlobalState:
+    return HaxGlobalState()
+
+
+@pytest.fixture(autouse=True)
+def inject_support(hax_state: HaxGlobalState, kv_adapter: KVAdapter):
+    def configure(binder: inject.Binder):
+        binder.bind(HaxGlobalState, hax_state)
+        binder.bind(EQPublisher, EQPublisher(kv=kv_adapter))
+        binder.bind(BQPublisher, BQPublisher(kv=kv_adapter))
+
+    inject.clear_and_configure(configure)
+    yield ''
+    inject.clear()
 
 
 @pytest.fixture

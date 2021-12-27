@@ -4,8 +4,7 @@ from typing import NamedTuple
 
 import click
 import inject
-
-from hax.common import di_configuration
+from hax.common.config import di_configuration
 from hax.queue.publish import BQPublisher, EQPublisher, Publisher
 
 AppCtx = NamedTuple('AppCtx', [('payload', str), ('type', str),
@@ -41,9 +40,7 @@ def parse_opts(ctx, queue: str, type: str, payload: str):
     # of arguments.
     # If the things change, such oneliner must be refactored.
     publisher: Publisher = types[name]()
-    ctx.obj['result'] = AppCtx(payload=payload,
-                               type=type,
-                               publisher=publisher)
+    ctx.obj['result'] = AppCtx(payload=payload, type=type, publisher=publisher)
     return ctx.obj
 
 
@@ -51,9 +48,7 @@ def main():
     _setup_logging()
     inject.configure(di_configuration)
     try:
-        raw_ctx = parse_opts(args=sys.argv[1:],
-                             standalone_mode=False,
-                             obj={})
+        raw_ctx = parse_opts(args=sys.argv[1:], standalone_mode=False, obj={})
         if type(raw_ctx) is not dict:
             exit(1)
         app_context = raw_ctx['result']

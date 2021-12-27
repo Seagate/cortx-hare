@@ -38,7 +38,7 @@ from urllib.parse import urlparse
 
 import yaml
 from cortx.utils.product_features import unsupported_features
-from hax.common import di_configuration
+from hax.common.config import di_configuration
 from hax.types import KeyDelete, Fid
 from hax.util import ConsulUtil, repeat_if_fails, KVAdapter
 from helper.generate_sysconf import Generator

@@ -25,7 +25,8 @@ from typing import List, NamedTuple
 
 import inject
 
-from hax.common import HaxGlobalState, di_configuration
+from hax.common import HaxGlobalState
+from hax.common.config import di_configuration
 from hax.filestats import FsStatsUpdater
 from hax.ha import create_ha_thread
 from hax.handler import ConsumerThread
@@ -140,7 +141,7 @@ def main():
     # process needs to shutdown).
     signal.signal(signal.SIGINT, handle_signal)
 
-    util: ConsulUtil = ConsulUtil()
+    util = inject.instance(ConsulUtil)
     # Avoid removing session on hax start as this will happen
     # on every node, thus leader election will keep re-triggering
     # until the final hax node starts, this will delay further

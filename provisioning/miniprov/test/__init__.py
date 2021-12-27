@@ -16,6 +16,6 @@
 # please email opensource@seagate.com or cortx-questions@seagate.com.
 #
 import inject
-from hax.common import di_configuration
+from hax.common.config import di_configuration
 
 inject.configure(di_configuration)

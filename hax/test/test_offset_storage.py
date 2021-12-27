@@ -22,7 +22,7 @@ import logging
 import unittest
 from time import sleep
 
-from hax.common import di_configuration
+from hax.common.config import di_configuration
 from hax.queue.offset import OffsetStorage
 from hax.util import KVAdapter
 from unittest.mock import Mock, MagicMock
