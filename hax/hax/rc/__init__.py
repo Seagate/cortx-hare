@@ -27,6 +27,9 @@ from hax.exception import InterruptedException
 from hax.types import StoppableThread
 from hax.util import KVAdapter, repeat_if_fails
 
+from .rule import (EqMessageHandler, NullHandler, ProcHealthUpdateHandler,
+                   StobIoqErrorHandler)
+
 LOG = logging.getLogger('hax')
 
 
@@ -121,6 +124,7 @@ class MessageProvider:
     def __init__(self, kv: KVAdapter):
         self.kv = kv
 
+    @repeat_if_fails(wait_seconds=0.25)
     def get_next_message(self) -> Optional[Tuple[int, Dict[str, str]]]:
         """ Returns the next unprocessed EQ message.
         """
@@ -163,7 +167,7 @@ class RCProcessorThread(StoppableThread):
         self.provider = MessageProvider(kv_adapter)
 
     def stop(self):
-        """Stops the current thread gracefully."""
+        """Stops the thread gracefully."""
         synch = self.synchronizer
         with synch.lock:
             synch.stopping = True
@@ -197,14 +201,22 @@ class RCProcessorThread(StoppableThread):
 
     def _process_message(self, msg: Dict[str, str]):
         LOG.debug('Started processing message %s', msg)
-        # TODO implement rule invocation here
         try:
             b_value: bytes = base64.b64decode(msg['Value'])
             str_val = b_value.decode('utf-8')
             parsed_obj = json.loads(str_val)
-            LOG.debug('XXX parsed message payload: %s', parsed_obj)
-            # TODO implement rule invocation here
+            msg_type = parsed_obj['message_type']
+            handler = self._get_msg_handler(msg_type)
+            handler.handle(msg_type, parsed_obj['payload'])
         except Exception as e:
             LOG.warn(
                 'Failed to process EQ message [offset=%s]: %s. '
                 'Skipped.', msg['Key'], e)
+
+    def _get_msg_handler(self, msg_type: str) -> EqMessageHandler:
+        if msg_type == 'STOB_IOQ_ERROR':
+            return StobIoqErrorHandler()
+        elif msg_type == 'PROCESS_HEALTH':
+            return ProcHealthUpdateHandler()
+        else:
+            return NullHandler()

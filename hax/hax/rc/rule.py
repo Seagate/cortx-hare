@@ -15,3 +15,33 @@
 # For any questions about this software or licensing,
 # please email opensource@seagate.com or cortx-questions@seagate.com.
 #
+import logging
+from typing import Any, Dict
+
+import inject
+from hax.queue.publish import BQPublisher
+
+LOG = logging.getLogger('hax')
+
+P = Dict[str, Any]
+
+
+class EqMessageHandler:
+    def handle(self, msg_type: str, payload: P) -> None:
+        raise RuntimeError('Not implemented')
+
+
+class NullHandler(EqMessageHandler):
+    def handle(self, msg_type: str, payload: P) -> None:
+        LOG.debug('Message [type=%s] is unsupported. Skipped', msg_type)
+
+
+class StobIoqErrorHandler(EqMessageHandler):
+    def handle(self, msg_type: str, payload: P) -> None:
+        pub = inject.instance(BQPublisher)
+        pub.publish(msg_type, payload)
+
+
+class ProcHealthUpdateHandler(EqMessageHandler):
+    def handle(self, msg_type: str, payload: P) -> None:
+        raise RuntimeError('Implement me')
