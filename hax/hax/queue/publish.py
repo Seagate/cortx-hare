@@ -1,4 +1,4 @@
-from typing import Any, Dict, NamedTuple, Optional
+from typing import Any, Dict, List, NamedTuple, Optional, Union
 
 import simplejson
 from hax.util import KVAdapter, TxPutKV, repeat_if_fails
@@ -6,8 +6,9 @@ from hax.util import KVAdapter, TxPutKV, repeat_if_fails
 # XXX do we want to make payload definition more strict?
 # E.g. there could be a type hierarchy for payload objects that depends
 # on the type name.
-Message = NamedTuple('Message', [('message_type', str),
-                                 ('payload', Dict[str, Any])])
+
+PLD = Union[str, List[Any], Dict[Any, Any]]
+Message = NamedTuple('Message', [('message_type', str), ('payload', PLD)])
 
 
 class Publisher:
@@ -22,11 +23,19 @@ class Publisher:
         self.epoch_key = epoch_key
 
     @repeat_if_fails(wait_seconds=0.1)
-    def publish(self, message_type: str, payload: str) -> int:
+    def publish(self, message_type: str, payload: PLD) -> int:
         """
         Publishes the given message to the queue.
         """
-        data = simplejson.loads(payload)
+        data = payload
+        if isinstance(payload, str):
+            # TODO do we really want this to happen?
+            #
+            # If in the future we'll want to support non-JSON message payloads
+            # (e.g. when we want to shrink message size), this line should be
+            # revisited.
+            data = simplejson.loads(payload)
+
         message = Message(message_type=message_type, payload=data)
         data = simplejson.dumps(message)
 

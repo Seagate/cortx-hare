@@ -29,6 +29,7 @@ from hax.util import KVAdapter, repeat_if_fails
 
 from .rule import (EqMessageHandler, NullHandler, ProcHealthUpdateHandler,
                    StobIoqErrorHandler)
+from .message import STOB_IOQ, PROCESS_HEALTH
 
 LOG = logging.getLogger('hax')
 
@@ -214,9 +215,9 @@ class RCProcessorThread(StoppableThread):
                 'Skipped.', msg['Key'], e)
 
     def _get_msg_handler(self, msg_type: str) -> EqMessageHandler:
-        if msg_type == 'STOB_IOQ_ERROR':
+        if msg_type == STOB_IOQ:
             return StobIoqErrorHandler()
-        elif msg_type == 'PROCESS_HEALTH':
+        elif msg_type == PROCESS_HEALTH:
             return ProcHealthUpdateHandler()
         else:
             return NullHandler()

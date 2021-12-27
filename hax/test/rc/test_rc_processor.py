@@ -115,8 +115,6 @@ def test_ioq_stob_supported(mocker, kv_adapter: KVAdapter,
                        size=100,
                        bshift=4)
 
-    # Here we make sure that rea StobIoqError can be used as the payload
-    # for STOB_IOQ_ERROR bq message.
     stob_payload = dump_json(msg)
     parsed_stob = simplejson.loads(stob_payload)
 
@@ -132,3 +130,5 @@ def test_ioq_stob_supported(mocker, kv_adapter: KVAdapter,
     assert not m_synch.sleep.called
     m_bq = cast(Mock, bq_pub)
     m_bq.publish.assert_called_with('STOB_IOQ_ERROR', parsed_stob)
+    m_kv = cast(Mock, kv_adapter)
+    m_kv.kv_del.assert_called_once_with('eq/12')

@@ -18,7 +18,8 @@
 
 import logging
 from base64 import b64encode
-from typing import List
+from typing import List, cast
+from unittest.mock import Mock
 
 import inject
 import pytest
@@ -27,10 +28,11 @@ from hax.common import HaxGlobalState
 from hax.message import BroadcastHAStates, StobId, StobIoqError
 from hax.motr import WorkPlanner
 from hax.motr.delivery import DeliveryHerald
+from hax.queue.publish import BQPublisher, EQPublisher
 from hax.rc import Synchronizer
 from hax.server import ServerRunner
 from hax.types import Fid, HAState, MessageId, ServiceHealth
-from hax.util import dump_json
+from hax.util import KVAdapter, dump_json
 
 
 @pytest.fixture
@@ -59,10 +61,23 @@ def rc_synchronizer():
     return Synchronizer()
 
 
+@pytest.fixture
+def kv_adapter(mocker):
+    return mocker.create_autospec(KVAdapter)
+
+
+@pytest.fixture
+def eq_publisher(mocker):
+    return mocker.create_autospec(EQPublisher)
+
+
 @pytest.fixture(autouse=True)
-async def logging_support(hax_state: HaxGlobalState):
+async def logging_support(hax_state: HaxGlobalState, kv_adapter: KVAdapter,
+                          eq_publisher: EQPublisher):
     def configure(binder: inject.Binder):
         binder.bind(HaxGlobalState, hax_state)
+        binder.bind(EQPublisher, eq_publisher)
+        binder.bind(BQPublisher, BQPublisher(kv=kv_adapter))
 
     inject.clear_and_configure(configure)
     yield ''
@@ -88,8 +103,12 @@ async def test_hello_works(hax_client):
 @pytest.mark.parametrize('status,health', [('passing', ServiceHealth.OK),
                                            ('warning', ServiceHealth.FAILED),
                                            ('critical', ServiceHealth.FAILED)])
-async def test_service_health_broadcast(hax_client, planner, status: str,
-                                        health: ServiceHealth):
+async def test_health_update_is_sent_to_eq_only(hax_client, planner,
+                                                status: str,
+                                                health: ServiceHealth,
+                                                eq_publisher: EQPublisher):
+    """Consul health updates are re-sent to EQ, no motr broadcast happens"""
+
     service_health = [{
         'Node': {
             'Node': 'localhost',
@@ -115,12 +134,15 @@ async def test_service_health_broadcast(hax_client, planner, status: str,
         ],
     }]
     resp = await hax_client.post('/', json=service_health)
+    # logging.error(await resp.json())
     assert resp.status == 200
-    assert planner.add_command.called
-    planner.add_command.assert_called_once_with(
-        BroadcastHAStates(
-            states=[HAState(fid=Fid(0x7200000000000001, 12), status=health)],
-            reply_to=None))
+    assert not planner.add_command.called
+    m_eq = cast(Mock, eq_publisher)
+    m_eq.publish.assert_called_once_with('PROCESS_HEALTH', service_health)
+    # planner.add_command.assert_called_once_with(
+    # BroadcastHAStates(
+    # states=[HAState(fid=Fid(0x7200000000000001, 12), status=health)],
+    # reply_to=None))
 
 
 class ContainsStates:

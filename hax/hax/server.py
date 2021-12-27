@@ -25,14 +25,14 @@ from json.decoder import JSONDecodeError
 from queue import Queue
 from typing import Any, Callable, Dict, List, Type, Union
 
+import inject
 from aiohttp import web
 from aiohttp.web import HTTPError, HTTPNotFound
 from aiohttp.web_response import json_response
-from helper.exec import Executor, Program
 
 from hax.common import HaxGlobalState
-from hax.message import (BaseMessage, BroadcastHAStates, SnsDiskAttach,
-                         SnsDiskDetach, SnsRebalancePause, SnsRebalanceResume,
+from hax.message import (BaseMessage, SnsDiskAttach, SnsDiskDetach,
+                         SnsRebalancePause, SnsRebalanceResume,
                          SnsRebalanceStart, SnsRebalanceStatus,
                          SnsRebalanceStop, SnsRepairPause, SnsRepairResume,
                          SnsRepairStart, SnsRepairStatus, SnsRepairStop)
@@ -41,9 +41,12 @@ from hax.motr.planner import WorkPlanner
 from hax.queue import BQProcessor
 from hax.queue.confobjutil import ConfObjUtil
 from hax.queue.offset import InboxFilter, OffsetStorage
+from hax.queue.publish import EQPublisher
 from hax.rc import Synchronizer
+from hax.rc.message import PROCESS_HEALTH
 from hax.types import Fid, HAState, ServiceHealth, StoppableThread
 from hax.util import ConsulUtil, create_process_fid, dump_json
+from helper.exec import Executor, Program
 
 LOG = logging.getLogger('hax')
 
@@ -101,7 +104,7 @@ def to_ha_states(data: Any, consul_util: ConsulUtil) -> List[HAState]:
     ]
 
 
-def process_ha_states(planner: WorkPlanner, consul_util: ConsulUtil):
+def process_ha_states(pub: EQPublisher):
     async def _process(request):
         data = await request.json()
 
@@ -109,11 +112,9 @@ def process_ha_states(planner: WorkPlanner, consul_util: ConsulUtil):
 
         def fn():
             # import pudb.remote
-            # pudb.remote.set_trace(term_size=(80, 40), port=9998)
+            # pudb.remote.set_trace(term_size=(130, 40), port=9998)
             LOG.debug('Service health from Consul: %s', data)
-            planner.add_command(
-                BroadcastHAStates(states=to_ha_states(data, consul_util),
-                                  reply_to=None))
+            pub.publish(PROCESS_HEALTH, data)
 
         # Note that planner.add_command is potentially a blocking call
         await loop.run_in_executor(None, fn)
@@ -262,6 +263,7 @@ class ServerRunner:
         self.planner = planner
         self.hax_state = hax_state
         self.rc_synch = rc_synch
+        self.eq_pub = inject.instance(EQPublisher)
 
     def _create_server(self) -> web.Application:
         return web.Application(middlewares=[encode_exception])
@@ -288,13 +290,14 @@ class ServerRunner:
         herald = self.herald
         consul_util = self.consul_util
         synch = self.rc_synch
+        eq_pub = self.eq_pub
         my_node = consul_util.get_local_nodename()
 
         app = self._create_server()
         app.add_routes([
             web.get('/', hello_reply),
             web.get('/cluster/status', hctl_stat),
-            web.post('/', process_ha_states(planner, consul_util)),
+            web.post('/', process_ha_states(eq_pub)),
             web.post(
                 '/watcher/bq',
                 process_bq_update(inbox_filter,
