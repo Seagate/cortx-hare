@@ -58,17 +58,12 @@ def _by_first(ret: List[Tuple[A, B]]):
 def test_workflow_works(cns_helper: ConsulHelper, mocker):
     fid = mk_fid(ObjT.PROCESS, 12)
     mocker.patch.object(cns_helper,
-                        'get_current_state',
-                        side_effect=_by_first([
-                            (fid, m0HaObjState.M0_NC_TRANSIENT)
-                        ]))
-    mocker.patch.object(cns_helper,
                         'get_process_status_key_pair',
                         side_effect=_by_first([
                             (fid, ('a_key',
                                    json.dumps({
                                        'name': 'PROC!',
-                                       'state': '---'
+                                       'state': 'M0_NC_TRANSIENT'
                                    }))),
                         ]))
 
@@ -93,9 +88,13 @@ def test_workflow_works(cns_helper: ConsulHelper, mocker):
 def test_no_actions_if_state_not_changed(cns_helper: ConsulHelper, mocker):
     fid = mk_fid(ObjT.PROCESS, 12)
     mocker.patch.object(cns_helper,
-                        'get_current_state',
+                        'get_process_status_key_pair',
                         side_effect=_by_first([
-                            (fid, m0HaObjState.M0_NC_DTM_RECOVERING)
+                            (fid, ('a_key',
+                                   json.dumps({
+                                       'name': 'PROC!',
+                                       'state': 'M0_NC_DTM_RECOVERING'
+                                   }))),
                         ]))
 
     ex = Collector()
@@ -118,14 +117,14 @@ def test_process_started_updates_devices(cns_helper: ConsulHelper, mocker):
     mocker.patch.object(cns_helper,
                         'get_services_under',
                         return_value=[svc_fid])
-    mocker.patch.object(cns_helper,
-                        'get_current_state',
-                        side_effect=_by_first([
-                            (fid, m0HaObjState.M0_NC_DTM_RECOVERING),
-                            (svc_fid, m0HaObjState.M0_NC_TRANSIENT),
-                            (disks[0], m0HaObjState.M0_NC_TRANSIENT),
-                            (disks[1], m0HaObjState.M0_NC_TRANSIENT),
-                        ]))
+    # mocker.patch.object(cns_helper,
+    #                     'get_current_state',
+    #                     side_effect=_by_first([
+    #                         (fid, m0HaObjState.M0_NC_DTM_RECOVERING),
+    #                         (svc_fid, m0HaObjState.M0_NC_TRANSIENT),
+    #                         (disks[0], m0HaObjState.M0_NC_TRANSIENT),
+    #                         (disks[1], m0HaObjState.M0_NC_TRANSIENT),
+    #                     ]))
     mocker.patch.object(cns_helper, 'get_disks_by_service', return_value=disks)
     mocker.patch.object(cns_helper,
                         'get_process_status_key_pair',
@@ -133,7 +132,7 @@ def test_process_started_updates_devices(cns_helper: ConsulHelper, mocker):
                             (fid, ('a_key',
                                    json.dumps({
                                        'name': 'PROC!',
-                                       'state': '---'
+                                       'state': 'M0_NC_DTM_RECOVERING'
                                    }))),
                         ]))
 
@@ -143,17 +142,17 @@ def test_process_started_updates_devices(cns_helper: ConsulHelper, mocker):
                             (f'a_key/services/{svc_fid}',
                              json.dumps({
                                  'name': 'PROC!',
-                                 'state': '---'
+                                 'state': 'M0_NC_TRANSIENT'
                              })),
                             (f'a_key/services/{svc_fid}/sdevs/{disks[0]}',
                              json.dumps({
                                  'path': '/dev/sda1',
-                                 'state': '---'
+                                 'state': 'M0_NC_TRANSIENT'
                              })),
                             (f'a_key/services/{svc_fid}/sdevs/{disks[1]}',
                              json.dumps({
                                  'path': '/dev/sda2',
-                                 'state': '---'
+                                 'state': 'M0_NC_TRANSIENT'
                              })),
                         ]))
 

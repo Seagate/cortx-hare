@@ -210,7 +210,7 @@ class RCProcessorThread(StoppableThread):
             handler = self._get_msg_handler(msg_type)
             handler.handle(msg_type, parsed_obj['payload'])
         except Exception as e:
-            LOG.warn(
+            LOG.warning(
                 'Failed to process EQ message [offset=%s]: %s. '
                 'Skipped.', msg['Key'], e)
 

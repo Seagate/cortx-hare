@@ -20,9 +20,9 @@ import logging
 from typing import List, Tuple
 
 from hax.consul.cache import create_kv_cache
-from hax.motr import Motr
 from hax.types import Fid, HaNoteStruct, m0HaObjState
 from hax.util import TxPutKV
+from hax.queue.publish import BQPublisher
 
 from .action import ActionHolder, ActionProvider, BroadcastState, SetKV
 from .common import ConsulHelper, Context, Pager
@@ -43,9 +43,9 @@ class Executor:
     transitions - even then the actions can be grouped for the sake of
     performance.
     """
-    def __init__(self, cns: ConsulHelper, motr: Motr):
+    def __init__(self, cns: ConsulHelper, pub: BQPublisher):
         self.cns = cns
-        self.motr = motr
+        self.pub = pub
 
     def execute(self, actions: ActionHolder) -> None:
         self._run_kv(actions.kv_ops)
@@ -60,13 +60,14 @@ class Executor:
             self.cns.put_kv(tx_data)
 
     def _run_bcast(self, actions: List[BroadcastState]):
-        to_send = [
-            HaNoteStruct(no_id=item.fid.to_c(),
-                         no_state=item.state.to_ha_note_status())
-            for item in actions
-        ]
-        # TODO: do we need this broadcast_hax_only?
-        self.motr.ha_broadcast(to_send, broadcast_hax_only=False)
+        # to_send = [
+        #     HaNoteStruct(no_id=item.fid.to_c(),
+        #                  no_state=item.state.to_ha_note_status())
+        #     for item in actions
+        # ]
+        # # TODO: do we need this broadcast_hax_only?
+        # self.motr.ha_broadcast(to_send, broadcast_hax_only=False)
+        self.pub.publish('MOTR_BCAST', actions)
 
 
 class ObjectWorkflow:

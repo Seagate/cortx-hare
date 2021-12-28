@@ -68,11 +68,6 @@ class ConsulHelper:
     def __init__(self, cns: Optional[ConsulUtil] = None):
         self.cns = cns or ConsulUtil()
 
-    def get_current_state(self, fid: Fid) -> m0HaObjState:
-        """ Reads the latest known state of the object from Consul KV.
-        """
-        raise RuntimeError('Not implemented')
-
     def is_proc_client(self, fid: Fid) -> bool:
         raise RuntimeError('Not implemented')
 

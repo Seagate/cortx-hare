@@ -16,6 +16,8 @@
 # please email opensource@seagate.com or cortx-questions@seagate.com.
 #
 import hax.common as C
+import hax.motr.workflow as W
+import hax.motr.workflow.common as WC
 import hax.queue.publish as P
 import hax.util as U
 import inject
@@ -28,6 +30,11 @@ def di_configuration(binder: inject.Binder):
     binder.bind(C.HaxGlobalState, C.HaxGlobalState())
 
     cns_util = U.ConsulUtil()
+    bq_publisher = P.BQPublisher(kv=cns_util.kv)
     binder.bind(U.ConsulUtil, cns_util)
-    binder.bind(P.BQPublisher, P.BQPublisher(kv=cns_util.kv))
+    binder.bind(P.BQPublisher, bq_publisher)
     binder.bind(P.EQPublisher, P.EQPublisher(kv=cns_util.kv))
+
+    helper = WC.ConsulHelper(cns=cns_util)
+    executor = W.Executor(helper, bq_publisher)
+    binder.bind(W.ObjectWorkflow, W.ObjectWorkflow(executor, helper))

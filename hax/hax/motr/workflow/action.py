@@ -101,8 +101,17 @@ class TransitStrategy:
         self.transitions = self._create_transitions()
         self.provider = provider
 
-    def do_transition(self, fid: Fid, old: m0HaObjState, new: m0HaObjState,
+    def do_transition(self, fid: Fid, new: m0HaObjState,
                       ctx: Context) -> ActionHolder:
+        _, value = self._get_kv_key(fid, ctx)
+        if not value:
+            # impossible situation: the corresponding {name, state}
+            # JSONs are generated in cfgen.
+            raise RuntimeError('Business logic error: process status '
+                               f'[fid={fid}] has no value in KV.')
+
+        old = self._parse_state_from_kv_value(value)
+
         if old == new:
             return ActionHolder()
 
@@ -128,6 +137,9 @@ class TransitStrategy:
                      state=state,
                      key=key,
                      value=self._get_new_value(fid, state, old_val))
+
+    def _parse_state_from_kv_value(self, value: str) -> m0HaObjState:
+        raise RuntimeError('Not implemented')
 
     def _get_kv_key(self, fid: Fid, ctx: Context) -> Tuple[str, Optional[str]]:
         raise RuntimeError('Not implemented')
@@ -166,6 +178,10 @@ class ProcessMove(TransitStrategy):
     def _get_kv_key(self, fid: Fid, ctx: Context) -> Tuple[str, str]:
         helper = self.provider.helper
         return helper.get_process_status_key_pair(fid, ctx)
+
+    def _parse_state_from_kv_value(self, value: str) -> m0HaObjState:
+        parsed = json.loads(value)
+        return m0HaObjState.parse(parsed['state'])
 
     def _get_new_value(self, fid: Fid, state: m0HaObjState,
                        old_value: Optional[str]) -> str:
@@ -245,6 +261,10 @@ class ServiceMove(TransitStrategy):
 
         return (key, value)
 
+    def _parse_state_from_kv_value(self, value: str) -> m0HaObjState:
+        parsed = json.loads(value)
+        return m0HaObjState.parse(parsed['state'])
+
     def _get_new_value(self, fid: Fid, state: m0HaObjState,
                        old_value: Optional[str]) -> str:
         if not old_value:
@@ -293,6 +313,8 @@ class ServiceMove(TransitStrategy):
 
 
 class HwMove(TransitStrategy):
+    """ Transition strategy for Node, Storage device, Enclosure and Controller.
+    """
     def _get_new_value(self, fid: Fid, state: m0HaObjState,
                        old_value: Optional[str]) -> str:
         if not old_value:
@@ -305,8 +327,9 @@ class HwMove(TransitStrategy):
         value['state'] = repr(state)
         return json.dumps(value)
 
-    """ Transition strategy for Node, Storage device, Enclosure and Controller.
-    """
+    def _parse_state_from_kv_value(self, value: str) -> m0HaObjState:
+        parsed = json.loads(value)
+        return m0HaObjState.parse(parsed['state'])
 
     def _create_transitions(
             self) -> Dict[Tuple[m0HaObjState, m0HaObjState], Handler]:
@@ -362,14 +385,7 @@ class ActionProvider:
     def get_actions(self, fid, new: m0HaObjState,
                     ctx: Context) -> ActionHolder:
         f_type = self._get_type(fid)
-        old = self.helper.get_current_state(fid)
-        if f_type not in self.movers:
-            # TODO it may happen that the problem is that the requested
-            # transition is obsolete (example: the object is ALREADY in new
-            # state). Do we want to ignore that transition without an
-            # exception?
-            raise TransitionNotAllowed()
-        actions = self.movers[f_type].do_transition(fid, old, new, ctx)
+        actions = self.movers[f_type].do_transition(fid, new, ctx)
         return actions
 
     def _get_type(self, fid: Fid) -> ObjT:
