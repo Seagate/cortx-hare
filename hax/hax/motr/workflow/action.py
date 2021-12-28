@@ -16,7 +16,7 @@
 # please email opensource@seagate.com or cortx-questions@seagate.com.
 #
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from typing import Callable, Dict, Iterable, List, Optional, Tuple
 
 from hax.types import Fid, ObjT, m0HaObjState
@@ -27,7 +27,32 @@ from .exception import TransitionForbidden, TransitionNotAllowed
 
 @dataclass
 class Action:
-    pass
+    def for_json(self):
+        parts = {}
+
+        def as_str(a):
+            return str(a)
+
+        def as_repr(a):
+            return repr(a)
+
+        def as_is(a):
+            return a
+
+        for fld in fields(self):
+            f_type = fld.type
+            f_name = fld.name
+            val = getattr(self, f_name)
+            to_str = as_str
+            if f_type is Fid:
+                to_str = as_repr
+            elif f_type is m0HaObjState:
+                to_str = as_is
+            elif f_type is int or f_type is None:
+                to_str = as_is
+            parts[fld.name] = to_str(val)
+
+        return parts
 
 
 @dataclass

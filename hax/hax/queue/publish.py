@@ -1,7 +1,7 @@
 from typing import Any, Dict, List, NamedTuple, Optional, Union
 
 import simplejson
-from hax.util import KVAdapter, TxPutKV, repeat_if_fails
+from hax.util import KVAdapter, TxPutKV, repeat_if_fails, dump_json
 
 # XXX do we want to make payload definition more strict?
 # E.g. there could be a type hierarchy for payload objects that depends
@@ -37,7 +37,7 @@ class Publisher:
             data = simplejson.loads(payload)
 
         message = Message(message_type=message_type, payload=data)
-        data = simplejson.dumps(message)
+        data = dump_json(message)
 
         while True:
             index, value = self.kv.kv_get_raw(self.epoch_key)

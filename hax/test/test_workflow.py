@@ -19,11 +19,14 @@
 import json
 from typing import List, Tuple, TypeVar
 
+import inject
 import pytest
 from hax.motr.workflow import ConsulHelper, Executor, ObjectWorkflow
+from hax.motr.workflow.action import BroadcastState
 from hax.motr.workflow.common import Pager
-from hax.types import ObjT, m0HaObjState
-from hax.util import ConsulUtil, mk_fid
+from hax.queue.publish import BQPublisher
+from hax.types import Fid, ObjT, m0HaObjState
+from hax.util import ConsulUtil, KVAdapter, TxPutKV, dump_json, mk_fid
 
 
 @pytest.fixture
@@ -117,14 +120,6 @@ def test_process_started_updates_devices(cns_helper: ConsulHelper, mocker):
     mocker.patch.object(cns_helper,
                         'get_services_under',
                         return_value=[svc_fid])
-    # mocker.patch.object(cns_helper,
-    #                     'get_current_state',
-    #                     side_effect=_by_first([
-    #                         (fid, m0HaObjState.M0_NC_DTM_RECOVERING),
-    #                         (svc_fid, m0HaObjState.M0_NC_TRANSIENT),
-    #                         (disks[0], m0HaObjState.M0_NC_TRANSIENT),
-    #                         (disks[1], m0HaObjState.M0_NC_TRANSIENT),
-    #                     ]))
     mocker.patch.object(cns_helper, 'get_disks_by_service', return_value=disks)
     mocker.patch.object(cns_helper,
                         'get_process_status_key_pair',
@@ -180,3 +175,41 @@ def test_pager_works_if_size_large():
     p = Pager(values, 20)
     paginated = [x for x in p.get_next()]
     assert [[1, 1, 2, 3, 5, 8]] == paginated
+
+
+@pytest.fixture(autouse=True)
+def inject_support(kv_adapter: KVAdapter):
+    def configure(binder: inject.Binder):
+        binder.bind(BQPublisher, BQPublisher(kv=kv_adapter))
+
+    inject.clear_and_configure(configure)
+    yield ''
+    inject.clear()
+
+
+@pytest.fixture
+def kv_adapter(mocker):
+    return mocker.create_autospec(KVAdapter)
+
+
+def test_bq_broadcast_serializeable():
+    bcast = BroadcastState(Fid(12, 13), m0HaObjState.M0_NC_DTM_RECOVERING)
+    first = dump_json(bcast)
+    assert first == '{"fid": "0xc:0xd", "state": 7}'
+
+
+# flake8: noqa
+def test_bq_can_publish_motr_bcast(mocker, kv_adapter):
+    mocker.patch.object(kv_adapter,
+                        'kv_get_raw',
+                        return_value=(1, {
+                            'Value': '12'
+                        }))
+    mocker.patch.object(kv_adapter, 'kv_put_in_transaction', return_value=True)
+    bcast = BroadcastState(Fid(12, 13), m0HaObjState.M0_NC_DTM_RECOVERING)
+    inject.instance(BQPublisher).publish('MOTR_BCAST', bcast)
+    kv_adapter.kv_put_in_transaction.assert_called_once_with([
+            TxPutKV(key='epoch', value='13', cas=1),
+            TxPutKV(key='bq/13', value='{"message_type": "MOTR_BCAST", "payload": {"fid": "0xc:0xd", "state": 7}}',
+                    cas=None)
+            ])
