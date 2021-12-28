@@ -285,6 +285,7 @@ class m0HaProcessEvent(IntEnum):
     M0_CONF_HA_PROCESS_STARTED = 1
     M0_CONF_HA_PROCESS_STOPPING = 2
     M0_CONF_HA_PROCESS_STOPPED = 3
+    M0_CONF_HA_PROCESS_DTM_RECOVERED = 4
 
     @staticmethod
     def str_to_Enum(evt: str):
@@ -295,18 +296,24 @@ class m0HaProcessEvent(IntEnum):
                   'M0_CONF_HA_PROCESS_STOPPING':
                   m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPING,
                   'M0_CONF_HA_PROCESS_STOPPED':
-                  m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED}
+                  m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED,
+                  'M0_CONF_HA_PROCESS_DTM_RECOVERED':
+                  m0HaProcessEvent.M0_CONF_HA_PROCESS_DTM_RECOVERED,
+                  }
         return events[evt]
 
     def __repr__(self):
         return self.name
 
     def event_to_svchealth(self):
+        M = m0HaProcessEvent
         m0ProcessEvToSvcHealth = {
-            m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTING: ServiceHealth.OK,
-            m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED: ServiceHealth.OK,
-            m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPING: ServiceHealth.FAILED,
-            m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED: ServiceHealth.FAILED}
+            M.M0_CONF_HA_PROCESS_STARTING: ServiceHealth.OK,
+            M.M0_CONF_HA_PROCESS_STARTED: ServiceHealth.OK,
+            M.M0_CONF_HA_PROCESS_DTM_RECOVERED: ServiceHealth.OK,
+            M.M0_CONF_HA_PROCESS_STOPPING: ServiceHealth.FAILED,
+            M.M0_CONF_HA_PROCESS_STOPPED: ServiceHealth.FAILED
+        }
         return m0ProcessEvToSvcHealth[self]
 
 
