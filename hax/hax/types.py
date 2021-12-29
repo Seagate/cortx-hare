@@ -363,7 +363,7 @@ class m0HaProcessEvent(IntEnum):
     def event_to_svchealth(self):
         m0ProcessEvToSvcHealth = {
             m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTING: ObjHealth.OK,
-            m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED: ObjHealth.OK,
+            m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED: ObjHealth.RECOVERING,
             m0HaProcessEvent.M0_CONF_HA_PROCESS_DTM_RECOVERED:
                 ObjHealth.OK,
             m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPING: ObjHealth.FAILED,
