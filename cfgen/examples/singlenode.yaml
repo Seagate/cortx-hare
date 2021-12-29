@@ -7,6 +7,7 @@ nodes:
     data_iface: eth1        # name of data network interface
     #data_iface_type: o2ib  # type of network interface (optional);
                             # supported values: "tcp" (default), "o2ib"
+    transport_type: libfab
     m0_servers:
       - runs_confd: true
         io_disks:

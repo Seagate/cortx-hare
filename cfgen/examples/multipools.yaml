@@ -2,6 +2,7 @@ nodes:
   - hostname: srvnode-1
     data_iface: enp175s0f1_c1
     data_iface_type: o2ib
+    transport_type: libfab
     m0_servers:
       - runs_confd: true
         io_disks:
@@ -22,6 +23,7 @@ nodes:
   - hostname: srvnode-2
     data_iface: enp175s0f1_c2
     data_iface_type: o2ib
+    transport_type: libfab
     m0_servers:
       - runs_confd: true
         io_disks:

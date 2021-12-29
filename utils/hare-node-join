@@ -44,6 +44,7 @@ Options:
   -h, --help    Show this help and exit.
   --xprt        Use given motr transport type to generate corresponding motr
                 endpoints. Supported transport types are lnet and libfab.
+                Transport type defaults to libfab if not specified.
 EOF
 }
 

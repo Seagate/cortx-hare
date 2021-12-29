@@ -40,6 +40,7 @@ Options:
   --node       Starts hare and motr services on current node only.
   --xprt       Use given motr transport type to generate corresponding motr
                process endpoints. Supported transport types are lnet and libfab.
+               Transport type defaults to libfab if not specified.
   -h, --help   Shows this help and exit.
 EOF
 
@@ -54,7 +55,7 @@ eval set -- "$TEMP"
 
 conf_dir=/var/lib/hare
 node=false
-xprt='lnet'
+xprt='libfab'
 
 while true; do
     case "$1" in

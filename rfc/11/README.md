@@ -49,6 +49,9 @@ Positional arguments:
 Options:
   --debug      Print commands and their arguments as they are executed.
   --mkfs       Execute m0mkfs.  *CAUTION* This wipes all Motr data!
+  --xprt       Use given motr transport type to generate corresponding motr
+               process endpoints. Supported transport types are lnet and libfab.
+               Transport type defaults to libfab if not specified.
   -h, --help   Show this help and exit.
 ```
 
@@ -68,6 +71,25 @@ $ hctl bootstrap --mkfs /tmp/ldr1-cluster.yaml
 2020-09-03 09:55:16: Starting Motr (phase2, m0d)... OK
 2020-09-03 09:55:19: Checking health of services... OK
 ```
+OR (specifying transport type)
+
+```
+$ hctl bootstrap --mkfs --xprt libfab /opt/seagate/cortx/hare/share/cfgen/examples/singlenode.yaml
+2021-12-29 10:38:57: Generating cluster configuration... OK
+2021-12-29 10:38:58: Stopping Consul on this node... OK
+2021-12-29 10:39:10: Stopping Consul on other nodes... OK
+2021-12-29 10:39:10: Starting Consul server on this node............ OK
+2021-12-29 10:39:20: Importing configuration into the KV store... OK
+2021-12-29 10:39:20: Starting Consul on other nodes...Consul ready on all nodes
+2021-12-29 10:39:20: Updating Consul configuraton from the KV store... OK
+2021-12-29 10:39:21: Waiting for the RC Leader to get elected.......... OK
+2021-12-29 10:39:28: Starting Motr (phase1, mkfs)... OK
+2021-12-29 10:39:35: Starting Motr (phase1, m0d)... OK
+2021-12-29 10:39:37: Starting Motr (phase2, mkfs)... OK
+2021-12-29 10:39:42: Starting Motr (phase2, m0d)... OK
+2021-12-29 10:39:45: Checking health of services... OK
+```
+
 
 ## Cluster shutdown
 

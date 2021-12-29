@@ -67,6 +67,7 @@ while true; do
         --mkfs)              do_mkfs=mkfs; shift ;;
         --mkfs-only)         do_mkfs=mkfs-only; shift ;;
         -p|--phase)          phase=$2; shift 2 ;;
+        --xprt)              xprt=$2; shift 2 ;;
         --)                  shift; break ;;
         *)                   echo 'getopt: internal error...'; exit 1 ;;
     esac

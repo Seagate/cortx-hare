@@ -67,7 +67,7 @@ log_dir=/var/log/seagate/hare
 kv_file=/var/lib/hare/consul-kv.json
 dry_run=false
 server=false
-xprt='lnet'
+xprt='libfab'
 # custom_config flag will tell if custom config dir is provided or not
 # In case of mini-provisioning, conf_dir will be provided(derived from confstore)
 # In case conf_dir is not provided then below flat will be false and we will use
@@ -139,7 +139,6 @@ get_ios_meta_data_from_kv_file() {
 get_service_ids_from_kv_file() {
     local filter=$1
     local key="m0conf/nodes/$(get_node_name)/processes/*"
-    # echo "key: $key fiter: $filter"
     local cmd="jq -r '.[] | select(.key|test(\"$key\"))' $kv_file |
                   $filter | sed 's/.*processes.//' | cut -d/ -f1"
     eval $cmd || true
@@ -148,7 +147,6 @@ get_service_ids_from_kv_file() {
 get_service_ep_from_kv_file() {
     local process_fidk=$1
     local key="m0conf/nodes/$(get_node_name)/processes/$process_fidk/endpoint"
-    # echo "key: $key"
     local cmd="jq -r '.[] | select(.key==\"$key\") |
                   .value' $kv_file | head -n 1"
     eval $cmd || true
