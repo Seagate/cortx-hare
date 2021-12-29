@@ -284,9 +284,8 @@ class Motr:
                             broadcast_hax_only=False) -> List[MessageId]:
         LOG.debug('Broadcasting HA states %s over ha_link', ha_states)
 
-        def ha_obj_state(st):
-            return HaNoteStruct.M0_NC_ONLINE if st.status == ServiceHealth.OK \
-                else HaNoteStruct.M0_NC_FAILED
+        def ha_obj_state(st: ServiceHealth):
+            return st.to_ha_note_status()
 
         def _update_process_tree(proc_fid: Fid, state: ServiceHealth) -> bool:
             return (st.status in (ServiceHealth.FAILED, ServiceHealth.OK) and
@@ -305,7 +304,7 @@ class Motr:
                     self.consul_util.is_proc_client(st.fid)):
                 proc_full_fid = self.consul_util.get_process_full_fid(st.fid)
                 st.fid = proc_full_fid
-            note = HaNoteStruct(st.fid.to_c(), ha_obj_state(st))
+            note = HaNoteStruct(st.fid.to_c(), ha_obj_state(st.status))
             notes.append(note)
 
             # For process failure, we report failure for the corresponding

@@ -144,7 +144,7 @@ wait_active() {
 
 process_started() {
     local fid=$1
-    if [[ $(get-process-state $fid) == M0_CONF_HA_PROCESS_STARTED ]]; then
+    if [[ $(get-process-state $fid) == M0_CONF_HA_PROCESS_DTM_RECOVERED ]]; then
         return 0
     fi
     return 1
