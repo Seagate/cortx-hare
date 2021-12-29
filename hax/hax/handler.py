@@ -79,6 +79,9 @@ class ConsumerThread(StoppableThread):
                     ServiceHealth.FAILED),
             (m0HaProcessType.M0_CONF_HA_PROCESS_M0D,
                 m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED): (
+                    ServiceHealth.RECOVERING),
+            (m0HaProcessType.M0_CONF_HA_PROCESS_M0D,
+                m0HaProcessEvent.M0_CONF_HA_PROCESS_DTM_RECOVERED): (
                     ServiceHealth.OK),
             (m0HaProcessType.M0_CONF_HA_PROCESS_M0D,
                 m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED): (
@@ -89,8 +92,10 @@ class ConsumerThread(StoppableThread):
             (m0HaProcessType.M0_CONF_HA_PROCESS_OTHER,
                 m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED): (
                     ServiceHealth.FAILED)}
-        if event.chp_event in (m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED,
-                               m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED):
+        if event.chp_event in (
+                m0HaProcessEvent.M0_CONF_HA_PROCESS_DTM_RECOVERED,
+                m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED,
+                m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED):
             svc_status = motr_to_svc_status[(event.chp_type, event.chp_event)]
             broadcast_hax_only = False
             if ((event.chp_type ==
@@ -122,7 +127,8 @@ class ConsumerThread(StoppableThread):
                     state.status, state.fid)
                 if current_status == ServiceHealth.OK:
                     if (self.consul.get_process_local_status(
-                            state.fid) == 'M0_CONF_HA_PROCESS_STARTED'):
+                            state.fid) in (
+                            'M0_CONF_HA_PROCESS_DTM_RECOVERED')):
                         continue
                 if current_status in (ServiceHealth.FAILED,
                                       ServiceHealth.STOPPED):
@@ -152,15 +158,21 @@ class ConsumerThread(StoppableThread):
                     # confirms its current status from Consul KV and updates
                     # the list of failed services and also adds it to the
                     # broadcast list.
-                    if current_status != ServiceHealth.OK:
-                        event = m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED
+                    proc_status_saved = self.consul.get_process_status(
+                                            state.fid)
+                    proc_type = m0HaProcessType.str_to_Enum(
+                        proc_status_saved.proc_type)
+                    if current_status not in (ServiceHealth.OK,
+                                              ServiceHealth.RECOVERING):
+                        proc_status = (
+                            m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED)
                     else:
-                        event = m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED
+                        proc_status = m0HaProcessEvent.str_to_Enum(
+                            proc_status_saved.proc_status)
                     self.consul.update_process_status(
                         ConfHaProcess(
-                            chp_event=event,
-                            chp_type=int(
-                                m0HaProcessType.M0_CONF_HA_PROCESS_M0D),
+                            chp_event=proc_status,
+                            chp_type=proc_type,
                             chp_pid=0,
                             fid=state.fid))
                 new_ha_states.append(
