@@ -111,8 +111,27 @@ class HaNoteStruct(c.Structure):
     # * copied from spare space to the replacement storage.
     # */
     M0_NC_REBALANCE = 6
+    # /**
+    #  * Recovery is triggered by the incoming DTM_RECOVERING HA state
+    #  * message. During this state, processes iterate over their DTM logs,
+    #  * pack elements of them, TXRs, into REDO messages and send REDO
+    #  * messages to corresponding participants of TXR. Any subsequent failure
+    #  * of the process in the cluster restarts the recovery process on all
+    #  * alive participants.
+    #  *
+    #  * DTM_RECOVERING state is transitive for client applications and mkfs,
+    #  * meaning that transition from NC_DTM_RECOVERING to NC_ONLINE is
+    #  * immediate.
+    #  *
+    #  * For m0ds(md-, io-services) indicates that the process waits for the
+    #  * completion of ongoing dtm recovery process. When client
+    #  * leans the process in DTM_RECOVERING state it treats the process as
+    #  * read-only, at least for the metadata, and skips sending modification
+    #  * requests to it.
+    #  */
+    M0_NC_DTM_RECOVERING = 7
 
-    M0_NC_NR = 7
+    M0_NC_NR = 8
 
     _fields_ = [("no_id", FidStruct), ("no_state", c.c_uint32)]
 
@@ -276,6 +295,7 @@ class ObjHealth(Enum):
     REPAIR = (5, HaNoteStruct.M0_NC_REPAIR)
     REPAIRED = (6, HaNoteStruct.M0_NC_REPAIRED)
     REBALANCE = (7, HaNoteStruct.M0_NC_REBALANCE)
+    RECOVERING = (8, HaNoteStruct.M0_NC_DTM_RECOVERING)
 
     def __repr__(self):
         """Return human-readable constant name (useful in log output)."""
@@ -310,6 +330,7 @@ class m0HaProcessEvent(IntEnum):
     M0_CONF_HA_PROCESS_STARTED = 1
     M0_CONF_HA_PROCESS_STOPPING = 2
     M0_CONF_HA_PROCESS_STOPPED = 3
+    M0_CONF_HA_PROCESS_DTM_RECOVERED = 4
 
     @staticmethod
     def str_to_Enum(evt: str):
@@ -320,7 +341,9 @@ class m0HaProcessEvent(IntEnum):
                   'M0_CONF_HA_PROCESS_STOPPING':
                   m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPING,
                   'M0_CONF_HA_PROCESS_STOPPED':
-                  m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED}
+                  m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED,
+                  'M0_CONF_HA_PROCESS_DTM_RECOVERED':
+                  m0HaProcessEvent.M0_CONF_HA_PROCESS_DTM_RECOVERED}
         return events[evt]
 
     def __repr__(self):
@@ -330,6 +353,8 @@ class m0HaProcessEvent(IntEnum):
         m0ProcessEvToSvcHealth = {
             m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTING: ObjHealth.OK,
             m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED: ObjHealth.OK,
+            m0HaProcessEvent.M0_CONF_HA_PROCESS_DTM_RECOVERED:
+                ObjHealth.OK,
             m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPING: ObjHealth.FAILED,
             m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED: ObjHealth.FAILED}
         return m0ProcessEvToSvcHealth[self]
@@ -368,6 +393,7 @@ class m0HaObjState(IntEnum):
     M0_NC_REPAIR = HaNoteStruct.M0_NC_REPAIR
     M0_NC_REPAIRED = HaNoteStruct.M0_NC_REPAIRED
     M0_NC_REBALANCE = HaNoteStruct.M0_NC_REBALANCE
+    M0_NC_DTM_RECOVERING = HaNoteStruct.M0_NC_DTM_RECOVERING
     M0_NC_NR = HaNoteStruct.M0_NC_NR
 
     def __repr__(self):
@@ -384,6 +410,7 @@ class m0HaObjState(IntEnum):
             'M0_NC_REPAIR': m0HaObjState.M0_NC_REPAIR,
             'M0_NC_REPAIRED': m0HaObjState.M0_NC_REPAIRED,
             'M0_NC_REBALANCE': m0HaObjState.M0_NC_REBALANCE,
+            'M0_NC_DTM_RECOVERING': m0HaObjState.M0_NC_DTM_RECOVERING,
             'M0_NC_NR': m0HaObjState.M0_NC_NR
         }
         return states[state]
