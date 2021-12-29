@@ -84,6 +84,9 @@ class ConsumerThread(StoppableThread):
                     ObjHealth.FAILED),
             (m0HaProcessType.M0_CONF_HA_PROCESS_M0D,
                 m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED): (
+                    ObjHealth.RECOVERING),
+            (m0HaProcessType.M0_CONF_HA_PROCESS_M0D,
+                m0HaProcessEvent.M0_CONF_HA_PROCESS_DTM_RECOVERED): (
                     ObjHealth.OK),
             (m0HaProcessType.M0_CONF_HA_PROCESS_M0D,
                 m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED): (
@@ -94,8 +97,10 @@ class ConsumerThread(StoppableThread):
             (m0HaProcessType.M0_CONF_HA_PROCESS_OTHER,
                 m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED): (
                     ObjHealth.FAILED)}
-        if event.chp_event in (m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED,
-                               m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED):
+        if event.chp_event in (
+                m0HaProcessEvent.M0_CONF_HA_PROCESS_DTM_RECOVERED,
+                m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED,
+                m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED):
             svc_status = motr_to_svc_status[(event.chp_type, event.chp_event)]
             broadcast_hax_only = False
             if ((event.chp_type ==

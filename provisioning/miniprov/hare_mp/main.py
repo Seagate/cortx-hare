@@ -864,7 +864,8 @@ def all_services_started(url: str, processes: Dict[str, List[Fid]]) -> bool:
             if proc_state:
                 proc_state_val = proc_state[0]['Value']
                 state = json.loads(proc_state_val.decode('utf8'))['state']
-                if state != 'M0_CONF_HA_PROCESS_STARTED':
+                if state not in ('M0_CONF_HA_PROCESS_STARTED',
+                                 'M0_CONF_HA_PROCESS_DTM_RECOVERED'):
                     return False
             else:
                 return False

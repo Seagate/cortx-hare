@@ -122,7 +122,8 @@ def create_profile_fid(key: int) -> Fid:
 ha_process_events = ('M0_CONF_HA_PROCESS_STARTING',
                      'M0_CONF_HA_PROCESS_STARTED',
                      'M0_CONF_HA_PROCESS_STOPPING',
-                     'M0_CONF_HA_PROCESS_STOPPED')
+                     'M0_CONF_HA_PROCESS_STOPPED',
+                     'M0_CONF_HA_PROCESS_DTM_RECOVERED')
 
 
 ha_conf_obj_states = ('M0_NC_UNKNOWN',
@@ -131,7 +132,8 @@ ha_conf_obj_states = ('M0_NC_UNKNOWN',
                       'M0_NC_TRANSIENT',
                       'M0_NC_REPAIR',
                       'M0_NC_REPAIRED',
-                      'M0_NC_REBALANCE')
+                      'M0_NC_REBALANCE',
+                      'M0_NC_DTM_RECOVERING')
 
 
 def repeat_if_fails(wait_seconds=5, max_retries=-1):
@@ -721,7 +723,8 @@ class ConsulUtil:
             'unknown': HaNoteStruct.M0_NC_UNKNOWN,
             'online': HaNoteStruct.M0_NC_ONLINE,
             'offline': HaNoteStruct.M0_NC_TRANSIENT,
-            'failed': HaNoteStruct.M0_NC_FAILED}
+            'failed': HaNoteStruct.M0_NC_FAILED,
+            'dtm_recovering': HaNoteStruct.M0_NC_DTM_RECOVERING}
 
         failvec_data = self.kv.kv_get('failvec', kv_cache=kv_cache)
         failvec = failvec_data['Value']
@@ -1750,6 +1753,9 @@ class ConsulUtil:
             local_remote_health_ret(ObjHealth.UNKNOWN,
                                     ObjHealth.UNKNOWN),
             cur_consul_status('passing', 'M0_CONF_HA_PROCESS_STARTED'):
+            local_remote_health_ret(ObjHealth.RECOVERING,
+                                    ObjHealth.RECOVERING),
+            cur_consul_status('passing', 'M0_CONF_HA_PROCESS_DTM_RECOVERED'):
             local_remote_health_ret(ObjHealth.OK,
                                     ObjHealth.OK),
             cur_consul_status('passing', 'M0_CONF_HA_PROCESS_STOPPED'):
@@ -1762,6 +1768,9 @@ class ConsulUtil:
             local_remote_health_ret(ObjHealth.OFFLINE,
                                     ObjHealth.OFFLINE),
             cur_consul_status('warning', 'M0_CONF_HA_PROCESS_STARTED'):
+            local_remote_health_ret(ObjHealth.OFFLINE,
+                                    ObjHealth.OFFLINE),
+            cur_consul_status('warning', 'M0_CONF_HA_PROCESS_DTM_RECOVERED'):
             local_remote_health_ret(ObjHealth.OFFLINE,
                                     ObjHealth.OFFLINE),
             cur_consul_status('warning', 'M0_CONF_HA_PROCESS_STOPPED'):
