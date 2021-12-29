@@ -42,6 +42,7 @@ Options:
   --mkfs       Execute m0mkfs.  *CAUTION* This wipes all Motr data!
   --xprt       Use given motr transport type to generate corresponding motr
                process endpoints. Supported transport types are lnet and libfab.
+               Transport type defaults to libfab if not specified.
   -h, --help   Show this help and exit.
 EOF
 }
@@ -237,7 +238,7 @@ eval set -- "$TEMP"
 conf_dir=
 opt_mkfs=
 debug_p=false
-xprt='lnet'
+xprt='libfab'
 
 while true; do
     case "$1" in

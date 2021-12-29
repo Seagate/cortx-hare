@@ -6,6 +6,7 @@ nodes:
     data_iface: eth1_c1     # name of data network interface
     data_iface_type: o2ib   # LNet type of network interface (optional);
                             # supported values: "tcp" (default), "o2ib"
+    transport_type: libfab
     m0_servers:
       - runs_confd: true
         io_disks:
@@ -22,6 +23,7 @@ nodes:
   - hostname: pod-c2
     data_iface: eth1_c2
     data_iface_type: o2ib
+    transport_type: libfab
     m0_servers:
       - runs_confd: true
         io_disks:
