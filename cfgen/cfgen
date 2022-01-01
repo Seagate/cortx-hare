@@ -3,7 +3,7 @@
 import abc
 import argparse
 import ast
-from enum import Enum, auto
+from enum import Enum, auto, IntEnum
 from functools import lru_cache, wraps
 import itertools
 import json
@@ -830,6 +830,24 @@ def oids_to_dhall(oids: List[Oid]) -> str:
 NetProtocol = Enum('NetProtocol', 'tcp o2ib')
 
 
+ProcT = Enum('ProcT', 'hax m0_server m0_client_s3 m0_client_other')
+ProcT.__doc__ = 'Type of process'
+
+
+class LnetPortalGroup(IntEnum):
+    hax = 1,
+    m0_server = 2,
+    m0_client_s3 = 3,
+    m0_client_other = 4
+
+
+class LibfabPortalGroup(IntEnum):
+    hax = 2000,
+    m0_server = 3000,
+    m0_client_s3 = 4000,
+    m0_client_other = 5000
+
+
 class Endpoint:
     pass
 
@@ -837,16 +855,17 @@ class Endpoint:
 class LnetEndpoint(Endpoint):
     _tmids: Dict[Tuple[str, int], int] = {}
 
-    def __init__(self, proto: NetProtocol, ipaddr: str, portalgroup: int,
+    def __init__(self, proto: NetProtocol, ipaddr: str,
+                 portalgroup: LnetPortalGroup,
                  tmid: int = None):
         self.proto = proto
         assert ipaddr
         self.ipaddr = ipaddr
-        assert portalgroup > 0
+        assert portalgroup.value > 0
         self.portalgroup = portalgroup
         if tmid is None:
-            self.tmid = self._tmids.setdefault((ipaddr, portalgroup), 1)
-            self._tmids[(ipaddr, portalgroup)] += 1
+            self.tmid = self._tmids.setdefault((ipaddr, portalgroup.value), 1)
+            self._tmids[(ipaddr, portalgroup.value)] += 1
         else:
             assert tmid > 0
             self.tmid = tmid
@@ -872,17 +891,17 @@ class LibfabricEndpoint(Endpoint):
     ep_map: Dict[Tuple[str, int], int] = {}
 
     def __init__(self, NetFamily: str, proto: NetProtocol, ipaddr: str,
-                 portalgroup: int):
+                 portalgroup: LibfabPortalGroup):
         self.netfamily = NetFamily
         self.proto = proto
         assert ipaddr
         self.ipaddr = ipaddr
-        assert portalgroup > 0
+        assert portalgroup.value > 0
         self.portalgroup = portalgroup
         self.portal = 0
-        self.portal = self.ep_map.setdefault((ipaddr, portalgroup),
-                                             (portalgroup + 1))
-        self.ep_map[(ipaddr, portalgroup)] += 1
+        self.portal = self.ep_map.setdefault((ipaddr, portalgroup.value),
+                                             (portalgroup.value + 1))
+        self.ep_map[(ipaddr, portalgroup.value)] += 1
 
     def __repr__(self):
         args = ', '.join([f'netfamily={self.netfamily!r}',
@@ -1022,16 +1041,6 @@ class ConfNode(ToDhall):
         return node_id
 
 
-# ProcT = Enum('ProcT', 'hax m0_server m0_client_s3 m0_client_other')
-# ProcT.__doc__ = 'Type of process'
-
-class ProcT(Enum):
-    hax = 2000
-    m0_server = 3000
-    m0_client_s3 = 4000
-    m0_client_other = 5000
-
-
 class ConfProcess(ToDhall):
     _objt = ObjT.process
     _downlinks = {Downlink('services', ObjT.service)}
@@ -1088,13 +1097,13 @@ class ConfProcess(ToDhall):
             LibfabricEndpoint(NetFamily='inet', proto=NetProtocol[proto],
                               ipaddr=facts[ipaddr_key(
                                            node_desc['data_iface'])],
-                              portalgroup=proc_t.value))
+                              portalgroup=LibfabPortalGroup[proc_t.name]))
         if transport_type == 'lnet':
             # Creates Lnet endpoint, remove once deprecated.
             ep = LnetEndpoint(proto=NetProtocol[proto],
                               ipaddr=facts[ipaddr_key(
                                            node_desc['data_iface'])],
-                              portalgroup=proc_t.value)
+                              portalgroup=LnetPortalGroup[proc_t.name])
         proc_id = new_oid(ObjT.process)
         meta_data = None
         if proc_desc is not None and proc_t is ProcT.m0_server:
@@ -2143,7 +2152,7 @@ def consul_kv_sdevs(m0conf: Dict[Oid, Any]) -> Dict[str, str]:
             assert proc_id.type is ObjT.process
             proc_key = f'{node_key}/processes/' + oid_to_fidstr(proc_id)
             # XXX-VERIFYME Can we really convert from portal (int) to name?
-            proc_name = ProcT(m0conf[proc_id].endpoint.portalgroup).name
+            proc_name = m0conf[proc_id].endpoint.portalgroup.name
             d[proc_key] = json.dumps({'name': proc_name,
                                       'state': 'M0_NC_UNKNOWN'})
             for svc_id in m0conf[proc_id].services:
@@ -2199,7 +2208,7 @@ def generate_consul_kv(cluster: Cluster, dhall_dir: str) -> str:
                                         proc_id=proc_id,
                                         ep=proc.endpoint,
                                         svc_id=cluster.m0_clients[proc_id],
-                                        stype=ProcT(proc_ep.portalgroup).name,
+                                        stype=proc_ep.portalgroup.name,
                                         meta_data=None)
 
     def sns_pools() -> List[Oid]:
