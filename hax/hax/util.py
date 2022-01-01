@@ -70,14 +70,20 @@ MotrProcStatusLocalRemote = NamedTuple('MotrProcStatusLocalRemote', [(
 
 
 def mkServiceData(service: Dict[str, Any]) -> ServiceData:
+    transport_type = service['ServiceMeta']['transport_type']
+    if transport_type == 'lnet':
+        addr = '{}:{}'.format(service['ServiceAddress'],
+                              service['ServicePort'])
+    else:
+        addr = '{}@{}'.format(service['ServiceAddress'],
+                              service['ServicePort'])
     return ServiceData(
         node=service['Node'],
         fid=mk_fid(
             ObjT.PROCESS,  # XXX s/PROCESS/SERVICE/ ?
             int(service['ServiceID'])),
         ip_addr=service['Address'],
-        address='{}@{}'.format(service['ServiceAddress'],
-                               service['ServicePort']))
+        address=addr)
 
 
 def mk_fid(obj_t: ObjT, key: int) -> Fid:

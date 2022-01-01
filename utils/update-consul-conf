@@ -268,6 +268,10 @@ append_hax_svc() {
       \"name\": \"hax\",
       \"address\": \"$addr\",
       \"port\": $port,
+      \"meta\":
+          {
+            \"transport_type\": \"$xprt\"
+          },
       \"checks\": [
           {
             \"args\": [ \"/opt/seagate/cortx/hare/libexec/check-service\",
@@ -293,6 +297,10 @@ append_confd_svc() {
       \"name\": \"confd\",
       \"address\": \"$addr\",
       \"port\": $port,
+      \"meta\":
+          {
+            \"transport_type\": \"$xprt\"
+          },
       \"checks\": [
           {
             \"args\": [ \"/opt/seagate/cortx/hare/libexec/check-service\",
@@ -327,6 +335,10 @@ append_ios_svc() {
       \"name\": \"ios\",
       \"address\": \"$addr\",
       \"port\": $port,
+      \"meta\":
+          {
+            \"transport_type\": \"$xprt\"
+          },
       \"checks\": [
           {
             \"args\": [ \"/opt/seagate/cortx/hare/libexec/check-service\",
@@ -368,6 +380,10 @@ append_s3_svc() {
       \"name\": \"s3service\",
       \"address\": \"$addr\",
       \"port\": $port,
+      \"meta\":
+          {
+            \"transport_type\": \"$xprt\"
+          },
       \"checks\": [
           {
             \"args\": [ \"/opt/seagate/cortx/hare/libexec/check-service\",
