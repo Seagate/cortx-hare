@@ -1050,6 +1050,8 @@ def create_parser() -> argparse.ArgumentParser:
                                    help_str='Generates support bundle',
                                    handler_fn=generate_support_bundle)
 
+    add_service_argument(sb_sub_parser)
+
     sb_sub_parser.add_argument(
         '-b',
         type=str,
@@ -1081,14 +1083,6 @@ def create_parser() -> argparse.ArgumentParser:
         help='Limit set on per component for its support bundle size.'
              'eg. "1G" for 1GB or "100M" for 100 MB. Default -> 0, '
              'for no size limit.',
-        action='store')
-
-    sb_sub_parser.add_argument(
-        '--services',
-        type=str,
-        nargs=1,
-        help='"|" pipe separated service names for the services for '
-             'which logs needs to be collected. Default is "All".',
         action='store')
 
     sb_sub_parser.add_argument(
