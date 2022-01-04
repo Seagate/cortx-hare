@@ -66,7 +66,6 @@ and health-checking mechanisms.
   On CentOS 7, if the facter version is less than 3.14 or not installed, then run the following commands to update/install it:
   
   ```sh
-  sudo yum erase -y $(rpm -q --whatprovides $(readlink -f /usr/bin/facter)) || sudo rm -fv /usr/bin/facter
   sudo yum localinstall -y https://yum.puppetlabs.com/puppet/el/7/x86_64/puppet-agent-7.0.0-1.el7.x86_64.rpm
   sudo ln -sf /opt/puppetlabs/bin/facter /usr/bin/facter
   ```
