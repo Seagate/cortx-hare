@@ -58,7 +58,7 @@ conf_dir=$DEFAULT_CONF_DIR
 use_systemd=true
 
 TEMP=$(getopt --options hm:b:t:c:l: \
-              --longoptions help,systemd-disabled \
+              --longoptions help,systemd-disabled,no-systemd \
               --name "$PROG" -- "$@" || true)
 
 eval set -- "$TEMP"
