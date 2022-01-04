@@ -1,6 +1,7 @@
 nodes:
   - hostname: ssu1
     data_iface: eth1
+    transport_type: libfab
     m0_servers:
       - runs_confd: true
         io_disks:
@@ -18,6 +19,7 @@ nodes:
         other: 2
   - hostname: ssu2
     data_iface: eth1
+    transport_type: libfab
     m0_servers:
       - runs_confd: true
         io_disks:
