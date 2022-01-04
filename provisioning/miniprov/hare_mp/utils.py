@@ -25,6 +25,7 @@ import io
 import os
 import logging
 from typing import List
+from functools import wraps
 from distutils.dir_util import copy_tree
 import shutil
 
@@ -36,60 +37,119 @@ from hare_mp.store import ValueProvider
 from hare_mp.types import Disk, DList, Maybe, Text
 
 
+def func_enter():
+    """
+    Logs function entry point.
+    """
+    def callable(f):
+        @wraps(f)
+        def wrapper(*args, **kwds):
+            func_name = f.__qualname__
+            logging.info('Entering %s', func_name)
+            return f(*args, **kwds)
+        return wrapper
+
+    return callable
+
+
+def func_leave():
+    """
+    Logs function exit point.
+    """
+    def callable(f):
+        @wraps(f)
+        def wrapper(*args, **kwds):
+            func_name = f.__qualname__
+            result = f(*args, **kwds)
+            logging.info('Leaving %s', func_name)
+            return result
+        return wrapper
+
+    return callable
+
+
 class Utils:
     def __init__(self, provider: ValueProvider):
         self.provider = provider
         self.kv = KVAdapter()
 
+    @func_enter()
+    @func_leave()
     def get_hostname(self, machine_id: str) -> str:
         """
         Returns the hostname of the given machine_id according to the given
         ConfStore (ValueProvider).
         """
-
+        # logging.info("Entering get_hostname function in class Utils")
         store = self.provider
         hostname = store.get(
             f'node>{machine_id}>network>data>private_fqdn', allow_null=True)
+        # logging.info("Exiting get_hostname function in class Utils")
         return hostname or store.get(f'node>{machine_id}>hostname')
 
+    @func_enter()
+    @func_leave()
     def get_local_hostname(self) -> str:
         """
         Retrieves the machine-id of the node where the code runs and fetches
         its hostname from the ConfStore (ValueProvider).
         """
+        # logging.info("Entering get_local_hostname function in class Utils")
         store = self.provider
         machine_id = store.get_machine_id()
+        # logging.info("Exiting get_local_hostname function in class Utils")
         return self.get_hostname(machine_id)
 
+    @func_enter()
+    @func_leave()
     @repeat_if_fails()
     def save_node_facts(self):
+        # logging.info("Entering save_node_facts function in class Utils")
         hostname = self.get_local_hostname()
         cmd = ['facter', '--json', 'processorcount', 'memorysize_mb']
         node_facts = execute(cmd)
         self.kv.kv_put(f'{hostname}/facts', node_facts)
+        # logging.info("Exiting save_node_facts function in class Utils")
 
+    @func_enter()
+    @func_leave()
     def get_node_facts(self):
+        # logging.info("Entering get_node_facts function in class Utils")
         hostname = self.get_local_hostname()
         node_facts = self.kv.kv_get(f'{hostname}/facts')
+        # logging.info("Exiting get_node_facts function in class Utils")
         return json.loads(node_facts['Value'])
 
+    @func_enter()
+    @func_leave()
     def get_data_devices(self, machine_id: str, cvg: int) -> DList[Text]:
+        # logging.info("Entering get_data_devices function in class Utils")
         data_devices = DList(
             [Text(device) for device in self.provider.get(
                 f'node>{machine_id}>'
                 f'storage>cvg[{cvg}]>devices>data')], 'List Text')
+        # logging.info("Exiting get_data_devices function in class Utils")
         return data_devices
 
+    @func_enter()
+    @func_leave()
     def _get_drive_info_form_os(self, path: str) -> Disk:
+        # logging.info("Entering _get_drive_info_form_os function in class "
+        #              "Utils")
         drive_size = 0
         with open(path, 'rb') as f:
             drive_size = f.seek(0, io.SEEK_END)
+        # logging.info("Exiting _get_drive_info_form_os function in class
+        #              Utils")
         return Disk(path=Maybe(Text(path), 'Text'),
                     size=Maybe(drive_size, 'Natural'),
                     blksize=Maybe(os.stat(path).st_blksize, 'Natural'))
 
+    @func_enter()
+    @func_leave()
     @repeat_if_fails()
     def _save_drive_info(self, path: str):
+        # logging.info("Entering _save_drive_info function in class Utils")
         disk: Disk = self._get_drive_info_form_os(path)
         hostname = self.get_local_hostname()
         drive_info = json.dumps({'path': disk.path.get().s,
@@ -97,13 +157,17 @@ class Utils:
                                  'blksize': int(disk.blksize.get())})
         disk_key = path.strip('/')
         self.kv.kv_put(f'{hostname}/{disk_key}', drive_info)
+        # logging.info("Exiting _save_drive_info function in class Utils")
 
+    @func_enter()
+    @func_leave()
     def is_motr_component(self, machine_id: str) -> bool:
         """
         Returns True if motr component is present in the components list
         for the given node>{machine_id} according to the
         ConfStore (ValueProvider).
         """
+        # logging.info("Entering is_motr_component function in class Utils")
         comp_names = self.provider.get(f'node>{machine_id}>'
                                        f'components')
         for component in comp_names:
@@ -112,14 +176,18 @@ class Utils:
                 break
             else:
                 rc = False
+        # logging.info("Exiting is_motr_component function in class Utils")
         return rc
 
+    @func_enter()
+    @func_leave()
     def is_s3_component(self, machine_id: str) -> bool:
         """
         Returns True if s3 component is present in the components list
         for the given node>{machine_id} according to the
         ConfStore (ValueProvider).
         """
+        # logging.info("Entering is_s3_component function in class Utils")
         comp_names = self.provider.get(f'node>{machine_id}>'
                                        f'components')
         for component in comp_names:
@@ -128,9 +196,13 @@ class Utils:
                 break
             else:
                 rc = False
+        # logging.info("Exiting is_s3_component function in class Utils")
         return rc
 
+    @func_enter()
+    @func_leave()
     def save_drives_info(self):
+        # logging.info("Entering save_drives_info function in class Utils")
         machine_id = self.provider.get_machine_id()
         if(self.is_motr_component(machine_id)):
             cvgs_key: str = f'node>{machine_id}>storage>cvg'
@@ -138,31 +210,49 @@ class Utils:
                 data_devs = self.get_data_devices(machine_id, cvg)
                 for dev_path in data_devs.value:
                     self._save_drive_info(dev_path.s)
+        # logging.info("Exiting save_drives_info function in class Utils")
 
+    @func_enter()
+    @func_leave()
     @repeat_if_fails()
     def get_drive_info_from_consul(self, path: Text, machine_id: str) -> Disk:
+        # logging.info("Entering get_drive_info_from_consul function in class "
+        #              "Utils")
         hostname = self.get_hostname(machine_id)
         disk_path = json.loads(str(path)).lstrip(os.sep)
         drive_data = self.kv.kv_get(f'{hostname}/{disk_path}')
         drive_info = json.loads(drive_data['Value'])
+        # logging.info("Exiting get_drive_info_from_consul function in class "
+        #              "Utils")
         return (Disk(path=Maybe(path, 'Text'),
                      size=Maybe(drive_info['size'], 'Natural'),
                      blksize=Maybe(drive_info['blksize'], 'Natural')))
 
+    @func_enter()
+    @func_leave()
     def get_drives_info_for(self, cvg: int, machine_id: str) -> DList[Disk]:
+        # logging.info("Entering get_drives_info_for function in class Utils")
         data_devs = self.get_data_devices(machine_id, cvg)
+        # logging.info("Exiting get_drives_info_for function in class Utils")
         return DList([self.get_drive_info_from_consul(dev_path, machine_id)
                       for dev_path in data_devs.value], 'List Disk')
 
+    @func_enter()
+    @func_leave()
     def import_kv(self, conf_dir_path: str):
+        # logging.info("Entering import_kv function in class Utils")
         with open(f'{conf_dir_path}/consul-kv.json') as f:
             data = json.load(f)
             for item in data:
                 item_data = json.loads(json.dumps(item))
                 self.kv.kv_put(item_data['key'],
                                str(item_data['value']))
+        # logging.info("Exiting import_kv function in class Utils")
 
+    @func_enter()
+    @func_leave()
     def copy_conf_files(self, conf_dir_path: str):
+        # logging.info("Entering copy_conf_files function in class Utils")
         machine_id = self.provider.get_machine_id()
         global_config_path = self.provider.get('cortx>common>storage>local')
 
@@ -181,11 +271,16 @@ class Utils:
         shutil.copyfile(
             f'{conf_dir_path}/confd.xc',
             f'{dest_motr}/confd.xc')
+        # logging.info("Exiting copy_conf_files function in class Utils")
 
+    @func_enter()
+    @func_leave()
     def copy_consul_files(self, conf_dir_path: str, mode: str):
+        # logging.info("Entering copy_consul_files function in class Utils")
         shutil.copyfile(
             f'{conf_dir_path}/consul-{mode}-conf/consul-{mode}-conf.json',
             f'{conf_dir_path}/consul/config/consul-{mode}-conf.json')
+        # logging.info("Exiting copy_consul_files function in class Utils")
 
     def stop_hare(self):
         self.hare_stop = True
@@ -193,12 +288,18 @@ class Utils:
     def is_hare_stopping(self) -> bool:
         return self.hare_stop
 
+    @func_enter()
+    @func_leave()
     def get_transport_type(self) -> str:
+        # logging.info("Entering get_transport_type function in class Utils")
         transport_type = self.provider.get(
             'cortx>motr>transport_type',
             allow_null=True)
         if transport_type is None:
+            # logging.info("Exiting get_transport_type function in class
+            #              Utils")
             return 'libfab'
+        # logging.info("Exiting get_transport_type function in class Utils")
         return transport_type
 
     @repeat_if_fails()
@@ -221,15 +322,24 @@ class LogWriter:
         return self.logging_handler.stream.fileno()
 
 
+@func_enter()
+@func_leave()
 def execute(cmd: List[str], env=None) -> str:
+    # logging.info("Entering " + execute.__name__)
+    logging.info("With cmd: " + " ".join(cmd))
     p = Program(cmd)
     out = Executor().run(p, env=env)
+    # logging.info("Exiting " + execute.__name__)
     return out
 
 
+@func_enter()
+@func_leave()
 def execute_no_communicate(cmd: List[str], env=None,
                            working_dir: str = '/var/log/cortx/hare',
                            out_file=subprocess.PIPE):
+    # logging.info("Entering " + execute_no_communicate.__name__)
+    logging.info("With cmd: " + " ".join(cmd))
     process = subprocess.Popen(cmd,
                                stdin=subprocess.PIPE,
                                stdout=out_file,
@@ -241,5 +351,6 @@ def execute_no_communicate(cmd: List[str], env=None,
     if process.returncode:
         raise Exception(
             f'Command {cmd} exited with error code {process.returncode}. ')
+    # logging.info("Exiting " + execute_no_communicate.__name__)
 
     return process

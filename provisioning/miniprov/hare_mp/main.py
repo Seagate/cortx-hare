@@ -47,7 +47,7 @@ from hare_mp.cdf import CdfGenerator
 from hare_mp.store import ConfStoreProvider
 from hare_mp.systemd import HaxUnitTransformer
 from hare_mp.validator import Validator
-from hare_mp.utils import execute, Utils
+from hare_mp.utils import execute, func_enter, func_leave, Utils
 from hare_mp.consul_starter import ConsulStarter
 from hare_mp.hax_starter import HaxStarter
 
@@ -73,7 +73,10 @@ class Svc(Enum):
     Hax = 'hax'
 
 
+@func_enter()
+@func_leave()
 def create_logger_directory(log_dir):
+    # logging.info("Entering " + create_logger_directory.__name__)
     """Create log directory if not exists."""
     if not os.path.isdir(log_dir):
         try:
@@ -82,9 +85,13 @@ def create_logger_directory(log_dir):
             logging.exception(f"{log_dir} Could not be created")
             shutdown_cluster()
             raise RuntimeError("Failed to create log directory " + str(e))
+    # logging.info("Exiting " + create_logger_directory.__name__)
 
 
+@func_enter()
+@func_leave()
 def setup_logging(url) -> None:
+    # logging.info("Entering " + setup_logging.__name__)
     provider = ConfStoreProvider(url)
     machine_id = provider.get_machine_id()
     log_path = provider.get('cortx>common>storage>log')
@@ -103,9 +110,13 @@ def setup_logging(url) -> None:
     logging.basicConfig(level=logging.INFO,
                         handlers=[console, fhandler],
                         format='%(asctime)s [%(levelname)s] %(message)s')
+    # logging.info("Exiting " + setup_logging.__name__)
 
 
+@func_enter()
+@func_leave()
 def get_data_from_provisioner_cli(method, output_format='json') -> str:
+    # logging.info("Entering " + get_data_from_provisioner_cli.__name__)
     try:
         process = subprocess.run(
             ['provisioner', method, f'--out={output_format}'],
@@ -121,17 +132,25 @@ def get_data_from_provisioner_cli(method, output_format='json') -> str:
     if rc != 0:
         return 'unknown'
     res = stdout.decode('utf-8')
+    # logging.info("Exiting " + get_data_from_provisioner_cli.__name__)
     return json.loads(res)['ret'] if res else 'unknown'
 
 
+@func_enter()
+@func_leave()
 def _report_unsupported_features(features_unavailable):
+    # logging.info("Entering " + _report_unsupported_features.__name__)
     uf_db = unsupported_features.UnsupportedFeaturesDB()
     loop = asyncio.get_event_loop()
     loop.run_until_complete(
         uf_db.store_unsupported_features('hare', features_unavailable))
+    # logging.info("Exiting " + _report_unsupported_features.__name__)
 
 
+@func_enter()
+@func_leave()
 def get_server_type(url: str) -> str:
+    # logging.info("Entering " + get_server_type.__name__)
     try:
         provider = ConfStoreProvider(url)
         # Values supported by below key are - VM, HW, K8
@@ -139,13 +158,17 @@ def get_server_type(url: str) -> str:
 
         # For 'server_type' of 'HW' we will consider env as 'physical' and
         # for 'server_type' of 'VM' and 'K8' we will consider env as virtual
+        # logging.info("Exiting " + get_server_type.__name__)
         return 'physical' if server_type == 'HW' else 'virtual'
     except Exception as error:
         logging.error('Cannot get server type (%s)', error)
         return 'unknown'
 
 
+@func_enter()
+@func_leave()
 def is_mkfs_required(url: str) -> bool:
+    # logging.info("Entering " + is_mkfs_required.__name__)
     try:
         conf = ConfStoreProvider(url)
         utils = Utils(conf)
@@ -158,7 +181,10 @@ def is_mkfs_required(url: str) -> bool:
         return False
 
 
+@func_enter()
+@func_leave()
 def logrotate_generic(url: str):
+    # logging.info("Entering " + logrotate_generic.__name__)
     try:
         with open('/opt/seagate/cortx/hare/conf/logrotate/hare',
                   'r') as f:
@@ -171,15 +197,20 @@ def logrotate_generic(url: str):
         with open('/etc/logrotate.d/hare', 'w') as f:
             f.write(content)
 
+        # logging.info("Exiting " + logrotate_generic.__name__)
+
     except Exception as error:
         logging.error('Cannot configure logrotate for hare (%s)', error)
 
 
+@func_enter()
+@func_leave()
 def logrotate(url: str):
     ''' This function is kept incase needed in future.
         This function configures logrotate based on
         'setup_type' key from confstore
     '''
+    # logging.info("Entering " + logrotate.__name__)
     try:
         server_type = get_server_type(url)
         logging.info('Server type (%s)', server_type)
@@ -196,11 +227,16 @@ def logrotate(url: str):
             with open('/etc/logrotate.d/hare', 'w') as f:
                 f.write(content)
 
+            # logging.info("Exiting " + logrotate.__name__)
+
     except Exception as error:
         logging.error('Cannot configure logrotate for hare (%s)', error)
 
 
+@func_enter()
+@func_leave()
 def unsupported_feature(url: str):
+    # logging.info("Entering " + unsupported_feature.__name__)
     try:
         features_unavailable = []
         path = '/opt/seagate/cortx/hare/conf/setup_info.json'
@@ -216,11 +252,15 @@ def unsupported_feature(url: str):
                         features_unavailable.extend(
                             setup['unsupported_features'])
                         _report_unsupported_features(features_unavailable)
+        # logging.info("Exiting " + unsupported_feature.__name__)
     except Exception as error:
         logging.error('Error reporting hare unsupported features (%s)', error)
 
 
+@func_enter()
+@func_leave()
 def _create_consul_namespace(hare_local_dir: str):
+    # logging.info("Entering " + _create_consul_namespace.__name__)
     log_dir = f'{hare_local_dir}/consul/log'
     if not os.path.exists(log_dir):
         os.makedirs(log_dir)
@@ -230,13 +270,17 @@ def _create_consul_namespace(hare_local_dir: str):
     config_dir = f'{hare_local_dir}/consul/config'
     if not os.path.exists(config_dir):
         os.makedirs(config_dir)
+    # logging.info("Exiting " + _create_consul_namespace.__name__)
 
 
+@func_enter()
+@func_leave()
 def _start_consul(utils: Utils,
                   stop_event: Event,
                   hare_local_dir: str,
                   hare_log_dir: str,
                   url: str):
+    # logging.info("Entering " + _start_consul.__name__)
     log_dir = hare_log_dir
     data_dir = f'{hare_local_dir}/consul/data'
     config_dir = f'{hare_local_dir}/consul/config'
@@ -258,14 +302,19 @@ def _start_consul(utils: Utils,
                                    log_dir=log_dir, data_dir=data_dir,
                                    config_dir=config_dir, peers=peers)
     consul_starter.start()
+    # logging.info("Exiting " + _start_consul.__name__)
 
     return consul_starter
 
 
+@func_enter()
+@func_leave()
 def _start_hax(utils: Utils,
                stop_event: Event,
                hare_local_dir: str,
                hare_log_dir: str) -> HaxStarter:
+    # logging.info("Entering " + _start_hax.__name__)
+
     if not os.path.exists(hare_local_dir):
         os.makedirs(hare_local_dir)
     if not os.path.exists(hare_log_dir):
@@ -273,11 +322,15 @@ def _start_hax(utils: Utils,
     hax_starter = HaxStarter(utils=utils, stop_event=stop_event,
                              home_dir=hare_local_dir, log_dir=hare_log_dir)
     hax_starter.start()
+    # logging.info("Exiting " + _start_hax.__name__)
+
     return hax_starter
 
 
+@func_enter()
+@func_leave()
 def post_install(args):
-
+    # logging.info("Entering " + post_install.__name__)
     checkRpm('cortx-motr')
     checkRpm('consul')
     checkRpm('cortx-hare')
@@ -289,6 +342,7 @@ def post_install(args):
 
     if args.configure_logrotate:
         logrotate_generic(args.config[0])
+    # logging.info("Exiting " + post_install.__name__)
 
 
 def enable_hare_consul_agent() -> None:
@@ -301,7 +355,10 @@ def disable_hare_consul_agent() -> None:
     execute(cmd)
 
 
+@func_enter()
+@func_leave()
 def prepare(args):
+    # logging.info("Entering " + prepare.__name__)
     url = args.config[0]
     utils = Utils(ConfStoreProvider(url))
     stop_event = Event()
@@ -317,20 +374,28 @@ def prepare(args):
         sess = util.get_leader_session_no_wait()
         util.destroy_session(sess)
     except Exception:
-        logging.debug('No leader is elected yet')
+        logging.info('No leader is elected yet')
 
     consul_starter.stop()
+    # logging.info("Exiting " + prepare.__name__)
 
 
+@func_enter()
+@func_leave()
 def get_hare_motr_s3_processes(utils: ConsulUtil) -> Dict[str, List[Fid]]:
+    # logging.info("Entering " + get_hare_motr_s3_processes.__name__)
     nodes = utils.catalog.get_node_names()
     processes: Dict[str, List[Fid]] = {}
     for node in nodes:
         processes[node] = utils.get_node_hare_motr_s3_fids(node)
+    # logging.info("Exiting " + get_hare_motr_s3_processes.__name__)
     return processes
 
 
+@func_enter()
+@func_leave()
 def init_with_bootstrap(args):
+    # logging.info("Entering " + init_with_bootstrap.__name__)
     url = args.config[0]
     validator = Validator(ConfStoreProvider(url))
     disable_hare_consul_agent()
@@ -346,6 +411,7 @@ def init_with_bootstrap(args):
         wait_for_cluster_start(url)
         shutdown_cluster()
     enable_hare_consul_agent()
+    # logging.info("Exiting " + init_with_bootstrap.__name__)
 
 
 def start_hax_with_systemd():
@@ -358,7 +424,10 @@ def start_crond():
     execute(cmd)
 
 
+@func_enter()
+@func_leave()
 def start_hax_and_consul_without_systemd(url: str, utils: Utils):
+    # logging.info("Entering " + start_hax_and_consul_without_systemd.__name__)
     conf_dir = get_config_dir(url)
     log_dir = get_log_dir(url)
     # Event on which hare receives a notification in case consul agent or hax
@@ -371,8 +440,11 @@ def start_hax_and_consul_without_systemd(url: str, utils: Utils):
     if utils.is_hare_stopping():
         consul_starter.stop()
         hax_starter.stop()
+    # logging.info("Exiting " + start_hax_and_consul_without_systemd.__name__)
 
 
+@func_enter()
+@func_leave()
 def start(args):
     logging.info('Starting Hare services')
     url = args.config[0]
@@ -386,6 +458,7 @@ def start(args):
         # or hax process terminates.
         # TODO: Check if the respective processes need to be restarted.
         start_hax_and_consul_without_systemd(url, utils)
+    # logging.info("Exiting " + start.__name__)
 
 
 @dataclass
@@ -395,22 +468,28 @@ class ProcessStartInfo:
     fid: str
 
 
+@func_enter()
+@func_leave()
 def start_mkfs(proc_to_start: ProcessStartInfo) -> int:
+    # logging.info("Entering " + start_mkfs.__name__)
     try:
-        logging.debug('Starting mkfs process [fid=%s] at hostname=%s',
-                      proc_to_start.fid, proc_to_start.hostname)
+        logging.info('Starting mkfs process [fid=%s] at hostname=%s',
+                     proc_to_start.fid, proc_to_start.hostname)
         command = proc_to_start.cmd
         execute(command)
-        logging.debug('Started mkfs process [fid=%s]', proc_to_start.fid)
+        logging.info('Started mkfs process [fid=%s]', proc_to_start.fid)
         rc = 0
     except Exception as error:
         logging.error('Error launching mkfs [fid=%s] at hostname=%s: %s',
                       proc_to_start.fid, proc_to_start.hostname, error)
         rc = -1
+    # logging.info("Exiting " + start_mkfs.__name__)
     return rc
 
 
 def start_mkfs_parallel(hostname: str, hare_config_dir: str):
+    # logging.info("Entering " + start_mkfs_parallel.__name__)
+
     # TODO: path needs to be updated according to the new conf-store key
     sysconfig_dir = '/etc/sysconfig/'
     src = f'{hare_config_dir}/sysconfig/motr/{hostname}'
@@ -444,22 +523,32 @@ def start_mkfs_parallel(hostname: str, hare_config_dir: str):
         raise RuntimeError('One or more mkfs processes failed to start. '
                            'Please check the logs above for details.')
     else:
-        logging.debug(f'Total time taken for all mkfs on this node = '
-                      f'{perf_result}\n\n')
+        logging.info(f'Total time taken for all mkfs on this node = '
+                     f'{perf_result}\n\n')
+    # logging.info("Exiting " + start_mkfs_parallel.__name__)
 
 
+@func_enter()
+@func_leave()
 @repeat_if_fails()
 def is_mkfs_done_on_all_nodes(utils: Utils,
                               cns_utils: ConsulUtil,
                               nodes: List[str]) -> bool:
+    # logging.info("Entering " + is_mkfs_done_on_all_nodes.__name__)
     for node in nodes:
         if not cns_utils.kv.kv_get(f'mkfs_done/{node}', recurse=True):
+            logging.info("Node " + node)
             return False
+    # logging.info("Exiting " + is_mkfs_done_on_all_nodes.__name__)
     return True
 
 
+@func_enter()
+@func_leave()
 @repeat_if_fails()
 def cleanup_mkfs_state(utils: Utils, cns_utils: ConsulUtil):
+    # logging.info("Entering " + cleanup_mkfs_state.__name__)
+
     hostname = utils.get_local_hostname()
     keys: List[KeyDelete] = [
         KeyDelete(name=f'mkfs_done/{hostname}', recurse=True),
@@ -468,17 +557,27 @@ def cleanup_mkfs_state(utils: Utils, cns_utils: ConsulUtil):
     if not cns_utils.kv.kv_delete_in_transaction(keys):
         logging.error('Delete transaction failed for %s', keys)
 
+    # logging.info("Exiting " + cleanup_mkfs_state.__name__)
 
+
+@func_enter()
+@func_leave()
 @repeat_if_fails()
 def set_mkfs_done_for(node: str, cns_utils: ConsulUtil):
+    # logging.info("Entering " + set_mkfs_done_for.__name__)
     cns_utils.kv.kv_put(f'mkfs_done/{node}', 'true')
+    # logging.info("Exiting " + set_mkfs_done_for.__name__)
 
 
+@func_enter()
+@func_leave()
 def init(args):
+    # logging.info("Entering " + init.__name__)
     try:
         url = args.config[0]
 
         if not is_mkfs_required(url):
+            logging.info("Exiting " + init.__name__)
             return
 
         conf = ConfStoreProvider(url)
@@ -508,6 +607,7 @@ def init(args):
         # Stopping hax and consul
         hax_starter.stop()
         consul_starter.stop()
+        # logging.info("Exiting " + init.__name__)
     except Exception as error:
         if hax_starter:
             hax_starter.stop()
@@ -516,7 +616,10 @@ def init(args):
         raise RuntimeError(f'Error while initializing cluster :key={error}')
 
 
+@func_enter()
+@func_leave()
 def test(args):
+    # logging.info("Entering " + test.__name__)
     try:
         url = args.config[0]
         validator = Validator(ConfStoreProvider(url))
@@ -533,6 +636,7 @@ def test(args):
             if cluster_status:
                 raise RuntimeError(f'Cluster status reports failure :'
                                    f' {cluster_status}')
+        # logging.info("Exiting " + test.__name__)
 
     finally:
         shutdown_cluster()
@@ -598,17 +702,25 @@ def pre_factory(url):
     motr_cleanup()
 
 
+@func_enter()
+@func_leave()
 def get_log_dir(url) -> str:
+    # logging.info("Entering " + get_log_dir.__name__)
     provider = ConfStoreProvider(url)
     machine_id = provider.get_machine_id()
     log_path = provider.get('cortx>common>storage>log')
+    # logging.info("Exiting " + get_log_dir.__name__)
     return log_path + LOG_DIR_EXT + machine_id
 
 
+@func_enter()
+@func_leave()
 def get_config_dir(url) -> str:
+    # logging.info("Entering " + get_config_dir.__name__)
     provider = ConfStoreProvider(url)
     machine_id = provider.get_machine_id()
     config_path = provider.get('cortx>common>storage>local')
+    # logging.info("Exiting " + get_config_dir.__name__)
     return config_path + CONF_DIR_EXT + '/' + machine_id
 
 
@@ -673,7 +785,10 @@ def motr_cleanup():
         raise RuntimeError(f'Error during motr cleanup: key={error}')
 
 
+@func_enter()
+@func_leave()
 def generate_support_bundle(args):
+    # logging.info("Entering " + generate_support_bundle.__name__)
     try:
         # Default target directory is /tmp/hare
         cmd = ['hctl', 'reportbug']
@@ -710,6 +825,7 @@ def generate_support_bundle(args):
             cmd.append('--no-systemd')
 
         execute(cmd)
+        # logging.info("Exiting " + generate_support_bundle.__name__)
     except Exception as error:
         raise RuntimeError(f'Error while generating support bundle : {error}')
 
@@ -730,8 +846,9 @@ def checkRpm(rpm_name):
                                   stderr=subprocess.PIPE,
                                   encoding='utf8')
     out, err = rpm_search.communicate()
-    logging.debug("Output: {}".format(out))
-    logging.debug("stderr: {}".format(err))
+    logging.info("Output: {}".format(out))
+    logging.info("rpm: {} found".format(rpm_name))
+    logging.info("stderr: {}".format(err))
     if rpm_search.returncode != 0:
         raise RuntimeError(f"rpm {rpm_name} is missing")
 
@@ -839,8 +956,12 @@ def check_cluster_status(path_to_cdf: str):
     return 0
 
 
+@func_enter()
+@func_leave()
 def generate_cdf(url: str) -> str:
+    # logging.info("Entering " + generate_cdf.__name__)
     generator = CdfGenerator(ConfStoreProvider(url))
+    # logging.info("Exiting " + generate_cdf.__name__)
     return generator.generate()
 
 
@@ -851,7 +972,10 @@ def save(filename: str, contents: str) -> None:
         f.write(contents)
 
 
+@func_enter()
+@func_leave()
 def generate_config(url: str, path_to_cdf: str) -> None:
+    # logging.info("Entering " + generate_config.__name__)
     provider = ConfStoreProvider(url)
     utils = Utils(provider)
     conf_dir = get_config_dir(url)
@@ -870,6 +994,7 @@ def generate_config(url: str, path_to_cdf: str) -> None:
     utils.copy_conf_files(conf_dir)
     utils.copy_consul_files(conf_dir, mode='client')
     utils.import_kv(conf_dir)
+    # logging.info("Exiting " + generate_config.__name__)
 
 
 def update_hax_unit(filename: str) -> None:
@@ -882,7 +1007,10 @@ def update_hax_unit(filename: str) -> None:
         raise RuntimeError('Failed to update hax systemd unit: ' + str(e))
 
 
+@func_enter()
+@func_leave()
 def config(args):
+    # logging.info("Entering " + config.__name__)
     consul_starter = None
     try:
         url = args.config[0]
@@ -900,6 +1028,7 @@ def config(args):
         update_hax_unit('/usr/lib/systemd/system/hare-hax.service')
         generate_config(url, filename)
         consul_starter.stop()
+        # logging.info("Entering " + config.__name__)
     except Exception as error:
         if consul_starter:
             consul_starter.stop()
@@ -1171,7 +1300,7 @@ def main():
         parsed.func(parsed)
     except Exception as e:
         logging.error(str(e))
-        logging.debug('Exiting with FAILED result', exc_info=True)
+        logging.info('Exiting with FAILED result', exc_info=True)
         exit(1)
 
 

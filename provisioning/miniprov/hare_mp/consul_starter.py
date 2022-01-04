@@ -20,7 +20,8 @@ import logging
 from typing import List
 from threading import Event
 from hax.types import StoppableThread
-from hare_mp.utils import execute_no_communicate, LogWriter, Utils
+from hare_mp.utils import (execute_no_communicate, func_enter, func_leave,
+                           LogWriter, Utils)
 
 LOG = logging.getLogger('consul')
 LOG_FILE_SIZE = 1024 * 1024 * 1024
@@ -46,14 +47,22 @@ class ConsulStarter(StoppableThread):
         self.bind_addr = bind_addr
         self.client_addr = client_addr
 
+    @func_enter()
+    @func_leave()
     def stop(self):
+        # logging.info("Entering stop function of " + ConsulStarter.__name__)
         try:
             if self.process:
                 self.process.terminate()
         except Exception:
             pass
+        # logging.info("Exiting stop function of " + ConsulStarter.__name__)
 
+    @func_enter()
+    @func_leave()
     def _execute(self):
+        # logging.info("Entering execute function of " +
+        #              ConsulStarter.__name__)
         try:
             log_file = f'{self.log_dir}/hare-consul.log'
             fh = logging.handlers.RotatingFileHandler(log_file,
@@ -90,3 +99,4 @@ class ConsulStarter(StoppableThread):
             LOG.debug('Stopping Consul')
             self.stop_event.set()
             self.utils.stop_hare()
+        # logging.info("Exiting execute function of " + ConsulStarter.__name__)
