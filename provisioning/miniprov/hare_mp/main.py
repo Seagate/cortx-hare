@@ -29,7 +29,6 @@ import os
 import shutil
 import subprocess
 import sys
-import re
 from enum import Enum
 from sys import exit
 from time import sleep, perf_counter
@@ -148,19 +147,10 @@ def get_server_type(url: str) -> str:
 
 def is_mkfs_required(url: str) -> bool:
     try:
-        provider = ConfStoreProvider(url)
-        machine_id = provider.get_machine_id()
-        # Query results into a list of keys where, Const.SERVICE_MOTR_IO
-        # is found as one of the services under `services`.
-        # e.g.
-        # node>aaa120a9e051d103c164f605615c32a4>components[1]>services[0]
-        # node>bbb340f79047df9bb52fa460615c32a5>components[1]>services[0]
-        # node>ccc8700fe6797ed532e311b0615c32a7>components[1]>services[0]
-        # We try to find this node's machine id in the query result.
-        services = provider.search_val('node', 'services',
-                                       Const.SERVICE_MOTR_IO.value)
-        check_id = re.compile(f".*{machine_id}.*")
-        return any(check_id.match(service) for service in services)
+        conf = ConfStoreProvider(url)
+        utils = Utils(conf)
+        machine_id = conf.get_machine_id()
+        return utils.is_motr_component(machine_id)
     except Exception as error:
         logging.warn('Failed to get pod type (%s). Current stage will '
                      'be assumed as not required by default', error)
@@ -489,7 +479,8 @@ def init(args):
         if not is_mkfs_required(url):
             return
 
-        utils = Utils(ConfStoreProvider(url))
+        conf = ConfStoreProvider(url)
+        utils = Utils(conf)
         cns_utils = ConsulUtil()
         stop_event = Event()
         config_dir = get_config_dir(url)
@@ -504,11 +495,13 @@ def init(args):
         start_mkfs_parallel(hostname, config_dir)
         # Update mkfs state
         set_mkfs_done_for(hostname, cns_utils)
-        nodes = utils.get_io_nodes()
+        data_nodes = conf.get_hostnames_for_service(
+            Const.SERVICE_MOTR_IO.value)
+
         # Wait for other nodes to complete.
         # This will block.
         while not is_mkfs_done_on_all_nodes(utils, cns_utils,
-                                            nodes):
+                                            data_nodes):
             sleep(5)
         # Stopping hax and consul
         hax_starter.stop()
@@ -1057,6 +1050,8 @@ def create_parser() -> argparse.ArgumentParser:
                                    help_str='Generates support bundle',
                                    handler_fn=generate_support_bundle)
 
+    add_service_argument(sb_sub_parser)
+
     sb_sub_parser.add_argument(
         '-b',
         type=str,
@@ -1088,14 +1083,6 @@ def create_parser() -> argparse.ArgumentParser:
         help='Limit set on per component for its support bundle size.'
              'eg. "1G" for 1GB or "100M" for 100 MB. Default -> 0, '
              'for no size limit.',
-        action='store')
-
-    sb_sub_parser.add_argument(
-        '--services',
-        type=str,
-        nargs=1,
-        help='"|" pipe separated service names for the services for '
-             'which logs needs to be collected. Default is "All".',
         action='store')
 
     sb_sub_parser.add_argument(

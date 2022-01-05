@@ -24,7 +24,7 @@ import json
 import io
 import os
 import logging
-from typing import List, Dict, Any
+from typing import List
 from distutils.dir_util import copy_tree
 import shutil
 
@@ -192,23 +192,6 @@ class Utils:
 
     def is_hare_stopping(self) -> bool:
         return self.hare_stop
-
-    def get_io_nodes(self) -> List[str]:
-        nodes: List[str] = []
-        conf = self.provider
-        machines: Dict[str, Any] = conf.get('node')
-        # Query results into a list of keys where, Const.SERVICE_MOTR_IO
-        # is found as one of the services under `services`.
-        # e.g.
-        # node>0b9cf99f07574422a45f9b61d2f5b746>components[1]>services[0]
-        # node>0b9cf99f07574422a45f9b61d2f5b746>components[3]>services[0]
-        services = conf.search_val('node', 'services',
-                                   Const.SERVICE_MOTR_IO.value)
-        for machine_id in machines.keys():
-            result = list(filter(lambda svc: machine_id in svc, services))
-            if result:
-                nodes.append(conf.get(f'node>{machine_id}>hostname'))
-        return nodes
 
     def get_transport_type(self) -> str:
         transport_type = self.provider.get(

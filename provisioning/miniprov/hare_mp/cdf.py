@@ -2,7 +2,7 @@ import os.path as P
 import subprocess as S
 from dataclasses import dataclass
 from string import Template
-from typing import Any, Dict, List, Optional, Tuple
+from typing import List, Optional, Tuple
 from math import floor, ceil
 import pkg_resources
 
@@ -63,16 +63,15 @@ class CdfGenerator:
     def _create_node_descriptions(self) -> List[NodeDesc]:
         nodes: List[NodeDesc] = []
         conf = self.provider
-        services = conf.search_val('node', 'services',
-                                   Const.SERVICE_MOTR_IO.value)
-        services.extend(conf.search_val('node', 'services',
-                                        Const.SERVICE_S3_SERVER.value))
-        machines: Dict[str, Any] = conf.get('node')
-        for machine_id in machines.keys():
-            result = [svc for svc in services if machine_id in svc]
-            # Skipping for controller and HA pod
-            if result:
-                nodes.append(self._create_node(machine_id))
+        # Skipping for controller and HA pod
+        machine_ids = conf.get_machine_ids_for_service(
+            Const.SERVICE_MOTR_IO.value)
+
+        machine_ids.extend(conf.get_machine_ids_for_service(
+            Const.SERVICE_S3_SERVER.value))
+
+        for machine_id in machine_ids:
+            nodes.append(self._create_node(machine_id))
         return nodes
 
     # cluster>storage_set[N]>durability>{type}>data/parity/spare
@@ -117,21 +116,6 @@ class CdfGenerator:
                 f'node>{node}>storage>cvg[{i}]>devices>{prop_name}')
         return all_cvg_devices
 
-    # cluster>storage_set[N]>nodes
-    def _get_data_nodes(self, pool: PoolHandle) -> List[str]:
-        i = pool.storage_ndx
-        conf = self.provider
-        nodes = conf.get(f'cluster>storage_set[{i}]>nodes')
-        out = []
-        services = conf.search_val('node', 'services',
-                                   Const.SERVICE_MOTR_IO.value)
-        for node in nodes:
-            result = [svc for svc in services if node in svc]
-            # skipped controller , HA and server pod
-            if result:
-                out.append(node)
-        return out
-
     def _validate_pool(self, pool: PoolHandle) -> None:
         layout = self._get_layout(pool)
         if not layout:
@@ -145,7 +129,10 @@ class CdfGenerator:
             f'cluster>storage_set[{i}]>name')
 
         data_devices_count: int = 0
-        for node in self._get_data_nodes(pool):
+        data_nodes = conf.get_machine_ids_for_service(
+            Const.SERVICE_MOTR_IO.value)
+
+        for node in data_nodes:
             data_devices_count += len(self._get_devices(pool, node))
 
         (data, parity, spare) = (layout.data, layout.parity, layout.spare)
@@ -167,7 +154,9 @@ class CdfGenerator:
         # This is a workaround for getting cvg by looking at one data node
         # only. The implementation here needs to be corrected using a
         # different task (EOS-27063).
-        data_nodes = conf.get_data_nodes()
+        data_nodes = conf.get_machine_ids_for_service(
+            Const.SERVICE_MOTR_IO.value)
+
         node_count = len(data_nodes)
         machine_id = data_nodes[0]
         # node>{machine-id}>storage>cvg_count
@@ -199,6 +188,9 @@ class CdfGenerator:
         storage_set_name = conf.get(f'cluster>storage_set[{i}]>name')
         pool_name = f'{storage_set_name}__{pool_type}'
         allowed_failure = self._calculate_allowed_failure(layout)
+        data_nodes = conf.get_machine_ids_for_service(
+            Const.SERVICE_MOTR_IO.value)
+
         out_list.append(
             PoolDesc(
                 name=Text(pool_name),
@@ -207,7 +199,7 @@ class CdfGenerator:
                         DiskRef(path=Text(device),
                                 node=Maybe(Text(self.utils.get_hostname(node)),
                                            'Text'))
-                        for node in self._get_data_nodes(pool)
+                        for node in data_nodes
                         for device in self._get_devices(pool, node)
                     ], 'List DiskRef'), 'List DiskRef'),
                 data_units=layout.data,
