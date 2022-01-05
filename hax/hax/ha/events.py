@@ -20,7 +20,7 @@ import logging
 from dataclasses import dataclass
 from typing import List, Optional
 
-from cortx.utils.message_bus import MessageBus, MessageConsumer
+from cortx.utils.message_bus import MessageConsumer
 
 from ha.core.event_manager.subscribe_event import SubscribeEvent
 from ha.core.event_manager.const import EVENT_MANAGER_KEYS
@@ -75,9 +75,7 @@ class EventListener():
         if topic is None:
             raise RuntimeError('Failed to subscribe to events')
 
-        message_bus = MessageBus()
         self.consumer = MessageConsumer(
-            message_bus=message_bus,
             consumer_id=COMPONENT_ID,
             consumer_group=group_id,
             message_types=[topic],

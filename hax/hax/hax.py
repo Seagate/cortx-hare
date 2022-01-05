@@ -38,6 +38,8 @@ from hax.motr.rconfc import RconfcStarter
 from hax.server import ServerRunner
 from hax.types import Fid, Profile, StoppableThread
 from hax.util import ConsulUtil, repeat_if_fails
+from cortx.utils.conf_store import Conf
+from cortx.utils.message_bus import MessageBus
 
 __all__ = ['main']
 
@@ -115,6 +117,21 @@ def _run_rconfc_starter_thread(motr: Motr,
     return rconfc_starter
 
 
+def _ha_message_bus_init(util: ConsulUtil):
+    configpath = util.get_configpath()
+    Conf.load('cortx_conf', configpath)
+
+    message_server_endpoints = Conf.get('cortx_conf',
+                                        'cortx>external>kafka>endpoints')
+
+    """
+    This creates a MessageBus internal global in-memory object which is
+    indirectly part of the process address space. Thus
+    `MessageBus.init()` must be invoked within process's address space.
+    """
+    MessageBus.init(message_server_endpoints)
+
+
 def main():
     # Note: no logging must happen before this call.
     # Otherwise the log configuration will not apply.
@@ -154,6 +171,8 @@ def main():
     LOG.info(f'Setting up ha_link interface with the options as follows: '
              f'hax fid = {cfg.hax_fid}, hax endpoint = {cfg.hax_ep}, '
              f'HA fid = {cfg.ha_fid}')
+
+    _ha_message_bus_init(util)
 
     ffi = HaxFFI()
     herald = DeliveryHerald()

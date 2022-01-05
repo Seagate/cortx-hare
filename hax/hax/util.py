@@ -1825,6 +1825,15 @@ class ConsulUtil:
         if not self.kv.kv_delete_in_transaction(keys):
             raise HAConsistencyException('KV deletion failed')
 
+    @repeat_if_fails()
+    def get_configpath(self):
+        logging.info('Getting config_path')
+        config_path = self.kv.kv_get('config_path')
+        if config_path is None:
+            raise HAConsistencyException('config path not present in consul')
+
+        return config_path['Value'].decode("utf-8")
+
 
 def dump_json(obj) -> str:
     """

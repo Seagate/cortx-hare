@@ -309,6 +309,7 @@ def prepare(args):
     log_dir = get_log_dir(url)
     _create_consul_namespace(conf_dir)
     consul_starter = _start_consul(utils, stop_event, conf_dir, log_dir, url)
+    utils.save_config_path(url)
     utils.save_node_facts()
     utils.save_drives_info()
     try:
@@ -373,6 +374,7 @@ def start_hax_and_consul_without_systemd(url: str, utils: Utils):
 
 
 def start(args):
+    logging.info('Starting Hare services')
     url = args.config[0]
     utils = Utils(ConfStoreProvider(url))
     logrotate_generic(url)
