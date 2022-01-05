@@ -801,6 +801,21 @@ Oid.__doc__ = 'Motr conf object identifier'
 Oid.fidk.__doc__ = '.f_key part of the corresponding m0_fid'
 
 
+ObjTMask = NamedTuple('ObjTMask', [('cont', int), ('key', int)])
+ObjTMask.__doc__ = 'Motr conf object identifier mask'
+ObjTMask.key.__doc__ = '.f_key part mask of the corresponding m0_fid'
+
+
+DW_F = 0xffffffff           # DW = DoubleWord
+QW_F = 0xffffffffffffffff   # QW = QuadWord
+
+
+ObjT_Mask_Map = {
+    # here for object key - higher 32 bits is masked for dynamic part.
+    ObjT.process: ObjTMask(QW_F, DW_F)
+}
+
+
 def oid_to_fidstr(oid: Oid) -> str:
     """Convert Oid to string representation of fid.
 
@@ -828,11 +843,55 @@ def _infinite_counter(start: int = 0) -> Iterator[int]:
         k += 1
 
 
-fidk_gen = _infinite_counter()  # fid key generator
+# fid key generator per object type
+ObjT_last_fidk = dict((type, _infinite_counter()) for type in ObjT)
+
+# FIDs : Hare allocates motr identifiers aka fids for every motr object as
+# part of motr cluster configuration.
+# fid (128 bits)= fid.container (64 bits) + fid.key (64 bits)
+
+# This fid is divided into to parts, a base fid and a dynamic fid.
+# Base Fid :
+# Base fid (96 bits) is a combination of higher 64 bits of FID container and
+# 32 bits of FID key (higher or lower, based on key mask).
+# This is the static part, unique across the cluster.
+# Dynamic Fid :
+# Consists of 32 bits, updated for motr clients during client restarts,
+# entrypoint reply failures.
+# For intial configuration, it is set to 0.
+
+# Purpose: Maintaining an unique base fid helps to update the fid as well as
+# avoids invalidating the entire motr configuration cache.
+
+
+def __allocate_base_fidkey(objt: ObjT, fidk: int) -> int:
+    """
+    This function sets the given 'fidk' to the base-key fid (32 bits),
+    based on the object type mask.
+
+    1. Gets the mask for the key based on ObjT.
+    mask = 0x00000000ffffffff
+    2. Inverts the mask to set the key in the previosly ON bits.
+    mask ^ 0xffffffffffffffff = 0xffffffff00000000
+    >>> fidk=5
+    >>> hex((mask ^ 0xffffffffffffffff) * fidk + fidk)
+    '0x4fffffffb00000005'
+    3. Reset to '0' the remaining 32 bits by ANDing with original mask.
+    >>> hex(result & mask)
+    '0x5'
+    """
+    obj_mask = ObjT_Mask_Map.get(objt)
+    if obj_mask:
+        fidk = (((obj_mask.key ^ QW_F) * fidk + fidk) &
+                obj_mask.key)
+    return fidk
 
 
 def new_oid(objt: ObjT) -> Oid:
-    return Oid(objt, next(fidk_gen))
+    # get the next fid sequence based on the object type
+    fidk = next(ObjT_last_fidk[objt])
+    key = __allocate_base_fidkey(objt, fidk)
+    return Oid(objt, key)
 
 
 def oid_to_dhall(oid: Oid) -> str:
@@ -2335,15 +2394,24 @@ def consul_kv_sdevs(m0conf: Dict[Oid, Any]) -> Dict[str, str]:
     return d
 
 
+def consul_kv_fidk() -> Dict[str, int]:
+    """
+    Prepares a dict for storing last generated base and dynamic fid keys per
+    object type in consul KV.
+    """
+    d = {}
+    for objt, fidk in ObjT_last_fidk.items():
+        base_key = f'last_base_fid_key/{objt.name}'
+        d[base_key] = next(fidk)
+        dynamic_key = f'last_dynamic_fid_key/{objt.name}'
+        d[dynamic_key] = 0
+    return d
+
+
 def generate_consul_kv(cluster: Cluster, dhall_dir: str) -> str:
     logging.debug('Generating consul KV structure')
     assert all(k.type is ObjT.process and v.type is ObjT.service
                for k, v in cluster.m0_clients.items())
-
-    global fidk_gen
-    _fidk_gen = next(fidk_gen)
-    # Give up ownership of `fidk_gen`, passing it to the Consul KV.
-    del fidk_gen
 
     m0conf = cluster.m0conf
 
@@ -2388,7 +2456,7 @@ def generate_consul_kv(cluster: Cluster, dhall_dir: str) -> str:
         ('epoch', 1),
         ('eq-epoch', 1),
         ('leader', ''),
-        ('last_fidk', _fidk_gen),
+        *consul_kv_fidk().items(),
         ('failvec', ''),
         ('bytecount/healthy', 0),
         ('bytecount/degraded', 0),
