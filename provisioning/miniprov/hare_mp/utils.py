@@ -201,6 +201,10 @@ class Utils:
             return 'libfab'
         return transport_type
 
+    @repeat_if_fails()
+    def save_config_path(self, path: str):
+        self.kv.kv_put('config_path', path)
+
 
 class LogWriter:
     def __init__(self, logger: logging.Logger, logging_handler):
