@@ -37,9 +37,9 @@ from urllib3.exceptions import HTTPError
 from hax.common import HaxGlobalState
 from hax.exception import HAConsistencyException, InterruptedException
 from hax.types import (ConfHaProcess, Fid, FsStatsWithTime,
-                       ObjT, ServiceHealth, Profile, m0HaProcessEvent,
-                       m0HaProcessType, KeyDelete, HaNoteStruct,
-                       m0HaObjState)
+                       ObjT, ObjTMaskMap, ServiceHealth, Profile,
+                       m0HaProcessEvent, m0HaProcessType, KeyDelete,
+                       HaNoteStruct, m0HaObjState)
 
 from hax.consul.cache import (uses_consul_cache, invalidates_consul_cache,
                               supports_consul_cache)
@@ -1428,15 +1428,24 @@ class ConsulUtil:
                            fid: Fid,
                            proc_node=None,
                            kv_cache=None) -> MotrConsulProcInfo:
+        proc_base_fid = self.get_process_base_fid(fid)
         if not proc_node:
-            proc_node = self.get_process_node(fid, kv_cache=kv_cache)
-        key = f'{proc_node}/processes/{fid}'
+            proc_node = self.get_process_node(proc_base_fid, kv_cache=kv_cache)
+        key = f'{proc_node}/processes/{proc_base_fid}'
         status = self.kv.kv_get(key, kv_cache=kv_cache)
         if status:
             val = json.loads(status['Value'])
             return MotrConsulProcInfo(val['state'], val['type'])
         else:
             return MotrConsulProcInfo('Unknown', 'Unknown')
+
+    @repeat_if_fails()
+    def get_process_full_fid(self, proc_base_fid: Fid) -> Optional[Fid]:
+        proc_fid = self.kv.kv_get(str(proc_base_fid), recurse=False)
+        if proc_fid is not None:
+            pfid: Fid = Fid.parse(json.loads(proc_fid['Value']))
+            return pfid
+        return proc_base_fid
 
     def get_process_local_status(self, fid: Fid) -> str:
         local_node = self.get_local_nodename()
@@ -1627,14 +1636,15 @@ class ConsulUtil:
 
     @uses_consul_cache
     def get_process_node(self, proc_fid: Fid, kv_cache=None) -> str:
-        fidk = proc_fid.key
+        proc_base_fid = self.get_process_base_fid(proc_fid)
+        fidk = proc_base_fid.key
         # 'node/<node_name>/process/<process_fidk>/service/type'
         node_items = self.kv.kv_get('m0conf/nodes',
                                     recurse=True,
                                     kv_cache=kv_cache)
-        if ObjT.PROCESS.value == proc_fid.container:
+        if ObjT.PROCESS.value == proc_base_fid.container:
             keys = self.get_process_keys(node_items, fidk)
-        elif ObjT.SERVICE.value == proc_fid.container:
+        elif ObjT.SERVICE.value == proc_base_fid.container:
             keys = self.get_service_keys(node_items, fidk)
         if len(keys) != 1:
             raise RuntimeError(f'XXX proc_fid:{proc_fid} fidk:{fidk}'
@@ -1798,18 +1808,18 @@ class ConsulUtil:
             ServiceHealth.UNKNOWN: 'unknown',
             ServiceHealth.STOPPED: 'stopped',
         }
+        proc_base_fid = self.get_process_base_fid(process_fid)
 
         # Example key is as follows
         # m0conf/nodes/0x6e00000000000001:0x3/processes/0x7200000000000001:
         # 0x15:{"name": "m0_server", "state": "M0_NC_UNKNOWN"}
         node_items = self.kv.kv_get('m0conf/nodes', recurse=True)
         regex = re.compile(
-            f'^m0conf\\/nodes\\/.*\\/processes\\/{process_fid}$')
+            f'^m0conf\\/nodes\\/.*\\/processes\\/{proc_base_fid}$')
         for item in node_items:
             match_result = re.match(regex, item['Key'])
             if not match_result:
                 continue
-#            value = item['Value']
             value = json.loads(item['Value'])
             value['state'] = process_state_map[state]
             self.kv.kv_put(item['Key'], json.dumps(value))
@@ -1825,7 +1835,6 @@ class ConsulUtil:
         if not self.kv.kv_delete_in_transaction(keys):
             raise HAConsistencyException('KV deletion failed')
 
-    @repeat_if_fails()
     def get_configpath(self):
         logging.info('Getting config_path')
         config_path = self.kv.kv_get('config_path')
@@ -1833,6 +1842,65 @@ class ConsulUtil:
             raise HAConsistencyException('config path not present in consul')
 
         return config_path['Value'].decode("utf-8")
+
+    @repeat_if_fails()
+    def process_dynamic_fidk_lock(self) -> bool:
+        # Acquire lock to update last_updated_base_fidk.
+        # This will block until lock is acquired.
+        # Will break if any other exception than
+        # HAConsistencyException occurs.
+        try:
+            while not self.kv.kv_put('fidk_update_lock', 'true', cas=0):
+                sleep(1)
+            return True
+        except Exception:
+            return False
+
+    @repeat_if_fails()
+    def process_dynamic_fidk_unlock(self):
+        # Release fidk_update_lock.
+        # This will block until released.
+        try:
+            keys: List[KeyDelete] = [
+                KeyDelete(name='fidk_update_lock', recurse=True),
+            ]
+            while not self.kv.kv_delete_in_transaction(keys):
+                sleep(1)
+        except Exception:
+            raise RuntimeError('Unreachable')
+
+    @repeat_if_fails()
+    def get_process_next_dynamic_fidk_lock(self) -> int:
+        if self.process_dynamic_fidk_lock():
+            fidk = self.kv.kv_get('last_dynamic_fid_key/process',
+                                  recurse=False)
+            new_fidk = int(json.loads(fidk['Value'])) + 1
+            # Update dynamic fid key.
+            while not self.kv.kv_put('last_dynamic_fid_key/process',
+                                     json.dumps(str(new_fidk))):
+                sleep(1)
+            self.process_dynamic_fidk_unlock()
+        return new_fidk
+
+    @repeat_if_fails()
+    def alloc_next_process_fid(self, process_fid: Fid) -> Fid:
+        next_fidk = self.get_process_next_dynamic_fidk_lock()
+        fid_mask: Fid = ObjTMaskMap[ObjT.PROCESS]
+        fid_cont = process_fid.container
+        fid_key = process_fid.key + ((fid_mask.key * next_fidk) + next_fidk)
+        new_proc_fid = Fid(fid_cont, fid_key)
+        base_fid = self.get_process_base_fid(new_proc_fid)
+        # Save base fid to actualy fid mapping in Consul.
+        while not self.kv.kv_put(f'{base_fid}',
+                                 json.dumps(str(new_proc_fid))):
+            sleep(1)
+        return new_proc_fid
+
+    def get_process_base_fid(self, proc_fid: Fid) -> Fid:
+        fid_mask: Fid = ObjTMaskMap[ObjT.PROCESS]
+        base_fid = Fid(proc_fid.container,
+                       (proc_fid.key & fid_mask.key))
+        return base_fid
 
 
 def dump_json(obj) -> str:
