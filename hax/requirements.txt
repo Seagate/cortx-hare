@@ -15,6 +15,7 @@ pytest==6.2.4
 pytest-aiohttp==0.3.0
 pytest-mock==3.6.1
 pytest-timeout==1.4.2
+recordclass
 
 #:runtime-requirements:
 idna==2.10
@@ -27,3 +28,4 @@ tcpping==0.2
 pytest-cov
 coverage
 inject==4.3.1
+recordclass
