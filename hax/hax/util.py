@@ -1635,8 +1635,6 @@ class ConsulUtil:
                            proc_node=None,
                            kv_cache=None) -> MotrConsulProcInfo:
         proc_base_fid = self.get_process_base_fid(fid)
-        if not proc_node:
-            proc_node = self.get_process_node(fid, kv_cache=kv_cache)
         key = f'processes/{proc_base_fid}'
         status = self.kv.kv_get(key, kv_cache=kv_cache, allow_null=True)
         if status:
@@ -1658,6 +1656,14 @@ class ConsulUtil:
             return MotrConsulProcInfo(val['state'], val['type'])
         else:
             return MotrConsulProcInfo('Unknown', 'Unknown')
+
+    @repeat_if_fails()
+    def get_process_full_fid(self, proc_base_fid: Fid) -> Optional[Fid]:
+        proc_fid = self.kv.kv_get(str(proc_base_fid), recurse=False)
+        if proc_fid is not None:
+            pfid: Fid = Fid.parse(json.loads(proc_fid['Value']))
+            return pfid
+        return proc_base_fid
 
     @repeat_if_fails()
     def get_process_full_fid(self, proc_base_fid: Fid) -> Optional[Fid]:
@@ -1838,11 +1844,11 @@ class ConsulUtil:
             #                             kv_cache=kv_cache)
             node_items = self.get_all_nodes(kv_cache=kv_cache)
             LOG.log(TRACE, 'node items: %s', node_items)
-            if ObjT.PROCESS.value == proc_fid.container:
+            if ObjT.PROCESS.value == proc_base_fid.container:
                 keys = self.get_process_keys(node_items, fidk)
-            elif ObjT.SERVICE.value == proc_fid.container:
+            elif ObjT.SERVICE.value == proc_base_fid.container:
                 keys = self.get_service_keys(node_items, fidk)
-            LOG.debug('proc_fid: %s keys: %s', proc_fid, keys)
+            LOG.debug('proc_fid: %s keys: %s', proc_base_fid, keys)
             if not keys:
                 raise HAConsistencyException('Failed to get process node')
             key = keys[0].split('/')
@@ -2106,6 +2112,7 @@ class ConsulUtil:
             LOG.debug('Updated motr_processes_status: %s',
                       motr_processes_status)
 
+    @repeat_if_fails()
     def process_dynamic_fidk_lock(self) -> bool:
         # Acquire lock to update last_updated_base_fidk.
         # This will block until lock is acquired.
