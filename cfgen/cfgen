@@ -21,6 +21,8 @@ from typing import (Any, Callable, Dict, Iterable, Iterator, List, NamedTuple,
                     Optional, Set, Type, Tuple)
 from math import floor, ceil
 from hax.log import create_logger_directory
+from hax.types import ObjTMaskMap, QW_F, Fid
+from hax.types import ObjT as HaxObjT
 from helper.exec import CliException, Executor, Program
 import yaml
 import logging
@@ -792,6 +794,29 @@ ObjT = Enum('ObjT', 'root fdmi_flt_grp fdmi_filter'
 ObjT.__doc__ = 'Motr conf object type'
 
 
+def ObjT_to_HaxObjT(t: ObjT):
+    ObjTMap = {
+        ObjT.root: HaxObjT.ROOT,
+        ObjT.fdmi_flt_grp: HaxObjT.FDMI_FLT_GRP,
+        ObjT.fdmi_filter: HaxObjT.FDMI_FILTER,
+        ObjT.node: HaxObjT.NODE,
+        ObjT.process: HaxObjT.PROCESS,
+        ObjT.service: HaxObjT.SERVICE,
+        ObjT.sdev: HaxObjT.SDEV,
+        ObjT.site: HaxObjT.SITE,
+        ObjT.rack: HaxObjT.RACK,
+        ObjT.enclosure: HaxObjT.ENCLOSURE,
+        ObjT.controller: HaxObjT.CONTROLLER,
+        ObjT.drive: HaxObjT.DRIVE,
+        ObjT.pool: HaxObjT.POOL,
+        ObjT.pver: HaxObjT.PVER,
+        ObjT.objv: HaxObjT.OBJV,
+        ObjT.profile: HaxObjT.PROFILE,
+        ObjT.pver_f: ObjT.pver_f
+    }
+    return ObjTMap[t]
+
+
 def objT_to_dhall(t: ObjT) -> str:
     return 'types.ObjT.' + ''.join(s.capitalize() for s in t.name.split('_'))
 
@@ -799,21 +824,6 @@ def objT_to_dhall(t: ObjT) -> str:
 Oid = NamedTuple('Oid', [('type', ObjT), ('fidk', int)])
 Oid.__doc__ = 'Motr conf object identifier'
 Oid.fidk.__doc__ = '.f_key part of the corresponding m0_fid'
-
-
-ObjTMask = NamedTuple('ObjTMask', [('cont', int), ('key', int)])
-ObjTMask.__doc__ = 'Motr conf object identifier mask'
-ObjTMask.key.__doc__ = '.f_key part mask of the corresponding m0_fid'
-
-
-DW_F = 0xffffffff           # DW = DoubleWord
-QW_F = 0xffffffffffffffff   # QW = QuadWord
-
-
-ObjT_Mask_Map = {
-    # here for object key - higher 32 bits is masked for dynamic part.
-    ObjT.process: ObjTMask(QW_F, DW_F)
-}
 
 
 def oid_to_fidstr(oid: Oid) -> str:
@@ -880,7 +890,8 @@ def __allocate_base_fidkey(objt: ObjT, fidk: int) -> int:
     >>> hex(result & mask)
     '0x5'
     """
-    obj_mask = ObjT_Mask_Map.get(objt)
+
+    obj_mask: Optional[Fid] = ObjTMaskMap.get(ObjT_to_HaxObjT(objt))
     if obj_mask:
         fidk = (((obj_mask.key ^ QW_F) * fidk + fidk) &
                 obj_mask.key)
