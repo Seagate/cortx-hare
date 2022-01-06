@@ -23,7 +23,7 @@ required to get Hare going.  For example, Hare will obtain the IP
 address of the given host by itself, but first it must be told which
 host(s) to work with.
 
-See: [3/CFGEN](rfc/3/README.md)
+See: [3/CFGEN](../3/README.md)
 
 <!-- XXX Other definitions that we might want to add:
 
