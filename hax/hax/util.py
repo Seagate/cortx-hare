@@ -1673,6 +1673,14 @@ class ConsulUtil:
             return pfid
         return proc_base_fid
 
+    @repeat_if_fails()
+    def get_process_full_fid(self, proc_base_fid: Fid) -> Optional[Fid]:
+        proc_fid = self.kv.kv_get(str(proc_base_fid), recurse=False)
+        if proc_fid is not None:
+            pfid: Fid = Fid.parse(json.loads(proc_fid['Value']))
+            return pfid
+        return proc_base_fid
+
     def is_proc_local(self, pfid: Fid) -> bool:
         local_node = self.get_local_nodename()
         proc_node = self.get_process_node(pfid)

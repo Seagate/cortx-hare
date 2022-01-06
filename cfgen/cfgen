@@ -826,21 +826,6 @@ Oid.__doc__ = 'Motr conf object identifier'
 Oid.fidk.__doc__ = '.f_key part of the corresponding m0_fid'
 
 
-ObjTMask = NamedTuple('ObjTMask', [('cont', int), ('key', int)])
-ObjTMask.__doc__ = 'Motr conf object identifier mask'
-ObjTMask.key.__doc__ = '.f_key part mask of the corresponding m0_fid'
-
-
-DW_F = 0xffffffff           # DW = DoubleWord
-QW_F = 0xffffffffffffffff   # QW = QuadWord
-
-
-ObjT_Mask_Map = {
-    # here for object key - higher 32 bits is masked for dynamic part.
-    ObjT.process: ObjTMask(QW_F, DW_F)
-}
-
-
 def oid_to_fidstr(oid: Oid) -> str:
     """Convert Oid to string representation of fid.
 
