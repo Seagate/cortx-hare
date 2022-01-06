@@ -195,12 +195,12 @@ class Motr:
         LOG.debug('Processing entrypoint request from remote endpoint'
                   " '{}', process fid {}".format(remote_rpc_endpoint,
                                                  str(process_fid)))
-        if self.consul_util.is_proc_client(process_fid):
-            if message.is_first_request:
-                self.consul_util.alloc_next_process_fid(process_fid)
         sess = principal_rm = confds = None
         try:
             util = self.consul_util
+            if util.is_proc_client(process_fid) and message.is_first_request:
+                util.alloc_next_process_fid(process_fid)
+
             # When stopping, there's a possibility that hax may receive
             # an entrypoint request from motr land. In order to unblock
             # motr land, reply with entrypoint request with no confds
