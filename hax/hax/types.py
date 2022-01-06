@@ -20,6 +20,7 @@ import ctypes as c
 from enum import Enum, IntEnum
 from threading import Thread
 from typing import List, NamedTuple, Set
+from recordclass import recordclass
 
 
 class FidStruct(c.Structure):
@@ -178,6 +179,16 @@ class Fid:
 
     def for_json(self):
         return self.__repr__()
+
+
+DW_F = 0xffffffff           # DW = DoubleWord
+QW_F = 0xffffffffffffffff   # QW = QuadWord
+
+
+ObjTMaskMap = {
+    # here for object key - higher 32 bits is masked for dynamic part.
+    ObjT.PROCESS: Fid(QW_F, DW_F)
+}
 
 
 class Uint128:
