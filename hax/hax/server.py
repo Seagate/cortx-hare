@@ -264,7 +264,7 @@ class ServerRunner:
         app = self._create_server()
         app.add_routes([
             web.get('/', hello_reply),
-            web.get('/cluster/status', hctl_stat),
+            web.get('/v1/cluster/status', hctl_stat),
             web.post('/', process_ha_states(planner, consul_util)),
             web.post(
                 '/watcher/bq',
