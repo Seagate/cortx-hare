@@ -22,6 +22,8 @@ import logging
 from hax.motr.planner import WorkPlanner
 from hax.types import StoppableThread
 from hax.util import ConsulUtil
+from cortx.utils.message_bus import MessageBus
+from cortx.utils.conf_store import Conf
 
 __all__ = ['create_ha_thread']
 
@@ -48,6 +50,21 @@ def create_ha_thread(planner: WorkPlanner,
     """Creates the proper HA-aware thread, handling possible import errors."""
     try:
         from .thread import EventPollingThread
+        _ha_message_bus_init(util)
         return EventPollingThread(planner, util)
     except ImportError:
         return StubEventThread()
+
+
+def _ha_message_bus_init(util: ConsulUtil):
+    """
+    This creates a MessageBus internal global in-memory object which is
+    indirectly part of the process address space. Thus
+    `MessageBus.init()` must be invoked within process's address space.
+    """
+    configpath = util.get_configpath()
+    Conf.load('cortx_conf', configpath)
+
+    message_server_endpoints = Conf.get('cortx_conf',
+                                        'cortx>external>kafka>endpoints')
+    MessageBus.init(message_server_endpoints)
