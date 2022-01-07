@@ -430,6 +430,7 @@ devinstall-hax: hax/requirements.txt $(HAX_EGG_LINK)
 	@ln -v -sf $(PY_VENV_DIR)/bin/q $(DESTDIR)/$(PREFIX)/bin
 	@ln -v -sf $(PY_VENV_DIR)/bin/configure $(DESTDIR)/$(PREFIX)/bin
 	@ln -v -sf $(PY_VENV_DIR)/bin/update-conf $(DESTDIR)/$(PREFIX)/bin
+	@ln -v -sf $(PY_VENV_DIR)/bin/m0ping $(DESTDIR)/$(PREFIX)/bin
 
 .PHONY: devinstall-miniprov
 devinstall-miniprov: MP_INSTALL_CMD = $(SETUP_PY) develop
