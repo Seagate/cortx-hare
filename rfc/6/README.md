@@ -22,7 +22,7 @@ document are to be interpreted as described in
 Cluster administrator
 
 1. Prepares the
-   [cluster description file (CDF)](rfc/3/README.md#cluster-description-file-cdf).
+   [cluster description file (CDF)](https://github.com/Seagate/cortx-hare/blob/main/rfc/3/README.md#cluster-description-file-cdf).
 
 2. Runs `hctl bootstrap --mkfs` command, passing it the CDF as an argument.
    The script MUST be started on a node which, accordingly to the CDF,
@@ -34,7 +34,7 @@ Cluster administrator
 
 `hctl bootstrap --mkfs` command
 
-1. Executes [‘cfgen’ script](rfc/3/README.md#cfgen), which generates
+1. Executes [‘cfgen’ script](https://github.com/Seagate/cortx-hare/blob/main/rfc/3/README.md#cfgen), which generates
    `confd.dhall`, `consul-agents.json`, and `consul-kv.json` files.
 
 2. Converts `confd.dhall` to `confd.xc`.
@@ -43,7 +43,7 @@ Cluster administrator
    [`-bootstrap-expect=1`](https://www.consul.io/docs/agent/options.html#_bootstrap_expect)
    option and gives it a few seconds to get going.
 
-4. Initialises [Consul KV](rfc/4/README.md) by executing
+4. Initialises [Consul KV](https://github.com/Seagate/cortx-hare/blob/main/rfc/4/README.md) by executing
    `consul kv import @consul-kv.json` command or its equivalent.
 
 5. Starts `consul` agents on every node of the cluster, knowing from
@@ -85,7 +85,7 @@ Cluster administrator
 
 **Note:** `hctl bootstrap` command waits for a Motr process by polling
 status of the corresponding Consul service; see
-[5/HAX](rfc/5/README.md#storing-process-status-in-consul-kv) for more
+[5/HAX](https://github.com/Seagate/cortx-hare/blob/main/rfc/5/README.md#storing-process-status-in-consul-kv) for more
 details.
 
 ## Design Highlights
