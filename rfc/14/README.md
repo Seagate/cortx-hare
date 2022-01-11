@@ -40,8 +40,3 @@ contributors:
 | | PSUs | 2 | Yes | Yes | Yes | Yes | ? |
 | | Sideplan expanders | 2 | Yes | Yes | Yes | Yes | ? |
 | | SAS ports | 8 | Yes | ? | No | No | ? |
-
-## See also
-
-* "The New Direct-Connect Reference Architecture.." e-mail thread.
-* [EOS HW HA Redux](https://seagatetechnology-my.sharepoint.com/:p:/g/personal/scott_hoot_seagate_com/EeznBp0URmRGjDI5fGQHtPYBtskEjjLHQPAEzjQdL-Fyag?e=kC2RHv) slides.

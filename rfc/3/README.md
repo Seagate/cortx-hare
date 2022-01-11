@@ -107,7 +107,7 @@ to generate configuration data.
   * `confd.dhall` &mdash; Motr configuration in
     [Dhall](https://dhall-lang.org/) format.
 
-  * `consul-agents.json` &mdash; tells [`bootstrap`](rfc/6/README.md) script
+  * `consul-agents.json` &mdash; tells [`bootstrap`](https://github.com/Seagate/cortx-hare/blob/main/rfc/6/README.md) script
     where Consul server and client agents should be started and which
     IP addresses they should bind to.
 

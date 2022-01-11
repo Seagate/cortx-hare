@@ -50,4 +50,4 @@ Assumption:
 
 ## See also
 
-* ["Consul-based Halon replacement (Hare). Design highlights"](https://seagatetechnology.sharepoint.com/sites/gteamdrv1/tdrive1224/_layouts/15/Doc.aspx?sourcedoc={D1E7E9B8-C4CC-4543-916E-4EF03C061C27}&file=Consul-based%20Halon%20replacement%20(Hare)%20-%20Design%20Highlights.docx&wdOrigin=OFFICECOM-WEB.MAIN.SEARCH&action=default&mobileredirect=true&cid=0f78d508-653a-4880-9e94-d81d57285935) document.
+* ["Consul-based Halon replacement (Hare). Design highlights"](https://seagate-systems.atlassian.net/wiki/spaces/PUB/pages/871727138/Consul-based+Halon+replacement+Hare+-+Design+Highlights) document.

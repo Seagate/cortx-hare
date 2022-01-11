@@ -78,7 +78,3 @@ There are 2 options for health checks integration into Pacemaker:
    add dependencies on this resource with required failover logic. This might
    be required for checks with actions that depend on other checks. Example:
    data2 check needs data1 check to help with the decision.
-
-## See also
-
-* [Original list of LDR1 HA health checks. The spreadsheet has a lot of useful information](https://docs.google.com/spreadsheets/d/1xASlPnlFx1OmhKttbgOweHbmfbXMI6n3Pmp2TSO8ou8/edit#gid=1305517710)
