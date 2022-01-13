@@ -38,6 +38,7 @@ from hax.types import Fid
 from requests.exceptions import RequestException
 from urllib3.exceptions import HTTPError
 
+Byte_count = NamedTuple('Byte_count', [('type', str), ('num_bytes', str)])
 
 Profile = NamedTuple('Profile', [
     ('fid', str), ('name', str), ('pools', List[str])])
@@ -97,6 +98,31 @@ def kv_value_as_str(cns: Consul, key: str) -> Optional[str]:
 
 def leader_tag(cns: Consul, host: str) -> str:
     return ' (RC)' if kv_value_as_str(cns, 'leader') == host else ''
+
+
+def byte_count(cns: Consul) -> List[Byte_count]:
+    """The byte_count() will return for the specified key ('bytecount/'),
+    or if `recurse` is True then a list of "_value_" for all keys with the
+    given prefix is returned.
+
+    Each _value_ looks like this:
+    ```
+    {
+      "byte_count": {
+        "critical_byte_count": 0,
+        "damaged_byte_count": 0,
+        "degraded_byte_count": 0,
+        "healthy_byte_count": 0
+      }
+    }
+    ```
+    """
+    bytecount = []
+    for x in kv_item(cns, 'bytecount/', recurse=True):
+        bytecount.append(Byte_count(
+            type=x['Key'].split('/')[-1],
+            num_bytes=json.loads(x['Value'])))
+    return bytecount
 
 
 def profiles(cns: Consul) -> List[Profile]:
@@ -265,9 +291,21 @@ def devices(cns: Consul, node_name: str) -> List[Device]:
 
 
 @repeat_if_fails(max_retries=24)
+def get_bytecount_status(cns: Consul) -> Dict[str, Any]:
+    """
+    This function will return a bytecount status in JSON format
+    """
+    result: Dict[str, Any] = {
+        'byte_count': {x.type: x.num_bytes for x in byte_count(cns)}
+    }
+    return result
+
+
+@repeat_if_fails(max_retries=24)
 def get_cluster_status(cns: Consul, consul_util: ConsulUtil,
                        devices_requested: bool) -> Dict[str, Any]:
     result: Dict[str, Any] = {
+        'byte_count': [get_bytecount_status(cns).get('byte_count')],
         'pools': [x for x in sns_pools(cns)],
         'profiles': [{'fid': x.fid, 'name': x.name, 'pools': x.pools}
                      for x in profiles(cns)],
@@ -292,6 +330,9 @@ def parse_opts(argv):
     p.add_argument("-d", "--devices",
                    help='include devices info',
                    action='store_true')
+    p.add_argument("-b", "--bytecount",
+                   help='show output of bytecount info in JSON',
+                   action='store_true')
     return p.parse_args(argv)
 
 
@@ -311,6 +352,12 @@ def show_text_status(cns: Consul, consul_util: ConsulUtil,
         # will be closed and its memory will be released.
         def echo(text):
             print(text, file=stream)
+
+        counts = byte_count(cns)
+        assert counts
+        echo('Byte_count:')
+        for x in counts:
+            echo(f'    {x.type} : {x.num_bytes}')
 
         pools = sns_pools(cns)
         assert pools
@@ -355,6 +402,9 @@ def main(argv=None):
     cns_util: ConsulUtil = ConsulUtil()
     if opts.json:
         status = get_cluster_status(cns, cns_util, opts.devices)
+        print(simplejson.dumps(status, indent=2, for_json=True))
+    elif opts.bytecount:
+        status = get_bytecount_status(cns)
         print(simplejson.dumps(status, indent=2, for_json=True))
     else:
         show_text_status(cns, cns_util, opts.devices)
