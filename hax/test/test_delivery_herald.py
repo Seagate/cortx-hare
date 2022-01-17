@@ -48,7 +48,7 @@ class CountDownLatch:
             if self.value == 0:
                 self.lock.notifyAll()
 
-    def await(self):
+    def waitfor(self):
         while True:
             with self.lock:
                 if not self.value:
@@ -176,7 +176,7 @@ class TestDeliveryHeraldAny(unittest.TestCase):
             t.start()
         # Block until all the threads come to latch.count_down() and thus
         # the message is notified for sure
-        latch.await()
+        latch.waitfor()
 
         def m(x):
             return MessageId(halink_ctx=100, tag=x)
@@ -217,7 +217,7 @@ class TestDeliveryHeraldAny(unittest.TestCase):
             t.start()
         # Block until all the threads come to latch.count_down() and thus
         # the message is notified for sure
-        latch.await()
+        latch.waitfor()
 
         def m(x):
             return MessageId(halink_ctx=100, tag=x)
@@ -264,7 +264,7 @@ class TestDeliveryHeraldAny(unittest.TestCase):
             t.start()
         # Block until all the threads come to latch.count_down() and thus
         # the message is notified for sure
-        latch.await()
+        latch.waitfor()
 
         def m(x):
             return MessageId(halink_ctx=100, tag=x)
@@ -424,7 +424,7 @@ class TestDeliveryHeraldAll(unittest.TestCase):
             t.start()
         # Block until all the threads come to latch.count_down() and thus
         # the message is notified for sure
-        latch.await()
+        latch.waitfor()
 
         def m(x):
             return MessageId(halink_ctx=100, tag=x)
@@ -465,7 +465,7 @@ class TestDeliveryHeraldAll(unittest.TestCase):
             t.start()
         # Block until all the threads come to latch.count_down() and thus
         # the message is notified for sure
-        latch.await()
+        latch.waitfor()
 
         def m(x):
             return MessageId(halink_ctx=100, tag=x)
@@ -507,7 +507,7 @@ class TestDeliveryHeraldAll(unittest.TestCase):
             t.start()
         # Block until all the threads come to latch.count_down() and thus
         # the message is notified for sure
-        latch.await()
+        latch.waitfor()
 
         def m(x):
             return MessageId(halink_ctx=100, tag=x)
