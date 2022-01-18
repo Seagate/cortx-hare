@@ -30,10 +30,11 @@ from hax.message import (EntrypointRequest, FirstEntrypointRequest,
 from hax.motr.delivery import DeliveryHerald
 from hax.motr.ffi import HaxFFI, make_array, make_c_str
 from hax.motr.planner import WorkPlanner
-from hax.types import (ConfHaProcess, Fid, FidStruct, FsStats,
+from hax.types import (ByteCountStats, ConfHaProcess, Fid, FidStruct, FsStats,
                        HaLinkMessagePromise, HaNote, HaNoteStruct, HAState,
-                       MessageId, ObjT, FidTypeToObjT, Profile, ReprebStatus,
-                       ObjHealth, m0HaProcessEvent, m0HaProcessType)
+                       MessageId, ObjT, FidTypeToObjT, Profile, PverState,
+                       ReprebStatus, ObjHealth, ServiceHealth,
+                       m0HaProcessEvent, m0HaProcessType)
 from hax.util import ConsulUtil, repeat_if_fails, FidWithType, PutKV
 
 LOG = logging.getLogger('hax')
@@ -706,6 +707,24 @@ class Motr:
             raise ConfdQuorumException(
                 'Confd quorum lost, filesystem statistics is unavailable')
         return stats
+
+    def get_proc_bytecount(self, proc_fid: Fid) -> ByteCountStats:
+        bytecount: ByteCountStats = self._ffi.proc_bytecount_fetch(
+            self._ha_ctx, proc_fid.to_c())
+        if not bytecount:
+            raise RuntimeError('Bytecount stats unavailable')
+        LOG.debug('Bytecount status for proc fid: %s, stats =%s',
+                  str(bytecount.proc_fid),
+                  bytecount.pvers)
+        return bytecount
+
+    def get_pver_status(self, pver_fid: Fid) -> PverState:
+        status = self._ffi.pver_status_fetch(
+            self._ha_ctx, pver_fid.to_c())
+        if status < 0:
+            raise RuntimeError('Pool version status unavailable')
+        LOG.debug('Pver status for pver %s: %s', pver_fid, status)
+        return PverState(status)
 
     def get_repair_status(self, pool_fid: Fid) -> List[ReprebStatus]:
         LOG.debug('Fetching repair status for pool %s', pool_fid)

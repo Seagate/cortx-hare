@@ -106,6 +106,22 @@ void m0_ha_broadcast_test(unsigned long long ctx);
  */
 PyObject *m0_ha_filesystem_stats_fetch(unsigned long long ctx);
 
+/*
+ * Invokes m0_spiel_proc_counters_fetch() which fetches bytecount per pool
+ * versions for all pvers under the ios service.
+ * @param proc_fid - Fid of the ios service
+ *
+ * @return Python object of type hax.types.ByteCountStats
+ */
+PyObject *m0_ha_proc_counters_fetch(unsigned long long ctx,
+	struct m0_fid *proc_fid);
+
+/*
+ * Invokes XXX api to fetch the status of the pool version fid,
+ * provided as an input.
+ */
+int m0_ha_pver_status(unsigned long long ctx, struct m0_fid *pver_fid);
+
 PyObject *m0_hax_stop(unsigned long long ctx, const struct m0_fid *process_fid,
 		      const char *hax_endpoint);
 void m0_hax_link_stopped(unsigned long long ctx, const char *proc_ep);
