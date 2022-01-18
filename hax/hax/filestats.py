@@ -22,7 +22,7 @@ from threading import Event
 
 from hax.exception import HAConsistencyException, InterruptedException
 from hax.motr import Motr, log_exception
-from hax.types import FsStatsWithTime, StoppableThread
+from hax.types import Fid, FsStatsWithTime, ObjT, StoppableThread
 from hax.util import ConsulUtil, wait_for_event
 
 LOG = logging.getLogger('hax')
@@ -55,6 +55,14 @@ class FsStatsUpdater(StoppableThread):
                         not all(self.consul.ensure_ioservices_running()))):
                     wait_for_event(self.event, self.interval_sec)
                     continue
+                # Testing purpose and usage
+                proc_fid = Fid(ObjT.PROCESS.value, 15)
+                byte_count = motr.get_proc_bytecount(proc_fid)
+                LOG.debug('Received bytecount: %s', byte_count)
+                pver_fid = Fid(ObjT.PVER.value, 8)
+                pver_status = motr.get_pver_status(pver_fid)
+                LOG.debug('Received pver: %s', pver_status)
+
                 stats = motr.get_filesystem_stats()
                 if not stats:
                     continue
