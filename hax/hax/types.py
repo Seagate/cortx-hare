@@ -161,6 +161,26 @@ FsStatsWithTime = NamedTuple('FsStatsWithTime', [('stats', FsStats),
                                                  ('timestamp', float),
                                                  ('date', str)])
 
+# pver byte count
+PverBC = NamedTuple('PverBC', [('pver_fid', Fid),
+                               ('user_id', int),
+                               ('byte_count', int),
+                               ('object_count', int)])
+
+
+# struct m0_proc_counter
+class ByteCountStats(NamedTuple):
+    proc_fid: Fid
+    pvers: List[PverBC]
+
+
+# enum m0_conf_pver_state
+class PverState(IntEnum):
+    M0_CPS_HEALTHY = 0
+    M0_CPS_DEGRADED = 1
+    M0_CPS_CRITICAL = 2
+    M0_CPS_DAMAGED = 3
+
 
 # enum m0_cm_status
 class SnsCmStatus(Enum):
