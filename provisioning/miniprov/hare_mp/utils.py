@@ -25,6 +25,7 @@ import io
 import os
 import logging
 from typing import List
+from functools import wraps
 from distutils.dir_util import copy_tree
 import shutil
 
@@ -36,11 +37,42 @@ from hare_mp.store import ValueProvider
 from hare_mp.types import Disk, DList, Maybe, Text
 
 
+def func_enter(func):
+    """
+    Logs function entry point.
+    """
+    func_name = func.__qualname__
+    func_line = func.__code__.co_firstlineno
+    func_filename = func.__code__.co_filename
+    logging.info('Entering %s at line %d in file %s', func_name, func_line,
+                 func_filename)
+
+
+def func_leave(func):
+    """
+    Logs function exit point.
+    """
+    logging.info('Leaving %s', func.__qualname__)
+
+
+def func_log(before=func_enter, after=func_leave):
+    def decorate(f):
+        @wraps(f)
+        def call(*args, **kwargs):
+            before(f)
+            result = f(*args, **kwargs)
+            after(f)
+            return result
+        return call
+    return decorate
+
+
 class Utils:
     def __init__(self, provider: ValueProvider):
         self.provider = provider
         self.kv = KVAdapter()
 
+    @func_log(func_enter, func_leave)
     def get_hostname(self, machine_id: str) -> str:
         """
         Returns the hostname of the given machine_id according to the given
@@ -52,6 +84,7 @@ class Utils:
             f'node>{machine_id}>network>data>private_fqdn', allow_null=True)
         return hostname or store.get(f'node>{machine_id}>hostname')
 
+    @func_log(func_enter, func_leave)
     def get_local_hostname(self) -> str:
         """
         Retrieves the machine-id of the node where the code runs and fetches
@@ -61,6 +94,7 @@ class Utils:
         machine_id = store.get_machine_id()
         return self.get_hostname(machine_id)
 
+    @func_log(func_enter, func_leave)
     @repeat_if_fails()
     def save_node_facts(self):
         hostname = self.get_local_hostname()
@@ -68,11 +102,13 @@ class Utils:
         node_facts = execute(cmd)
         self.kv.kv_put(f'{hostname}/facts', node_facts)
 
+    @func_log(func_enter, func_leave)
     def get_node_facts(self):
         hostname = self.get_local_hostname()
         node_facts = self.kv.kv_get(f'{hostname}/facts')
         return json.loads(node_facts['Value'])
 
+    @func_log(func_enter, func_leave)
     def get_data_devices(self, machine_id: str, cvg: int) -> DList[Text]:
         data_devices = DList(
             [Text(device) for device in self.provider.get(
@@ -80,6 +116,7 @@ class Utils:
                 f'storage>cvg[{cvg}]>devices>data')], 'List Text')
         return data_devices
 
+    @func_log(func_enter, func_leave)
     def _get_drive_info_form_os(self, path: str) -> Disk:
         drive_size = 0
         with open(path, 'rb') as f:
@@ -88,6 +125,7 @@ class Utils:
                     size=Maybe(drive_size, 'Natural'),
                     blksize=Maybe(os.stat(path).st_blksize, 'Natural'))
 
+    @func_log(func_enter, func_leave)
     @repeat_if_fails()
     def _save_drive_info(self, path: str):
         disk: Disk = self._get_drive_info_form_os(path)
@@ -98,6 +136,7 @@ class Utils:
         disk_key = path.strip('/')
         self.kv.kv_put(f'{hostname}/{disk_key}', drive_info)
 
+    @func_log(func_enter, func_leave)
     def is_motr_component(self, machine_id: str) -> bool:
         """
         Returns True if motr component is present in the components list
@@ -114,6 +153,7 @@ class Utils:
                 rc = False
         return rc
 
+    @func_log(func_enter, func_leave)
     def is_s3_component(self, machine_id: str) -> bool:
         """
         Returns True if s3 component is present in the components list
@@ -130,6 +170,7 @@ class Utils:
                 rc = False
         return rc
 
+    @func_log(func_enter, func_leave)
     def save_drives_info(self):
         machine_id = self.provider.get_machine_id()
         if(self.is_motr_component(machine_id)):
@@ -139,6 +180,7 @@ class Utils:
                 for dev_path in data_devs.value:
                     self._save_drive_info(dev_path.s)
 
+    @func_log(func_enter, func_leave)
     @repeat_if_fails()
     def get_drive_info_from_consul(self, path: Text, machine_id: str) -> Disk:
         hostname = self.get_hostname(machine_id)
@@ -149,11 +191,13 @@ class Utils:
                      size=Maybe(drive_info['size'], 'Natural'),
                      blksize=Maybe(drive_info['blksize'], 'Natural')))
 
+    @func_log(func_enter, func_leave)
     def get_drives_info_for(self, cvg: int, machine_id: str) -> DList[Disk]:
         data_devs = self.get_data_devices(machine_id, cvg)
         return DList([self.get_drive_info_from_consul(dev_path, machine_id)
                       for dev_path in data_devs.value], 'List Disk')
 
+    @func_log(func_enter, func_leave)
     def import_kv(self, conf_dir_path: str):
         with open(f'{conf_dir_path}/consul-kv.json') as f:
             data = json.load(f)
@@ -162,6 +206,7 @@ class Utils:
                 self.kv.kv_put(item_data['key'],
                                str(item_data['value']))
 
+    @func_log(func_enter, func_leave)
     def copy_conf_files(self, conf_dir_path: str):
         machine_id = self.provider.get_machine_id()
         global_config_path = self.provider.get('cortx>common>storage>local')
@@ -182,17 +227,21 @@ class Utils:
             f'{conf_dir_path}/confd.xc',
             f'{dest_motr}/confd.xc')
 
+    @func_log(func_enter, func_leave)
     def copy_consul_files(self, conf_dir_path: str, mode: str):
         shutil.copyfile(
             f'{conf_dir_path}/consul-{mode}-conf/consul-{mode}-conf.json',
             f'{conf_dir_path}/consul/config/consul-{mode}-conf.json')
 
+    @func_log(func_enter, func_leave)
     def stop_hare(self):
         self.hare_stop = True
 
+    @func_log(func_enter, func_leave)
     def is_hare_stopping(self) -> bool:
         return self.hare_stop
 
+    @func_log(func_enter, func_leave)
     def get_transport_type(self) -> str:
         transport_type = self.provider.get(
             'cortx>motr>transport_type',
@@ -201,6 +250,7 @@ class Utils:
             return 'libfab'
         return transport_type
 
+    @func_log(func_enter, func_leave)
     @repeat_if_fails()
     def save_config_path(self, path: str):
         self.kv.kv_put('config_path', path)

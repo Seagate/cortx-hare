@@ -12,7 +12,7 @@ from hare_mp.types import (ClusterDesc, DiskRef, DList, Maybe, NodeDesc,
                            PoolDesc, PoolType, ProfileDesc, Protocol, Text,
                            M0ServerDesc, DisksDesc, AllowedFailures, Layout,
                            FdmiFilterDesc)
-from hare_mp.utils import Utils
+from hare_mp.utils import func_log, func_enter, func_leave, Utils
 
 DHALL_PATH = '/opt/seagate/cortx/hare/share/cfgen/dhall'
 DHALL_EXE = '/opt/seagate/cortx/hare/bin/dhall'
@@ -264,6 +264,7 @@ class CdfGenerator:
                                                      params=params_text)
         return gencdf
 
+    @func_log(func_enter, func_leave)
     def generate(self) -> str:
         gencdf = self._get_cdf_dhall()
 

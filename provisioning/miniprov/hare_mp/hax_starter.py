@@ -21,7 +21,8 @@ import sys
 from threading import Event
 import os
 from hax.types import StoppableThread
-from hare_mp.utils import execute_no_communicate, LogWriter, Utils
+from hare_mp.utils import (execute_no_communicate, func_log, func_enter,
+                           func_leave, LogWriter, Utils)
 
 LOG = logging.getLogger('hax')
 LOG_FILE_SIZE = 1024 * 1024 * 1024
@@ -41,6 +42,7 @@ class HaxStarter(StoppableThread):
         self.home_dir = home_dir
         self.log_dir = log_dir
 
+    @func_log(func_enter, func_leave)
     def stop(self):
         try:
             if self.process:
@@ -48,6 +50,7 @@ class HaxStarter(StoppableThread):
         except Exception:
             pass
 
+    @func_log(func_enter, func_leave)
     def _execute(self):
         try:
             hax_log_file = f'{self.log_dir}/hare-hax.log'
