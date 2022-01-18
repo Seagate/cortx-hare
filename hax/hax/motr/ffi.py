@@ -129,6 +129,16 @@ class HaxFFI:
         lib.m0_ha_filesystem_stats_fetch.restype = c.py_object
         self.filesystem_stats_fetch = lib.m0_ha_filesystem_stats_fetch
 
+        lib.m0_ha_proc_counters_fetch.argtypes = [c.c_void_p,
+                                                  c.POINTER(FidStruct)]
+        lib.m0_ha_proc_counters_fetch.restype = c.py_object
+        self.proc_bytecount_fetch = lib.m0_ha_proc_counters_fetch
+
+        lib.m0_ha_pver_status.argtypes = [c.c_void_p,
+                                          c.POINTER(FidStruct)]
+        lib.m0_ha_pver_status.restype = c.c_int
+        self.pver_status_fetch = lib.m0_ha_pver_status
+
         lib.repair_status.argtypes = [c.c_void_p, c.POINTER(FidStruct)]
         lib.repair_status.restype = c.py_object
         self.repair_status = lib.repair_status
