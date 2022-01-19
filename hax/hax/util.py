@@ -720,19 +720,28 @@ class ConsulUtil:
                                     obj_fid: Fid,
                                     kv_cache=None) -> int:
         to_ha_state_map = {
-            'unknown': HaNoteStruct.M0_NC_UNKNOWN,
+            'unknown': HaNoteStruct.M0_NC_TRANSIENT,
             'online': HaNoteStruct.M0_NC_ONLINE,
             'offline': HaNoteStruct.M0_NC_TRANSIENT,
             'failed': HaNoteStruct.M0_NC_FAILED,
-            'dtm_recovering': HaNoteStruct.M0_NC_DTM_RECOVERING}
+            'dtm_recovering': HaNoteStruct.M0_NC_DTM_RECOVERING,
+            'm0_conf_ha_process_starting': HaNoteStruct.M0_NC_TRANSIENT,
+            'm0_conf_ha_process_started': HaNoteStruct.M0_NC_DTM_RECOVERING,
+            'm0_conf_ha_process_stopping': HaNoteStruct.M0_NC_TRANSIENT,
+            'm0_conf_ha_process_stopped': HaNoteStruct.M0_NC_TRANSIENT,
+            'm0_conf_ha_process_dtm_recovered':
+            HaNoteStruct.M0_NC_ONLINE}
 
-        failvec_data = self.kv.kv_get('failvec', kv_cache=kv_cache)
-        failvec = failvec_data['Value']
-        if failvec:
-            obj_state = failvec.get(f'{obj_fid}')
-            if obj_state:
-                return to_ha_state_map[str(obj_state).lower()]
-        return HaNoteStruct.M0_NC_ONLINE
+        obj_state = 'online'
+        if (obj_fid.container == ObjT.PROCESS.value):
+            obj_state = self.get_process_status(obj_fid).proc_status
+            LOG.debug('Got process obj state: %s', obj_state)
+        else:
+            failvec_data = self.kv.kv_get('failvec', kv_cache=kv_cache)
+            failvec = failvec_data['Value']
+            if failvec:
+                obj_state = failvec.get(f'{obj_fid}')
+        return to_ha_state_map[str(obj_state).lower()]
 
     @repeat_if_fails()
     @uses_consul_cache
@@ -2023,6 +2032,7 @@ class ConsulUtil:
             ObjHealth.OFFLINE: 'offline',
             ObjHealth.UNKNOWN: 'unknown',
             ObjHealth.STOPPED: 'stopped',
+            ObjHealth.RECOVERING: 'dtm_recovering'
         }
         proc_base_fid = self.get_process_base_fid(process_fid)
 
@@ -2039,6 +2049,7 @@ class ConsulUtil:
                 continue
             value = json.loads(item['Value'])
             value['state'] = process_state_map[state]
+            LOG.debug('set_process_state: %s', json.dumps(value))
             self.kv.kv_put(item['Key'], json.dumps(value))
 
     @repeat_if_fails()
