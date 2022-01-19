@@ -337,6 +337,7 @@ class Motr:
                     and _update_process_tree(st.fid, st.status)):
 
                 if st.fid.container == ObjT.PROCESS.value:
+                    LOG.debug('ha_broadcast:set_process_state')
                     self.consul_util.set_process_state(st.fid, st.status)
 
                 notes += self._generate_sub_services(note,
