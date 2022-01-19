@@ -625,19 +625,28 @@ class ConsulUtil:
                                     obj_fid: Fid,
                                     kv_cache=None) -> int:
         to_ha_state_map = {
-            'unknown': HaNoteStruct.M0_NC_UNKNOWN,
+            'unknown': HaNoteStruct.M0_NC_TRANSIENT,
             'online': HaNoteStruct.M0_NC_ONLINE,
             'offline': HaNoteStruct.M0_NC_TRANSIENT,
             'failed': HaNoteStruct.M0_NC_FAILED,
-            'dtm_recovering': HaNoteStruct.M0_NC_DTM_RECOVERING}
+            'dtm_recovering': HaNoteStruct.M0_NC_DTM_RECOVERING,
+            'm0_conf_ha_process_starting': HaNoteStruct.M0_NC_TRANSIENT,
+            'm0_conf_ha_process_started': HaNoteStruct.M0_NC_DTM_RECOVERING,
+            'm0_conf_ha_process_stopping': HaNoteStruct.M0_NC_TRANSIENT,
+            'm0_conf_ha_process_stopped': HaNoteStruct.M0_NC_TRANSIENT,
+            'm0_conf_ha_process_dtm_recovered':
+            HaNoteStruct.M0_NC_ONLINE}
 
-        failvec_data = self.kv.kv_get('failvec', kv_cache=kv_cache)
-        failvec = failvec_data['Value']
-        if failvec:
-            obj_state = failvec.get(f'{obj_fid}')
-            if obj_state:
-                return to_ha_state_map[str(obj_state).lower()]
-        return HaNoteStruct.M0_NC_ONLINE
+        obj_state = 'online'
+        if (obj_fid.container == ObjT.PROCESS.value):
+            obj_state = self.get_process_status(obj_fid).proc_status
+            LOG.debug('Got process obj state: %s', obj_state)
+        else:
+            failvec_data = self.kv.kv_get('failvec', kv_cache=kv_cache)
+            failvec = failvec_data['Value']
+            if failvec:
+                obj_state = failvec.get(f'{obj_fid}')
+        return to_ha_state_map[str(obj_state).lower()]
 
     @repeat_if_fails()
     @uses_consul_cache
@@ -1246,7 +1255,6 @@ class ConsulUtil:
     def update_process_status(self, event: ConfHaProcess) -> None:
         assert 0 <= event.chp_event < len(ha_process_events), \
             f'Invalid event type: {event.chp_event}'
-        local_node = self.get_local_nodename()
         data = json.dumps({'state': ha_process_events[event.chp_event],
                            'type': m0HaProcessType(event.chp_type).name})
         # Maintain statuses for all the motr processes in the cluster
@@ -1255,7 +1263,7 @@ class ConsulUtil:
         # processes statuses will be updated locally without each node
         # stepping over each other's update and without any need for
         # synchronization.
-        key = f'{local_node}/processes/{event.fid}'
+        key = f'processes/{event.fid}'
         LOG.debug('Setting process status in KV: %s:%s', key, data)
         self.kv.kv_put(key, data)
 
@@ -1432,9 +1440,7 @@ class ConsulUtil:
                            proc_node=None,
                            kv_cache=None) -> MotrConsulProcInfo:
         proc_base_fid = self.get_process_base_fid(fid)
-        if not proc_node:
-            proc_node = self.get_process_node(proc_base_fid, kv_cache=kv_cache)
-        key = f'{proc_node}/processes/{proc_base_fid}'
+        key = f'processes/{proc_base_fid}'
         status = self.kv.kv_get(key, kv_cache=kv_cache)
         if status:
             val = json.loads(status['Value'])
@@ -1813,6 +1819,7 @@ class ConsulUtil:
             ServiceHealth.OFFLINE: 'offline',
             ServiceHealth.UNKNOWN: 'unknown',
             ServiceHealth.STOPPED: 'stopped',
+            ServiceHealth.RECOVERING: 'dtm_recovering'
         }
         proc_base_fid = self.get_process_base_fid(process_fid)
 
@@ -1828,13 +1835,13 @@ class ConsulUtil:
                 continue
             value = json.loads(item['Value'])
             value['state'] = process_state_map[state]
+            LOG.debug('set_process_state: %s', json.dumps(value))
             self.kv.kv_put(item['Key'], json.dumps(value))
 
     @repeat_if_fails()
     def cleanup_node_process_states(self):
-        local_node = self.get_local_nodename()
         keys: List[KeyDelete] = [
-            KeyDelete(name=f'{local_node}/processes/', recurse=True),
+            KeyDelete(name='processes/', recurse=True),
         ]
 
         logging.info('Deleting Hare KV entries (%s)', keys)
