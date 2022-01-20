@@ -1243,7 +1243,6 @@ class ConsulUtil:
     def update_process_status(self, event: ConfHaProcess) -> None:
         assert 0 <= event.chp_event < len(ha_process_events), \
             f'Invalid event type: {event.chp_event}'
-        local_node = self.get_local_nodename()
         data = json.dumps({'state': ha_process_events[event.chp_event],
                            'type': m0HaProcessType(event.chp_type).name})
         # Maintain statuses for all the motr processes in the cluster
@@ -1252,7 +1251,7 @@ class ConsulUtil:
         # processes statuses will be updated locally without each node
         # stepping over each other's update and without any need for
         # synchronization.
-        key = f'{local_node}/processes/{event.fid}'
+        key = f'processes/{event.fid}'
         LOG.debug('Setting process status in KV: %s:%s', key, data)
         self.kv.kv_put(key, data)
 
@@ -1430,7 +1429,7 @@ class ConsulUtil:
                            kv_cache=None) -> MotrConsulProcInfo:
         if not proc_node:
             proc_node = self.get_process_node(fid, kv_cache=kv_cache)
-        key = f'{proc_node}/processes/{fid}'
+        key = f'processes/{fid}'
         status = self.kv.kv_get(key, kv_cache=kv_cache)
         if status:
             val = json.loads(status['Value'])
@@ -1439,8 +1438,7 @@ class ConsulUtil:
             return MotrConsulProcInfo('Unknown', 'Unknown')
 
     def get_process_local_status(self, fid: Fid) -> str:
-        local_node = self.get_local_nodename()
-        key = f'{local_node}/processes/{fid}'
+        key = f'processes/{fid}'
         status = self.kv.kv_get(key)
         if status:
             return str(json.loads(status['Value'])['state'])
@@ -1813,11 +1811,9 @@ class ConsulUtil:
 
     @repeat_if_fails()
     def cleanup_node_process_states(self):
-        local_node = self.get_local_nodename()
         keys: List[KeyDelete] = [
-            KeyDelete(name=f'{local_node}/processes/', recurse=True),
+            KeyDelete(name='processes/', recurse=True),
         ]
-
         logging.info('Deleting Hare KV entries (%s)', keys)
         if not self.kv.kv_delete_in_transaction(keys):
             raise HAConsistencyException('KV deletion failed')

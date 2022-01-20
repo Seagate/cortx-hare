@@ -121,13 +121,15 @@ class ConsumerThread(StoppableThread):
                 current_status = self.consul.get_process_current_status(
                     state.status, state.fid)
                 if current_status == ServiceHealth.OK:
-                    if (self.consul.get_process_local_status(
-                            state.fid) == 'M0_CONF_HA_PROCESS_STARTED'):
+                    if (self.consul.get_process_status(
+                            state.fid).proc_status ==
+                            'M0_CONF_HA_PROCESS_STARTED'):
                         continue
                 if current_status in (ServiceHealth.FAILED,
                                       ServiceHealth.STOPPED):
-                    if (self.consul.get_process_local_status(
-                            state.fid) == 'M0_CONF_HA_PROCESS_STOPPED'):
+                    if (self.consul.get_process_status(
+                            state.fid).proc_status ==
+                            'M0_CONF_HA_PROCESS_STOPPED'):
                         # Consul may report failure of a process multiple
                         # times, so we don't want to send duplicate failure
                         # notifications, it may cause delay in cleanup
@@ -152,17 +154,20 @@ class ConsumerThread(StoppableThread):
                     # confirms its current status from Consul KV and updates
                     # the list of failed services and also adds it to the
                     # broadcast list.
+                    proc_status_saved = self.consul.get_process_status(
+                                            state.fid)
+                    proc_type = m0HaProcessType.str_to_Enum(
+                        proc_status_saved.proc_type)
                     if current_status != ServiceHealth.OK:
-                        event = m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED
-                    else:
-                        event = m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED
-                    self.consul.update_process_status(
-                        ConfHaProcess(
-                            chp_event=event,
-                            chp_type=int(
-                                m0HaProcessType.M0_CONF_HA_PROCESS_M0D),
-                            chp_pid=0,
-                            fid=state.fid))
+                        proc_status = (
+                            m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED)
+                        LOG.debug('update process failure')
+                        self.consul.update_process_status(
+                            ConfHaProcess(
+                                chp_event=proc_status,
+                                chp_type=proc_type,
+                                chp_pid=0,
+                                fid=state.fid))
                 new_ha_states.append(
                     HAState(fid=state.fid, status=current_status))
             else:

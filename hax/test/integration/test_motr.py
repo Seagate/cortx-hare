@@ -611,9 +611,9 @@ def test_broadcast_node_failure(mocker, motr, consul_util):
         elif key == 'm0conf/nodes/localhost/processes/7/services/rms':
             return new_kv('m0conf/nodes/localhost/processes/7/services/rms',
                           '17')
-        elif key == 'localhost/processes/0x7200000000000001:0x15':
+        elif key == 'processes/0x7200000000000001:0x15':
             return new_kv(
-                'localhost/processes/0x7200000000000001',
+                'processes/0x7200000000000001',
                 json.dumps({
                     'type': 'M0_CONF_HA_PROCESS_OTHER',
                     'state': 'Unknown'
@@ -711,9 +711,9 @@ def create_stub_get(process_type: str) -> Callable[[str, bool], Any]:
                   '/ctrls/0x6300000000000001:0x6',
                   json.dumps({"state": "M0_NC_UNKNOWN"}))]
             ]
-        elif key == 'localhost/processes/0x7200000000000001:0x15':
+        elif key == 'processes/0x7200000000000001:0x15':
             return new_kv(
-                'localhost/processes/0x7200000000000001',
+                'processes/0x7200000000000001',
                 json.dumps({
                     'type': process_type,
                     'state': 'Unknown'
@@ -968,9 +968,9 @@ def test_broadcast_io_service_failure(mocker, planner, motr, consumer,
         elif key == 'm0conf/nodes/localhost/processes/7/services/rms':
             return new_kv('m0conf/nodes/localhost/processes/7/services/rms',
                           '17')
-        elif key == 'localhost/processes/0x7200000000000001:0x15':
+        elif key == 'processes/0x7200000000000001:0x15':
             return new_kv(
-                'localhost/processes/0x7200000000000001',
+                'processes/0x7200000000000001',
                 json.dumps({
                     'type': 'M0_CONF_HA_PROCESS_OTHER',
                     'state': 'Unknown'
@@ -1151,9 +1151,9 @@ def test_broadcast_more_than_1024_objects(mocker, planner, motr, consumer,
         elif key == 'm0conf/nodes/localhost/processes/7/services/rms':
             return new_kv('m0conf/nodes/localhost/processes/7/services/rms',
                           '17')
-        elif key == 'localhost/processes/0x7200000000000001:0x15':
+        elif key == 'processes/0x7200000000000001:0x15':
             return new_kv(
-                'localhost/processes/0x7200000000000001',
+                'processes/0x7200000000000001',
                 json.dumps({
                     'type': 'M0_CONF_HA_PROCESS_OTHER',
                     'state': 'Unknown'
