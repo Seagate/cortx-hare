@@ -4,26 +4,27 @@
 nodes:
   - hostname: localhost     # [user@]hostname
     data_iface: eth1        # name of data network interface
-    #data_iface_type: o2ib  # type of network interface (optional);
-                            # supported values: "tcp" (default), "o2ib"
+    data_iface_ip_addr: null
     transport_type: libfab
     m0_servers:
       - runs_confd: true
         io_disks:
           data: []
-      - io_disks:
-          #meta_data: /path/to/meta-data/drive
+          meta_data: null
+      - runs_confd: null
+        io_disks:
           data:
-            - path: /dev/loop0
-            - path: /dev/loop1
-            - path: /dev/loop2
-            - path: /dev/loop3
-            - path: /dev/loop4
-            - path: /dev/loop5
-            - path: /dev/loop6
-            - path: /dev/loop7
-            - path: /dev/loop8
-            - path: /dev/loop9
+            - path: /dev/loop0 
+            - path: /dev/loop1 
+            - path: /dev/loop2 
+            - path: /dev/loop3 
+            - path: /dev/loop4 
+            - path: /dev/loop5 
+            - path: /dev/loop6 
+            - path: /dev/loop7 
+            - path: /dev/loop8 
+            - path: /dev/loop9 
+          meta_data: null
     m0_clients:
       s3: 0         # number of S3 servers to start
       other: 2      # max quantity of other Motr clients this host may have
@@ -45,7 +46,7 @@ pools:
     data_units: 1
     parity_units: 0
     spare_units: 0
-    #allowed_failures: { site: 0, rack: 0, encl: 0, ctrl: 0, disk: 0 }
+    # allowed_failures: { site: 0, rack: 0, encl: 0, ctrl: 0, disk: 0 }
 #profiles:
 #  - name: default
 #    pools: [ the pool ]
