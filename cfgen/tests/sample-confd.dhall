@@ -133,16 +133,16 @@ let node = types.Obj.Node
   }
 
 let endpoints =
-    let ep = utils.endpoint types.Protocol.tcp "172.28.128.3"
+    let ep = utils.lnetendpoint types.Protocol.tcp "172.28.128.3"
     in
-      { process_24 = ep 34 101
-      , process_27 = ep 44 101
-      , process_30 = ep 41 401
-      , process_38 = ep 41 301
-      , process_40 = ep 41 302
-      , process_42 = ep 41 303
-      , process_44 = ep 41 304
-      , process_46 = ep 41 305
+      { process_24 = "172.28.128.3@tcp:12345:34:101"
+      , process_27 = "172.28.128.3@tcp:12345:44:101"
+      , process_30 = "172.28.128.3@tcp:12345:41:401"
+      , process_38 = "172.28.128.3@tcp:12345:41:301"
+      , process_40 = "172.28.128.3@tcp:12345:41:302"
+      , process_42 = "172.28.128.3@tcp:12345:41:303"
+      , process_44 = "172.28.128.3@tcp:12345:41:304"
+      , process_46 = "172.28.128.3@tcp:12345:41:305"
       }
 
 let process_24 = types.Obj.Process

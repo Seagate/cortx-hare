@@ -25,23 +25,70 @@ in
 { create_aux = Some False
 , nodes =
     [ { hostname = "localhost"
-      , machine_id = "123hjbdf"
+      , machine_id = None Text
+      , memorysize_mb = None Double
+      , processorcount = None Natural
+      , transport_type = "libfab"
       , data_iface = "eth1"
-      , data_iface_type = None types.Protocol
+      , data_iface_ip_addr = None Text
+      , data_iface_type = None < o2ib | tcp >
       , m0_servers =
           Some
           [ { runs_confd = Some True
             , io_disks =
                 { meta_data = None Text
-                , data = [] : List Text
+                , data = [] : List
+                           { blksize : Optional Natural
+                           , path : Optional Text
+                           , size : Optional Natural
+                           }
                 }
             }
           , { runs_confd = None Bool
             , io_disks =
                 { meta_data = None Text
                 , data =
-                    let mkPath = \(i : Natural) -> "/dev/loop" ++ Natural/show i
-                    in Prelude.List.generate 10 Text mkPath
+                    [ { blksize = None Natural
+                      , path = Some "/dev/loop0"
+                      , size = None Natural
+                      }
+                    , { blksize = None Natural
+                      , path = Some "/dev/loop1"
+                      , size = None Natural
+                      }
+                    , { blksize = None Natural
+                      , path = Some "/dev/loop2"
+                      , size = None Natural
+                      }
+                    , { blksize = None Natural
+                      , path = Some "/dev/loop3"
+                      , size = None Natural
+                      }
+                    , { blksize = None Natural
+                      , path = Some "/dev/loop4"
+                      , size = None Natural
+                      }
+                    , { blksize = None Natural
+                      , path = Some "/dev/loop5"
+                      , size = None Natural
+                      }
+                    , { blksize = None Natural
+                      , path = Some "/dev/loop6"
+                      , size = None Natural
+                      }
+                    , { blksize = None Natural
+                      , path = Some "/dev/loop7"
+                      , size = None Natural
+                      }
+                    , { blksize = None Natural
+                      , path = Some "/dev/loop8"
+                      , size = None Natural
+                      }
+                    , { blksize = None Natural
+                      , path = Some "/dev/loop9"
+                      , size = None Natural
+                      }
+                    ]
                 }
             }
           ]
@@ -69,9 +116,24 @@ in
       , data_units = 1
       , parity_units = 0
       , spare_units = Some 0
-      , allowed_failures = None types.FailVec
+      , allowed_failures = 
+          None
+            { ctrl : Natural
+            , disk : Natural
+            , encl : Natural
+            , rack : Natural
+            , site : Natural
+            }
       }
     ]
-, profiles = None (List types.PoolsRef)
-, fdmi_filters = None (List types.FdmiFilterDesc)
+, profiles = None (List { name : Text, pools : List Text })
+, fdmi_filters =
+    None
+      ( List
+          { client_index : Natural
+          , name : Text
+          , node : Text
+          , substrings : List Text
+          }
+      )
 } : types.ClusterDesc
