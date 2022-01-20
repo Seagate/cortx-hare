@@ -84,7 +84,6 @@ class Motr:
 
         rm_fid = _get_rm_fid()
         # Cleanup old process states.
-        self.consul_util.cleanup_node_process_states()
         result = self._ffi.start(self._ha_ctx, make_c_str(rpc_endpoint),
                                  process.to_c(), ha_service.to_c(),
                                  rm_fid.to_c())
@@ -143,8 +142,7 @@ class Motr:
                                                    str(process_fid)) +
                   ' The request will be processed in another thread.')
         try:
-            if (is_first_request
-                    and (not self.consul_util.is_proc_client(process_fid))):
+            if is_first_request:
                 # This is the first start of this process or the process has
                 # restarted.
                 # Let everyone know that the process has restarted so that
@@ -308,7 +306,7 @@ class Motr:
         hax_fid = self.consul_util.get_hax_fid()
         notes = []
         for st in ha_states:
-            if st.status in (ServiceHealth.UNKNOWN, ServiceHealth.OFFLINE):
+            if st.status == ServiceHealth.UNKNOWN:
                 continue
             note = HaNoteStruct(st.fid.to_c(), ha_obj_state(st))
             notes.append(note)
