@@ -23,6 +23,46 @@ export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
 
 PATH=$PATH:/opt/seagate/cortx/hare/bin
 
+PROG=${0##*/}
+
+die() {
+    echo "$PROG: $*" >&2
+    exit 1
+}
+
+usage() {
+    cat <<EOF
+Usage: $PROG [<option>]...
+
+Options:
+  --xprt       Use given motr transport type to generate corresponding motr
+               process endpoints. Supported transport types are lnet and libfab.
+               Transport type defaults to libfab if not specified.
+  -h, --help   Shows this help and exit.
+EOF
+
+    exit 1;
+}
+
+TEMP=$(getopt --options h \
+              --longoptions help,xprt: \
+              --name "$PROG" -- "$@" || true)
+
+eval set -- "$TEMP"
+
+xprt='libfab'
+
+while true; do
+    case "$1" in
+        -h|--help)           usage ;;
+        --xprt)              xprt=$2; shift 2 ;;
+        --)                  shift; break ;;
+        *)                   break ;;
+    esac
+done
+
+[[ $xprt == 'lnet' ]] || [[ $xprt == 'libfab' ]] || die "Invalid transport type $xprt"
+
 ## Fid of the first profile.
 ##
 ## Sample output:
@@ -35,21 +75,35 @@ first_profile_fid() {
 
 ## Return process fid and endpoint of every motr client.
 ##
-## Sample output:
+## Sample output with transport type as lnet:
 ## ```
 ## 0x7200000000000001:0x28 172.28.128.150@tcp:12345:4:1
 ## 0x7200000000000001:0x2b 172.28.128.150@tcp:12345:4:2
 ## ```
+## Sample output with transport type as libfabric:
+## 0x7200000000000001:0x2b inet:tcp:10.230.240.185@5001
+## 0x7200000000000001:0x2e inet:tcp:10.230.240.185@5002
+## ```
 motr_clients() {
     consul kv get -recurse m0conf/nodes |
-        # Sample input:
+        # Sample input with transport type as lnet:
         # ```
         # m0conf/nodes/cmu/processes/12/endpoint:172.28.128.150@tcp:12345:2:2
         # m0conf/nodes/cmu/processes/12/services/addb2:37
+        # ```
+        # Sample input with transport type as libfabric:
+        # m0conf/nodes/localhost/processes/29/endpoint:inet:tcp:10.230.250.106@5001
+        # m0conf/nodes/localhost/processes/29/services/m0_client_other:31
         # [...]
         # ```
         awk -F/ '/endpoint:/ {ep=$6; sub(/^endpoint:/, "", ep)}
                  /m0_client_other/ {printf("0x7200000000000001:0x%x %s\n", $5, ep)}'
+}
+
+hax_endpoint() {
+   consul kv get -recurse m0conf/nodes |
+   awk -F/ '/endpoint:/ {ep=$6; sub(/^endpoint:/, "", ep)}
+            /ha/ {printf("0x7200000000000001:0x%x %s\n", $5, ep)}'
 }
 
 ## Parameterized version of `motr/m0crate/tests/test1_io.yaml` from
@@ -96,10 +150,42 @@ WORKLOAD_SPEC:                # Workload specification section
 EOF
 }
 
+hax_tmp(){
+    hax_endpoint | while read fid haxep; do
+    if [ ! -z "$haxep" -a "$haxep" != " " ]; then
+        if [[ $xprt == 'libfab' ]]; then
+            ip=$(echo $haxep | awk -F":|@" '{print $3}')
+            if ip a | grep -q $ip; then
+                echo $haxep
+                break
+            fi
+        else
+            ip=${haxep%@*}
+            if ip a | grep -q $ip; then  # our IP
+                echo $haxep
+                break
+            fi
+        fi
+    fi
+done
+}
+
 motr_clients | while read fid ep; do
-    ip=${ep%@*}
-    if ip a | grep -q $ip; then  # our IP
-        m0crate_io_conf $ep ${ep%:*:*}:1:1 $fid
-        break
+    if [ ! -z "$ep" -a "$ep" != " " ]; then
+        if [[ $xprt == 'libfab' ]]; then
+            ip=$(echo $ep | awk -F":|@" '{print $3}')
+            val=$( hax_tmp )
+            if ip a | grep -q $ip; then  # our IP
+                m0crate_io_conf $ep $val $fid
+                break
+            fi
+        else
+            ip=${ep%@*}
+            val=$( hax_tmp )
+            if ip a | grep -q $ip; then  # our IP
+                m0crate_io_conf $ep $val $fid
+                break
+            fi
+        fi
     fi
 done
