@@ -70,6 +70,7 @@ class CdfGenerator:
         machine_ids.extend(conf.get_machine_ids_for_service(
             Const.SERVICE_S3_SERVER.value))
 
+        machine_ids = list(set(machine_ids))
         for machine_id in machine_ids:
             nodes.append(self._create_node(machine_id))
         return nodes
