@@ -7,11 +7,11 @@
           "sns": {
             "data": "4",
             "parity": "2",
-            "spare": "2"
+            "spare": "0"
           },
           "dix": {
             "data": "1",
-            "parity": "2",
+            "parity": "1",
             "spare": "0"
           }
         },

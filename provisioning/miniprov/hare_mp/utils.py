@@ -28,6 +28,7 @@ from typing import List
 from functools import wraps
 from distutils.dir_util import copy_tree
 import shutil
+from time import sleep
 
 from cortx.utils.cortx import Const
 from hax.util import repeat_if_fails, KVAdapter
@@ -103,10 +104,21 @@ class Utils:
         self.kv.kv_put(f'{hostname}/facts', node_facts)
 
     @func_log(func_enter, func_leave)
+    @repeat_if_fails()
     def get_node_facts(self):
         hostname = self.get_local_hostname()
-        node_facts = self.kv.kv_get(f'{hostname}/facts')
-        return json.loads(node_facts['Value'])
+        node_facts = None
+        node_facts_val = None
+        while (not node_facts or node_facts is None):
+            try:
+                node_facts = self.kv.kv_get(f'{hostname}/facts')
+                node_facts_val = json.loads(node_facts['Value'])
+            except TypeError:
+                logging.info('%s facts not available yet, retrying...',
+                             hostname)
+                sleep(2)
+                continue
+        return node_facts_val
 
     @func_log(func_enter, func_leave)
     def get_data_devices(self, machine_id: str, cvg: int) -> DList[Text]:
@@ -185,8 +197,17 @@ class Utils:
     def get_drive_info_from_consul(self, path: Text, machine_id: str) -> Disk:
         hostname = self.get_hostname(machine_id)
         disk_path = json.loads(str(path)).lstrip(os.sep)
-        drive_data = self.kv.kv_get(f'{hostname}/{disk_path}')
-        drive_info = json.loads(drive_data['Value'])
+        drive_data = None
+        drive_info = None
+        while (not drive_data or drive_data is None):
+            try:
+                drive_data = self.kv.kv_get(f'{hostname}/{disk_path}')
+                drive_info = json.loads(drive_data['Value'])
+            except TypeError:
+                logging.info('%s details are not available yet, retrying...',
+                             disk_path)
+                sleep(2)
+                continue
         return (Disk(path=Maybe(path, 'Text'),
                      size=Maybe(drive_info['size'], 'Natural'),
                      blksize=Maybe(drive_info['blksize'], 'Natural')))

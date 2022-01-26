@@ -2491,8 +2491,8 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
         ConfProcess.build(conf, node_id, node, ProcT.hax)
 
         m0srv = node.get('m0_servers')
+        confd_p = False
         if m0srv is not None:
-            confd_p = False
             for ctrl_id in ctrl_ids:
                 m0d = ctrl_id[1]
                 conf_ctrl_id: Optional[Oid] = ctrl_id[0]
