@@ -18,14 +18,7 @@
 
 -}
 
-{ hostname : Text
-, machine_id : Optional Text
-, processorcount: Optional Natural
-, memorysize_mb: Optional Double
-, data_iface : Text
-, data_iface_ip_addr : Optional Text
-, data_iface_type : Optional ./Protocol.dhall
-, transport_type : Text
-, m0_servers : Optional (List ./M0ServerDesc.dhall)
-, m0_clients : Optional (List ./M0ClientDesc.dhall)
+-- motr client definition
+{ name : Text
+, instances : Natural
 }

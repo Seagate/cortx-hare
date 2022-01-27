@@ -186,6 +186,14 @@ get_service_host() {
     echo ${1##*:}
 }
 
+get_motr_client_types() {
+
+    local cmd="jq '.[] | select(.key==\"m0_client_types\") |
+                  .value' $kv_file"
+
+    eval $cmd || true
+}
+
 install_motr_conf() {
     local motr_conf_file=$1
     if $custom_config; then
@@ -195,12 +203,12 @@ install_motr_conf() {
     fi
 }
 
-install_s3_conf() {
-    local s3_conf_file=$1
+install_motr_client_conf() {
+    local motr_client_conf_file=$1
     if $custom_config; then
-        sudo install $s3_conf_file $conf_dir/$sysconfig_dir/s3/$(get_node_name)/
+        sudo install $motr_client_conf_file $conf_dir/$sysconfig_dir/s3/$(get_node_name)/
     else
-        sudo install $s3_conf_file $sysconfig_dir/
+        sudo install $motr_client_conf_file $sysconfig_dir/
     fi
 }
 
@@ -238,7 +246,19 @@ Please verify that the host name matches the one stored in the Consul KV.
 }
 CONFD_IDs=$(get_service_ids_from_kv_file 'grep -iw "services\/confd"')
 IOS_IDs=$(get_service_ids_from_kv_file 'grep -iw "services\/ios"')
-S3_IDs=$(get_service_ids_from_kv_file 'grep -iw "services\/m0_client_s3"')
+
+MOTR_CLIENT_TYPES=$(get_motr_client_types)
+MOTR_CLIENT_TYPES=$(echo $MOTR_CLIENT_TYPES  | cut -d "[" -f2 | cut -d "]" -f1)
+
+MOTR_CLIENT_IDS=
+for motr_client_type in $MOTR_CLIENT_TYPES; do
+    motr_client_type=$(echo $motr_client_type | tr -d ',')
+    ids=$(get_service_ids_from_kv_file "grep -iw \"services\/$motr_client_type\"")
+    for client_id in $ids; do
+        MOTR_CLIENT_IDS+="${motr_client_type}:${client_id} "
+    done
+done
+
 HAX_EP=$(get_service_ep_from_kv_file $HAX_ID)
 
 if $dry_run; then
@@ -366,15 +386,16 @@ EOF
     install_motr_conf /tmp/m0d-$fid
 }
 
-append_s3_svc() {
+append_motr_client_svc() {
     local id=$1
     local fid=$(id2fid $id)
     local ep=$(get_service_ep_from_kv_file $id)
     local addr=$(get_service_addr $ep)
     local port=$(get_service_port $ep)
     local host=$(get_service_host $addr)
-    local s3port=$2
-    local s3svc='s3server'@$fid
+    local client_port=$2
+    local motr_client_type=$(echo $3 | tr -d '"')
+    local svc=$motr_client_type@$fid
     SVCS_CONF+="${SVCS_CONF:+,}{
       \"id\": \"$id\",
       \"name\": \"s3service\",
@@ -387,7 +408,7 @@ append_s3_svc() {
       \"checks\": [
           {
             \"args\": [ \"/opt/seagate/cortx/hare/libexec/check-service\",
-                        \"--svc\", \"$s3svc\", \"--port\", \"$port\",
+                        \"--svc\", \"$svc\", \"--port\", \"$port\",
                         \"--host\", \"$host\",
                         \"--conf-dir\", \"$conf_dir\" ],
             \"interval\": \"1s\",
@@ -397,14 +418,14 @@ append_s3_svc() {
     }"
     local first_profile_fid=$(get_profile_from_kv_file)
     [[ -n $first_profile_fid ]]  # assert
-    cat <<EOF | sudo tee /tmp/s3server-$fid > /dev/null
+    cat <<EOF | sudo tee /tmp/$motr_client_type-$fid > /dev/null
 MOTR_PROFILE_FID=$first_profile_fid
-MOTR_S3SERVER_EP='$ep'
+MOTR_${motr_client_type^^}_EP='$ep'
 MOTR_HA_EP='$HAX_EP'
 MOTR_PROCESS_FID='$fid'
-MOTR_S3SERVER_PORT=$s3port
+MOTR_${motr_client_type^^}_PORT=$client_port
 EOF
-    install_s3_conf /tmp/s3server-$fid
+    install_motr_client_conf /tmp/$motr_client_type-$fid
 }
 
 for id in $HAX_ID; do
@@ -419,10 +440,13 @@ for id in $IOS_IDs; do
     append_ios_svc $id
 done
 
-s3port=28071
-for id in $S3_IDs; do
-    append_s3_svc $id $s3port
-    ((s3port++))
+client_port=28071
+
+for id in $MOTR_CLIENT_IDS; do
+    proc=$(echo $id| cut -d':' -f 1)
+    client_id=$(echo $id| cut -d':' -f 2)
+    append_motr_client_svc $client_id $client_port $proc
+    ((client_port++))
 done
 
 tmpfile=$(mktemp /tmp/${CONF_FILE##*/}.XXXXXX)
