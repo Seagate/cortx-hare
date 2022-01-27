@@ -33,7 +33,7 @@ The required parameter is one of the following:
 
   --phase 1 - start Motr confd servers
   --phase 2 - start Motr IO servers
-  --phase 3 - start S3 servers
+  --phase 3 - start Motr client services
 
 Options:
   --mkfs-only   Do m0mkfs only (CAUTION: wipes Motr data).
@@ -118,7 +118,7 @@ EOF
     die "'motr-kernel' systemd service is not installed"
 fi
 
-. update-consul-conf --dry-run --xprt $xprt # import CONFD_IDs, IOS_IDs, S3_IDs, id2fid()
+. update-consul-conf --dry-run --xprt $xprt # import CONFD_IDs, IOS_IDs, MOTR_CLIENT_IDS, id2fid()
 
 sysconfig_dir='/etc/sysconfig'
 [ -d $sysconfig_dir ] || sysconfig_dir='/etc/default'
@@ -187,8 +187,8 @@ case $phase in
        IDs=$IOS_IDs
        ;;
     phase3)
-       proc='s3server@'
-       IDs=$S3_IDs
+       proc=
+       IDs=$MOTR_CLIENT_IDS
        ;;
     *)
        die 'Impossible happened'
@@ -217,11 +217,18 @@ wait_m0mkfs_done() {
 }
 
 for id in $IDs; do
-    fid=$(id2fid $id)
+    if [[ $phase == 'phase3' ]]; then
+        proc="$(echo $id| cut -d':' -f 1| tr -d '"' )@"
+        fid=$(id2fid $(echo $id| cut -d':' -f 2))
+    else
+        fid=$(id2fid $id)
+    fi
+
     if [[ $do_mkfs ]]; then
         sudo systemctl start motr-mkfs@$fid
         wait_m0mkfs_done $id
     fi
+
 
     if [[ $do_mkfs != 'mkfs-only' ]]; then
         sudo systemctl start $proc$fid
