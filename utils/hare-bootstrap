@@ -510,10 +510,10 @@ bootstrap_nodes phase1
 # Start ioservices
 bootstrap_nodes phase2
 
-. update-consul-conf --server --dry-run --xprt $xprt # import S3_IDs
-if [[ -n $S3_IDs ]]; then
-    # Now the 3rd phase (s3servers).
-    say 'Starting S3 servers (phase3)...'
+. update-consul-conf --server --dry-run --xprt $xprt # import MOTR_CLIENT_IDS
+if [[ -n $MOTR_CLIENT_IDS ]]; then
+    # Now the 3rd phase (motr clients).
+    say 'Starting motr clients...'
     bootstrap-node --phase phase3 --xprt $xprt &
     pids=($!)
 
