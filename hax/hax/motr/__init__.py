@@ -198,8 +198,9 @@ class Motr:
         sess = principal_rm = confds = None
         try:
             util = self.consul_util
-            if util.is_proc_client(process_fid) and message.is_first_request:
-                util.alloc_next_process_fid(process_fid)
+            # Disabling dynamic fids allocation until dtm is ready to consume.
+            # if util.is_proc_client(process_fid) and message.is_first_request:
+            #     util.alloc_next_process_fid(process_fid)
 
             # When stopping, there's a possibility that hax may receive
             # an entrypoint request from motr land. In order to unblock
@@ -314,10 +315,11 @@ class Motr:
                 continue
             # If its a client process then update the base fid to its full
             # fid.
-            if (st.fid.container == ObjT.PROCESS.value and
-                    self.consul_util.is_proc_client(st.fid)):
-                proc_full_fid = self.consul_util.get_process_full_fid(st.fid)
-                st.fid = proc_full_fid
+            # XXX Commenting until dtm is ready to consume dynamic fids.
+            # if (st.fid.container == ObjT.PROCESS.value and
+            #         self.consul_util.is_proc_client(st.fid)):
+            #     proc_full_fid = self.consul_util.get_process_full_fid(st.fid)
+            #     st.fid = proc_full_fid
             note = HaNoteStruct(st.fid.to_c(), st.status.to_ha_note_status())
             notes.append(note)
 
