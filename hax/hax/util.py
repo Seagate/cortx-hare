@@ -734,14 +734,29 @@ class ConsulUtil:
 
         obj_state = 'online'
         if (obj_fid.container == ObjT.PROCESS.value):
-            obj_state = self.get_process_status(obj_fid).proc_status
+            status = self.get_process_status(obj_fid)
+            obj_state = 'unknown'
+            if status.proc_type == m0HaProcessType.M0_CONF_HA_PROCESS_M0D.name:
+                obj_state = status.proc_status
             LOG.debug('Got process obj state: %s', obj_state)
+            if (obj_state ==
+                m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED.name and
+                    self.is_process_confd(obj_fid)):
+                return HaNoteStruct.M0_NC_ONLINE
         else:
             failvec_data = self.kv.kv_get('failvec', kv_cache=kv_cache)
             failvec = failvec_data['Value']
             if failvec:
                 obj_state = failvec.get(f'{obj_fid}')
         return to_ha_state_map[str(obj_state).lower()]
+
+    @repeat_if_fails()
+    def is_process_confd(self, proc_fid: Fid, kv_cache=None) -> bool:
+        confds = self.get_confd_list()
+        for confd in confds:
+            if proc_fid == confd.fid:
+                return True
+        return False
 
     @repeat_if_fails()
     @uses_consul_cache

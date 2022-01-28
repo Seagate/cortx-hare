@@ -97,11 +97,24 @@ class ConsumerThread(StoppableThread):
             (m0HaProcessType.M0_CONF_HA_PROCESS_OTHER,
                 m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED): (
                     ObjHealth.FAILED)}
+        LOG.debug('chp_type=%d chp_event=%d',
+                  event.chp_type, event.chp_event)
         if event.chp_event in (
                 m0HaProcessEvent.M0_CONF_HA_PROCESS_DTM_RECOVERED,
                 m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED,
                 m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED):
-            svc_status = motr_to_svc_status[(event.chp_type, event.chp_event)]
+
+            svc_status = motr_to_svc_status[(event.chp_type,
+                                             event.chp_event)]
+            # Confd does not report M0_CONF_HA_PROCESS_DTM_RECOVERED as of yet,
+            # thus, we check if the reporting process is a confd and report it
+            # ONLINE immediately if it reported M0_CONF_HA_PROCESS_STARTED.
+            if (event.chp_event ==
+                    m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED and
+                    (event.chp_type ==
+                     m0HaProcessType.M0_CONF_HA_PROCESS_M0D) and
+                    self.consul.is_process_confd(event.fid)):
+                svc_status = ServiceHealth.OK
             broadcast_hax_only = False
             if ((event.chp_type ==
                  m0HaProcessType.M0_CONF_HA_PROCESS_M0MKFS) or
@@ -114,8 +127,6 @@ class ConsumerThread(StoppableThread):
                 # motr-mkfs process stops.
                 broadcast_hax_only = True
 
-            LOG.debug('chp_type %d broadcast_hax_only %s', event.chp_type,
-                      broadcast_hax_only)
             motr.broadcast_ha_states(
                 [HAState(fid=event.fid, status=svc_status)],
                 broadcast_hax_only=broadcast_hax_only)
