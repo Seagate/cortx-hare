@@ -223,7 +223,8 @@ def get_node_process_states(cns: Consul, node_name: str) -> Dict[str, str]:
             continue
         fid = key_split[-1]
         val = json.loads(proc['Value'])
-        if val['state'] == 'M0_CONF_HA_PROCESS_STARTED':
+        if val['state'] in ('M0_CONF_HA_PROCESS_STARTED',
+                            'M0_CONF_HA_PROCESS_DTM_RECOVERED'):
             state = 'started'
         elif val['state'] in ('Unknown', 'UNKNOWN'):
             state = 'unknown'
