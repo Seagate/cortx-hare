@@ -25,9 +25,9 @@ nodes:
             - path: /dev/loop8 
             - path: /dev/loop9 
           meta_data: null
-    m0_clients:
-      s3: 0         # number of S3 servers to start
-      other: 2      # max quantity of other Motr clients this host may have
+    m0_clients: null
+     # - name: other   # name of the motr client
+     #   instances: 2   # Number of instances, this host will run
 create_aux: false # optional; supported values: "false" (default), "true"
 pools:
   - name: the pool
