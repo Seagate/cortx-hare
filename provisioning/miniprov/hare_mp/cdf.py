@@ -2,7 +2,7 @@ import os.path as P
 import subprocess as S
 from dataclasses import dataclass
 from string import Template
-from typing import List, Optional, Tuple
+from typing import Iterator, List, Optional, Tuple
 from math import floor, ceil
 import pkg_resources
 from urllib.parse import urlparse
@@ -12,7 +12,7 @@ from hare_mp.store import ValueProvider
 from hare_mp.types import (ClusterDesc, DiskRef, DList, Maybe, NodeDesc,
                            PoolDesc, PoolType, ProfileDesc, Protocol, Text,
                            M0ServerDesc, DisksDesc, AllowedFailures, Layout,
-                           FdmiFilterDesc, NetworkPorts)
+                           FdmiFilterDesc, NetworkPorts, M0ClientDesc)
 from hare_mp.utils import func_log, func_enter, func_leave, Utils
 
 DHALL_PATH = '/opt/seagate/cortx/hare/share/cfgen/dhall'
@@ -67,15 +67,18 @@ class CdfGenerator:
         # Skipping for controller and HA pod
         machines = conf.get_machine_ids_for_service(
             Const.SERVICE_MOTR_IO.value)
+        # Get all the pods which runs the client components
+        client_machines = []
+        for client in conf.get_motr_clients():
+            name = str(client.get('name'))
+            client_machines.extend(conf.get_machine_ids_for_component(name))
 
-        s3_machines = conf.get_machine_ids_for_service(
-            Const.SERVICE_S3_SERVER.value)
-        # Avoid adding duplicate machine ids if s3 and data node
+        # Avoid adding duplicate machine ids if client and data node
         # are the same. We do not use list(set()) mechanism as it
         # changes the order and since this code is executed on all
         # the nodes in-parallel, the configuration generated on
         # every node must follow the same order to maintain consistency.
-        for machine in s3_machines:
+        for machine in client_machines:
             if machine not in machines:
                 machines.append(machine)
 
@@ -378,6 +381,24 @@ class CdfGenerator:
         length = 1
         return length
 
+    def _get_node_clients(self, machine_id: str) -> Iterator[M0ClientDesc]:
+        """
+        For all the motr clients present in the cluster return only those
+        clients that are present in the components list for the given
+        node>{machine_id} according to the ConfStore.
+
+        cortx>motr>clients=[rgw, other]
+        node>{machine_id}>components=[motr, other]
+
+        return 'other' only.
+        """
+        for client in self.provider.get_motr_clients():
+            name = str(client.get('name'))
+            if self.utils.is_component(machine_id, name):
+                yield M0ClientDesc(
+                    name=Text(name),
+                    instances=int(str(client.get('num_instances'))))
+
     def _create_node(self, machine_id: str) -> NodeDesc:
         store = self.provider
 
@@ -385,16 +406,7 @@ class CdfGenerator:
         # node>{machine-id}>name
         iface = self._get_iface(machine_id)
         servers = None
-        no_m0clients = 0
-        nr_s3_instances = 0
         if(self.utils.is_motr_component(machine_id)):
-            try:
-                # cortx>motr>client_instances
-                no_m0clients = int(store.get(
-                    'cortx>motr>client_instances',
-                    allow_null=True))
-            except TypeError:
-                no_m0clients = 2
             # Currently, there is 1 m0d per cvg.
             # We will create 1 IO service entry in CDF per cvg.
             # An IO service entry will use data  and metadat devices
@@ -422,8 +434,12 @@ class CdfGenerator:
                     meta_data=Maybe(None, 'Text')),
                 runs_confd=Maybe(True, 'Bool')))
 
-        if (self.utils.is_s3_component(machine_id)):
-            nr_s3_instances = int(store.get('cortx>s3>service_instances'))
+        # adding clients
+        clients = DList([
+            client
+            for client in self._get_node_clients(machine_id)
+        ], 'List M0ClientDesc')
+        m0_clients = clients if clients else None
 
         node_facts = self.utils.get_node_facts()
         return NodeDesc(
@@ -436,10 +452,5 @@ class CdfGenerator:
             data_iface_type=Maybe(self._get_iface_type(machine_id), 'P'),
             transport_type=Text(self.utils.get_transport_type()),
             m0_servers=Maybe(servers, 'List M0ServerDesc'),
-            #
-            # [KN] This is a hotfix for singlenode deployment
-            # TODO in the future the value must be taken from a correct
-            # ConfStore key (it doesn't exist now).
-            # cortx>s3>service_instances
-            s3_instances=nr_s3_instances,
-            client_instances=no_m0clients)
+            m0_clients=Maybe(m0_clients, 'List M0ClientDesc')
+        )
