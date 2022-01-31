@@ -152,35 +152,25 @@ class Utils:
     def is_motr_component(self, machine_id: str) -> bool:
         """
         Returns True if motr component is present in the components list
-        for the given node>{machine_id} according to the
-        ConfStore (ValueProvider).
+        for the given node>{machine_id}.
         """
-        comp_names = self.provider.get(f'node>{machine_id}>'
-                                       f'components')
-        for component in comp_names:
-            if(component.get('name') == Const.COMPONENT_MOTR.value):
-                rc = True
-                break
-            else:
-                rc = False
-        return rc
+        return self.is_component(machine_id, Const.COMPONENT_MOTR.value)
 
     @func_log(func_enter, func_leave)
-    def is_s3_component(self, machine_id: str) -> bool:
+    def is_component(self, machine_id: str, name: str) -> bool:
         """
-        Returns True if s3 component is present in the components list
-        for the given node>{machine_id} according to the
+        Returns True if the given component is present in the components
+        list for the given node>{machine_id} according to the
         ConfStore (ValueProvider).
         """
         comp_names = self.provider.get(f'node>{machine_id}>'
                                        f'components')
+        found = False
         for component in comp_names:
-            if(component.get('name') == Const.COMPONENT_S3.value):
-                rc = True
+            if(component.get('name') == name):
+                found = True
                 break
-            else:
-                rc = False
-        return rc
+        return found
 
     @func_log(func_enter, func_leave)
     def save_drives_info(self):

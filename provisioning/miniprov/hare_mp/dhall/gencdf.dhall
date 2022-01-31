@@ -21,6 +21,11 @@ let M0ServerDesc =
       , io_disks : IODisks
       }
 
+let M0ClientDesc =
+      { name : Text
+      , instances : Natural
+      }
+
 let NodeInfo =
       { hostname : Text
       , machine_id : Optional Text
@@ -31,8 +36,7 @@ let NodeInfo =
       , data_iface_type : Optional T.Protocol
       , transport_type : Text
       , m0_servers : Optional (List M0ServerDesc)
-      , s3_instances : Natural
-      , client_instances : Natural
+      , m0_clients : Optional (List M0ClientDesc)
       }
 
 let AllowedFailures =
@@ -77,7 +81,7 @@ let toNodeDesc
           , data_iface = n.data_iface
           , data_iface_type = n.data_iface_type
           , transport_type = n.transport_type
-          , m0_clients = { other = n.client_instances, s3 = n.s3_instances }
+          , m0_clients = n.m0_clients
           , m0_servers = n.m0_servers
           }
 

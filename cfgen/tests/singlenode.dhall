@@ -92,10 +92,7 @@ in
                 }
             }
           ]
-      , m0_clients =
-          { s3 = 0
-          , other = 2
-          }
+      , m0_clients = None (List { name : Text, instances : Natural })
       }
     ]
 , pools =
