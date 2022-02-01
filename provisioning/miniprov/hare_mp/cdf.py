@@ -64,14 +64,22 @@ class CdfGenerator:
         nodes: List[NodeDesc] = []
         conf = self.provider
         # Skipping for controller and HA pod
-        machine_ids = conf.get_machine_ids_for_service(
+        machines = conf.get_machine_ids_for_service(
             Const.SERVICE_MOTR_IO.value)
 
-        machine_ids.extend(conf.get_machine_ids_for_service(
-            Const.SERVICE_S3_SERVER.value))
+        s3_machines = conf.get_machine_ids_for_service(
+            Const.SERVICE_S3_SERVER.value)
+        # Avoid adding duplicate machine ids if s3 and data node
+        # are the same. We do not use list(set()) mechanism as it
+        # changes the order and since this code is executed on all
+        # the nodes in-parallel, the configuration generated on
+        # every node must follow the same order to maintain consistency.
+        for machine in s3_machines:
+            if machine not in machines:
+                machines.append(machine)
 
-        for machine_id in machine_ids:
-            nodes.append(self._create_node(machine_id))
+        for machine in machines:
+            nodes.append(self._create_node(machine))
         return nodes
 
     # cluster>storage_set[N]>durability>{type}>data/parity/spare

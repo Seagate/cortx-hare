@@ -2366,6 +2366,10 @@ def generate_consul_kv(cluster: Cluster, dhall_dir: str) -> str:
         ('leader', ''),
         *consul_kv_fidk().items(),
         ('failvec', ''),
+        ('bytecount/healthy_byte_count', 0),
+        ('bytecount/degraded_byte_count', 0),
+        ('bytecount/critical_byte_count', 0),
+        ('bytecount/damaged_byte_count', 0),
         *[(node.machine_id, node.name)
           for node_id, node in m0conf.items() if (node_id.type is ObjT.node
                                                   and node.machine_id)],
@@ -2594,8 +2598,8 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
         ConfProcess.build(conf, node_id, node, ProcT.hax)
 
         m0srv = node.get('m0_servers')
+        confd_p = False
         if m0srv is not None:
-            confd_p = False
             for ctrl_id in ctrl_ids:
                 m0d = ctrl_id[1]
                 conf_ctrl_id: Optional[Oid] = ctrl_id[0]

@@ -178,7 +178,7 @@ class ConfGenerator:
         cns_file = f'{self.conf_dir}/consul-agents.json'
 
         def get_join_ip() -> str:
-            for node, ip in self._get_data_nodes(cns_file):
+            for node, ip in self._get_nodes(cns_file):
                 if node == node_name:
                     return ip
             raise RuntimeError(f'Logic error: node_name={node_name}'

@@ -62,12 +62,13 @@ def is_content_ok(content: str, mocker, kv_adapter) -> bool:
 
         store = ConfStoreProvider(f'json://{path}')
         mocker.patch.object(store, 'get_machine_id', return_value='machine-id')
+        mocker.patch.object(store, 'get_machine_ids_for_service', return_value=['machine-id'])
         motr_store = ValueProvider()
         mocker.patch.object(motr_store, '_raw_get', return_value='/dev/dummy')
         #
         # the method will raise an exception if either
         # Dhall is unhappy or some values are not found in ConfStore
-        generator = CdfGenerator(provider=store, motr_provider=motr_store)
+        generator = CdfGenerator(provider=store)
         generator.utils.kv = kv_adapter
         generator.generate()
         return True

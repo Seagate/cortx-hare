@@ -67,6 +67,17 @@ def get_python_env():
     return env
 
 
+def bytecount_stat(request):
+    """This function calls for hare-status script from hax-server in order to
+    provide CSM with an endpoint to get --byecount data in json format.
+    """
+    exec = Executor()
+    env = get_python_env()
+    result = exec.run(Program(["/opt/seagate/cortx/hare/libexec/hare-status",
+                      "--bytecount"]), env=env)
+    return json_response(text=result)
+
+
 def hctl_stat(request):
     """This function calls the hare-status script from the hax-server in order
     to provide CSM with an endpoint to get the hctl status --json data.
@@ -265,6 +276,7 @@ class ServerRunner:
         app.add_routes([
             web.get('/', hello_reply),
             web.get('/v1/cluster/status', hctl_stat),
+            web.get('/v1/cluster/status/bytecount', bytecount_stat),
             web.post('/', process_ha_states(planner, consul_util)),
             web.post(
                 '/watcher/bq',

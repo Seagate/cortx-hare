@@ -7,11 +7,11 @@
           "sns": {
             "data": "4",
             "parity": "2",
-            "spare": "2"
+            "spare": "0"
           },
           "dix": {
             "data": "1",
-            "parity": "2",
+            "parity": "1",
             "spare": "0"
           }
         },
@@ -39,6 +39,11 @@
       "hostname": "ssc-vm-1623.colo.seagate.com",
       "name": "srvnode-1",
       "type": "storage_node",
+      "components": [
+        { "name": "hare" },
+        { "name": "motr" },
+        { "name": "s3"}
+      ],
       "network": {
         "data": {
           "private_fqdn": "srvnode-1.data.private",

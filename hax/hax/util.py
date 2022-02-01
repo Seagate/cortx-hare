@@ -1655,9 +1655,6 @@ class ConsulUtil:
             keys = self.get_process_keys(node_items, fidk)
         elif ObjT.SERVICE.value == proc_base_fid.container:
             keys = self.get_service_keys(node_items, fidk)
-        if len(keys) != 1:
-            raise RuntimeError(f'XXX proc_fid:{proc_fid} fidk:{fidk}'
-                               f'len:{len(keys)}')
         key = keys[0].split('/')
         node_key = ('/'.join(key[:3]))
         node_val = self.kv.kv_get(node_key, kv_cache=kv_cache)
