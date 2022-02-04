@@ -1209,20 +1209,27 @@ class ConfProcess(ToDhall):
                     assert ctrl is not None
                     ConfDrive.build(m0conf, ctrl,
                                     ConfSdev.build(m0conf, svc_id, disk))
-
-            if stype is SvcT.M0_CST_CAS:
-                assert proc_desc is not None
-                disk = '/dev/null'
-                if meta_data:
-                    disk = proc_desc['io_disks'].get('meta_data')
-                assert ctrl is not None
-                ConfDrive.build(m0conf, ctrl,
-                                ConfSdev.build(
-                                    m0conf, svc_id,
-                                    Disk(path=disk,
-                                         size=1024,
-                                         blksize=1)))
         return proc_id
+
+
+def build_cas_devs(m0conf: Dict[Oid, Any],
+                   ctrls: Dict[Oid, Any]):
+    for item in list(m0conf):
+        if item.type is ObjT.enclosure:
+            encl_id = item
+            for proc_id in m0conf[m0conf[encl_id].node].processes:
+                for svc_id in m0conf[proc_id].services:
+                    if m0conf[svc_id].type is SvcT.M0_CST_CAS:
+                        ctrl_id = m0conf[svc_id].ctrl_id
+                        proc_desc = ctrls[ctrl_id]
+                        meta_data = proc_desc['io_disks'].get('meta_data')
+                        if not meta_data or meta_data is None:
+                            meta_data = '/dev/null'
+                        ConfDrive.build(m0conf, ctrl_id,
+                                        ConfSdev.build(m0conf, svc_id,
+                                                       Disk(path=meta_data,
+                                                            size=1024,
+                                                            blksize=1)))
 
 
 # m0_conf_service_type
@@ -1269,11 +1276,11 @@ def service_types(proc_t: ProcT,
         if proc_desc.get('runs_confd'):
             ts.append(SvcT.M0_CST_CONFD)
         if proc_desc['_io_disks']:
-            ts.extend([SvcT.M0_CST_CAS,
-                       SvcT.M0_CST_IOS,
+            ts.extend([SvcT.M0_CST_IOS,
                        SvcT.M0_CST_SNS_REP,
                        SvcT.M0_CST_SNS_REB,
                        SvcT.M0_CST_ADDB2,
+                       SvcT.M0_CST_CAS,
                        SvcT.M0_CST_ISCS,
                        SvcT.M0_CST_FDMI,
                        SvcT.M0_CST_DTM0])
@@ -1602,7 +1609,7 @@ def pool_drives(m0conf: Dict[Oid, Any],
     ptype = pool_type(pool_desc)
 
     if ptype is PoolT.dix:
-        return [m0conf[ctrl_id].drives[0]
+        return [m0conf[ctrl_id].drives[-1]
                 for ctrl_id in m0conf if ctrl_id.type is ObjT.controller]
 
     if ptype is PoolT.md:
@@ -2582,6 +2589,7 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
     rack_id = ConfRack.build(conf, ConfSite.build(conf, root_id))
 
     other_clients: Dict[str, List[Tuple[Oid, Oid]]] = {}
+    io_ctrls: Dict[Oid, Any] = {}
 
     for node in cluster_desc['nodes']:
         node_id = ConfNode.build(conf, root_id, node)
@@ -2591,7 +2599,9 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
         if m0srv is not None:
             for m0d in node.get('m0_servers', []):
                 if m0d['_io_disks']:
-                    ctrl_ids.append((ConfController.build(conf, encl_id), m0d))
+                    ctrl_oid = ConfController.build(conf, encl_id)
+                    ctrl_ids.append((ctrl_oid, m0d))
+                    io_ctrls[ctrl_oid] = m0d
                 else:
                     ctrl_ids.append((None, m0d))
 
@@ -2624,6 +2634,13 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
                         other_clients[node['hostname']] = []
                     other_clients[node['hostname']].append((node_id, proc_id))
 
+    # Motr requires all the data devices together in-order to map a data object
+    # to its corresponding device and further to its ioservice. Motr maintains
+    # a global pool wide device to service context array which is expected to
+    # be long as the number of data devices in the pool. Adding CAS device in
+    # between the data devices voids this assumption in motr code. Thus we
+    # create metadata devices after creating all the data devices in the pool.
+    build_cas_devs(conf, io_ctrls)
     check_drive_multiple_references(conf, cluster_desc)
 
     create_aux_val = cluster_desc.get('create_aux')
