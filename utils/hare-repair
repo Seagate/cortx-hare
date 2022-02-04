@@ -1,0 +1,90 @@
+#!/usr/bin/env bash
+#
+# Copyright (c) 2020 Seagate Technology LLC and/or its Affiliates
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# For any questions about this software or licensing,
+# please email opensource@seagate.com or cortx-questions@seagate.com.
+
+set -e -o pipefail
+#set -x
+export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
+
+# :help: control SNS repair procedure
+
+# constants
+PROG=${0##*/}
+
+# functions
+log() {
+    logger --stderr --tag "$0" "$*"
+}
+
+die() {
+    log "$*"
+    exit 1
+}
+
+usage() {
+    cat <<EOF
+Usage: $PROG <command> [options]
+
+Control SNS repair procedure for previously selected drives.
+
+Commands:
+  start       Start SNS repair procedure
+  stop        Stop SNS repair procedure
+  pause       Pause ongoing SNS repair procedure
+  resume      Resume paused SNS repair procedure
+  status      Return status of ongoning SNS repair procedure, if any
+  help        Show this help and exit.
+
+EOF
+}
+
+# parse CLI options
+while true ; do
+    case $1 in
+        -h|--help|help) usage; exit ;;
+        -*) die "Unknown option '$1'; see \`$PROG help\`" ;;
+        *)  cmd=${1:-help} ; shift || true ; break ;;
+    esac
+    shift
+done
+
+# process commands
+case $cmd in
+    help) usage; exit ;;
+    start|stop|pause|resume)
+        # TODO: take pool fid from agrument if provided, otherwise make sure
+        # a default SNS pool is fetched from Consul KV
+        pool_fid=$(consul kv get m0conf/profiles/pools | awk '{print $1}')
+        payload=$(jq --null-input --compact-output \
+                     --arg cmd "$cmd" \
+                     --arg pool_fid "$pool_fid" \
+                     '{ cmd: $cmd, fid: $pool_fid }')
+        h0q eq 'sns-repair' "$payload"
+        ;;
+    status)
+        # TODO: take pool fid from agrument if provided, otherwise make sure
+        # a default SNS pool is fetched from Consul KV
+        pool_fid=$(consul kv get m0conf/profiles/pools | awk '{print $1}')
+        # Access HTTP API request to get percentage of repair operation
+        # This request is synchronous.
+        curl http://localhost:8008/api/v1/sns/repair-status?pool_fid=$pool_fid
+        # TODO: JSON is expected. Additional processing may be needed depending
+        # on output.
+        ;;
+    *) die "Unknown command: '$cmd'" ;;
+esac
