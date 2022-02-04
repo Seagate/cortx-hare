@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Copyright (c) 2020 Seagate Technology LLC and/or its Affiliates
+# Copyright (c) 2020-2022 Seagate Technology LLC and/or its Affiliates
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -63,13 +63,21 @@ while true ; do
     shift
 done
 
+get_pool_fid() {
+    consul kv get -keys m0conf/pools/ | awk -F/ '{print $3}'
+}
+
+get_ip_addr() {
+    curl -sX GET http://localhost:8500/v1/agent/self | jq -r .DebugConfig.BindAddr
+}
+
 # process commands
 case $cmd in
     help) usage; exit ;;
     start|stop|pause|resume)
         # TODO: take pool fid from agrument if provided, otherwise make sure
         # a default SNS pool is fetched from Consul KV
-        pool_fid=$(consul kv get m0conf/profiles/pools | awk '{print $1}')
+        pool_fid=$(get_pool_fid)
         payload=$(jq --null-input --compact-output \
                      --arg cmd "$cmd" \
                      --arg pool_fid "$pool_fid" \
@@ -79,10 +87,12 @@ case $cmd in
     status)
         # TODO: take pool fid from agrument if provided, otherwise make sure
         # a default SNS pool is fetched from Consul KV
-        pool_fid=$(consul kv get m0conf/profiles/pools | awk '{print $1}')
+        pool_fid=$(get_pool_fid)
         # Access HTTP API request to get percentage of repair operation
         # This request is synchronous.
-        curl http://localhost:8008/api/v1/sns/repair-status?pool_fid=$pool_fid
+        ip_addr=$(get_ip_addr)
+        curl "http://$ip_addr:8008/api/v1/sns/repair-status?pool_fid=$pool_fid"
+        echo
         # TODO: JSON is expected. Additional processing may be needed depending
         # on output.
         ;;
