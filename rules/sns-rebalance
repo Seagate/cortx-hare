@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Copyright (c) 2020 Seagate Technology LLC and/or its Affiliates
+# Copyright (c) 2020-2022 Seagate Technology LLC and/or its Affiliates
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -57,7 +57,13 @@ payload=$(jq --null-input --compact-output \
              --arg fid "$fid" \
              '{ cmd: $cmd, fid: $fid }')
 
-status_code=$(curl http://localhost:8008/api/v1/sns/${op_name} \
+get_ip_addr() {
+    curl -sX GET http://localhost:8500/v1/agent/self | jq -r .DebugConfig.BindAddr
+}
+
+ip_addr=$(get_ip_addr)
+
+status_code=$(curl http://${ip_addr}:8008/api/v1/sns/${op_name} \
                    --silent \
                    --output /dev/null \
                    --request POST \
