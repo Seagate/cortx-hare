@@ -125,7 +125,8 @@ is_systemd_enabled() {
 # process commands
 case $cmd in
     help) usage; exit ;;
-    bootstrap|start|reportbug|shutdown|status|drive-state|node-join|fetch-fids)
+    bootstrap|start|reportbug|shutdown|status|drive-state|node-join|fetch-fids|\
+    rebalance|repair)
         if [[ -d $M0_SRC_DIR/utils ]]; then
             PATH="$M0_SRC_DIR/utils:$PATH"
         fi
