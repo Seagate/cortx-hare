@@ -312,6 +312,7 @@ install-systemd: $(wildcard systemd/*)
 
 .PHONY: install-hax
 install-hax: HAX_INSTALL_CMD = $(PIP) install --ignore-installed --prefix $(DESTDIR)/$(PREFIX) $(HAX_WHL:hax/%=%)
+install-hax: export PYTHONPATH = $(DESTDIR)/$(PREFIX)/lib/python3.$(PY3_VERSION_MINOR)/site-packages
 install-hax: $(HAX_EXE)
 
 $(HAX_EGG_LINK) $(HAX_EXE): $(HAX_WHL)
@@ -320,6 +321,7 @@ $(HAX_EGG_LINK) $(HAX_EXE): $(HAX_WHL)
 
 .PHONY: install-miniprov
 install-miniprov: MP_INSTALL_CMD = $(PIP) install --ignore-installed --prefix $(DESTDIR)/$(PREFIX) $(MP_WHL:provisioning/miniprov/%=%)
+install-miniprov: export PYTHONPATH = $(DESTDIR)/$(PREFIX)/lib/python3.$(PY3_VERSION_MINOR)/site-packages
 install-miniprov: $(MP_EXE)
 	@cd provisioning/miniprov && $(SETUP_PY) install
 
