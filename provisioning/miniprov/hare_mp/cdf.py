@@ -315,14 +315,34 @@ class CdfGenerator:
             return 'dummy'
         return ifaces[0]
 
-    # cortx>motr>interface_type
     def _get_iface_type(self, machine_id: str) -> Optional[Protocol]:
-        iface = self.provider.get(
-            'cortx>motr>interface_type',
+        endpoints = self.provider.get(
+            'cortx>hare>hax>endpoints',
             allow_null=True)
-        if iface is None:
+
+        if endpoints is None:
             return None
-        return Protocol[iface]
+
+        hostname = self.utils.get_hostname(machine_id)
+
+        proto = None
+        # Expected format '<protocol>://<hostname>:<port>'
+        # e.g. endpoints:
+        #      - tcp://data1-node1:22001  # For motr and Hax communication
+        #      - tcp://data1-node2:22001  # For motr and Hax communication
+        for e in endpoints:
+            key = e.split(':')
+
+            if key[0] == 'https':
+                continue
+
+            if key[1].split('/')[2] == hostname:
+                proto = key[0]
+                break
+
+        if proto is None:
+            return None
+        return Protocol[proto]
 
     # node>{machine -id}>storage>cvg[N]>devices>data
     def _get_data_devices(self, machine_id: str, cvg: int) -> DList[Text]:
