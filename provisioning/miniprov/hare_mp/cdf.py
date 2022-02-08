@@ -5,13 +5,14 @@ from string import Template
 from typing import List, Optional, Tuple
 from math import floor, ceil
 import pkg_resources
+from urllib.parse import urlparse
 
 from cortx.utils.cortx import Const
 from hare_mp.store import ValueProvider
 from hare_mp.types import (ClusterDesc, DiskRef, DList, Maybe, NodeDesc,
                            PoolDesc, PoolType, ProfileDesc, Protocol, Text,
                            M0ServerDesc, DisksDesc, AllowedFailures, Layout,
-                           FdmiFilterDesc)
+                           FdmiFilterDesc, NetworkPorts)
 from hare_mp.utils import func_log, func_enter, func_leave, Utils
 
 DHALL_PATH = '/opt/seagate/cortx/hare/share/cfgen/dhall'
@@ -249,6 +250,31 @@ class CdfGenerator:
             self, nodes: List[NodeDesc]) -> Maybe[List[FdmiFilterDesc]]:
         return Maybe(None, 'List T.FdmiFilterDesc')
 
+    def _create_ports_descriptions(self) -> NetworkPorts:
+        conf = self.provider
+
+        for srv in NetworkPorts.__annotations__.keys():
+            if srv == 'hax':
+                url = conf.get('cortx>hare>hax>endpoints', allow_null=True)
+                _hax = url if url is None else \
+                    round(urlparse(url[0]).port / 100) * 100
+            elif srv == 'm0_client_other':
+                _client_other = None
+            elif srv == 'm0_server':
+                url = conf.get('cortx>motr>ios>endpoints', allow_null=True)
+                _ios = url if url is None else \
+                    round(urlparse(url[0]).port / 100) * 100
+            else:
+                url = conf.get('cortx>motr>client>endpoints', allow_null=True)
+                _client_s3 = url if url is None else \
+                    round(urlparse(url[0]).port / 100) * 100
+
+        return NetworkPorts(
+            hax=Maybe(_hax, 'Natural'),
+            m0_server=Maybe(_ios, 'Natural'),
+            m0_client_other=Maybe(_client_other, 'Natural'),
+            m0_client_s3=Maybe(_client_s3, 'Natural'))
+
     def _get_cdf_dhall(self) -> str:
         dhall_path = self._get_dhall_path()
         conf = self.provider
@@ -256,8 +282,10 @@ class CdfGenerator:
         pools = self._create_pool_descriptions()
         profiles = self._create_profile_descriptions(pools)
         fdmi_filters = self._create_fdmi_filter_descriptions(nodes)
+        network_ports = self._create_ports_descriptions()
         create_aux = conf.get('cluster>create_aux',
                               allow_null=True)
+
         if create_aux is None:
             create_aux = False
 
@@ -266,6 +294,7 @@ class CdfGenerator:
                         node_info=DList(nodes, 'List NodeInfo'),
                         pool_info=DList(pools, 'List PoolInfo'),
                         profile_info=DList(profiles, 'List ProfileInfo'),
+                        ports_info=Maybe(network_ports, 'T.NetworkPorts'),
                         fdmi_filter_info=fdmi_filters))
 
         gencdf = Template(self._gencdf()).substitute(path=dhall_path,

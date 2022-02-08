@@ -424,6 +424,18 @@ def enrich_cluster_desc(desc: Dict[str, Any], mock_p: bool) -> None:
                      if pool_type(pool) is PoolT.sns]
         desc['profiles'] = [{'name': 'default', 'pools': sns_pools}]
 
+    portalgroup = PortalGroup
+    if 'network_ports' not in desc or not bool(desc['network_ports']):
+        desc['network_ports'] = {port_type.name: port_type.value
+                                 for port_type in portalgroup}
+    else:
+        for key, value in desc['network_ports'].items():
+            if value is None:
+                desc['network_ports'][key] = portalgroup[key].value
+        for srv in [port_type.name for port_type in portalgroup]:
+            if srv not in desc['network_ports']:
+                desc['network_ports'][srv] = portalgroup[srv].value
+
 
 def validate_cluster_desc(desc: Dict[str, Any]) -> None:
     validate_nodes_desc(desc['nodes'])
@@ -835,18 +847,40 @@ ProcT = Enum('ProcT', 'hax m0_server m0_client_s3 m0_client_other')
 ProcT.__doc__ = 'Type of process'
 
 
-class LnetPortalGroup(IntEnum):
-    hax = 1,
-    m0_server = 2,
-    m0_client_s3 = 3,
-    m0_client_other = 4
+class PortalGroup(IntEnum):
+    hax = 22000,
+    m0_server = 21000,
+    m0_client_s3 = 22500,
+    m0_client_other = 21500
 
 
-class LibfabPortalGroup(IntEnum):
-    hax = 2000,
-    m0_server = 3000,
-    m0_client_s3 = 4000,
-    m0_client_other = 5000
+class Portals:
+    def __init__(self, hax=22000, m0_server=21000, m0_client_s3=22500,
+                 m0_client_other=21500):
+        self.hax = hax
+        self.m0_server = m0_server
+        self.m0_client_s3 = m0_client_s3
+        self.m0_client_other = m0_client_other
+
+    def get_portal_group(self):
+        return IntEnum('PortalGroup',
+                       {'hax': self.hax,
+                        'm0_server': self.m0_server,
+                        'm0_client_s3': self.m0_client_s3,
+                        'm0_client_other': self.m0_client_other})
+
+
+def get_lnet_portal_group(hax=1, m0_server=2,
+                          m0_client_s3=3, m0_client_other=4) -> Portals:
+    return Portals(hax=hax, m0_server=m0_server, m0_client_s3=m0_client_s3,
+                   m0_client_other=m0_client_other)
+
+
+def get_libfab_portal_group(hax=22000, m0_server=21000,
+                            m0_client_s3=22500,
+                            m0_client_other=21500) -> Portals:
+    return Portals(hax=hax, m0_server=m0_server, m0_client_s3=m0_client_s3,
+                   m0_client_other=m0_client_other)
 
 
 class Endpoint:
@@ -857,7 +891,7 @@ class LnetEndpoint(Endpoint):
     _tmids: Dict[Tuple[str, int], int] = {}
 
     def __init__(self, proto: NetProtocol, ipaddr: str,
-                 portalgroup: LnetPortalGroup,
+                 portalgroup: PortalGroup,
                  tmid: int = None):
         self.proto = proto
         assert ipaddr
@@ -892,7 +926,7 @@ class LibfabricEndpoint(Endpoint):
     ep_map: Dict[Tuple[str, int], int] = {}
 
     def __init__(self, NetFamily: str, proto: NetProtocol, ipaddr: str,
-                 portalgroup: LibfabPortalGroup):
+                 portalgroup: PortalGroup):
         self.netfamily = NetFamily
         self.proto = proto
         assert ipaddr
@@ -1080,6 +1114,7 @@ class ConfProcess(ToDhall):
     def build(cls,
               m0conf: Dict[Oid, Any],
               parent: Oid,
+              portalgroup: Portals,
               node_desc: Dict[str, Any],
               proc_t: ProcT,
               proc_desc: Dict[str, Any] = None,
@@ -1094,17 +1129,18 @@ class ConfProcess(ToDhall):
         facts = node_desc['facts']
         proto = node_desc.get('data_iface_type', 'tcp')
         transport_type = node_desc.get('transport_type', 'libfab')
+        portal_group = portalgroup.get_portal_group()
         ep: Any = (
             LibfabricEndpoint(NetFamily='inet', proto=NetProtocol[proto],
                               ipaddr=facts[ipaddr_key(
                                            node_desc['data_iface'])],
-                              portalgroup=LibfabPortalGroup[proc_t.name]))
+                              portalgroup=portal_group[proc_t.name]))
         if transport_type == 'lnet':
             # Creates Lnet endpoint, remove once deprecated.
             ep = LnetEndpoint(proto=NetProtocol[proto],
                               ipaddr=facts[ipaddr_key(
                                            node_desc['data_iface'])],
-                              portalgroup=LnetPortalGroup[proc_t.name])
+                              portalgroup=portal_group[proc_t.name])
         proc_id = new_oid(ObjT.process)
         meta_data = None
         if proc_desc is not None and proc_t is ProcT.m0_server:
@@ -2484,6 +2520,22 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
     other_clients: Dict[str, List[Tuple[Oid, Oid]]] = {}
     io_ctrls: Dict[Oid, Any] = {}
 
+    ports = cluster_desc.get('network_ports')
+    if ports:
+        lnet_portals = get_lnet_portal_group(
+                           hax=ports['hax'],
+                           m0_server=ports['m0_server'],
+                           m0_client_s3=ports['m0_client_s3'],
+                           m0_client_other=ports['m0_client_other'])
+        libfab_portals = get_libfab_portal_group(
+                             hax=ports['hax'],
+                             m0_server=ports['m0_server'],
+                             m0_client_s3=ports['m0_client_s3'],
+                             m0_client_other=ports['m0_client_other'])
+    else:
+        lnet_portals = get_lnet_portal_group()
+        libfab_portals = get_libfab_portal_group()
+
     for node in cluster_desc['nodes']:
         node_id = ConfNode.build(conf, root_id, node)
         encl_id = ConfEnclosure.build(conf, rack_id, node_id)
@@ -2497,8 +2549,13 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
                     io_ctrls[ctrl_oid] = m0d
                 else:
                     ctrl_ids.append((None, m0d))
+        transport_type = node.get('transport_type', 'libfab')
+        if transport_type == 'lnet':
+            portalgroup = lnet_portals
+        else:
+            portalgroup = libfab_portals
 
-        ConfProcess.build(conf, node_id, node, ProcT.hax)
+        ConfProcess.build(conf, node_id, portalgroup, node, ProcT.hax)
 
         m0srv = node.get('m0_servers')
         confd_p = False
@@ -2506,8 +2563,8 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
             for ctrl_id in ctrl_ids:
                 m0d = ctrl_id[1]
                 conf_ctrl_id: Optional[Oid] = ctrl_id[0]
-                ConfProcess.build(conf, node_id, node, ProcT.m0_server, m0d,
-                                  conf_ctrl_id)
+                ConfProcess.build(conf, node_id, portalgroup, node,
+                                  ProcT.m0_server, m0d, conf_ctrl_id)
                 if m0d['runs_confd']:
                     confd_p = True
 
@@ -2520,7 +2577,8 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
         for client_t, proc_t in [('s3', ProcT.m0_client_s3),
                                  ('other', ProcT.m0_client_other)]:
             for _ in range(node['m0_clients'][client_t]):
-                proc_id = ConfProcess.build(conf, node_id, node, proc_t)
+                proc_id = ConfProcess.build(conf, node_id, portalgroup, node,
+                                            proc_t)
                 cluster.m0_clients[proc_id] = new_oid(ObjT.service)
                 if client_t == 'other':
                     if node['hostname'] not in other_clients:
