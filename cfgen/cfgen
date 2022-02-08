@@ -424,6 +424,18 @@ def enrich_cluster_desc(desc: Dict[str, Any], mock_p: bool) -> None:
                      if pool_type(pool) is PoolT.sns]
         desc['profiles'] = [{'name': 'default', 'pools': sns_pools}]
 
+    portalgroup = LibfabPortalGroup
+    if 'network_ports' not in desc or not bool(desc['network_ports']):
+        desc['network_ports'] = {port_type.name: port_type.value
+                                 for port_type in portalgroup}
+    else:
+        for key, value in desc['network_ports'].items():
+            if value is None:
+                desc['network_ports'][key] = portalgroup[key].value
+        for srv in [port_type.name for port_type in portalgroup]:
+            if srv not in desc['network_ports']:
+                desc['network_ports'][srv] = portalgroup[srv].value
+
 
 def validate_cluster_desc(desc: Dict[str, Any]) -> None:
     validate_nodes_desc(desc['nodes'])
@@ -843,10 +855,26 @@ class LnetPortalGroup(IntEnum):
 
 
 class LibfabPortalGroup(IntEnum):
-    hax = 2000,
-    m0_server = 3000,
-    m0_client_s3 = 4000,
-    m0_client_other = 5000
+    hax = 22000,
+    m0_server = 21000,
+    m0_client_s3 = 22500,
+    m0_client_other = 21500
+
+
+class LibfabPortals:
+    def __init__(self, hax=22000, m0_server=21000, m0_client_s3=22500,
+                 m0_client_other=21500):
+        self.hax = hax
+        self.m0_server = m0_server
+        self.m0_client_s3 = m0_client_s3
+        self.m0_client_other = m0_client_other
+
+    def get_portal_group(self) -> Enum:
+        return Enum('LibfabPortals',
+                    {'hax': self.hax,
+                     'm0_server': self.m0_server,
+                     'm0_client_s3': self.m0_client_s3,
+                     'm0_client_other': self.m0_client_other})
 
 
 class Endpoint:

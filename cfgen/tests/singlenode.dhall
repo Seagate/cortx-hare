@@ -136,4 +136,11 @@ in
           , substrings : List Text
           }
       )
+,  network_ports =
+     None
+     { hax : Optional Natural
+     , m0_server : Optional Natural
+     , m0_client_s3 : Optional Natural
+     , m0_client_other : Optional Natural
+     }
 } : types.ClusterDesc
