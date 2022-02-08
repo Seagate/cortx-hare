@@ -205,8 +205,9 @@ install_motr_conf() {
 
 install_motr_client_conf() {
     local motr_client_conf_file=$1
+    local motr_client_type=$2
     if $custom_config; then
-        sudo install $motr_client_conf_file $conf_dir/$sysconfig_dir/s3/$(get_node_name)/
+        sudo install $motr_client_conf_file $conf_dir/$sysconfig_dir/$motr_client_type/$(get_node_name)/
     else
         sudo install $motr_client_conf_file $sysconfig_dir/
     fi
@@ -216,14 +217,10 @@ create_motr_conf_dir() {
     mkdir -p $conf_dir/$sysconfig_dir/motr/$(get_node_name)
 }
 
-create_s3_conf_dir() {
-    mkdir -p $conf_dir/$sysconfig_dir/s3/$(get_node_name)
+create_client_conf_dir() {
+    local motr_client_type=$1
+    mkdir -p $conf_dir/$sysconfig_dir/$motr_client_type/$(get_node_name)
 }
-
-if $custom_config ; then
-    create_motr_conf_dir
-    create_s3_conf_dir
-fi
 
 if $custom_config ; then
     [ -d $conf_dir/$sysconfig_dir ] || sysconfig_dir='/etc/default'
@@ -265,6 +262,14 @@ if $dry_run; then
     return 0  # we must not `exit`, because the script is sourced
 fi
 # --------------------------------------------------------------------
+
+if $custom_config ; then
+    create_motr_conf_dir
+    for motr_client_type in $MOTR_CLIENT_TYPES; do
+        motr_client_type=$(echo $motr_client_type | tr -d ',' | tr -d '"')
+        create_client_conf_dir $motr_client_type
+    done
+fi
 
 mkdir -p $conf_dir/consul-server-conf/
 mkdir -p $conf_dir/consul-client-conf/
@@ -425,7 +430,7 @@ MOTR_HA_EP='$HAX_EP'
 MOTR_PROCESS_FID='$fid'
 MOTR_${motr_client_type^^}_PORT=$client_port
 EOF
-    install_motr_client_conf /tmp/$motr_client_type-$fid
+    install_motr_client_conf /tmp/$motr_client_type-$fid $motr_client_type
 }
 
 for id in $HAX_ID; do
