@@ -292,7 +292,8 @@ def post_install(args):
     checkRpm('consul')
     checkRpm('cortx-hare')
     checkRpm('cortx-py-utils')
-    checkRpm('cortx-s3server')
+    # we need to check for 'rgw' rpm
+    # checkRpm('cortx-s3server')
 
     if args.report_unavailable_features:
         unsupported_feature(args.config[0])
