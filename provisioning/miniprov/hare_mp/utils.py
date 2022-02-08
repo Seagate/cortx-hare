@@ -222,17 +222,28 @@ class Utils:
         machine_id = self.provider.get_machine_id()
         global_config_path = self.provider.get('cortx>common>storage>local')
 
-        dest_s3 = f'{global_config_path}/s3/sysconfig/{machine_id}'
         dest_motr = f'{global_config_path}/motr/sysconfig/{machine_id}'
-        os.makedirs(dest_s3, exist_ok=True)
         os.makedirs(dest_motr, exist_ok=True)
 
         cmd = ['/opt/seagate/cortx/hare/libexec/node-name',
                '--conf-dir', conf_dir_path]
         node_name = execute(cmd)
 
-        copy_tree(f'{conf_dir_path}/sysconfig/s3/{node_name}', dest_s3)
         copy_tree(f'{conf_dir_path}/sysconfig/motr/{node_name}', dest_motr)
+
+        with open(f'{conf_dir_path}/consul-kv.json') as f:
+            data = json.load(f)
+            for item in data:
+                item_data = json.loads(json.dumps(item))
+                if item_data['key'] == 'm0_client_types':
+                    m0_client_types = item_data['value']
+                    break
+
+        for client_type in m0_client_types:
+            src = f'{conf_dir_path}/sysconfig/{client_type}/{node_name}'
+            dest = f'{global_config_path}/{client_type}/sysconfig/{machine_id}'
+            os.makedirs(dest, exist_ok=True)
+            copy_tree(src, dest)
 
         shutil.copyfile(
             f'{conf_dir_path}/confd.xc',
