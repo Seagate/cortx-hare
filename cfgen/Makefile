@@ -39,7 +39,7 @@ typecheck: $(PYTHON_SCRIPTS)
 
 .PHONY: test-cfgen
 test-cfgen: unpack-dhall-prelude
-	set -eu -o pipefail;\
+	set -x; set -eu -o pipefail;\
  out=$$(mktemp -d);\
  ./cfgen -D ./dhall --mock --debug examples/singlenode.yaml >/dev/null;\
  ./cfgen -D ./dhall --mock -o $$out examples/singlenode.yaml;\
