@@ -428,10 +428,10 @@ append_motr_client_svc() {
     [[ -n $first_profile_fid ]]  # assert
     cat <<EOF | sudo tee /tmp/$motr_client_type-$fid > /dev/null
 MOTR_PROFILE_FID=$first_profile_fid
-MOTR_${motr_client_type^^}_EP='$ep'
+MOTR_CLIENT_EP='$ep'
 MOTR_HA_EP='$HAX_EP'
 MOTR_PROCESS_FID='$fid'
-MOTR_${motr_client_type^^}_PORT=$client_port
+MOTR_CLIENT_PORT=$client_port
 EOF
     install_motr_client_conf /tmp/$motr_client_type-$fid $motr_client_type
 }
