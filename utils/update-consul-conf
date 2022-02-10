@@ -223,6 +223,10 @@ create_client_conf_dir() {
 }
 
 if $custom_config ; then
+    create_motr_conf_dir
+fi
+
+if $custom_config ; then
     [ -d $conf_dir/$sysconfig_dir ] || sysconfig_dir='/etc/default'
 else
     [ -d $sysconfig_dir ] || sysconfig_dir='/etc/default'
@@ -264,7 +268,6 @@ fi
 # --------------------------------------------------------------------
 
 if $custom_config ; then
-    create_motr_conf_dir
     for motr_client_type in $MOTR_CLIENT_TYPES; do
         motr_client_type=$(echo $motr_client_type | tr -d ',' | tr -d '"')
         create_client_conf_dir $motr_client_type
