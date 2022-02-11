@@ -239,7 +239,7 @@ class Utils:
                     m0_client_types = item_data['value']
                     break
 
-        for client_type in m0_client_types:
+        for client_type in json.loads(m0_client_types):
             src = f'{conf_dir_path}/sysconfig/{client_type}/{node_name}'
             dest = f'{global_config_path}/{client_type}/sysconfig/{machine_id}'
             os.makedirs(dest, exist_ok=True)
