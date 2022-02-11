@@ -187,9 +187,8 @@ get_service_host() {
 }
 
 get_motr_client_types() {
-
-    local cmd="jq '.[] | select(.key==\"m0_client_types\") |
-                  .value' $kv_file"
+    local cmd="jq -r '.[] | select(.key==\"m0_client_types\") |
+                  .value' $kv_file | jq -r '.[]'"
 
     eval $cmd || true
 }
@@ -249,11 +248,9 @@ CONFD_IDs=$(get_service_ids_from_kv_file 'grep -iw "services\/confd"')
 IOS_IDs=$(get_service_ids_from_kv_file 'grep -iw "services\/ios"')
 
 MOTR_CLIENT_TYPES=$(get_motr_client_types)
-MOTR_CLIENT_TYPES=$(echo $MOTR_CLIENT_TYPES  | cut -d "[" -f2 | cut -d "]" -f1)
 
 MOTR_CLIENT_IDS=
 for motr_client_type in $MOTR_CLIENT_TYPES; do
-    motr_client_type=$(echo $motr_client_type | tr -d ',')
     ids=$(get_service_ids_from_kv_file "grep -iw \"services\/$motr_client_type\"")
     for client_id in $ids; do
         MOTR_CLIENT_IDS+="${motr_client_type}:${client_id} "
