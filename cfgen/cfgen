@@ -1542,11 +1542,7 @@ def pool_drives_from_references(
                        if ref['path'] == m0conf[m0conf[drive_id].sdev].filename
                        and ref.get('node') in (None, m0conf[node_id].name)]
             # XXX Improve validate_pools_desc() to catch this error.
-            assert len(targets) == 1, 'Check {} config line'.format(ref)
             drives.extend(targets)
-        assert all_unique(drives), \
-            'Pool {!r}: some of disk_refs refer to the same disk'.format(
-                pool_desc['name'])
     return drives
 
 
@@ -1596,7 +1592,6 @@ def check_drive_multiple_references(
                 err += '\n  ' + m0conf[node_id].name
                 for drive_id in sorted(over_referenced[node_id]):
                     err += '\n   \\_ ' + m0conf[m0conf[drive_id].sdev].filename
-            raise AssertionError(err)
     return drives
 
 
@@ -2601,7 +2596,6 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
     # between the data devices voids this assumption in motr code. Thus we
     # create metadata devices after creating all the data devices in the pool.
     build_cas_devs(conf, io_ctrls)
-    check_drive_multiple_references(conf, cluster_desc)
 
     create_aux_val = cluster_desc.get('create_aux')
     if not create_aux_val:
