@@ -168,7 +168,7 @@ def get_nodes_for_cluster(path: str) -> List[Node]:
     client_types = []
     for key in file_data:
         if key['key'] == 'm0_client_types':
-            client_types = key['value']
+            client_types = json.loads(key['value'])
             break
 
     keys = get_keys_for_processes(file_data, client_types)
