@@ -38,8 +38,10 @@ Options:
                           "node" : "ssc-vm-c-0553.colo.seagate.com",
                           "source_type" : "drive",
                           "device" : "/dev/vdb"
-                          "state" : "FAILED",
+                          "state" : "failed",
                         }
+                        supported states: online, failed, offline,
+                                          repairing, repaired, rebalancing
   -h, --help            Show this help and exit.
 EOF
 }

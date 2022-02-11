@@ -23,17 +23,17 @@ from hax.ha.events import Event
 from hax.ha.handler import EventHandler
 from hax.message import BroadcastHAStates
 from hax.motr.planner import WorkPlanner
-from hax.types import HAState, ServiceHealth
+from hax.types import HAState, ObjHealth
 from hax.util import ConsulUtil
 
 LOG = logging.getLogger('hax')
 
 __all__ = ['NodeEventHandler']
 
-status_map: Dict[str, ServiceHealth] = {
-    'online': ServiceHealth.OK,
-    'offline': ServiceHealth.OFFLINE,
-    'failed': ServiceHealth.FAILED,
+status_map: Dict[str, ObjHealth] = {
+    'online': ObjHealth.OK,
+    'offline': ObjHealth.OFFLINE,
+    'failed': ObjHealth.FAILED,
 }
 
 
@@ -68,5 +68,5 @@ class NodeEventHandler(EventHandler):
             ],
                               reply_to=None))
 
-    def _get_status_by_text(self, status: str) -> ServiceHealth:
-        return status_map.get(status, ServiceHealth.UNKNOWN)
+    def _get_status_by_text(self, status: str) -> ObjHealth:
+        return status_map.get(status, ObjHealth.UNKNOWN)

@@ -8,7 +8,7 @@ from hax.motr.delivery import DeliveryHerald
 from hax.motr.planner import WorkPlanner
 from hax.queue.confobjutil import ConfObjUtil
 from hax.types import (Fid, HaLinkMessagePromise, HAState, MessageId,
-                       ServiceHealth)
+                       ObjHealth)
 
 LOG = logging.getLogger('hax')
 
@@ -84,16 +84,23 @@ class BQProcessor:
         self.planner.add_command(
             BroadcastHAStates(
                 states=[HAState(fid,
-                                status=ServiceHealth.FAILED)], reply_to=q))
+                                status=ObjHealth.FAILED)], reply_to=q))
         ids: List[MessageId] = q.get()
         self.herald.wait_for_any(HaLinkMessagePromise(ids))
 
     def to_ha_state(self, objinfo: Dict[str, str]) -> Optional[HAState]:
+        hastate_to_objstate = {
+            'online': ObjHealth.OK,
+            'failed': ObjHealth.FAILED,
+            'offline': ObjHealth.OFFLINE,
+            'repair': ObjHealth.REPAIR,
+            'repaired': ObjHealth.REPAIRED,
+            'rebalance': ObjHealth.REBALANCE
+        }
         try:
             sdev_fid = self.confobjutil.drive_to_sdev_fid(
                 objinfo['node'], objinfo['device'])
-            state = ServiceHealth.OK if objinfo[
-                'state'] == 'online' else ServiceHealth.FAILED
+            state = hastate_to_objstate[objinfo['state']]
         except KeyError as error:
             LOG.error('Invalid json payload, no key (%s) present', error)
             return None

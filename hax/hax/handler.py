@@ -31,7 +31,7 @@ from hax.motr.delivery import DeliveryHerald
 from hax.motr.planner import WorkPlanner
 from hax.queue.publish import EQPublisher
 from hax.types import (ConfHaProcess, HAState, MessageId,
-                       ObjT, ServiceHealth, StoppableThread, m0HaProcessEvent,
+                       ObjT, ObjHealth, StoppableThread, m0HaProcessEvent,
                        m0HaProcessType)
 from hax.util import ConsulUtil, dump_json, repeat_if_fails
 
@@ -73,22 +73,22 @@ class ConsumerThread(StoppableThread):
         motr_to_svc_status = {
             (m0HaProcessType.M0_CONF_HA_PROCESS_M0MKFS,
                 m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED): (
-                    ServiceHealth.OK),
+                    ObjHealth.OK),
             (m0HaProcessType.M0_CONF_HA_PROCESS_M0MKFS,
                 m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED): (
-                    ServiceHealth.FAILED),
+                    ObjHealth.FAILED),
             (m0HaProcessType.M0_CONF_HA_PROCESS_M0D,
                 m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED): (
-                    ServiceHealth.OK),
+                    ObjHealth.OK),
             (m0HaProcessType.M0_CONF_HA_PROCESS_M0D,
                 m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED): (
-                    ServiceHealth.FAILED),
+                    ObjHealth.FAILED),
             (m0HaProcessType.M0_CONF_HA_PROCESS_OTHER,
                 m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED): (
-                    ServiceHealth.OK),
+                    ObjHealth.OK),
             (m0HaProcessType.M0_CONF_HA_PROCESS_OTHER,
                 m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED): (
-                    ServiceHealth.FAILED)}
+                    ObjHealth.FAILED)}
         if event.chp_event in (m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED,
                                m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED):
             svc_status = motr_to_svc_status[(event.chp_type, event.chp_event)]
@@ -120,16 +120,14 @@ class ConsumerThread(StoppableThread):
             if state.fid.container == ObjT.PROCESS.value:
                 current_status = self.consul.get_process_current_status(
                     state.status, state.fid)
-                if current_status == ServiceHealth.OK:
-                    if (self.consul.get_process_status(
-                            state.fid).proc_status ==
-                            'M0_CONF_HA_PROCESS_STARTED'):
+                if current_status == ObjHealth.OK:
+                    if (self.consul.get_process_local_status(
+                            state.fid) == 'M0_CONF_HA_PROCESS_STARTED'):
                         continue
-                if current_status in (ServiceHealth.FAILED,
-                                      ServiceHealth.STOPPED):
-                    if (self.consul.get_process_status(
-                            state.fid).proc_status ==
-                            'M0_CONF_HA_PROCESS_STOPPED'):
+                if current_status in (ObjHealth.FAILED,
+                                      ObjHealth.STOPPED):
+                    if (self.consul.get_process_local_status(
+                            state.fid) == 'M0_CONF_HA_PROCESS_STOPPED'):
                         # Consul may report failure of a process multiple
                         # times, so we don't want to send duplicate failure
                         # notifications, it may cause delay in cleanup
@@ -146,8 +144,8 @@ class ConsumerThread(StoppableThread):
                 # Consul services catalog, in such a case the reported status
                 # can be true and cannot be just dropped. These scenarios must
                 # be re-visited.
-                if current_status not in (ServiceHealth.UNKNOWN,
-                                          ServiceHealth.OFFLINE):
+                if current_status not in (ObjHealth.UNKNOWN,
+                                          ObjHealth.OFFLINE):
                     # We also need to account and report the failure of remote
                     # Motr processes to this node's hax and motr processes.
                     # When Consul reports a remote process failure, hax
@@ -158,9 +156,13 @@ class ConsumerThread(StoppableThread):
                                             state.fid)
                     proc_type = m0HaProcessType.str_to_Enum(
                         proc_status_saved.proc_type)
-                    if current_status != ServiceHealth.OK:
+                    if current_status != ObjHealth.OK:
                         proc_status = (
                             m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED)
+                    else:
+                        proc_status = (
+                            m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED)
+
                         LOG.debug('update process failure')
                         self.consul.update_process_status(
                             ConfHaProcess(

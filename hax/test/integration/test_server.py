@@ -28,7 +28,7 @@ from hax.message import BroadcastHAStates, StobId, StobIoqError
 from hax.motr import WorkPlanner
 from hax.motr.delivery import DeliveryHerald
 from hax.server import ServerRunner
-from hax.types import Fid, HAState, MessageId, ServiceHealth
+from hax.types import Fid, HAState, MessageId, ObjHealth
 from hax.util import dump_json
 
 
@@ -79,11 +79,11 @@ async def test_hello_works(hax_client):
     assert text == "I'm alive! Sincerely, HaX"
 
 
-@pytest.mark.parametrize('status,health', [('passing', ServiceHealth.OK),
-                                           ('warning', ServiceHealth.FAILED),
-                                           ('critical', ServiceHealth.FAILED)])
+@pytest.mark.parametrize('status,health', [('passing', ObjHealth.OK),
+                                           ('warning', ObjHealth.FAILED),
+                                           ('critical', ObjHealth.FAILED)])
 async def test_service_health_broadcast(hax_client, planner, status: str,
-                                        health: ServiceHealth):
+                                        health: ObjHealth):
     service_health = [{
         'Node': {
             'Node': 'localhost',
@@ -170,7 +170,7 @@ async def test_bq_stob_message_type_recognized(hax_client, planner, herald,
     assert resp.status == 200
     planner.add_command.assert_called_once_with(
         ContainsStates(
-            [HAState(fid=Fid(0x1, 0x4), status=ServiceHealth.FAILED)]))
+            [HAState(fid=Fid(0x1, 0x4), status=ObjHealth.FAILED)]))
 
 
 async def test_bq_stob_message_deserialized(hax_client, planner, herald,
@@ -223,4 +223,4 @@ async def test_bq_stob_message_deserialized(hax_client, planner, herald,
     assert resp.status == 200
     planner.add_command.assert_called_once_with(
         ContainsStates(
-            [HAState(fid=Fid(0x103, 0x204), status=ServiceHealth.FAILED)]))
+            [HAState(fid=Fid(0x103, 0x204), status=ObjHealth.FAILED)]))
