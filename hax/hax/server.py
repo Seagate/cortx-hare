@@ -39,7 +39,7 @@ from hax.motr.planner import WorkPlanner
 from hax.queue import BQProcessor
 from hax.queue.confobjutil import ConfObjUtil
 from hax.queue.offset import InboxFilter, OffsetStorage
-from hax.types import Fid, HAState, ServiceHealth, StoppableThread
+from hax.types import Fid, HAState, ObjHealth, StoppableThread
 from hax.util import ConsulUtil, create_process_fid, dump_json
 from helper.exec import Executor, Program
 LOG = logging.getLogger('hax')
@@ -99,9 +99,9 @@ def to_ha_states(data: Any, consul_util: ConsulUtil) -> List[HAState]:
     if not data:
         return []
 
-    def get_status(checks: List[Dict[str, Any]]) -> ServiceHealth:
+    def get_status(checks: List[Dict[str, Any]]) -> ObjHealth:
         ok = all(x.get('Status') == 'passing' for x in checks)
-        return ServiceHealth.OK if ok else ServiceHealth.FAILED
+        return ObjHealth.OK if ok else ObjHealth.FAILED
 
     return [
         HAState(fid=create_process_fid(int(t['Service']['ID'])),

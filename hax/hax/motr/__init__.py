@@ -31,7 +31,7 @@ from hax.motr.ffi import HaxFFI, make_array, make_c_str
 from hax.motr.planner import WorkPlanner
 from hax.types import (ConfHaProcess, Fid, FidStruct, FsStats,
                        HaLinkMessagePromise, HaNote, HaNoteStruct, HAState,
-                       MessageId, ObjT, Profile, ReprebStatus, ServiceHealth,
+                       MessageId, ObjT, Profile, ReprebStatus, ObjHealth,
                        m0HaProcessEvent, m0HaProcessType)
 from hax.util import ConsulUtil, repeat_if_fails, FidWithType, PutKV
 
@@ -294,11 +294,11 @@ class Motr:
         LOG.debug('Broadcasting HA states %s over ha_link', ha_states)
 
         def ha_obj_state(st):
-            return HaNoteStruct.M0_NC_ONLINE if st.status == ServiceHealth.OK \
+            return HaNoteStruct.M0_NC_ONLINE if st.status == ObjHealth.OK \
                 else HaNoteStruct.M0_NC_FAILED
 
-        def _update_process_tree(proc_fid: Fid, state: ServiceHealth) -> bool:
-            return (st.status in (ServiceHealth.FAILED, ServiceHealth.OK) and
+        def _update_process_tree(proc_fid: Fid, state: ObjHealth) -> bool:
+            return (st.status in (ObjHealth.FAILED, ObjHealth.OK) and
                     not self.consul_util.is_proc_client(st.fid) and
                     not broadcast_hax_only and
                     proc_fid != hax_fid)
@@ -306,7 +306,7 @@ class Motr:
         hax_fid = self.consul_util.get_hax_fid()
         notes = []
         for st in ha_states:
-            if st.status == ServiceHealth.UNKNOWN:
+            if st.status == ObjHealth.UNKNOWN:
                 continue
             note = HaNoteStruct(st.fid.to_c(), ha_obj_state(st))
             notes.append(note)
@@ -342,11 +342,11 @@ class Motr:
                 # If both the above conditions are not true then we will just
                 # mark controller status
                 is_node_failed = self.is_node_failed(note, kv_cache=kv_cache)
-                if (st.status == ServiceHealth.FAILED
+                if (st.status == ObjHealth.FAILED
                         and is_node_failed):
                     notes += self.notify_node_status_by_process(
                         note, kv_cache=kv_cache)
-                elif (st.status == ServiceHealth.OK
+                elif (st.status == ObjHealth.OK
                         and not is_node_failed):
                     notes += self.notify_node_status_by_process(
                         note, kv_cache=kv_cache)
@@ -490,11 +490,11 @@ class Motr:
         new_state = note.no_state
         proc_fid = Fid.from_struct(note.no_id)
 
-        state = (ServiceHealth.OK if new_state ==
-                 HaNoteStruct.M0_NC_ONLINE else ServiceHealth.OFFLINE)
+        state = (ObjHealth.OK if new_state ==
+                 HaNoteStruct.M0_NC_ONLINE else ObjHealth.OFFLINE)
         is_mkfs = self._is_mkfs(proc_fid)
 
-        mkfs_down = is_mkfs and state != ServiceHealth.OK
+        mkfs_down = is_mkfs and state != ObjHealth.OK
 
         if not mkfs_down:
             for svc in services:
@@ -527,7 +527,7 @@ class Motr:
     def add_node_state_by_fid(
             self,
             node_fid: Fid,
-            new_state: ServiceHealth
+            new_state: ObjHealth
             ) -> List[HaNoteStruct]:
 
         # Update the node state in consul kv.
@@ -541,7 +541,7 @@ class Motr:
     @uses_consul_cache
     def add_enclosing_devices_by_node(self,
                                       node_fid: Fid,
-                                      new_state: ServiceHealth,
+                                      new_state: ObjHealth,
                                       node: Optional[str] = None,
                                       kv_cache=None) -> List[HaNoteStruct]:
         """
@@ -564,7 +564,7 @@ class Motr:
         # Update the states of all the controllers as failed, in case of
         # node failure event.
         #
-        if new_state == ServiceHealth.FAILED and ctrl_fids:
+        if new_state == ObjHealth.FAILED and ctrl_fids:
             updates: List[PutKV] = []
             for x in ctrl_fids:
                 updates += self.consul_util.get_ctrl_state_updates(
@@ -588,7 +588,7 @@ class Motr:
                                       proc_note: HaNoteStruct,
                                       kv_cache=None) -> List[HaNoteStruct]:
         # proc_note.no_state is of int type
-        new_state = ServiceHealth.from_ha_note_state(proc_note.no_state)
+        new_state = ObjHealth.from_ha_note_state(proc_note.no_state)
         proc_fid = Fid.from_struct(proc_note.no_id)
         assert ObjT.PROCESS.value == proc_fid.container
         LOG.debug('Notifying node status for process_fid=%s state=%s',
@@ -597,7 +597,7 @@ class Motr:
         node = self.consul_util.get_process_node(proc_fid, kv_cache=kv_cache)
 
         updates: List[PutKV] = []
-        if new_state == ServiceHealth.OK:
+        if new_state == ObjHealth.OK:
             # Node can have multiple controllers. Node can be online, with
             # a single controller running online.
             # If we receive process 'OK', only the process state is
@@ -639,7 +639,7 @@ class Motr:
             # Update controller state in consul kv.
             updates = self.consul_util.get_ctrl_state_updates(
                 ctrl_fid,
-                ServiceHealth.from_ha_note_state(new_state),
+                ObjHealth.from_ha_note_state(new_state),
                 kv_cache=kv_cache)
             return (HaNoteStruct(no_id=ctrl_fid.to_c(),
                                  no_state=new_state), updates)

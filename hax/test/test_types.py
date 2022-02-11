@@ -16,24 +16,29 @@
 # please email opensource@seagate.com or cortx-questions@seagate.com.
 #
 import pytest
-from hax.types import HaNoteStruct, ServiceHealth
+from hax.types import HaNoteStruct, ObjHealth
 
 h = HaNoteStruct
-s = ServiceHealth
+o = ObjHealth
 
 
-@pytest.mark.parametrize('ha_note,health', [(h.M0_NC_ONLINE, s.OK),
-                                            (h.M0_NC_FAILED, s.FAILED),
-                                            (h.M0_NC_TRANSIENT, s.OFFLINE),
-                                            (h.M0_NC_UNKNOWN, s.UNKNOWN)])
-def test_service_health_to_ha_note(ha_note: int, health: ServiceHealth):
+@pytest.mark.parametrize('ha_note,health', [(h.M0_NC_ONLINE, o.OK),
+                                            (h.M0_NC_FAILED, o.FAILED),
+                                            (h.M0_NC_TRANSIENT, o.OFFLINE),
+                                            (h.M0_NC_UNKNOWN, o.UNKNOWN),
+                                            (h.M0_NC_REPAIR, o.REPAIR),
+                                            (h.M0_NC_REPAIRED, o.REPAIRED),
+                                            (h.M0_NC_REBALANCE, o.REBALANCE)])
+def test_obj_health_to_ha_note(ha_note: int, health: ObjHealth):
     assert ha_note == health.to_ha_note_status()
 
 
-@pytest.mark.parametrize('ha_note,health', [(h.M0_NC_ONLINE, s.OK),
-                                            (h.M0_NC_FAILED, s.FAILED),
-                                            (h.M0_NC_TRANSIENT, s.OFFLINE),
-                                            (h.M0_NC_UNKNOWN, s.UNKNOWN),
-                                            (h.M0_NC_REPAIRED, s.UNKNOWN)])
-def test_ha_note_to_service_health_works(ha_note: int, health: ServiceHealth):
-    assert ServiceHealth.from_ha_note_state(ha_note) == health
+@pytest.mark.parametrize('ha_note,health', [(h.M0_NC_ONLINE, o.OK),
+                                            (h.M0_NC_FAILED, o.FAILED),
+                                            (h.M0_NC_TRANSIENT, o.OFFLINE),
+                                            (h.M0_NC_UNKNOWN, o.UNKNOWN),
+                                            (h.M0_NC_REPAIR, o.REPAIR),
+                                            (h.M0_NC_REPAIRED, o.REPAIRED),
+                                            (h.M0_NC_REBALANCE, o.REBALANCE)])
+def test_ha_note_to_obj_health_works(ha_note: int, health: ObjHealth):
+    assert ObjHealth.from_ha_note_state(ha_note) == health

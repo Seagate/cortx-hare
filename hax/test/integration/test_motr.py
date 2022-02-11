@@ -31,7 +31,7 @@ from hax.motr import Motr, WorkPlanner
 from hax.motr.delivery import DeliveryHerald
 from hax.motr.ffi import HaxFFI
 from hax.types import (Fid, FidStruct, HaNote, HaNoteStruct, HAState, Profile,
-                       ServiceHealth, Uint128)
+                       ObjHealth, Uint128)
 from hax.util import (create_process_fid, create_profile_fid, create_drive_fid,
                       dump_json)
 
@@ -439,7 +439,7 @@ def test_get_nvec_replies_something(
 
     patch(consul_util.catalog, 'get_services', side_effect=my_services)
     patch(consul_util, 'get_node_health_status', return_value='passing')
-    patch(consul_util, 'get_service_health', return_value=ServiceHealth.OK)
+    patch(consul_util, 'get_service_health', return_value=ObjHealth.OK)
 
     msg = HaNvecGetEvent(
         hax_msg=12,
@@ -641,7 +641,7 @@ def test_broadcast_node_failure(mocker, motr, consul_util):
                         return_value=Fid(0x6500000000000001, 0x4))
 
     motr.broadcast_ha_states([
-        HAState(fid=Fid(0x7200000000000001, 0x15), status=ServiceHealth.FAILED)
+        HAState(fid=Fid(0x7200000000000001, 0x15), status=ObjHealth.FAILED)
     ])
 
     traces = motr._ffi.traces
@@ -814,7 +814,7 @@ def test_mkfs_process_stopped_no_disk_marked_offline(mocker, motr,
                         return_value='endpoint')
 
     motr.broadcast_ha_states([
-        HAState(fid=Fid(0x7200000000000001, 0x15), status=ServiceHealth.FAILED)
+        HAState(fid=Fid(0x7200000000000001, 0x15), status=ObjHealth.FAILED)
     ])
 
     assert not consul_util.update_drive_state.called, \
@@ -844,7 +844,7 @@ def test_nonmkfs_process_stop_causes_drive_offline(mocker, motr, consul_util):
                         return_value=Fid(0x6500000000000001, 0x4))
 
     motr.broadcast_ha_states([
-        HAState(fid=Fid(0x7200000000000001, 0x15), status=ServiceHealth.FAILED)
+        HAState(fid=Fid(0x7200000000000001, 0x15), status=ObjHealth.FAILED)
     ])
 
     assert consul_util.update_drive_state.called, \
@@ -998,7 +998,7 @@ def test_broadcast_io_service_failure(mocker, planner, motr, consumer,
                         return_value=Fid(0x6500000000000001, 0x4))
 
     motr.broadcast_ha_states([
-        HAState(fid=Fid(0x7200000000000001, 0x15), status=ServiceHealth.FAILED)
+        HAState(fid=Fid(0x7200000000000001, 0x15), status=ObjHealth.FAILED)
     ])
 
     traces = motr._ffi.traces
@@ -1184,7 +1184,7 @@ def test_broadcast_more_than_1024_objects(mocker, planner, motr, consumer,
                         return_value=_generate_sub_disks())
 
     motr.broadcast_ha_states([
-        HAState(fid=Fid(0x7200000000000001, 0x15), status=ServiceHealth.FAILED)
+        HAState(fid=Fid(0x7200000000000001, 0x15), status=ObjHealth.FAILED)
     ])
 
     traces = motr._ffi.traces
