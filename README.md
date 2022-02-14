@@ -186,7 +186,7 @@ You will probably need to modify `host`, `data_iface`, and `io_disks` values.
 * Make sure that `data_iface` value refers to existing network
   interface (it should be present in the output of `ip a` command).
 
-* Currently, the two networking types are supported: LNet and libfabric.
+* Currently, two networking types are supported: LNet and libfabric.
   For LNet, the network interface must be added to `/etc/modprobe.d/lnet.conf`
   configuration file. If you can see the IP address if your network interface
   in the output of `sudo lctl list_nids` command, you are all set. Otherwise,
