@@ -200,8 +200,8 @@ You will probably need to modify `host`, `data_iface`, and `io_disks` values.
 
   You will need to reload lnet.ko kernel module to pick up the new config.
 
-* In case of `libfabric`, make sure to set `transport_type: libfab` to the
-  node configuration section in the CDF.
+* In case of `libfabric`, make sure to set `transport_type: libfab` at the
+  node(s) configuration section in the CDF.
 
 #### io_disks
 
