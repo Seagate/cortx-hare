@@ -1472,8 +1472,7 @@ class ConsulUtil:
         return proc_base_fid
 
     def get_process_local_status(self, fid: Fid) -> str:
-        local_node = self.get_local_nodename()
-        key = f'{local_node}/processes/{fid}'
+        key = f'processes/{fid}'
         status = self.kv.kv_get(key)
         if status:
             return str(json.loads(status['Value'])['state'])
@@ -1858,7 +1857,6 @@ class ConsulUtil:
         keys: List[KeyDelete] = [
             KeyDelete(name='processes/', recurse=True),
         ]
-
         logging.info('Deleting Hare KV entries (%s)', keys)
         if not self.kv.kv_delete_in_transaction(keys):
             raise HAConsistencyException('KV deletion failed')

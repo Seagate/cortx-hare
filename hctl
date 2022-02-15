@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Copyright (c) 2020 Seagate Technology LLC and/or its Affiliates
+# Copyright (c) 2020-2022 Seagate Technology LLC and/or its Affiliates
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -125,7 +125,8 @@ is_systemd_enabled() {
 # process commands
 case $cmd in
     help) usage; exit ;;
-    bootstrap|start|reportbug|shutdown|status|drive-state|node-join|fetch-fids)
+    bootstrap|start|reportbug|shutdown|status|drive-state|node-join|fetch-fids|\
+    rebalance|repair)
         if [[ -d $M0_SRC_DIR/utils ]]; then
             PATH="$M0_SRC_DIR/utils:$PATH"
         fi

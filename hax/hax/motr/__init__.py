@@ -17,8 +17,10 @@
 #
 
 import ctypes as c
+from errno import EAGAIN
 import logging
 from typing import Any, List, Optional, Tuple
+from time import sleep
 
 from hax.consul.cache import supports_consul_cache, uses_consul_cache
 from hax.exception import ConfdQuorumException, RepairRebalanceException
@@ -82,7 +84,6 @@ class Motr:
 
         rm_fid = _get_rm_fid()
         # Cleanup old process states.
-        self.consul_util.cleanup_node_process_states()
         result = self._ffi.start(self._ha_ctx, make_c_str(rpc_endpoint),
                                  process.to_c(), ha_service.to_c(),
                                  rm_fid.to_c())
@@ -141,8 +142,7 @@ class Motr:
                                                    str(process_fid)) +
                   ' The request will be processed in another thread.')
         try:
-            if (is_first_request
-                    and (not self.consul_util.is_proc_client(process_fid))):
+            if is_first_request:
                 # This is the first start of this process or the process has
                 # restarted.
                 # Let everyone know that the process has restarted so that
@@ -187,6 +187,7 @@ class Motr:
         req_id = message.req_id
         remote_rpc_endpoint = message.remote_rpc_endpoint
         process_fid = message.process_fid
+        e_rc = EAGAIN
 
         LOG.debug('Processing entrypoint request from remote endpoint'
                   " '{}', process fid {}".format(remote_rpc_endpoint,
@@ -252,17 +253,28 @@ class Motr:
                     rm_eps = svc.address
                     break
             if confds and (not self.is_stopping) and (not rm_eps):
+                if util.m0ds_stopping():
+                    e_rc = 0
                 raise RuntimeError('No RM node found in Consul')
         except Exception:
-            # In case of exception we are dropping the entrypoint requests
-            # silently at hax and hax will not send any entrypoint reply.
-            # In such a case we will let motr timeout and Hare will then
-            # expect a subsequent entrypoint request from Motr
-            # Note that this is short term fix and we have created
-            # EOS-27068 to solve it properly
             LOG.exception('Failed to get the data from Consul.'
-                          ' dropping the entrypoint request.')
-            LOG.debug('Entrypoint request ignored')
+                          ' Replying with EAGAIN error code, with a 1'
+                          ' second delay.')
+            # If replied EAGAIN, motr immediately sends a subsequent entrypoint
+            # request and it is observed that several entrypoint requests are
+            # received by hare in a second. This floods Hare, as an
+            # intermediate solution, Hare dropped the requests in case of an
+            # error preparing the same. But, motr does not send any subsequent
+            # entrypoint requests as expected after a timeout. As per the
+            # discussion, it is agreed upon to have a temporary fix in Hare.
+            # https://jts.seagate.com/browse/EOS-27068 motr ticket is created
+            # to track the same.
+            sleep(1)
+            self._ffi.entrypoint_reply(reply_context, req_id.to_c(), e_rc, 0,
+                                       make_array(FidStruct, []),
+                                       make_array(c.c_char_p, []), 0,
+                                       Fid(0, 0).to_c(), None)
+            LOG.debug('Reply sent')
             return
 
         confd_fids = [x.fid.to_c() for x in confds]
@@ -297,7 +309,7 @@ class Motr:
         hax_fid = self.consul_util.get_hax_fid()
         notes = []
         for st in ha_states:
-            if st.status in (ServiceHealth.UNKNOWN, ServiceHealth.OFFLINE):
+            if st.status == ServiceHealth.UNKNOWN:
                 continue
             # If its a client process then update the base fid to its full
             # fid.

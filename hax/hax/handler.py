@@ -178,9 +178,6 @@ class ConsumerThread(StoppableThread):
                                               ServiceHealth.RECOVERING):
                         proc_status = (
                             m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED)
-                    # else:
-                    #     proc_status = m0HaProcessEvent.str_to_Enum(
-                    #         proc_status_saved.proc_status)
                         LOG.debug('update process failure')
                         self.consul.update_process_status(
                             ConfHaProcess(

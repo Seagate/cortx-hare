@@ -165,11 +165,20 @@ class FdmiFilterDesc(DhallTuple):
 
 
 @dataclass(repr=False)
+class NetworkPorts(DhallTuple):
+    hax: Maybe[int]
+    m0_server: Maybe[int]
+    m0_client_s3: Maybe[int]
+    m0_client_other: Maybe[int]
+
+
+@dataclass(repr=False)
 class ClusterDesc(DhallTuple):
     create_aux: Maybe[bool]
     node_info: DList[NodeDesc]
     pool_info: DList[PoolDesc]
     profile_info: DList[ProfileDesc]
+    ports_info: Maybe[NetworkPorts]
     fdmi_filter_info: Maybe[List[FdmiFilterDesc]]
 
 

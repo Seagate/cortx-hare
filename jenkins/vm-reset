@@ -58,13 +58,13 @@ validate_args() {
         die 'Cannot communicate with CloudForms Management Engine'
 }
 
-# Wait till the certain condition (state transition or task completion) is met, 
+# Wait till the certain condition (state transition or task completion) is met,
 # or timeout occurs.
 # Currently power state (on/off) and snapshot task progress is checked.
 # It takes inputs,
-# vm_id         id of VM 
+# vm_id         id of VM
 # wait_timeout  minutes to wait for state or task before timeout
-# state         power state or task whose progress needs to checked  
+# state         power state or task whose progress needs to checked
 wait_till() {
     local vm_id=$1
     local wait_timeout=$2
@@ -84,7 +84,7 @@ wait_till() {
             fi
         else
             if [[ $(vm_task_state $state) == "Finished" ]]; then
-                echo  # add a newline after all those dots                
+                echo  # add a newline after all those dots
                 return
             fi
         fi
@@ -147,11 +147,11 @@ vm_snapshot_revert() {
           )
     >&2 jq -r '.message' <<< "$resp"
     [[ $(jq '.success' <<< "$resp") == true ]] || die 'Cannot revert snapshot'
-    
+
     local snapshot_task_id
     snapshot_task_id=$(jq -r '.task_id' <<< "$resp")
 
-    wait_till $vm_id 5 $snapshot_task_id   
+    wait_till $vm_id 5 $snapshot_task_id
 }
 
 main() {
