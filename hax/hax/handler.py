@@ -317,6 +317,8 @@ class ConsumerThread(StoppableThread):
                         decorated(item)
                     elif isinstance(item, BroadcastHAStates):
                         LOG.info('HA states: %s', item.states)
+                        # Check the current status of the object and
+                        # broadcast accordingly.
                         ha_states = self.update_process_failure(
                             planner, item.states)
                         result: List[MessageId] = motr.broadcast_ha_states(
