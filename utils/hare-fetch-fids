@@ -30,7 +30,8 @@ from hax.types import ObjT
 
 from utils import get_node_name
 
-Process = NamedTuple('Process', [('name', str), ('fid', str)])
+Process = NamedTuple('Process', [('name', str), ('fid', str), ('ep', str)])
+KeyData = NamedTuple('KeyData', [('key_path', str), ('ep', str)])
 
 
 class Node:
@@ -38,8 +39,8 @@ class Node:
         self.name = name
         self.svcs: List[Process] = []
 
-    def add_service(self, svc: str, fid: str) -> None:
-        self.svcs.append(Process(svc, fid))
+    def add_service(self, svc: str, fid: str, ep: str) -> None:
+        self.svcs.append(Process(svc, fid, ep))
 
     def get_service(self, service: str) -> Optional[List[Process]]:
         # Returns list of services matching the given service
@@ -79,23 +80,39 @@ def node_names(data: List) -> List[str]:
     return nodes
 
 
-def get_keys_for_processes(data: List, client_types: List) -> List[str]:
+def get_keys_for_processes(data: List, client_types: List) -> List[KeyData]:
     # Get 'm0conf/nodes/<node_id>/processes/<process_fidk>/services/<svc_type>'
     # entries from the file.  See 'Consul KV Schema' in [4/KV](rfc/4/README.md)
 
-    service_names = 'confd|ios'
+    service_names = 'confd|ios|ha'
 
     for client_type in client_types:
         service_names += '|' + client_type
 
     regex = re.compile('^m0conf\\/.*\\/processes\\/.*\\/services\\'
                        '/(' + service_names + ')+$')
-    keys = []
+    keys: List[KeyData] = []
     for key in data:
         match_result = re.match(regex, key['key'])
         if not match_result:
             continue
-        keys.append(match_result.group(0))
+
+        # Key e.g. m0conf/nodes/localhost/processes/43/services/rgw
+        parts = key['key'].split('/')
+        process_fidk = parts[-3]
+
+        # key e.g. m0conf/nodes/localhost/processes/43/
+        #                         endpoint:inet:tcp:192.168.59.148@5001
+        regex_ep = re.compile(
+            f'^m0conf\\/.*\\/processes\\/{process_fidk}\\/endpoint')
+
+        for epdata in data:
+            result = re.match(regex_ep, epdata['key'])
+            if not result:
+                continue
+
+            keys.append(KeyData(match_result.group(0), epdata['value']))
+            break
     if not keys:
         raise RuntimeError(
             'No ioservice, confd, or any motr client found in the cluster')
@@ -103,10 +120,10 @@ def get_keys_for_processes(data: List, client_types: List) -> List[str]:
 
 
 def add_service_to_node(nodes: List[Node], node_name: str, svc_name: str,
-                        fid: str) -> None:
+                        fid: str, ep: str) -> None:
     for node in nodes:
         if node.name == node_name:
-            node.add_service(svc_name, fid)
+            node.add_service(svc_name, fid, ep)
 
 
 def get_service_for_node(nodes: List[Node], node_name: str,
@@ -130,10 +147,12 @@ def get_service_for_node(nodes: List[Node], node_name: str,
     return None
 
 
-def process_all_keys(keys: List,
+def process_all_keys(keys: List[KeyData],
                      nodes: List[Node],
                      client_types: List) -> None:
-    names = {'confd': 'confd', 'ios': 'ioservice'}
+    names = {'confd': 'confd',
+             'ios': 'ioservice',
+             'ha': 'hax'}
 
     for client_type in client_types:
         names[client_type] = client_type
@@ -141,12 +160,13 @@ def process_all_keys(keys: List,
     for key in keys:
         # key looks like
         # 'm0conf/nodes/<name>/processes/<process_fidk>/services/<svc_type>'
-        parts = key.split('/')
+        parts = key.key_path.split('/')
         svc_type = parts[-1]
         node_name = parts[2]
         process_fidk = parts[-3]
         add_service_to_node(nodes, node_name, names[svc_type],
-                            to_fid(ObjT.PROCESS.value, int(process_fidk)))
+                            to_fid(ObjT.PROCESS.value, int(process_fidk)),
+                            key.ep)
 
     for node in nodes:
         if not node.svcs:
