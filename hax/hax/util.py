@@ -1695,11 +1695,12 @@ class ConsulUtil:
             return MotrConsulProcInfo('Unknown', 'Unknown')
 
     def get_process_status_local(self,
-                                 proc_fid: Fid,
+                                 fid: Fid,
                                  proc_node=None) -> MotrConsulProcInfo:
+        proc_base_fid = self.get_process_base_fid(fid)
         this_node = self.get_local_nodename()
-        key = f'{this_node}/processes/{proc_fid}'
-        status = self.kv.kv_get(key, allow_null=True)
+        key = f'{this_node}/processes/{proc_base_fid}'
+        status = self.kv.kv_get(key)
         if status:
             val = json.loads(status['Value'])
             return MotrConsulProcInfo(val['state'], val['type'])
