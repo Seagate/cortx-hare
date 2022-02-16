@@ -247,33 +247,36 @@ class HaLinkMessagePromise:
         return 'HaLinkMessagePromise' + str(self._ids)
 
 
-class ServiceHealth(Enum):
+class ObjHealth(Enum):
     FAILED = (0, HaNoteStruct.M0_NC_FAILED)
     OK = (1, HaNoteStruct.M0_NC_ONLINE)
     UNKNOWN = (2, HaNoteStruct.M0_NC_UNKNOWN)
     OFFLINE = (3, HaNoteStruct.M0_NC_TRANSIENT)
     STOPPED = (4, HaNoteStruct.M0_NC_TRANSIENT)
     RECOVERING = (5, HaNoteStruct.M0_NC_DTM_RECOVERING)
+    REPAIR = (6, HaNoteStruct.M0_NC_REPAIR)
+    REPAIRED = (7, HaNoteStruct.M0_NC_REPAIRED)
+    REBALANCE = (8, HaNoteStruct.M0_NC_REBALANCE)
 
     def __repr__(self):
         """Return human-readable constant name (useful in log output)."""
         return self.name
 
     @staticmethod
-    def from_ha_note_state(state: int) -> 'ServiceHealth':
+    def from_ha_note_state(state: int) -> 'ObjHealth':
         """
         Converts the int constant from HaNoteStruct into the corresponding
-        ServiceHealth.
+        ObjHealth.
         """
-        for i in list(ServiceHealth):
+        for i in list(ObjHealth):
             (_, note) = i.value
             if note == state:
                 return i
-        return ServiceHealth.UNKNOWN
+        return ObjHealth.UNKNOWN
 
     def to_ha_note_status(self) -> int:
         """
-        Converts the given ServiceHealth to the most suitable HaNoteStruct
+        Converts the given ObjHealth to the most suitable HaNoteStruct
         status.
         """
         ha_note: int = self.value[1]
@@ -309,12 +312,12 @@ class m0HaProcessEvent(IntEnum):
 
     def event_to_svchealth(self):
         m0ProcessEvToSvcHealth = {
-            m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTING: ServiceHealth.OK,
-            m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED: ServiceHealth.OK,
+            m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTING: ObjHealth.OFFLINE,
+            m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED: ObjHealth.RECOVERING,
             m0HaProcessEvent.M0_CONF_HA_PROCESS_DTM_RECOVERED:
-                ServiceHealth.OK,
-            m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPING: ServiceHealth.FAILED,
-            m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED: ServiceHealth.FAILED}
+                ObjHealth.OK,
+            m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPING: ObjHealth.OFFLINE,
+            m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED: ObjHealth.OFFLINE}
         return m0ProcessEvToSvcHealth[self]
 
 

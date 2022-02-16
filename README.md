@@ -53,30 +53,33 @@ and health-checking mechanisms.
   ```
 
 * Install facter
-  
-  > **NOTE:** the supported version of facter is 3.14 or above, which is available in CentOS 8 as a separate rpm,
+
+  > **NOTE:** the supported version of facter is 3.14 or above,
+  > which is available in CentOS 8 as a separate rpm,
   > but on CentOS 7 it needs to be installed from puppet-agent rpm.
-  
+
   Check facter version details:
-  
+
   ```sh
   facter -v
   ```
-  
-  On CentOS 7, if the facter version is less than 3.14 or not installed, then run the following commands to update/install it:
-  
+
+  On CentOS 7, if the facter version is less than 3.14 or not installed,
+  then run the following commands to update/install it:
+
   ```sh
   sudo yum localinstall -y https://yum.puppetlabs.com/puppet/el/7/x86_64/puppet-agent-7.0.0-1.el7.x86_64.rpm
   sudo ln -sf /opt/puppetlabs/bin/facter /usr/bin/facter
   ```
 
   On CentOS 8, install it (if not installed already):
-  
+
   ```sh
   sudo yum install -y facter
   ```
 
 * Install Consul.
+
   ```sh
   sudo yum -y install yum-utils
   sudo yum-config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo
@@ -85,52 +88,61 @@ and health-checking mechanisms.
 
 * Install py-utils.
 
-   Please refer to [the instruction](https://github.com/Seagate/cortx-utils/blob/main/py-utils/README.md) to install corxt-py-utils from sources.
-
+  Please refer to [the instruction](https://github.com/Seagate/cortx-utils/blob/main/py-utils/README.md)
+  to install corxt-py-utils from sources.
 
 * Build and Install Motr.
 
-  *  Follow [Motr quick start guide](https://github.com/Seagate/cortx-motr/blob/main/doc/Quick-Start-Guide.rst) to build Motr from source. After compiling Motr sources, please continue with the below steps to build Hare using Motr sources.
+  Follow [Motr quick start guide](https://github.com/Seagate/cortx-motr/blob/main/doc/Quick-Start-Guide.rst)
+  to build Motr from source. After compiling Motr sources, please continue
+  with the below steps to build Hare using Motr sources.
 
-     ```sh
-     sudo scripts/install-motr-service --link
- 
-     export M0_SRC_DIR=$PWD
-     cd -
-     ```
+  ```sh
+  cd cortx-motr && sudo scripts/install-motr-service --link
+  export M0_SRC_DIR=$PWD
+  cd -
+  ```
 
 * Build and install Hare.
+
   ```sh
   make
   sudo make install
   ```
+
 * Create `hare` group.
+
   ```sh
   sudo groupadd --force hare
   ```
-  
+
 * Add current user to `hare` group.
+
   ```sh
   sudo usermod --append --groups hare $USER
   ```
+
   Log out and log back in.
 
 ### Build and install rpms from source
 
-**NOTE: If you have built Motr and HARE from sources you need not generate RPM packages as below, however, it might be more convenient to build and install rpms on a multinode setup sometimes**
+**NOTE: If you have built Motr and HARE from sources you need not generate
+RPM packages as below, however, it might be more convenient to build ands
+install rpms on a multinode setup sometimes**
 
 * Build & Install Motr RPMs
-  *  Follow [Motr quick start guide](https://github.com/Seagate/cortx-motr/blob/main/doc/Quick-Start-Guide.rst) to install Motr.
-  
+
+  Follow [Motr quick start guide](https://github.com/Seagate/cortx-motr/blob/main/doc/Quick-Start-Guide.rst)
+  to install Motr.
+
 * Build `hare` RPMs
 
-  * Download `hare` source as mentioned above
-    ```sh
-    cd hare
-    make rpm
-    sudo rpm -ivh ~/rpmbuild/RPMS/x86_64/cortx-hare-*.rpm
-    ```
+  ```sh
+  cd cortx-hare
+  make rpm
+  ```
 
+  The packages will be placed at `~/rpmbuild/RPMS/$(arch)` directory.
 
 <!------------------------------------------------------------------->
 ## Quick start
@@ -169,20 +181,27 @@ vi ~/CDF.yaml
 
 You will probably need to modify `host`, `data_iface`, and `io_disks` values.
 
-#### data_iface
+#### Networking configuration
 
 * Make sure that `data_iface` value refers to existing network
   interface (it should be present in the output of `ip a` command).
 
-* This network interface must be configured for LNet.  If you can see
-  its IP address in the output of `sudo lctl list_nids` command, you
-  are all set.  Otherwise, configure LNet by executing this code
-  snippet on each node:
+* Currently, two networking types are supported: LNet and libfabric.
+  For LNet, the network interface must be added to `/etc/modprobe.d/lnet.conf`
+  configuration file. If you can see the IP address if your network interface
+  in the output of `sudo lctl list_nids` command, you are all set. Otherwise,
+  configure LNet by executing this code snippet on each node:
+
   ```bash
   IFACE=eth1  # XXX `data_iface` value from the CDF
   sudo tee /etc/modprobe.d/lnet.conf <<< \
       "options lnet networks=tcp($IFACE) config_on_load=1"
   ```
+
+  You will need to reload lnet.ko kernel module to pick up the new config.
+
+* In case of `libfabric`, make sure to set `transport_type: libfab` at the
+  node(s) configuration section in the CDF.
 
 #### io_disks
 
