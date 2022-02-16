@@ -283,7 +283,7 @@ class ObjHealth(Enum):
         return ha_note
 
 
-HAState = recordclass('HAState', [('fid', Fid), ('status', ServiceHealth)])
+HAState = recordclass('HAState', [('fid', Fid), ('status', ObjHealth)])
 
 
 class m0HaProcessEvent(IntEnum):
