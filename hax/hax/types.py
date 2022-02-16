@@ -333,7 +333,7 @@ class ObjHealth(Enum):
         return ha_note
 
 
-HAState = NamedTuple('HAState', [('fid', Fid), ('status', ObjHealth)])
+HAState = recordclass('HAState', [('fid', Fid), ('status', ObjHealth)])
 
 
 class m0HaProcessEvent(IntEnum):
