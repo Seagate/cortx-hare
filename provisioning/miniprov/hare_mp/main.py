@@ -758,9 +758,11 @@ def checkRpm(rpm_name):
                                   stderr=subprocess.PIPE,
                                   encoding='utf8')
     out, err = rpm_search.communicate()
-    logging.info(f"Output: {out}")
-    logging.info(f"rpm: {rpm_name} found")
-    logging.info(f"stderr: {err}")
+    if out:
+        logging.info("Output: %s", out)
+    logging.info("RPM: %s found", rpm_name)
+    if err:
+        logging.info("Stderr: %s", err)
     if rpm_search.returncode != 0:
         raise RuntimeError(f"rpm {rpm_name} is missing")
 
