@@ -22,6 +22,7 @@ import logging
 import re
 import signal
 from typing import List, NamedTuple
+from hax.bytecount import ByteCountUpdater
 
 import inject
 
@@ -62,6 +63,11 @@ def _run_qconsumer_thread(planner: WorkPlanner, motr: Motr,
 def _run_stats_updater_thread(motr: Motr,
                               consul_util: ConsulUtil) -> StoppableThread:
     return _run_thread(FsStatsUpdater(motr, consul_util, interval_sec=30))
+
+
+def _run_bc_updater_thread(motr: Motr,
+                           consul_util: ConsulUtil) -> StoppableThread:
+    return _run_thread(ByteCountUpdater(motr, consul_util, interval_sec=30))
 
 
 @repeat_if_fails()
@@ -180,6 +186,7 @@ def main():
         rconfc_starter = _run_rconfc_starter_thread(motr, consul_util=util)
 
         stats_updater = _run_stats_updater_thread(motr, consul_util=util)
+        bc_updater = _run_bc_updater_thread(motr, consul_util=util)
         event_poller = _run_thread(create_ha_thread(planner, util))
         # [KN] This is a blocking call. It will work until the program is
         # terminated by signal
@@ -189,7 +196,8 @@ def main():
                               consul_util=util,
                               hax_state=state)
         server.run(threads_to_wait=[
-            *consumer_threads, stats_updater, rconfc_starter, event_poller
+            *consumer_threads, stats_updater, bc_updater, rconfc_starter,
+            event_poller
         ])
     except Exception:
         LOG.exception('Exiting due to an exception')

@@ -32,7 +32,7 @@ from hax.motr.planner import WorkPlanner
 from hax.types import (ByteCountStats, ConfHaProcess, Fid, FidStruct, FsStats,
                        HaLinkMessagePromise, HaNote, HaNoteStruct, HAState,
                        MessageId, ObjT, Profile, PverState, ReprebStatus,
-                       ServiceHealth, m0HaProcessEvent, m0HaProcessType)
+                       ObjHealth, m0HaProcessEvent, m0HaProcessType)
 from hax.util import ConsulUtil, repeat_if_fails, FidWithType, PutKV
 
 LOG = logging.getLogger('hax')
