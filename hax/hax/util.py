@@ -36,7 +36,7 @@ from urllib3.exceptions import HTTPError
 
 from hax.common import HaxGlobalState
 from hax.exception import HAConsistencyException, InterruptedException
-from hax.types import (ConfHaProcess, Fid, FsStatsWithTime,
+from hax.types import (ByteCountStats, ConfHaProcess, Fid, FsStatsWithTime,
                        ObjT, ObjHealth, Profile, m0HaProcessEvent,
                        m0HaProcessType, KeyDelete, HaNoteStruct,
                        m0HaObjState)
@@ -511,16 +511,18 @@ class ConsulUtil:
 
     @supports_consul_cache
     def get_m0d_statuses(self,
+                         motr_services=None,
                          kv_cache=None
                          ) -> List[Tuple[ServiceData, ObjHealth]]:
         """
         Return the list of all Motr service statuses according to Consul
-        watchers. The following services are considered: ios, confd.
+        watchers.The following services are considered [default]: ios, confd.
         """
-        m0d_services = set(['ios', 'confd'])
+        if not motr_services:
+            motr_services = set(['ios', 'confd'])
         result = []
         for service_name in self.catalog.get_service_names():
-            if service_name not in m0d_services:
+            if service_name not in motr_services:
                 continue
             data = self.get_service_data_by_name(service_name)
             LOG.debug('svc data: %s', data)
@@ -539,6 +541,18 @@ class ConsulUtil:
 
     def get_confd_list(self) -> List[ServiceData]:
         return self.get_service_data_by_name('confd')
+
+    def get_proc_fids_with_status(self,
+                                  proc_names: List[str]
+                                  ) -> List[Tuple[Fid, ObjHealth]]:
+        """
+        Fetches all the process fids and their statuses across the cluster
+        for a given process name.
+        """
+        statuses = self.get_m0d_statuses(proc_names)
+        LOG.debug('The following statuses received for %s: %s',
+                  proc_names, statuses)
+        return [(item.fid, status) for item, status in statuses]
 
     @uses_consul_cache
     def get_services_by_parent_process(self,
@@ -1250,6 +1264,24 @@ class ConsulUtil:
         # all the cases
         data_str = simplejson.dumps(stats_data)
         self.kv.kv_put('stats/filesystem', data_str)
+
+    def update_pver_bc(self, data: ByteCountStats) -> None:
+        """
+        Updates bytecount stats per pool versions for all pvers
+        under the ios service in consul kv.
+        Example: key= ioservices/0x7200000000000001:0xf/pvers/
+                      0x7600000000000001:0x8/users/1
+        value = {"bc":4096, "object_cnt":1}
+        """
+        ios_fid = data.proc_fid
+        for pver in data.pvers:
+            value = json.dumps({'bc': pver.byte_count,
+                                'object_cnt': pver.object_count})
+
+            key = f'ioservices/{ios_fid}/pvers/{pver.pver_fid}/' \
+                f'users/{pver.user_id}'
+            LOG.debug('Setting bytecount stats in KV: %s:%s', key, value)
+            self.kv.kv_put(key, value)
 
     @repeat_if_fails()
     def update_process_status(self, event: ConfHaProcess) -> None:
