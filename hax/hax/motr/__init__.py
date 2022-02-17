@@ -33,7 +33,7 @@ from hax.motr.planner import WorkPlanner
 from hax.types import (ByteCountStats, ConfHaProcess, Fid, FidStruct, FsStats,
                        HaLinkMessagePromise, HaNote, HaNoteStruct, HAState,
                        MessageId, ObjT, FidTypeToObjT, Profile, PverState,
-                       ReprebStatus, ObjHealth, ServiceHealth,
+                       ReprebStatus, ObjHealth,
                        m0HaProcessEvent, m0HaProcessType)
 from hax.util import ConsulUtil, repeat_if_fails, FidWithType, PutKV
 
