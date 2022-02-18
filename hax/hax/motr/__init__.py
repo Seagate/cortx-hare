@@ -293,10 +293,6 @@ class Motr:
                             broadcast_hax_only=False) -> List[MessageId]:
         LOG.debug('Broadcasting HA states %s over ha_link', ha_states)
 
-        def ha_obj_state(st):
-            return HaNoteStruct.M0_NC_ONLINE if st.status == ObjHealth.OK \
-                else HaNoteStruct.M0_NC_FAILED
-
         def _update_process_tree(proc_fid: Fid, state: ObjHealth) -> bool:
             return (st.status in (ObjHealth.FAILED, ObjHealth.OK,
                                   ObjHealth.OFFLINE) and
@@ -310,7 +306,7 @@ class Motr:
         for st in ha_states:
             if st.status == ObjHealth.UNKNOWN:
                 continue
-            note = HaNoteStruct(st.fid.to_c(), ha_obj_state(st))
+            note = HaNoteStruct(st.fid.to_c(), st.status.to_ha_note_status())
             notes.append(note)
 
             # For process failure, we report failure for the corresponding
