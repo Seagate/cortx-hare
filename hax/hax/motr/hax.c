@@ -29,7 +29,7 @@
 #include "fid/fid.h"		/* M0_FID_TINIT */
 #include "ha/halon/interface.h" /* m0_halon_interface */
 #include "spiel/spiel.h"	/* m0_spiel, m0_spiel_filesystem_stats_fetch */
-#include "conf/pvers.h"
+#include "conf/pvers.h"		 /* m0_conf_pver_info, m0_conf_pver_state */
 #include "module/instance.h"
 #include "lib/assert.h"   /* M0_ASSERT */
 #include "lib/memory.h"   /* M0_ALLOC_ARR */
@@ -222,21 +222,21 @@ PyObject *m0_ha_proc_counters_fetch(unsigned long long ctx,
 
 	struct m0_proc_counter count_stats;
 	int rc;
-	// call the motr api
+	/* call the motr api */
 	Py_BEGIN_ALLOW_THREADS rc =
 	    m0_spiel_proc_counters_fetch(spiel, proc_fid, &count_stats);
 	Py_END_ALLOW_THREADS if (rc != 0)
 	{
 		PyGILState_Release(gstate);
-		// This returns None python object (which is a singleton)
-		// properly with respect to reference counters.
+		/* This returns None python object (which is a singleton)
+		   properly with respect to reference counters. */
 		Py_RETURN_NONE;
 	}
 
 	PyObject *hax_mod = getModule("hax.types");
 	PyObject *py_fid = toFid(&count_stats.pc_proc_fid);
 	int len = count_stats.pc_cnt;
-	// Fetch all byte count stats per pver.
+	/* Fetch all byte count stats per pver. */
 	PyObject *list = PyList_New(len);
 	int i;
 	for (i = 0; i < len; ++i) {
@@ -271,29 +271,28 @@ int m0_ha_pver_status(unsigned long long ctx,
 {
 	PyGILState_STATE gstate;
 	gstate = PyGILState_Ensure();
-	// TODO use motr spiel API for fetching pver_status.
-	/*
+
 	struct hax_context *hc = (struct hax_context *)ctx;
 	struct m0_halon_interface *hi = hc->hc_hi;
 	struct m0_spiel *spiel = m0_halon_interface_spiel(hi);
-	struct m0_confc *confc = spiel->spl_core.spc_confc;
+
 	struct m0_conf_pver_info pver_info;
 
 	int rc;
-	// call the motr api
+	/* call the motr api */
 	Py_BEGIN_ALLOW_THREADS rc =
-	    m0_conf_pver_status(pver_fid, confc, &pver_info);
+	    m0_spiel_conf_pver_status(spiel, pver_fid, &pver_info);
 	Py_END_ALLOW_THREADS if (rc != 0)
 	{
 		PyGILState_Release(gstate);
-		// This returns error code.
+		/* This returns error code. */
 		return M0_ERR(rc);
 	}
 	M0_LOG(M0_INFO, "FID:"FID_F", Status:%d",
 		FID_P(&pver_info.cpi_fid), pver_info.cpi_state);
-	enum m0_conf_pver_state status  = pver_info.cpi_state;*/
+	enum m0_conf_pver_state status  = pver_info.cpi_state;
 	PyGILState_Release(gstate);
-	return 2;
+	return status;
 }
 
 static void handle_failvec(const struct hax_msg *hm)
