@@ -31,8 +31,8 @@ from hax.motr.ffi import HaxFFI, make_array, make_c_str
 from hax.motr.planner import WorkPlanner
 from hax.types import (ConfHaProcess, Fid, FidStruct, FsStats,
                        HaLinkMessagePromise, HaNote, HaNoteStruct, HAState,
-                       MessageId, ObjT, Profile, ReprebStatus, ObjHealth,
-                       m0HaProcessEvent, m0HaProcessType)
+                       MessageId, ObjT, FidTypeToObjT, Profile, ReprebStatus,
+                       ObjHealth, m0HaProcessEvent, m0HaProcessType)
 from hax.util import ConsulUtil, repeat_if_fails, FidWithType, PutKV
 
 LOG = logging.getLogger('hax')
@@ -452,10 +452,12 @@ class Motr:
     def ha_nvec_get_reply(self, event: HaNvecGetEvent, kv_cache=None) -> None:
         LOG.debug('Preparing the reply for HaNvecGetEvent (nvec size = %s)',
                   len(event.nvec))
+        self.consul_util.get_all_nodes()
         notes: List[HaNoteStruct] = []
         for n in event.nvec:
-            n.note.no_state = self.consul_util.get_conf_obj_status_failvec(
-                Fid.from_struct(n.note.no_id), kv_cache=kv_cache)
+            fid = Fid.from_struct(n.note.no_id)
+            n.note.no_state = self.consul_util.get_conf_obj_status(
+                FidTypeToObjT[fid.container], fid.key, kv_cache=kv_cache)
             notes.append(n.note)
 
         LOG.debug('Replying ha nvec of length ' + str(len(event.nvec)))
