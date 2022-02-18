@@ -298,9 +298,11 @@ class Motr:
                 else HaNoteStruct.M0_NC_FAILED
 
         def _update_process_tree(proc_fid: Fid, state: ObjHealth) -> bool:
-            return (st.status in (ObjHealth.FAILED, ObjHealth.OK) and
+            return (st.status in (ObjHealth.FAILED, ObjHealth.OK,
+                                  ObjHealth.OFFLINE) and
                     not self.consul_util.is_proc_client(st.fid) and
                     not broadcast_hax_only and
+                    not self._is_mkfs(proc_fid) and
                     proc_fid != hax_fid)
 
         hax_fid = self.consul_util.get_hax_fid()
@@ -342,8 +344,8 @@ class Motr:
                 # If both the above conditions are not true then we will just
                 # mark controller status
                 is_node_failed = self.is_node_failed(note, kv_cache=kv_cache)
-                if (st.status == ObjHealth.FAILED
-                        and is_node_failed):
+                if (st.status in (ObjHealth.FAILED, ObjHealth.OFFLINE) and
+                        is_node_failed):
                     notes += self.notify_node_status_by_process(
                         note, kv_cache=kv_cache)
                 elif (st.status == ObjHealth.OK

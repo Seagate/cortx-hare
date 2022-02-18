@@ -1432,13 +1432,41 @@ class ConsulUtil:
         else:
             return MotrConsulProcInfo('Unknown', 'Unknown')
 
-    def get_process_local_status(self, fid: Fid) -> str:
-        key = f'processes/{fid}'
-        status = self.kv.kv_get(key)
+    @uses_consul_cache
+    def get_process_status_local(self,
+                                 proc_fid: Fid,
+                                 proc_node=None,
+                                 kv_cache=None) -> MotrConsulProcInfo:
+        this_node = self.get_local_nodename()
+        key = f'{this_node}/processes/{proc_fid}'
+        status = self.kv.kv_get(key, kv_cache=kv_cache)
         if status:
-            return str(json.loads(status['Value'])['state'])
+            val = json.loads(status['Value'])
+            return MotrConsulProcInfo(val['state'], val['type'])
         else:
-            return 'Unknown'
+            return MotrConsulProcInfo('Unknown', 'Unknown')
+
+    def is_proc_local(self, pfid: Fid) -> bool:
+        local_node = self.get_local_nodename()
+        proc_node = self.get_process_node(pfid)
+        return proc_node == local_node
+
+    @repeat_if_fails()
+    def update_process_status_local(self, event: ConfHaProcess) -> None:
+        assert 0 <= event.chp_event < len(ha_process_events), \
+            f'Invalid event type: {event.chp_event}'
+        data = json.dumps({'state': ha_process_events[event.chp_event],
+                           'type': m0HaProcessType(event.chp_type).name})
+        # Maintain statuses for all the motr processes in the cluster
+        # for every node so that in case of 1 or more node failures,
+        # as every node will receive the node failure event, the failed
+        # processes statuses will be updated locally without each node
+        # stepping over each other's update and without any need for
+        # synchronization.
+        this_node = self.get_local_nodename()
+        key = f'{this_node}/processes/{event.fid}'
+        LOG.debug('Setting process status locally in KV: %s:%s', key, data)
+        self.kv.kv_put(key, data)
 
     def drive_name_to_id(self, uid: str) -> str:
         drive_id = ''
@@ -1527,29 +1555,29 @@ class ConsulUtil:
 
         svc_to_motr_status_map = {
             cur_consul_status('passing', 'M0_CONF_HA_PROCESS_STARTING'):
-            local_remote_health_ret(ObjHealth.OFFLINE,
-                                    ObjHealth.OK),
+            local_remote_health_ret(ObjHealth.UNKNOWN,
+                                    ObjHealth.UNKNOWN),
             cur_consul_status('passing', 'M0_CONF_HA_PROCESS_STOPPING'):
-            local_remote_health_ret(ObjHealth.OFFLINE,
+            local_remote_health_ret(ObjHealth.UNKNOWN,
                                     ObjHealth.UNKNOWN),
             cur_consul_status('passing', 'M0_CONF_HA_PROCESS_STARTED'):
             local_remote_health_ret(ObjHealth.OK,
                                     ObjHealth.OK),
             cur_consul_status('passing', 'M0_CONF_HA_PROCESS_STOPPED'):
             local_remote_health_ret(ObjHealth.OFFLINE,
-                                    ObjHealth.UNKNOWN),
+                                    ObjHealth.OFFLINE),
             cur_consul_status('passing', 'Unknown'):
             local_remote_health_ret(ObjHealth.UNKNOWN,
                                     ObjHealth.UNKNOWN),
             cur_consul_status('warning', 'M0_CONF_HA_PROCESS_STOPPING'):
             local_remote_health_ret(ObjHealth.OFFLINE,
-                                    ObjHealth.STOPPED),
+                                    ObjHealth.OFFLINE),
             cur_consul_status('warning', 'M0_CONF_HA_PROCESS_STARTED'):
             local_remote_health_ret(ObjHealth.OFFLINE,
-                                    ObjHealth.FAILED),
+                                    ObjHealth.OFFLINE),
             cur_consul_status('warning', 'M0_CONF_HA_PROCESS_STOPPED'):
-            local_remote_health_ret(ObjHealth.STOPPED,
-                                    ObjHealth.STOPPED),
+            local_remote_health_ret(ObjHealth.OFFLINE,
+                                    ObjHealth.OFFLINE),
             cur_consul_status('warning', 'M0_CONF_HA_PROCESS_STARTING'):
             local_remote_health_ret(ObjHealth.OFFLINE,
                                     ObjHealth.OFFLINE),
@@ -1821,6 +1849,13 @@ class ConsulUtil:
             raise HAConsistencyException('config path not present in consul')
 
         return config_path['Value'].decode("utf-8")
+
+    def am_i_rc(self):
+        # The call is already marked with @repeat_if_fails
+        leader = self.get_leader_node()
+        # The call doesn't communicate via Consul REST API
+        this_node = self.get_local_nodename()
+        return leader == this_node
 
 
 def dump_json(obj) -> str:
