@@ -48,7 +48,7 @@ class FsStatsUpdater(StoppableThread):
         try:
             LOG.info('filesystem stats updater thread has started')
             while not self.stopped:
-                if not self._am_i_rc():
+                if not self.consul.am_i_rc():
                     wait_for_event(self.event, self.interval_sec)
                     continue
                 if (not motr.is_spiel_ready() or (
@@ -80,10 +80,3 @@ class FsStatsUpdater(StoppableThread):
             LOG.exception('Aborting due to an error')
         finally:
             LOG.debug('filesystem stats updater thread exited')
-
-    def _am_i_rc(self):
-        # The call is already marked with @repeat_if_fails
-        leader = self.consul.get_leader_node()
-        # The call doesn't communicate via Consul REST API
-        this_node = self.consul.get_local_nodename()
-        return leader == this_node
