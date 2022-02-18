@@ -180,32 +180,6 @@ def logrotate_generic(url: str):
 
 
 @func_log(func_enter, func_leave)
-def logrotate(url: str):
-    ''' This function is kept incase needed in future.
-        This function configures logrotate based on
-        'setup_type' key from confstore
-    '''
-    try:
-        server_type = get_server_type(url)
-        logging.info('Server type (%s)', server_type)
-
-        if server_type != 'unknown':
-            with open(f'/opt/seagate/cortx/hare/conf/logrotate/{server_type}',
-                      'r') as f:
-                content = f.read()
-
-            log_dir = get_log_dir(url)
-            content = content.replace('TMP_LOG_PATH',
-                                      log_dir)
-
-            with open('/etc/logrotate.d/hare', 'w') as f:
-                f.write(content)
-
-    except Exception as error:
-        logging.error('Cannot configure logrotate for hare (%s)', error)
-
-
-@func_log(func_enter, func_leave)
 def unsupported_feature(url: str):
     try:
         features_unavailable = []
@@ -726,10 +700,6 @@ def generate_support_bundle(args):
         cmd.append(log_dir)
         cmd.append('-c')
         cmd.append(conf_dir)
-
-        provider = ConfStoreProvider(url)
-        if provider.get('cortx>common>setup_type') == 'K8':
-            cmd.append('--no-systemd')
 
         execute(cmd)
     except Exception as error:
