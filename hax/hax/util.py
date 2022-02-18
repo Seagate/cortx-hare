@@ -37,7 +37,7 @@ from urllib3.exceptions import HTTPError
 from hax.common import HaxGlobalState
 from hax.exception import HAConsistencyException, InterruptedException
 from hax.types import (ByteCountStats, ConfHaProcess, Fid, FsStatsWithTime,
-                       ObjT, ObjHealth, Profile, m0HaProcessEvent,
+                       ObjT, ObjHealth, Profile, PverState, m0HaProcessEvent,
                        m0HaProcessType, KeyDelete, HaNoteStruct,
                        m0HaObjState)
 
@@ -1282,6 +1282,40 @@ class ConsulUtil:
                 f'users/{pver.user_id}'
             LOG.debug('Setting bytecount stats in KV: %s:%s', key, value)
             self.kv.kv_put(key, value)
+
+    def update_bc_for_dg_category(self,
+                                  pver_items: Dict[str, PverState]) -> None:
+        '''
+        This function will update bytecount for subsequent dg state/category
+        which will reflect on cluster status.
+        Bytecount data is stored in consul KV in key:value format
+        ioservices/0x7200000000000001:0x20/pvers/0x7600000000000001:0x6/users/1
+        value = {"bc": 4096, "object_cnt": 1}
+        '''
+        pool_ver = self.kv.kv_get('ioservices/', recurse=True)
+        pver_state_map = {
+            PverState.M0_CPS_HEALTHY: 'healthy_byte_count',
+            PverState.M0_CPS_DEGRADED: 'degraded_byte_count',
+            PverState.M0_CPS_CRITICAL: 'critical_byte_count',
+            PverState.M0_CPS_DAMAGED: 'damaged_byte_count'
+        }
+        # Calculate total bytecount per pver and store it based on its status.
+        data: Dict[PverState, int] = {}
+        for pver, status in pver_items.items():
+            total_bc = 0
+            for pool in pool_ver:
+                if pver in pool['Key']:
+                    total_bc += json.loads(pool['Value'].decode())['bc']
+            LOG.debug('pool version : %s  total_bytecount : %s  Status : %s',
+                      pver, total_bc, pver_state_map[status])
+            if status in data:
+                data[status] += total_bc
+            else:
+                data[status] = total_bc
+        # Populate the consul kv with total bytecount based on state.
+        for state in pver_state_map:
+            self.kv.kv_put(f'bytecount/{pver_state_map[state]}',
+                           json.dumps(data.get(state, 0)))
 
     @repeat_if_fails()
     def update_process_status(self, event: ConfHaProcess) -> None:
