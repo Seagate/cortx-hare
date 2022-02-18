@@ -470,7 +470,6 @@ class ConsulUtil:
     @repeat_if_fails()
     def fid_to_endpoint(self, proc_fid: Fid) -> Optional[str]:
         pfidk = int(proc_fid.key)
-        # process_items = self.kv.kv_get('m0conf/nodes', recurse=True)
         process_items = self.get_all_nodes()
         regex = re.compile(
             f'^m0conf\\/.*\\/processes\\/{pfidk}\\/endpoint')
@@ -623,9 +622,6 @@ class ConsulUtil:
     def get_services_by_parent_process(self,
                                        process_fid: Fid,
                                        kv_cache=None) -> List[FidWithType]:
-        # node_items = self.kv.kv_get('m0conf/nodes',
-        #                             recurse=True,
-        #                             kv_cache=kv_cache)
         node_items = self.get_all_nodes(kv_cache=kv_cache)
         fidk = str(process_fid.key)
 
@@ -657,7 +653,6 @@ class ConsulUtil:
     def get_disks_by_parent_process(self,
                                     process_fid: Fid,
                                     svc_fid: Fid) -> List[Fid]:
-        # node_items = self.kv.kv_get('m0conf/nodes', recurse=True)
         node_items = self.get_all_nodes()
         # This is the RegExp to match the keys in Consul KV that describe
         # the Motr processes and services that are enclosed into the Motr
@@ -687,7 +682,6 @@ class ConsulUtil:
 
     @repeat_if_fails()
     def is_proc_client(self, process_fid: Fid) -> bool:
-        # node_items = self.kv.kv_get('m0conf/nodes', recurse=True)
         node_items = self.get_all_nodes()
         fidk = str(process_fid.key)
 
@@ -932,9 +926,6 @@ class ConsulUtil:
         # m0conf/nodes/
         # 0x6e00000000000001:0x3:{"name": "ssc-vm-1623.colo.seagate.com",
         #                         "state": "M0_NC_UNKNOWN"}
-        # node_items = self.kv.kv_get('m0conf/nodes',
-        #                             recurse=True,
-        #                             kv_cache=kv_cache)
         node_items = self.get_all_nodes(kv_cache=kv_cache)
         for item in node_items:
             key = item['Key']
@@ -1042,10 +1033,6 @@ class ConsulUtil:
         # Example key m0conf/nodes/0x6e00000000000001:0x3/processes/
         #   0x7200000000000001:0x15/services/0x7300000000000001:0x17/sdevs/
         #   0x6400000000000001:0x18:{"path": "/dev/sdc", "state": "offline"}
-        # sdev_items = self.kv.kv_get('m0conf/nodes',
-        #                             recurse=True,
-        #                             kv_cache=kv_cache)
-
         sdev_items = self.get_all_nodes(kv_cache=kv_cache)
         regex = re.compile(
             f'^m0conf\\/.*\\/processes\\/{ioservice_fid}\\/.*\\/sdevs\\/.*$')
@@ -1263,9 +1250,6 @@ class ConsulUtil:
         #    "value": "{\"name\": \"srvnode-1.data.private\",
         #               \"state\": \"M0_NC_UNKNOWN\"}"
         # }
-        # node_items = self.kv.kv_get('m0conf/nodes',
-        #                             recurse=True,
-        #                             kv_cache=kv_cache)
         node_items = self.get_all_nodes(kv_cache=kv_cache)
         regex = re.compile(f'^m0conf/nodes/{node_fid}$')
         for node in node_items:
@@ -1737,7 +1721,6 @@ class ConsulUtil:
     def drive_name_to_id(self, uid: str) -> str:
         drive_id = ''
         # 'm0conf/nodes/<node_name>/processes/<process_fidk>/disks/<disk_uuid>'
-        # node_items = self.kv.kv_get('m0conf/nodes', recurse=True)
         node_items = self.get_all_nodes()
         for x in node_items:
             if '/disks/' in x['Key'] and uid in x['Key']:
@@ -1952,9 +1935,6 @@ class ConsulUtil:
 
     def get_service_process_fid(self, svc_fid: Fid, kv_cache=None) -> Fid:
         assert ObjT.SERVICE.value == svc_fid.container
-        # node_items = self.kv.kv_get('m0conf/nodes',
-        #                             recurse=True,
-        #                             kv_cache=kv_cache)
         node_items = self.get_all_nodes(kv_cache=kv_cache)
         keys = self.get_service_keys(node_items, svc_fid.key)
         if len(keys) != 1:
@@ -2061,7 +2041,6 @@ class ConsulUtil:
         # Example key is as follows
         # m0conf/nodes/0x6e00000000000001:0x3/processes/0x7200000000000001:
         # 0x15:{"name": "m0_server", "state": "M0_NC_UNKNOWN"}
-        # node_items = self.kv.kv_get('m0conf/nodes', recurse=True)
         node_items = self.get_all_nodes()
         regex = re.compile(
             f'^m0conf\\/nodes\\/.*\\/processes\\/{proc_base_fid}$')
