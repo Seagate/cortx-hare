@@ -1,5 +1,6 @@
 {
   "enable_local_script_checks": true,
+  "leave_on_terminate": true,
   "watches": [
     {
       "type": "service",
