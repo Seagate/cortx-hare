@@ -31,8 +31,8 @@ from hax.motr.ffi import HaxFFI, make_array, make_c_str
 from hax.motr.planner import WorkPlanner
 from hax.types import (ConfHaProcess, Fid, FidStruct, FsStats,
                        HaLinkMessagePromise, HaNote, HaNoteStruct, HAState,
-                       MessageId, ObjT, Profile, ReprebStatus, ObjHealth,
-                       m0HaProcessEvent, m0HaProcessType)
+                       MessageId, ObjT, FidTypeToObjT, Profile, ReprebStatus,
+                       ObjHealth, m0HaProcessEvent, m0HaProcessType)
 from hax.util import ConsulUtil, repeat_if_fails, FidWithType, PutKV
 
 LOG = logging.getLogger('hax')
@@ -294,9 +294,11 @@ class Motr:
         LOG.debug('Broadcasting HA states %s over ha_link', ha_states)
 
         def _update_process_tree(proc_fid: Fid, state: ObjHealth) -> bool:
-            return (st.status in (ObjHealth.FAILED, ObjHealth.OK) and
+            return (st.status in (ObjHealth.FAILED, ObjHealth.OK,
+                                  ObjHealth.OFFLINE) and
                     not self.consul_util.is_proc_client(st.fid) and
                     not broadcast_hax_only and
+                    not self._is_mkfs(proc_fid) and
                     proc_fid != hax_fid)
 
         hax_fid = self.consul_util.get_hax_fid()
@@ -338,8 +340,8 @@ class Motr:
                 # If both the above conditions are not true then we will just
                 # mark controller status
                 is_node_failed = self.is_node_failed(note, kv_cache=kv_cache)
-                if (st.status == ObjHealth.FAILED
-                        and is_node_failed):
+                if (st.status in (ObjHealth.FAILED, ObjHealth.OFFLINE) and
+                        is_node_failed):
                     notes += self.notify_node_status_by_process(
                         note, kv_cache=kv_cache)
                 elif (st.status == ObjHealth.OK
@@ -446,10 +448,12 @@ class Motr:
     def ha_nvec_get_reply(self, event: HaNvecGetEvent, kv_cache=None) -> None:
         LOG.debug('Preparing the reply for HaNvecGetEvent (nvec size = %s)',
                   len(event.nvec))
+        self.consul_util.get_all_nodes()
         notes: List[HaNoteStruct] = []
         for n in event.nvec:
-            n.note.no_state = self.consul_util.get_conf_obj_status_failvec(
-                Fid.from_struct(n.note.no_id), kv_cache=kv_cache)
+            fid = Fid.from_struct(n.note.no_id)
+            n.note.no_state = self.consul_util.get_conf_obj_status(
+                FidTypeToObjT[fid.container], fid.key, kv_cache=kv_cache)
             notes.append(n.note)
 
         LOG.debug('Replying ha nvec of length ' + str(len(event.nvec)))
