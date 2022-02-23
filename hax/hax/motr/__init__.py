@@ -471,15 +471,19 @@ class Motr:
         LOG.debug('Processing HaNvecSetEvent (nvec size = %s)',
                   len(event.nvec))
         self.consul_util.get_all_nodes()
-        repaired_ss: List[HAState] = []
+        ha_states: List[HAState] = []
+        bcast_ss: List[HAState] = []
         for n in event.nvec:
             fid = Fid.from_struct(n.note.no_id)
-            if n.note.no_state == HaNoteStruct.M0_NC_REPAIRED:
-                repaired_ss.append(HAState(fid, status=ObjHealth.REPAIRED))
+            obj_health = ObjHealth.from_ha_note_state(n.note.no_state)
+            ha_states.append(HAState(fid, obj_health))
+            if n.note.no_state in {HaNoteStruct.M0_NC_REPAIRED,
+                                   HaNoteStruct.M0_NC_ONLINE}:
+                bcast_ss.append(HAState(fid, obj_health))
 
-        LOG.debug('got ha_states %s', repaired_ss)
-        if repaired_ss:
-            self.broadcast_ha_states(repaired_ss)
+        LOG.debug('got ha_states %s', ha_states)
+        if bcast_ss:
+            self.broadcast_ha_states(bcast_ss)
 
     @supports_consul_cache
     def _generate_sub_services(self,
