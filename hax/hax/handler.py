@@ -20,7 +20,8 @@ import logging
 from typing import List
 
 from hax.message import (BroadcastHAStates, Die, EntrypointRequest,
-                         FirstEntrypointRequest, HaNvecGetEvent, ProcessEvent,
+                         FirstEntrypointRequest, HaNvecGetEvent,
+                         HaNvecSetEvent, ProcessEvent,
                          SnsRebalancePause, SnsRebalanceResume,
                          SnsRebalanceStart, SnsRebalanceStatus,
                          SnsRebalanceStop, SnsRepairPause, SnsRepairResume,
@@ -216,6 +217,15 @@ class ConsumerThread(StoppableThread):
                         self._update_process_status(planner, motr, item.evt)
                     elif isinstance(item, HaNvecGetEvent):
                         fn = motr.ha_nvec_get_reply
+                        # If a consul-related exception appears, it will
+                        # be processed by repeat_if_fails.
+                        #
+                        # This thread will become blocked until that
+                        # intermittent error gets resolved.
+                        decorated = (repeat_if_fails(wait_seconds=5))(fn)
+                        decorated(item)
+                    elif isinstance(item, HaNvecSetEvent):
+                        fn = motr.ha_nvec_set_process
                         # If a consul-related exception appears, it will
                         # be processed by repeat_if_fails.
                         #
