@@ -25,7 +25,8 @@ from time import sleep
 from hax.consul.cache import supports_consul_cache, uses_consul_cache
 from hax.exception import ConfdQuorumException, RepairRebalanceException
 from hax.message import (EntrypointRequest, FirstEntrypointRequest,
-                         HaNvecGetEvent, ProcessEvent, StobIoqError)
+                         HaNvecGetEvent, HaNvecSetEvent, ProcessEvent,
+                         StobIoqError)
 from hax.motr.delivery import DeliveryHerald
 from hax.motr.ffi import HaxFFI, make_array, make_c_str
 from hax.motr.planner import WorkPlanner
@@ -440,8 +441,13 @@ class Motr:
 
     @log_exception
     def ha_nvec_get(self, hax_msg: int, nvec: List[HaNote]) -> None:
-        LOG.debug('Got ha nvec of length %s from Motr land', len(nvec))
+        LOG.debug('Got ha nvec get of length %s from Motr land', len(nvec))
         self.planner.add_command(HaNvecGetEvent(hax_msg, nvec))
+
+    @log_exception
+    def ha_nvec_set(self, hax_msg: int, nvec: List[HaNote]) -> None:
+        LOG.debug('Got ha nvec set of length %s from Motr land', len(nvec))
+        self.planner.add_command(HaNvecSetEvent(hax_msg, nvec))
 
     @log_exception
     @supports_consul_cache
@@ -459,6 +465,21 @@ class Motr:
         LOG.debug('Replying ha nvec of length ' + str(len(event.nvec)))
         self._ffi.ha_nvec_reply(event.hax_msg, make_array(HaNoteStruct, notes),
                                 len(notes))
+
+    @log_exception
+    def ha_nvec_set_process(self, event: HaNvecSetEvent) -> None:
+        LOG.debug('Processing HaNvecSetEvent (nvec size = %s)',
+                  len(event.nvec))
+        self.consul_util.get_all_nodes()
+        repaired_ss: List[HAState] = []
+        for n in event.nvec:
+            fid = Fid.from_struct(n.note.no_id)
+            if n.note.no_state == HaNoteStruct.M0_NC_REPAIRED:
+                repaired_ss.append(HAState(fid, status=ObjHealth.REPAIRED))
+
+        LOG.debug('got ha_states %s', repaired_ss)
+        if repaired_ss:
+            self.broadcast_ha_states(repaired_ss)
 
     @supports_consul_cache
     def _generate_sub_services(self,
