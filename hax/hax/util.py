@@ -408,14 +408,6 @@ class ConsulUtil:
                 return mkServiceData(svc)
         raise RuntimeError('Unreachable')
 
-    @repeat_if_fails()
-    @uses_consul_cache
-    def get_all_nodes(self, kv_cache=None):
-        node_items = self.kv.kv_get('m0conf/nodes',
-                                    recurse=True,
-                                    kv_cache=kv_cache)
-        return node_items
-
     @uses_consul_cache
     def get_hax_fid(self, kv_cache=None) -> Fid:
         """
