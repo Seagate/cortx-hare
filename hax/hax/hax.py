@@ -24,6 +24,9 @@ import signal
 from typing import List, NamedTuple
 
 import inject
+import locale
+import codecs
+import os
 
 from hax.common import HaxGlobalState, di_configuration
 from hax.filestats import FsStatsUpdater
@@ -116,10 +119,20 @@ def _run_rconfc_starter_thread(motr: Motr,
     return rconfc_starter
 
 
+def set_locale():
+    try:
+        if codecs.lookup('UTF-8').name == 'utf-8':
+            locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
+            os.environ["LANG"] = "en_US.utf-8"
+    except Exception:
+        LOG.exception('Error setting locale ')
+
+
 def main():
     # Note: no logging must happen before this call.
     # Otherwise the log configuration will not apply.
     setup_logging()
+    set_locale()
     inject.configure(di_configuration)
 
     state = inject.instance(HaxGlobalState)
