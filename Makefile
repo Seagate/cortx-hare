@@ -550,7 +550,9 @@ test: test-cfgen
 test-cfgen: export PYTHONPATH=$(DESTDIR)/$(PREFIX)/lib64/python3.$(PY3_VERSION_MINOR)/site-packages
 test-cfgen: $(PY_VENV_DIR) unpack-dhall-bin unpack-dhall-prelude
 	@$(call _info,Testing cfgen)
-	@$(PY_VENV); PATH=$$PWD/vendor/dhall-bin/current:$$PATH \
+	@$(PY_VENV); 
+	export PYTHONPATH=$(DESTDIR)/$(PREFIX)/lib64/python3.$(PY3_VERSION_MINOR)/site-packages
+	PATH=$$PWD/vendor/dhall-bin/current:$$PATH \
 		$(MAKE) --quiet -C cfgen test-cfgen check-dhall
 
 # RPM ------------------------------------------------- {{{1
