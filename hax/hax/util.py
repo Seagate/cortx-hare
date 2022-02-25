@@ -1425,9 +1425,11 @@ class ConsulUtil:
         #    key 0x6400000000000001:0x2c
         # 4. Create sdev fid from sdev fid key.
         # sdev_items = self.kv.kv_get('m0conf/nodes', recurse=True)
+        node_fid = self.get_node_fid(node_name)
         sdev_items = self.get_all_nodes()
         for x in sdev_items:
-            if '/sdevs/' in x['Key']:
+            if (f'm0conf/nodes/{node_fid}' in x['Key'] and
+                    '/sdevs/' in x['Key']):
                 if json.loads(x['Value'])['path'] == drive:
                     # Using constant index 8 for the sdev fid.
                     # Fix this by changing the Consul schema to have

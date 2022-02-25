@@ -17,7 +17,7 @@
 #
 
 import logging
-from typing import List
+from typing import List, Any
 
 from hax.message import (BroadcastHAStates, Die, EntrypointRequest,
                          FirstEntrypointRequest, HaNvecGetEvent, ProcessEvent,
@@ -121,6 +121,7 @@ class ConsumerThread(StoppableThread):
                     state.status, state.fid)
                 proc_status_remote = self.consul.get_process_status(
                                          state.fid)
+                proc_status: Any = None
                 # MKFS states are upated by the node corresponding to a
                 # given process. So we ignore notifications for mkfs
                 # processes.
@@ -175,13 +176,14 @@ class ConsumerThread(StoppableThread):
                                 m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED)
                     else:
                         continue
-                    self.consul.update_process_status_local(
-                        ConfHaProcess(chp_event=proc_status,
-                                      chp_type=proc_type,
-                                      chp_pid=0,
-                                      fid=state.fid))
-                    new_ha_states.append(
-                        HAState(fid=state.fid, status=current_status))
+                    if proc_status is not None:
+                        self.consul.update_process_status_local(
+                            ConfHaProcess(chp_event=proc_status,
+                                          chp_type=proc_type,
+                                          chp_pid=0,
+                                          fid=state.fid))
+                        new_ha_states.append(
+                            HAState(fid=state.fid, status=current_status))
             else:
                 new_ha_states.append(state)
         return new_ha_states
