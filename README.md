@@ -337,5 +337,6 @@ Solution: install cortx-py-utils RPM and retry.
 ## See also
 
 * [Hare RFCs](rfc/README.md)
+* [Hare Architecture](https://seagate-systems.atlassian.net/wiki/spaces/PUB/pages/192020649/Hare+Architecture)
 * [Hare wiki](https://github.com/Seagate/cortx-hare/wiki)
 * [QSG_Test_History](Testing_Verification_History.md)
