@@ -48,17 +48,20 @@ class FsStatsUpdater(StoppableThread):
         try:
             LOG.info('filesystem stats updater thread has started')
             while not self.stopped:
+                LOG.info('filesystem stats updater still running')
                 if not self.consul.am_i_rc():
                     wait_for_event(self.event, self.interval_sec)
                     continue
-                if (not motr.is_spiel_ready() or (
-                        not all(self.consul.ensure_ioservices_running()))):
-                    wait_for_event(self.event, self.interval_sec)
-                    continue
+                # if (not motr.is_spiel_ready() or (
+                #         not all(self.consul.ensure_ioservices_running()))):
+                #     wait_for_event(self.event, self.interval_sec)
+                #     continue
+                LOG.info('Calling get_filesysytem_stats')
                 stats = motr.get_filesystem_stats()
                 if not stats:
+                    LOG.info('no stats found')
                     continue
-                LOG.debug('FS stats are as follows: %s', stats)
+                LOG.info('FS stats are as follows: %s', stats)
                 now_time = datetime.datetime.now()
                 data = FsStatsWithTime(stats=stats,
                                        timestamp=now_time.timestamp(),
@@ -66,10 +69,10 @@ class FsStatsUpdater(StoppableThread):
                 try:
                     self.consul.update_fs_stats(data)
                 except HAConsistencyException:
-                    LOG.debug('Failed to update Consul KV '
-                              'due to an intermittent error. The '
-                              'error is swallowed since new attempts '
-                              'will be made timely')
+                    LOG.info('Failed to update Consul KV '
+                             'due to an intermittent error. The '
+                             'error is swallowed since new attempts '
+                             'will be made timely')
                 wait_for_event(self.event, self.interval_sec)
         except InterruptedException:
             # No op. _sleep() has interrupted before the timeout exceeded:

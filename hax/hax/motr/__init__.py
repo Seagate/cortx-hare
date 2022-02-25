@@ -23,7 +23,7 @@ from typing import Any, List, Optional, Tuple
 from time import sleep
 
 from hax.consul.cache import supports_consul_cache, uses_consul_cache
-from hax.exception import ConfdQuorumException, RepairRebalanceException
+from hax.exception import RepairRebalanceException
 from hax.message import (EntrypointRequest, FirstEntrypointRequest,
                          HaNvecGetEvent, HaNvecSetEvent, ProcessEvent,
                          StobIoqError)
@@ -702,9 +702,9 @@ class Motr:
 
     def get_filesystem_stats(self) -> FsStats:
         stats: FsStats = self._ffi.filesystem_stats_fetch(self._ha_ctx)
-        if stats is None:
-            raise ConfdQuorumException(
-                'Confd quorum lost, filesystem statistics is unavailable')
+        # if stats is None:
+        #     log ConfdQuorumException(
+        #         'Confd quorum lost, filesystem statistics is unavailable')
         return stats
 
     def get_repair_status(self, pool_fid: Fid) -> List[ReprebStatus]:
