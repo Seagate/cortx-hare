@@ -547,7 +547,6 @@ mypy: $(PYTHON_SCRIPTS)
 test: test-cfgen
 
 .PHONY: test-cfgen
-test-cfgen: export PYTHONPATH=$(DESTDIR)/$(PREFIX)/lib64/python3.$(PY3_VERSION_MINOR)/site-packages
 test-cfgen: $(PY_VENV_DIR) unpack-dhall-bin unpack-dhall-prelude
 	@$(call _info,Testing cfgen)
 	@$(PY_VENV); 
