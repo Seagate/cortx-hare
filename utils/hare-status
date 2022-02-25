@@ -38,7 +38,7 @@ from hax.types import Fid
 from requests.exceptions import RequestException
 from urllib3.exceptions import HTTPError
 
-Byte_count = NamedTuple('Byte_count', [('type', str), ('num_bytes', str)])
+Bytecount = NamedTuple('Bytecount', [('type', str), ('num_bytes', str)])
 
 Profile = NamedTuple('Profile', [
     ('fid', str), ('name', str), ('pools', List[str])])
@@ -100,26 +100,26 @@ def leader_tag(cns: Consul, host: str) -> str:
     return ' (RC)' if kv_value_as_str(cns, 'leader') == host else ''
 
 
-def byte_count(cns: Consul) -> List[Byte_count]:
-    """The byte_count() will return for the specified key ('bytecount/'),
+def bytecount(cns: Consul) -> List[Bytecount]:
+    """The bytecount() will return for the specified key ('bytecount/'),
     or if `recurse` is True then a list of "_value_" for all keys with the
     given prefix is returned.
 
     Each _value_ looks like this:
     ```
     {
-      "byte_count": {
-        "critical_byte_count": 0,
-        "damaged_byte_count": 0,
-        "degraded_byte_count": 0,
-        "healthy_byte_count": 0
+      "bytecount": {
+        "critical": 0,
+        "damaged": 0,
+        "degraded": 0,
+        "healthy": 0
       }
     }
     ```
     """
     bytecount = []
     for x in kv_item(cns, 'bytecount/', recurse=True):
-        bytecount.append(Byte_count(
+        bytecount.append(Bytecount(
             type=x['Key'].split('/')[-1],
             num_bytes=json.loads(x['Value'])))
     return bytecount
@@ -296,7 +296,7 @@ def get_bytecount_status(cns: Consul) -> Dict[str, Any]:
     This function will return a bytecount status in JSON format
     """
     result: Dict[str, Any] = {
-        'byte_count': {x.type: x.num_bytes for x in byte_count(cns)}
+        'bytecount': {x.type: x.num_bytes for x in bytecount(cns)}
     }
     return result
 
@@ -305,7 +305,7 @@ def get_bytecount_status(cns: Consul) -> Dict[str, Any]:
 def get_cluster_status(cns: Consul, consul_util: ConsulUtil,
                        devices_requested: bool) -> Dict[str, Any]:
     result: Dict[str, Any] = {
-        'byte_count': [get_bytecount_status(cns).get('byte_count')],
+        'bytecount': get_bytecount_status(cns).get('bytecount'),
         'pools': [x for x in sns_pools(cns)],
         'profiles': [{'fid': x.fid, 'name': x.name, 'pools': x.pools}
                      for x in profiles(cns)],
@@ -353,9 +353,9 @@ def show_text_status(cns: Consul, consul_util: ConsulUtil,
         def echo(text):
             print(text, file=stream)
 
-        counts = byte_count(cns)
+        counts = bytecount(cns)
         assert counts
-        echo('Byte_count:')
+        echo('Bytecount:')
         for x in counts:
             echo(f'    {x.type} : {x.num_bytes}')
 

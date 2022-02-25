@@ -1289,10 +1289,10 @@ class ConsulUtil:
         '''
         pool_ver = self.kv.kv_get('ioservices/', recurse=True)
         pver_state_map = {
-            PverState.M0_CPS_HEALTHY: 'healthy_byte_count',
-            PverState.M0_CPS_DEGRADED: 'degraded_byte_count',
-            PverState.M0_CPS_CRITICAL: 'critical_byte_count',
-            PverState.M0_CPS_DAMAGED: 'damaged_byte_count'
+            PverState.M0_CPS_HEALTHY: 'healthy',
+            PverState.M0_CPS_DEGRADED: 'degraded',
+            PverState.M0_CPS_CRITICAL: 'critical',
+            PverState.M0_CPS_DAMAGED: 'damaged'
         }
         # Calculate total bytecount per pver and store it based on its status.
         data: Dict[PverState, int] = {}

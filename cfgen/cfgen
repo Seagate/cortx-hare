@@ -2302,10 +2302,10 @@ def generate_consul_kv(cluster: Cluster, dhall_dir: str) -> str:
         ('leader', ''),
         ('last_fidk', _fidk_gen),
         ('failvec', ''),
-        ('bytecount/healthy_byte_count', 0),
-        ('bytecount/degraded_byte_count', 0),
-        ('bytecount/critical_byte_count', 0),
-        ('bytecount/damaged_byte_count', 0),
+        ('bytecount/healthy', 0),
+        ('bytecount/degraded', 0),
+        ('bytecount/critical', 0),
+        ('bytecount/damaged', 0),
         *[(node.machine_id, node.name)
           for node_id, node in m0conf.items() if (node_id.type is ObjT.node
                                                   and node.machine_id)],
