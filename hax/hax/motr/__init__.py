@@ -481,6 +481,18 @@ class Motr:
                                    HaNoteStruct.M0_NC_ONLINE}:
                 bcast_ss.append(HAState(fid, obj_health))
 
+            # In case of failed repair, roll back to failed state.
+            elif n.note.no_state == HaNoteStruct.M0_NC_REPAIR:
+                obj_health = ObjHealth.from_ha_note_state(
+                                       HaNoteStruct.M0_NC_FAILED)
+                bcast_ss.append(HAState(fid, obj_health))
+
+            # In case of failed rebalance, roll back to repaired state.
+            elif n.note.no_state == HaNoteStruct.M0_NC_REBALANCE:
+                obj_health = ObjHealth.from_ha_note_state(
+                                       HaNoteStruct.M0_NC_REPAIRED)
+                bcast_ss.append(HAState(fid, obj_health))
+
         LOG.debug('got ha_states %s', ha_states)
         if bcast_ss:
             self.broadcast_ha_states(bcast_ss)
