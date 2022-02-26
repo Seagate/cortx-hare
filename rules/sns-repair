@@ -39,6 +39,7 @@ if [[ -z "$cmd" || -z "$fid" ]]; then
     exit 1
 fi
 
+op_name=
 case $cmd in
     start) op_name='repair-start' ;;
     stop) op_name='repair-stop' ;;
@@ -50,25 +51,11 @@ case $cmd in
     ;;
 esac
 
-log "handler is called for $cmd, $fid"
+log "handler is called for $cmd, $fid, $op_name"
 
 payload=$(jq --null-input --compact-output \
-             --arg cmd "$cmd" \
+             --arg op_name "$op_name" \
              --arg fid "$fid" \
-             '{ cmd: $cmd, fid: $fid }')
+             '{ op_name: $op_name, fid: $fid }')
 
-get_ip_addr() {
-    curl -sX GET http://localhost:8500/v1/agent/self | jq -r .DebugConfig.BindAddr
-}
-
-ip_addr=$(get_ip_addr)
-
-status_code=$(curl http://${ip_addr}:8008/api/v1/sns/${op_name} \
-                   --silent \
-                   --output /dev/null \
-                   --request POST \
-                   --write-out '%{http_code}\n' \
-                   --data "$payload")
-rc=$?
-[[ status_code -eq 200 && rc -eq 0 ]] \
-    || log "rule failed. http: $status_code, rc: $rc"
+h0q bq SNS_OP "$payload"
