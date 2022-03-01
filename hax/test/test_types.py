@@ -25,17 +25,20 @@ o = ObjHealth
 @pytest.mark.parametrize('ha_note,health', [(h.M0_NC_ONLINE, o.OK),
                                             (h.M0_NC_FAILED, o.FAILED),
                                             (h.M0_NC_TRANSIENT, o.OFFLINE),
-                                            (h.M0_NC_UNKNOWN, o.UNKNOWN),
+                                            (h.M0_NC_UNKNOWN, o.OFFLINE),
                                             (h.M0_NC_REPAIR, o.REPAIR),
                                             (h.M0_NC_REPAIRED, o.REPAIRED),
                                             (h.M0_NC_REBALANCE, o.REBALANCE)])
 def test_obj_health_to_ha_note(ha_note: int, health: ObjHealth):
-    assert ha_note == health.to_ha_note_status()
+    if ha_note == h.M0_NC_UNKNOWN:
+        assert health.to_ha_note_status() == h.M0_NC_TRANSIENT
+    else:
+        assert ha_note == health.to_ha_note_status()
 
 
 @pytest.mark.parametrize('ha_note,health', [(h.M0_NC_ONLINE, o.OK),
                                             (h.M0_NC_FAILED, o.FAILED),
-                                            (h.M0_NC_TRANSIENT, o.OFFLINE),
+                                            (h.M0_NC_TRANSIENT, o.UNKNOWN),
                                             (h.M0_NC_UNKNOWN, o.UNKNOWN),
                                             (h.M0_NC_REPAIR, o.REPAIR),
                                             (h.M0_NC_REPAIRED, o.REPAIRED),
