@@ -30,6 +30,8 @@ import shutil
 import subprocess
 import sys
 import socket
+import psutil
+import uuid
 from enum import Enum
 from sys import exit
 from time import sleep, perf_counter
@@ -212,6 +214,22 @@ def _create_consul_namespace(hare_local_dir: str):
 
 
 @func_log(func_enter, func_leave)
+def has_process_started(proc_name: str) -> bool:
+    for process in psutil.process_iter():
+        if proc_name.lower() in process.name().lower():
+            return True
+    return False
+
+
+@func_log(func_enter, func_leave)
+def has_process_stopped(proc_name: str) -> bool:
+    for process in psutil.process_iter():
+        if proc_name.lower() in process.name().lower():
+            return False
+    return True
+
+
+@func_log(func_enter, func_leave)
 def _start_consul(utils: Utils,
                   stop_event: Event,
                   hare_local_dir: str,
@@ -222,7 +240,10 @@ def _start_consul(utils: Utils,
     config_dir = f'{hare_local_dir}/consul/config'
 
     provider = ConfStoreProvider(url)
+    machine_id = provider.get_machine_id()
+    node_id = uuid.UUID(f'{machine_id}')
     consul_endpoints = provider.get('cortx>external>consul>endpoints')
+    cns_utils: ConsulUtil = ConsulUtil()
     hostname = utils.get_local_hostname()
 
     # remove tcp://
@@ -236,13 +257,32 @@ def _start_consul(utils: Utils,
         peers.append(peer)
 
     bind_addr = socket.gethostbyname(hostname)
-    consul_starter = ConsulStarter(utils=utils, stop_event=stop_event,
+    consul_starter = ConsulStarter(utils=utils, cns_utils=cns_utils,
+                                   stop_event=stop_event,
                                    log_dir=log_dir, data_dir=data_dir,
-                                   config_dir=config_dir, peers=peers,
-                                   bind_addr=bind_addr)
+                                   config_dir=config_dir, node_name=hostname,
+                                   node_id=str(node_id),
+                                   peers=peers, bind_addr=bind_addr)
     consul_starter.start()
 
     return consul_starter
+
+
+@func_log(func_enter, func_leave)
+def _stop_consul(consul_starter: ConsulStarter) -> bool:
+    try:
+        consul_starter.stop()
+        consul_starter.join()
+    except Exception:
+        return False
+    return True
+
+
+@func_log(func_enter, func_leave)
+def stop_consul_blocking(consul_starter: ConsulStarter):
+    while not _stop_consul(consul_starter):
+        logging.debug('Stopping Consul...')
+        sleep(5)
 
 
 @func_log(func_enter, func_leave)
@@ -258,6 +298,23 @@ def _start_hax(utils: Utils,
                              home_dir=hare_local_dir, log_dir=hare_log_dir)
     hax_starter.start()
     return hax_starter
+
+
+@func_log(func_enter, func_leave)
+def _stop_hax(hax_starter: HaxStarter) -> bool:
+    try:
+        hax_starter.stop()
+        hax_starter.join()
+    except Exception:
+        return False
+    return True
+
+
+@func_log(func_enter, func_leave)
+def stop_hax_blocking(hax_starter: HaxStarter):
+    while not _stop_hax(hax_starter):
+        logging.debug('Stopping hax...')
+        sleep(5)
 
 
 @func_log(func_enter, func_leave)
@@ -304,7 +361,7 @@ def prepare(args):
     except Exception:
         logging.debug('No leader is elected yet')
 
-    consul_starter.stop()
+    stop_consul_blocking(consul_starter)
 
 
 def get_hare_motr_s3_processes(utils: ConsulUtil) -> Dict[str, List[Fid]]:
@@ -355,8 +412,8 @@ def start_hax_and_consul_without_systemd(url: str, utils: Utils):
     hax_starter = _start_hax(utils, hare_stop_event, conf_dir, log_dir)
     hare_stop_event.wait()
     if utils.is_hare_stopping():
-        consul_starter.stop()
-        hax_starter.stop()
+        stop_consul_blocking(consul_starter)
+        stop_hax_blocking(hax_starter)
 
 
 def start(args):
@@ -499,13 +556,13 @@ def init(args):
                                             data_nodes):
             sleep(5)
         # Stopping hax and consul
-        hax_starter.stop()
-        consul_starter.stop()
+        stop_hax_blocking(hax_starter)
+        stop_consul_blocking(consul_starter)
     except Exception as error:
         if hax_starter:
-            hax_starter.stop()
+            stop_hax_blocking(hax_starter)
         if consul_starter:
-            consul_starter.stop()
+            stop_consul_blocking(consul_starter)
         raise RuntimeError(f'Error while initializing cluster :key={error}')
 
 
@@ -951,10 +1008,10 @@ def config(args):
         save(filename, generate_cdf(url))
         update_hax_unit('/usr/lib/systemd/system/hare-hax.service')
         generate_config(url, filename)
-        consul_starter.stop()
+        stop_consul_blocking(consul_starter)
     except Exception as error:
         if consul_starter:
-            consul_starter.stop()
+            stop_consul_blocking(consul_starter)
         raise RuntimeError(f'Error performing configuration : {error}')
 
 
