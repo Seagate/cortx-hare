@@ -18,7 +18,7 @@ pytest-timeout==1.4.2
 
 #:runtime-requirements:
 idna==2.10
-aiohttp==3.7.4.post0
+aiohttp==3.8.1
 click==8.0.1
 dataclasses==0.8
 python-consul==1.1.0
