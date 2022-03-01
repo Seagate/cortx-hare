@@ -3,6 +3,7 @@
 import abc
 import argparse
 import ast
+import sys
 from enum import Enum, auto, IntEnum
 from functools import lru_cache, wraps
 import itertools
@@ -16,7 +17,6 @@ import random
 import re
 import socket
 import subprocess
-import sys
 from typing import (Any, Callable, Dict, Iterable, Iterator, List, NamedTuple,
                     Optional, Set, Type, Tuple)
 from math import floor, ceil

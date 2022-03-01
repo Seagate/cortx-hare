@@ -17,10 +17,11 @@
 #
 
 import logging
-from typing import List
+from typing import List, Any
 
 from hax.message import (BroadcastHAStates, Die, EntrypointRequest,
-                         FirstEntrypointRequest, HaNvecGetEvent, ProcessEvent,
+                         FirstEntrypointRequest, HaNvecGetEvent,
+                         HaNvecSetEvent, ProcessEvent,
                          SnsRebalancePause, SnsRebalanceResume,
                          SnsRebalanceStart, SnsRebalanceStatus,
                          SnsRebalanceStop, SnsRepairPause, SnsRepairResume,
@@ -132,64 +133,79 @@ class ConsumerThread(StoppableThread):
                                ha_states: List[HAState]) -> List[HAState]:
         new_ha_states: List[HAState] = []
         for state in ha_states:
-            # We are only concerned with process statuses.
             if state.fid.container == ObjT.PROCESS.value:
                 current_status = self.consul.get_process_current_status(
                     state.status, state.fid)
-                if current_status == ObjHealth.OK:
-                    if (self.consul.get_process_status(
-                            state.fid).proc_status in (
-                            'M0_CONF_HA_PROCESS_DTM_RECOVERED')):
-                        continue
-                if current_status in (ObjHealth.FAILED,
-                                      ObjHealth.STOPPED):
-                    if (self.consul.get_process_local_status(
-                            state.fid) == 'M0_CONF_HA_PROCESS_STOPPED'):
-                        # Consul may report failure of a process multiple
-                        # times, so we don't want to send duplicate failure
-                        # notifications, it may cause delay in cleanup
-                        # activities.
-                        continue
-                # XXX:
-                # Sometime, there can be situation where Consul event is sent
-                # and can be delayed, where state reported by Consul for a
-                # given process can be in its past already, e.g. consul
-                # reported process failure but when hax received the event,
-                # process might have already restarted. In this case the event
-                # still needs to be handled. Also, it is possible that Consul
-                # reported failure but process status is not yet updated in
-                # Consul services catalog, in such a case the reported status
-                # can be true and cannot be just dropped. These scenarios must
-                # be re-visited.
-                if current_status not in (ObjHealth.UNKNOWN,
-                                          ObjHealth.OFFLINE):
-                    # We also need to account and report the failure of remote
-                    # Motr processes to this node's hax and motr processes.
-                    # When Consul reports a remote process failure, hax
-                    # confirms its current status from Consul KV and updates
-                    # the list of failed services and also adds it to the
-                    # broadcast list.
-                    proc_status_saved = self.consul.get_process_status(
-                                            state.fid)
-                    proc_type = m0HaProcessType.str_to_Enum(
-                        proc_status_saved.proc_type)
-                    if current_status not in (ObjHealth.OK,
-                                              ObjHealth.RECOVERING):
+                proc_status_remote = self.consul.get_process_status(
+                                         state.fid)
+                proc_status: Any = None
+                # MKFS states are upated by the node corresponding to a
+                # given process. So we ignore notifications for mkfs
+                # processes.
+                if proc_status_remote.proc_type in (
+                        'Unknown',
+                        str(m0HaProcessType.M0_CONF_HA_PROCESS_M0MKFS)):
+                    continue
+                proc_type = m0HaProcessType.str_to_Enum(
+                     proc_status_remote.proc_type)
+                # Consul reports process failure, if that process died
+                # abruptly, its corresponding status might not have been
+                # persisted. Thus, its the RC's responsibility to update
+                # its status. So, we check the current status of the
+                # process and if the status was persisted, if not then RC
+                # will do it.
+                # Corressponding process ONLINE event will be updated when
+                # the process notifies so to Hare.
+                if (current_status == ObjHealth.OFFLINE and (
+                        proc_status_remote.proc_status !=
+                        'M0_CONF_HA_PROCESS_STOPPED')):
+                    if self.consul.am_i_rc():
                         proc_status = (
                             m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED)
-                    else:
+                        self.consul.update_process_status(
+                            ConfHaProcess(chp_event=proc_status,
+                                          chp_type=proc_type,
+                                          chp_pid=0,
+                                          fid=state.fid))
+                        new_ha_states.append(
+                            HAState(fid=state.fid, status=current_status))
+                    continue
+                if not self.consul.is_proc_local(state.fid):
+                    proc_status_local = self.consul.get_process_status_local(
+                                            state.fid)
+                    # Consul monitors a process every 1 second and this
+                    # notification is sent to every node. Thus to avoid
+                    # notifying about a process multiple times about the
+                    # same status every node maintains a local copy of the
+                    # remote process status, which is checked everytime a
+                    # consul notification is received and accordingly
+                    # the status is notified locally to all the local motr
+                    # processes.
+                    if (current_status == ObjHealth.RECOVERING and
+                            (proc_status_local.proc_status !=
+                             'M0_CONF_HA_PROCESS_STARTED')):
                         proc_status = (
                             m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED)
-
-                        LOG.debug('update process failure')
-                        self.consul.update_process_status(
-                            ConfHaProcess(
-                                chp_event=proc_status,
-                                chp_type=proc_type,
-                                chp_pid=0,
-                                fid=state.fid))
-                new_ha_states.append(
-                    HAState(fid=state.fid, status=current_status))
+                    elif (current_status == ObjHealth.OK and
+                            (proc_status_local.proc_status !=
+                             'M0_CONF_HA_PROCESS_DTM_RECOVERED')):
+                        proc_status = (
+                            m0HaProcessEvent.M0_CONF_HA_PROCESS_DTM_RECOVERED)
+                    elif current_status == ObjHealth.OFFLINE:
+                        if (proc_status_local.proc_status !=
+                                'M0_CONF_HA_PROCESS_STOPPED'):
+                            proc_status = (
+                                m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED)
+                    else:
+                        continue
+                    if proc_status is not None:
+                        self.consul.update_process_status_local(
+                            ConfHaProcess(chp_event=proc_status,
+                                          chp_type=proc_type,
+                                          chp_pid=0,
+                                          fid=state.fid))
+                        new_ha_states.append(
+                            HAState(fid=state.fid, status=current_status))
             else:
                 new_ha_states.append(state)
         return new_ha_states
@@ -224,6 +240,15 @@ class ConsumerThread(StoppableThread):
                         self._update_process_status(planner, motr, item.evt)
                     elif isinstance(item, HaNvecGetEvent):
                         fn = motr.ha_nvec_get_reply
+                        # If a consul-related exception appears, it will
+                        # be processed by repeat_if_fails.
+                        #
+                        # This thread will become blocked until that
+                        # intermittent error gets resolved.
+                        decorated = (repeat_if_fails(wait_seconds=5))(fn)
+                        decorated(item)
+                    elif isinstance(item, HaNvecSetEvent):
+                        fn = motr.ha_nvec_set_process
                         # If a consul-related exception appears, it will
                         # be processed by repeat_if_fails.
                         #
