@@ -57,7 +57,8 @@ class FsStatsUpdater(StoppableThread):
                 #     wait_for_event(self.event, self.interval_sec)
                 #     continue
                 LOG.info('Calling get_filesysytem_stats')
-                stats = motr.get_filesystem_stats()
+                stats = None
+                # stats = motr.get_filesystem_stats()
                 if not stats:
                     LOG.info('no stats found')
                     continue
