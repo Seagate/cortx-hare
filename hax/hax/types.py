@@ -242,7 +242,7 @@ class HaLinkMessagePromise:
 class ObjHealth(Enum):
     FAILED = (0, HaNoteStruct.M0_NC_FAILED)
     OK = (1, HaNoteStruct.M0_NC_ONLINE)
-    UNKNOWN = (2, HaNoteStruct.M0_NC_UNKNOWN)
+    UNKNOWN = (2, HaNoteStruct.M0_NC_TRANSIENT)
     OFFLINE = (3, HaNoteStruct.M0_NC_TRANSIENT)
     STOPPED = (4, HaNoteStruct.M0_NC_TRANSIENT)
     REPAIR = (5, HaNoteStruct.M0_NC_REPAIR)
