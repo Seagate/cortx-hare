@@ -354,6 +354,13 @@ class ConsulUtil:
             raise HAConsistencyException('Failed to communicate '
                                          'to Consul Agent') from e
 
+    @repeat_if_fails()
+    def force_leave(self, node: str):
+        try:
+            self.cns.agent.force_leave(node)
+        except Exception:
+            LOG.error('force leaving the agent failed, trying again...')
+
     @uses_consul_cache
     def _local_service_by_name(self,
                                name: str,
@@ -403,8 +410,12 @@ class ConsulUtil:
         return self._service_data(kv_cache=kv_cache).address
 
     @uses_consul_cache
+    @repeat_if_fails()
     def get_hax_ip_address(self, kv_cache=None) -> str:
-        return self._service_data(kv_cache=kv_cache).ip_addr
+        hax_ip = self._service_data(kv_cache=kv_cache).ip_addr
+        if not hax_ip or hax_ip is None:
+            raise HAConsistencyException('Error fetching hax ip address')
+        return str(hax_ip)
 
     def get_hax_http_port(self) -> int:
         return int(self._local_service_by_name('hax')['ServiceMeta'].get(
