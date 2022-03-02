@@ -885,6 +885,8 @@ class TestCDF(unittest.TestCase):
                 },
                 'node>MACH_ID>hostname':
                 'myhost',
+                'cortx>hare>hax>endpoints':
+                ['tcp://myhost:22001'],
                 'node>MACH_ID>name': 'mynodename',
                 'node>MACH_ID>type': 'storage_node',
                 'node>MACH_ID>components':
@@ -996,12 +998,15 @@ class TestCDF(unittest.TestCase):
                 'StorageSet-1',
                 'cluster>storage_set[0]>nodes':
                 ['srvnode_1', 'srvnode_2'],
+                'cortx>hare>hax>endpoints':
+                ['tcp://srvnode-1.data.private:22001',
+                 'tcp://srvnode-2.data.private:22001'],
                 'node>MACH_ID>hostname':
                 'myhost',
                 'node>MACH_ID>name': 'mynodename',
                 'node>MACH_ID>type': 'storage_node',
                 'node>MACH_ID>network>data>private_fqdn':
-                    'srvnode-1.data.private',
+                'srvnode-1.data.private',
                 'node>MACH_ID>components':
                 [{'name':'hare'}, {'name': 'motr'}, {'name': 's3'},
                  {'name': 'other'}],
@@ -1018,7 +1023,7 @@ class TestCDF(unittest.TestCase):
                 'node>MACH_2_ID>type':                'storage_node',
                 'cortx>motr>interface_type':                'tcp',
                 'node>MACH_2_ID>network>data>private_fqdn':
-                    'srvnode-2.data.private',
+                'srvnode-2.data.private',
                 'node>MACH_2_ID>components':
                 [{'name':'hare'}, {'name': 'motr'}, {'name': 's3'},
                  {'name': 'other'}],
@@ -1144,6 +1149,8 @@ class TestCDF(unittest.TestCase):
                 ['/dev/meta1'],
                 'node>MACH_ID>network>data>private_fqdn':
                     'srvnode-1.data.private',
+                'cortx>hare>hax>endpoints':
+                ['tcp://myhost:22001'],
                 'cortx>s3>service_instances':
                 1,
                 'cortx>motr>interface_type':
