@@ -26,10 +26,16 @@ import sys
 from typing import List, Optional, Dict, Any
 import logging
 import simplejson
+import inject
 from hax.types import ObjT
+from hax.common import di_configuration
+from hax.util import ConsulUtil, repeat_if_fails
+from hax.exception import HAConsistencyException
 
 from utils import get_node_name
 from helper.exec import Executor, Program
+
+g_kv: bool = False
 
 
 class Node:
@@ -276,8 +282,26 @@ def read_file(path: str) -> List[Dict[str, str]]:
     return data
 
 
+@repeat_if_fails(max_retries=5)
+def read_kv() -> Optional[List[Dict[str, str]]]:
+    cns_utils = ConsulUtil()
+    data: List[Dict[str, str]] = []
+    for key in ["m0conf", "m0_client_types"]:
+        kv_data = cns_utils.kv.kv_get(key, recurse=True)
+        if not kv_data:
+            raise RuntimeError(f"'{key}' not found in KV store")
+        for d in kv_data:
+            data.append({'key': d['Key'], 'value': d['Value']})
+
+    return data
+
+
 def get_nodes_for_cluster(path: str) -> List[Node]:
-    file_data: List[Dict[str, str]] = read_file(path)
+    file_data: List[Dict[str, str]] = []
+    if g_kv:
+        file_data = read_kv()
+    else:
+        file_data = read_file(path)
     nodes: List[Node] = []
     for n in node_names(file_data):
         nodes.append(Node(n))
@@ -350,13 +374,20 @@ def parse_opts(argv):
     p.add_argument('--json',
                    help='show output in JSON format',
                    action='store_true')
+    p.add_argument('--use-kv-store',
+                   help='use KV store for e.g. consul to get data',
+                   action='store_true')
 
     return p.parse_args(argv)
 
 
 def main(argv=None):
     opts = parse_opts(argv)
+    inject.configure(di_configuration)
     try:
+        if opts.use_kv_store:
+            global g_kv
+            g_kv = True
         nodes = get_nodes_for_cluster(opts.conf_dir)
 
         if opts.all:
@@ -375,8 +406,12 @@ def main(argv=None):
             else:
                 print(simplejson.dumps(svcs, indent=2, for_json=True))
 
+    except HAConsistencyException as err:
+        print(f"Could not read data from KV store '{err}'")
+        return -1
     except (RuntimeError, FileNotFoundError) as e:
         print(e, file=sys.stderr)
+        return -1
 
     return 0
 
