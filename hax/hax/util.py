@@ -737,11 +737,13 @@ class ConsulUtil:
         proc_node = self.get_process_node(pfid, kv_cache=kv_cache)
         proc_status: ObjHealth = self.get_service_health(proc_node, pfid.key,
                                                          kv_cache=kv_cache)
-        obj_state = proc_status.to_ha_note_status()
-        if obj_state == HaNoteStruct.M0_NC_UNKNOWN:
+        # Report ONLINE for hax and confd if they are already started.
+        hax_fid = self.get_hax_fid(kv_cache=kv_cache)
+        if (proc_status == ObjHealth.RECOVERING and
+                (self.is_process_confd(pfid) or
+                 pfid == hax_fid)):
             return HaNoteStruct.M0_NC_ONLINE
-        else:
-            return obj_state
+        return proc_status.to_ha_note_status()
 
     @staticmethod
     def get_process_keys(node_items: List[Any], fidk: int) -> List[Any]:
