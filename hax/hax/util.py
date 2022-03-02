@@ -815,6 +815,12 @@ class ConsulUtil:
         #     return HaNoteStruct.M0_NC_ONLINE
         proc_status: ObjHealth = self.get_service_health(proc_node, pfid.key,
                                                          kv_cache=kv_cache)
+        # Report ONLINE for hax and confd if they are already started.
+        hax_fid = self.get_hax_fid(kv_cache=kv_cache)
+        if (proc_status == ObjHealth.RECOVERING and
+                (self.is_process_confd(pfid) or
+                 pfid == hax_fid)):
+            return HaNoteStruct.M0_NC_ONLINE
         return proc_status.to_ha_note_status()
 
     @staticmethod
