@@ -177,9 +177,20 @@ def processes(cns: Consul, consul_util: ConsulUtil,
     node_health = consul_util.get_node_health_status(node_name)
     process_states = get_node_process_states(cns, node_name)
     process_list = get_node_processes(cns, node_name)
+
+    names = {
+        'confd': 'confd',
+        'ha': 'hax',
+        'ios': 'ioservice',
+        'm0_client_s3': 's3server'
+    }
+    m0_client_types = kv_item(cns, 'm0_client_types')
+    for client_type in json.loads(m0_client_types['Value']):
+        names[client_type] = client_type
+
     return [
         Process(
-            name=proc_id2name(process_list, k),
+            name=proc_id2name(names, process_list, k),
             fid=Fid(0x7200000000000001, k),
             ep=(proc_id2endpoint(process_list, k) or '**ERROR**'),
             status=process_status(node_health, process_states,
@@ -235,13 +246,9 @@ def proc_id2endpoint(process_list: List[Dict[str, Any]],
     return None
 
 
-def proc_id2name(processes: List[Dict[str, Any]], proc_id: int) -> str:
-    names = {
-        'confd': 'confd',
-        'ha': 'hax',
-        'ios': 'ioservice',
-        'm0_client_s3': 's3server'
-    }
+def proc_id2name(names: Dict[str, str],
+                 processes: List[Dict[str, Any]],
+                 proc_id: int) -> str:
     regex = re.compile(
         f'^m0conf\\/.*\\/processes\\/{proc_id}\\/services\\/(.+)$')
     process_found = False

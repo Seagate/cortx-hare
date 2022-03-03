@@ -710,11 +710,7 @@ class ConsulUtil:
         proc_node = self.get_process_node(pfid, kv_cache=kv_cache)
         proc_status: ObjHealth = self.get_service_health(proc_node, pfid.key,
                                                          kv_cache=kv_cache)
-        obj_state = proc_status.to_ha_note_status()
-        if obj_state == HaNoteStruct.M0_NC_UNKNOWN:
-            return HaNoteStruct.M0_NC_ONLINE
-        else:
-            return obj_state
+        return proc_status.to_ha_note_status()
 
     @staticmethod
     def get_process_keys(node_items: List[Any], fidk: int) -> List[Any]:
