@@ -17,35 +17,38 @@
 # For any questions about this software or licensing,
 # please email opensource@seagate.com or cortx-questions@seagate.com.
 
-# :help: Fetch the fids for motr services (m0d and s3server)
+# :help: Fetch the fids for motr services (m0d and other clients)
 
 import argparse
 import json
 import re
 import sys
-from typing import List, NamedTuple, Optional
+from typing import List, Optional, Dict, Any
 import logging
 import simplejson
 from hax.types import ObjT
 
 from utils import get_node_name
-
-Process = NamedTuple('Process', [('name', str), ('fid', str)])
+from helper.exec import Executor, Program
 
 
 class Node:
+    profile_fid: Optional[str] = None
+
     def __init__(self, name: str):
         self.name = name
-        self.svcs: List[Process] = []
+        self.svcs: List[Dict[str, str]] = []
+        self.ha_ep: Optional[str] = None
+        self.uuid: Optional[str] = None
 
-    def add_service(self, svc: str, fid: str) -> None:
-        self.svcs.append(Process(svc, fid))
+    def add_service(self, svc: Dict[str, Any]) -> None:
+        self.svcs.append(svc)
 
-    def get_service(self, service: str) -> Optional[List[Process]]:
+    def get_service(self, service: str) -> Optional[List[Dict[str, Any]]]:
         # Returns list of services matching the given service
-        services: List[Process] = []
+        services: List[Dict[str, Any]] = []
         for svc in self.svcs:
-            if svc.name == service:
+            if svc['name'] == service:
                 services.append(svc)
         if services:
             return services
@@ -64,7 +67,7 @@ def to_fid(container: int, key: int) -> str:
     return f'{container:#x}:{key:#x}'
 
 
-def node_names(data: List) -> List[str]:
+def node_names(data: List[Dict[str, str]]) -> List[str]:
     # Get entries from file
     # "key": "m0conf/nodes/<node_fid>",
     # "value": "{\"name\": \"<node name>\", \"state\": \"<HA state>\"}"
@@ -79,32 +82,135 @@ def node_names(data: List) -> List[str]:
     return nodes
 
 
-def get_keys_for_processes(data: List) -> List[str]:
+def get_keys_for_processes(data: List, client_types: List) -> List[str]:
     # Get 'm0conf/nodes/<node_id>/processes/<process_fidk>/services/<svc_type>'
     # entries from the file.  See 'Consul KV Schema' in [4/KV](rfc/4/README.md)
-    regex = re.compile('^m0conf\\/.*\\/processes\\/.*\\/services\\'
-                       '/(confd|ios|m0_client_s3)+$')
 
-    keys = []
+    service_names = 'confd|ios|ha'
+
+    for client_type in client_types:
+        service_names += '|' + client_type
+
+    regex = re.compile('^m0conf\\/.*\\/processes\\/.*\\/services\\'
+                       '/(' + service_names + ')+$')
+    keys: List[str] = []
     for key in data:
         match_result = re.match(regex, key['key'])
         if not match_result:
             continue
+
         keys.append(match_result.group(0))
+
     if not keys:
         logging.error('No services found')
     return keys
 
 
-def add_service_to_node(nodes: List[Node], node_name: str, svc_name: str,
-                        fid: str) -> None:
+def get_ha_ep(data: List[Dict[str, str]], node_name: str) -> Optional[str]:
+    # Key e.g. 'm0conf/nodes/localhost/processes/6/services/ha'
+    regex = re.compile(f'^m0conf\\/nodes\\/{node_name}\\/processes\\/.*\\'
+                       '/services\\/ha')
+
+    for key in data:
+        match_result = re.match(regex, key['key'])
+        if not match_result:
+            continue
+        parts = key['key'].split('/')
+        ha_id = parts[4]
+        break
+
+    # Key e.g. 'm0conf/nodes/localhost/processes/6/endpoint'
+    regex = re.compile(f'^m0conf\\/nodes\\/{node_name}\\/processes\\'
+                       f'/{ha_id}\\/endpoint')
+
+    for key in data:
+        match_result = re.match(regex, key['key'])
+        if not match_result:
+            continue
+        return key['value']
+
+    return None
+
+
+def generate_node_uuid() -> str:
+    p = Program(['uuidgen', '--time'])
+    return Executor().run(p)
+
+
+def get_confd_svc(node: Node, data: List) -> Dict[str, Any]:
+    return {'ha_ep': node.ha_ep,
+            'conf_xc': '/etc/motr/confd.xc',
+            'uuid': node.uuid}
+
+
+def get_io_svc(fid: str, node: Node,
+               data: List) -> Dict[str, Any]:
+    svc: Dict[str, Any] = {}
+    svc = {'ha_ep': node.ha_ep,
+           'uuid': node.uuid}
+
+    metadata = get_ios_metadata(fid, node.name, data)
+    if metadata:
+        svc.update({'be_seg_path': metadata})
+
+    return svc
+
+
+def get_ios_metadata(fid: str,
+                     node_name: str,
+                     data: List[Dict[str, str]]) -> Optional[str]:
+    # Key e.g. '"key": "m0conf/nodes/localhost/processes/12/meta_data",
+    #           "value": "/dev/sda"'
+    regex = re.compile(f'^m0conf\\/nodes\\/{node_name}\\/processes\\/{fid}\\'
+                       '/meta_data')
+
+    for key in data:
+        match_result = re.match(regex, key['key'])
+        if not match_result:
+            continue
+        return key['value']
+    return None
+
+
+def get_profile_fid(data: List[Dict[str, str]]) -> Optional[str]:
+    # Key e.g. "m0conf/profiles/0x7000000000000001:0x59"
+    regex = re.compile('^m0conf\\/profiles\\/.*$')
+
+    for key in data:
+        match_result = re.match(regex, key['key'])
+        if not match_result:
+            continue
+        parts = key['key'].split('/')
+        return parts[2]
+    return None
+
+
+def get_motr_client_svc(node: Node, data: List) -> Dict[str, Any]:
+    return {'ha_ep': node.ha_ep,
+            'profile_fid': node.profile_fid}
+
+
+def add_service_to_node(nodes: List[Node], data: List, client_types: List,
+                        node_name: str, svc_name: str,
+                        process_fidk: str, ep: str) -> None:
+    fid = to_fid(ObjT.PROCESS.value, int(process_fidk))
     for node in nodes:
         if node.name == node_name:
-            node.add_service(svc_name, fid)
+            svc: Dict[str, Any] = {}
+            svc.update({'name': svc_name, 'fid': fid, 'ep': ep})
+            if svc_name == 'confd':
+                svc.update(get_confd_svc(node, data))
+            elif svc_name == 'ioservice':
+                svc.update(get_io_svc(process_fidk, node, data))
+            elif svc_name in client_types:
+                svc.update(get_motr_client_svc(node, data))
+            node.add_service(svc)
 
 
-def get_service_for_node(nodes: List[Node], node_name: str,
-                         service: str, path: str) -> Optional[List[Process]]:
+def get_service_for_node(nodes: List[Node],
+                         node_name: str,
+                         service: str,
+                         path: str) -> Optional[List[Dict[str, Any]]]:
     # if node_name is not specified, then local node is used.
     if not node_name:
         node_name = get_node_name(path)
@@ -123,8 +229,17 @@ def get_service_for_node(nodes: List[Node], node_name: str,
     return None
 
 
-def process_all_keys(keys: List, nodes: List[Node]) -> None:
-    names = {'confd': 'confd', 'ios': 'ioservice', 'm0_client_s3': 's3server'}
+def process_all_keys(keys: List[str],
+                     nodes: List[Node],
+                     client_types: List,
+                     data: List) -> None:
+    names = {'confd': 'confd',
+             'ios': 'ioservice',
+             'ha': 'hax'}
+
+    for client_type in client_types:
+        names[client_type] = client_type
+
     for key in keys:
         # key looks like
         # 'm0conf/nodes/<name>/processes/<process_fidk>/services/<svc_type>'
@@ -132,43 +247,69 @@ def process_all_keys(keys: List, nodes: List[Node]) -> None:
         svc_type = parts[-1]
         node_name = parts[2]
         process_fidk = parts[-3]
-        add_service_to_node(nodes, node_name, names[svc_type],
-                            to_fid(ObjT.PROCESS.value, int(process_fidk)))
+
+        regex_ep = re.compile(
+            f'^m0conf\\/.*\\/processes\\/{process_fidk}\\/endpoint')
+
+        for epdata in data:
+            result = re.match(regex_ep, epdata['key'])
+            if not result:
+                continue
+
+            ep = epdata['value']
+            break
+
+        add_service_to_node(nodes, data, client_types, node_name,
+                            names[svc_type], process_fidk, ep)
+
     for node in nodes:
         if not node.svcs:
             logging.error(
-                'No ioservice, confd, or s3servers found on the '
+                'No ioservice, confd, or any motr client found on the '
                 f'node {node.name}')
 
 
-def read_file(path: str):
+def read_file(path: str) -> List[Dict[str, str]]:
     filename = f'{path}/consul-kv.json'
     with open(filename) as consul_kv_file:
-        data = json.load(consul_kv_file)
+        data: List[Dict[str, str]] = json.load(consul_kv_file)
     return data
 
 
 def get_nodes_for_cluster(path: str) -> List[Node]:
-    file_data = read_file(path)
+    file_data: List[Dict[str, str]] = read_file(path)
     nodes: List[Node] = []
     for n in node_names(file_data):
         nodes.append(Node(n))
 
-    keys = get_keys_for_processes(file_data)
-    process_all_keys(keys, nodes)
+    client_types = []
+    for key in file_data:
+        if key['key'] == 'm0_client_types':
+            client_types = json.loads(key['value'])
+            break
+
+    keys = get_keys_for_processes(file_data, client_types)
+
+    Node.profile_fid = get_profile_fid(file_data)
+    for node in nodes:
+        node.ha_ep = get_ha_ep(file_data, node.name)
+        node.uuid = generate_node_uuid()
+
+    process_all_keys(keys, nodes, client_types, file_data)
     return nodes
 
 
 def parse_opts(argv):
     p = argparse.ArgumentParser(
-        description='Fetches the fids for motr services (m0d and s3server) '
+        description='Fetches the fids for motr services (m0d and clients) '
         'in cluster or node.',
         usage='%(prog)s [OPTION]')
 
     p.add_argument('--service',
                    '-s',
                    help='service name. - Returns fid for given service. '
-                   'List of services- "confd", "ioservice", "s3server". '
+                   'List of services- "confd", "ioservice", other '
+                   'client type. '
                    'Default: Returns the fids for all the services.',
                    type=str,
                    action='store')

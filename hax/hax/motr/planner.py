@@ -24,7 +24,8 @@ from typing import Callable, Deque, Dict, Optional, Set, Tuple, Type
 
 from hax.log import TRACE
 from hax.message import (AnyEntrypointRequest, BaseMessage, BroadcastHAStates,
-                         Die, HaNvecGetEvent, ProcessEvent, SnsOperation)
+                         Die, HaNvecGetEvent, HaNvecSetEvent, ProcessEvent,
+                         SnsOperation)
 from hax.motr.util import LinkedList
 from hax.types import Fid
 
@@ -314,6 +315,10 @@ class WorkPlanner:
             # HaNvecGetEvent can be done in parallel to any other commands.
             # No need to form the new group for it.
             return False
+        if isinstance(cmd, HaNvecSetEvent):
+            # HaNvecSetEvent can be done in parallel to any other commands.
+            # No need to form the new group for it.
+            return False
         if isinstance(cmd, AnyEntrypointRequest):
             # Entrypoint requests can be processed in parallel to other
             # requests are they are per processes. In a situation where
@@ -363,6 +368,7 @@ class WorkPlanner:
 
         if (isinstance(cmd, AnyEntrypointRequest)
                 or isinstance(cmd, HaNvecGetEvent)
+                or isinstance(cmd, HaNvecSetEvent)
                 or isinstance(cmd, ProcessEvent)):
             # Entrypoint and Die will always be added to the CURRENT group
             # (the one being currently active), so they can be executed at

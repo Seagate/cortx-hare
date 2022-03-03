@@ -25,14 +25,15 @@ from time import sleep
 from hax.consul.cache import supports_consul_cache, uses_consul_cache
 from hax.exception import ConfdQuorumException, RepairRebalanceException
 from hax.message import (EntrypointRequest, FirstEntrypointRequest,
-                         HaNvecGetEvent, ProcessEvent, StobIoqError)
+                         HaNvecGetEvent, HaNvecSetEvent, ProcessEvent,
+                         StobIoqError)
 from hax.motr.delivery import DeliveryHerald
 from hax.motr.ffi import HaxFFI, make_array, make_c_str
 from hax.motr.planner import WorkPlanner
 from hax.types import (ConfHaProcess, Fid, FidStruct, FsStats,
                        HaLinkMessagePromise, HaNote, HaNoteStruct, HAState,
-                       MessageId, ObjT, Profile, ReprebStatus, ObjHealth,
-                       m0HaProcessEvent, m0HaProcessType)
+                       MessageId, ObjT, FidTypeToObjT, Profile, ReprebStatus,
+                       ObjHealth, m0HaProcessEvent, m0HaProcessType)
 from hax.util import ConsulUtil, repeat_if_fails, FidWithType, PutKV
 
 LOG = logging.getLogger('hax')
@@ -293,14 +294,12 @@ class Motr:
                             broadcast_hax_only=False) -> List[MessageId]:
         LOG.debug('Broadcasting HA states %s over ha_link', ha_states)
 
-        def ha_obj_state(st):
-            return HaNoteStruct.M0_NC_ONLINE if st.status == ObjHealth.OK \
-                else HaNoteStruct.M0_NC_FAILED
-
         def _update_process_tree(proc_fid: Fid, state: ObjHealth) -> bool:
-            return (st.status in (ObjHealth.FAILED, ObjHealth.OK) and
+            return (st.status in (ObjHealth.FAILED, ObjHealth.OK,
+                                  ObjHealth.OFFLINE) and
                     not self.consul_util.is_proc_client(st.fid) and
                     not broadcast_hax_only and
+                    not self._is_mkfs(proc_fid) and
                     proc_fid != hax_fid)
 
         hax_fid = self.consul_util.get_hax_fid()
@@ -308,7 +307,7 @@ class Motr:
         for st in ha_states:
             if st.status == ObjHealth.UNKNOWN:
                 continue
-            note = HaNoteStruct(st.fid.to_c(), ha_obj_state(st))
+            note = HaNoteStruct(st.fid.to_c(), st.status.to_ha_note_status())
             notes.append(note)
 
             # For process failure, we report failure for the corresponding
@@ -342,8 +341,8 @@ class Motr:
                 # If both the above conditions are not true then we will just
                 # mark controller status
                 is_node_failed = self.is_node_failed(note, kv_cache=kv_cache)
-                if (st.status == ObjHealth.FAILED
-                        and is_node_failed):
+                if (st.status in (ObjHealth.FAILED, ObjHealth.OFFLINE) and
+                        is_node_failed):
                     notes += self.notify_node_status_by_process(
                         note, kv_cache=kv_cache)
                 elif (st.status == ObjHealth.OK
@@ -442,23 +441,61 @@ class Motr:
 
     @log_exception
     def ha_nvec_get(self, hax_msg: int, nvec: List[HaNote]) -> None:
-        LOG.debug('Got ha nvec of length %s from Motr land', len(nvec))
+        LOG.debug('Got ha nvec get of length %s from Motr land', len(nvec))
         self.planner.add_command(HaNvecGetEvent(hax_msg, nvec))
+
+    @log_exception
+    def ha_nvec_set(self, hax_msg: int, nvec: List[HaNote]) -> None:
+        LOG.debug('Got ha nvec set of length %s from Motr land', len(nvec))
+        self.planner.add_command(HaNvecSetEvent(hax_msg, nvec))
 
     @log_exception
     @supports_consul_cache
     def ha_nvec_get_reply(self, event: HaNvecGetEvent, kv_cache=None) -> None:
         LOG.debug('Preparing the reply for HaNvecGetEvent (nvec size = %s)',
                   len(event.nvec))
+        self.consul_util.get_all_nodes()
         notes: List[HaNoteStruct] = []
         for n in event.nvec:
-            n.note.no_state = self.consul_util.get_conf_obj_status_failvec(
-                Fid.from_struct(n.note.no_id), kv_cache=kv_cache)
+            fid = Fid.from_struct(n.note.no_id)
+            n.note.no_state = self.consul_util.get_conf_obj_status(
+                FidTypeToObjT[fid.container], fid.key, kv_cache=kv_cache)
             notes.append(n.note)
 
         LOG.debug('Replying ha nvec of length ' + str(len(event.nvec)))
         self._ffi.ha_nvec_reply(event.hax_msg, make_array(HaNoteStruct, notes),
                                 len(notes))
+
+    @log_exception
+    def ha_nvec_set_process(self, event: HaNvecSetEvent) -> None:
+        LOG.debug('Processing HaNvecSetEvent (nvec size = %s)',
+                  len(event.nvec))
+        self.consul_util.get_all_nodes()
+        ha_states: List[HAState] = []
+        bcast_ss: List[HAState] = []
+        for n in event.nvec:
+            fid = Fid.from_struct(n.note.no_id)
+            obj_health = ObjHealth.from_ha_note_state(n.note.no_state)
+            ha_states.append(HAState(fid, obj_health))
+            if n.note.no_state in {HaNoteStruct.M0_NC_REPAIRED,
+                                   HaNoteStruct.M0_NC_ONLINE}:
+                bcast_ss.append(HAState(fid, obj_health))
+
+            # In case of failed repair, roll back to failed state.
+            elif n.note.no_state == HaNoteStruct.M0_NC_REPAIR:
+                obj_health = ObjHealth.from_ha_note_state(
+                                       HaNoteStruct.M0_NC_FAILED)
+                bcast_ss.append(HAState(fid, obj_health))
+
+            # In case of failed rebalance, roll back to repaired state.
+            elif n.note.no_state == HaNoteStruct.M0_NC_REBALANCE:
+                obj_health = ObjHealth.from_ha_note_state(
+                                       HaNoteStruct.M0_NC_REPAIRED)
+                bcast_ss.append(HAState(fid, obj_health))
+
+        LOG.debug('got ha_states %s', ha_states)
+        if bcast_ss:
+            self.broadcast_ha_states(bcast_ss)
 
     @supports_consul_cache
     def _generate_sub_services(self,

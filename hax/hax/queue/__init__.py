@@ -3,7 +3,10 @@ import logging
 from queue import Queue
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from hax.message import BroadcastHAStates
+from hax.message import (BaseMessage, BroadcastHAStates, SnsDiskAttach,
+                         SnsDiskDetach, SnsRebalancePause, SnsRebalanceResume,
+                         SnsRebalanceStart, SnsRebalanceStop, SnsRepairPause,
+                         SnsRepairResume, SnsRepairStart, SnsRepairStop)
 from hax.motr.delivery import DeliveryHerald
 from hax.motr.planner import WorkPlanner
 from hax.queue.confobjutil import ConfObjUtil
@@ -50,6 +53,7 @@ class BQProcessor:
 
         handlers: Dict[str, Callable[[Dict[str, Any]], None]] = {
             'M0_HA_MSG_NVEC': self.handle_device_state_set,
+            'SNS_OP': self.handle_sns_op,
             'STOB_IOQ_ERROR': self.handle_ioq_stob_error,
         }
         if msg_type not in handlers:
@@ -73,6 +77,36 @@ class BQProcessor:
             BroadcastHAStates(states=[hastate], reply_to=q))
         ids: List[MessageId] = q.get()
         self.herald.wait_for_any(HaLinkMessagePromise(ids))
+
+    def handle_sns_op(self, payload: Dict[str, Any]) -> None:
+        op_name = payload['op_name']
+
+        def create_handler(
+            a_type: Callable[[Fid], BaseMessage]
+        ) -> Callable[[Dict[str, Any]], BaseMessage]:
+            def fn(data: Dict[str, Any]):
+                fid = Fid.parse(data['fid'])
+                return a_type(fid)
+            return fn
+
+        msg_factory = {
+            'rebalance-start': create_handler(SnsRebalanceStart),
+            'rebalance-stop': create_handler(SnsRebalanceStop),
+            'rebalance-pause': create_handler(SnsRebalancePause),
+            'rebalance-resume': create_handler(SnsRebalanceResume),
+            'repair-start': create_handler(SnsRepairStart),
+            'repair-stop': create_handler(SnsRepairStop),
+            'repair-pause': create_handler(SnsRepairPause),
+            'repair-resume': create_handler(SnsRepairResume),
+            'disk-attach': create_handler(SnsDiskAttach),
+            'disk-detach': create_handler(SnsDiskDetach),
+        }
+
+        LOG.debug(f'process_sns_operation: {op_name}')
+        if op_name not in msg_factory:
+            LOG.error('Invalid sns operation, (%s) ', op_name)
+        message = msg_factory[op_name](payload)
+        self.planner.add_command(message)
 
     def handle_ioq_stob_error(self, payload: Dict[str, Any]) -> None:
         fid = Fid.parse(payload['conf_sdev'])

@@ -45,6 +45,7 @@
 , ClusterDesc  = ./types/ClusterDesc.dhall
 , NodeDesc     = ./types/NodeDesc.dhall
 , M0ServerDesc = ./types/M0ServerDesc.dhall
+, M0ClientDesc = ./types/M0ClientDesc.dhall
 , Disk         = ./types/IODisk.dhall
 , PoolDesc     = ./types/PoolDesc.dhall
 , DiskRef      = ./types/DiskRef.dhall

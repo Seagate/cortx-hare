@@ -256,6 +256,7 @@ install: install-dirs install-cfgen install-hax install-miniprov install-systemd
 	@$(call _fix_hare_imports,configure)
 	@$(call _fix_hare_imports,m0ping)
 	@$(call _fix_hare_imports,update-conf)
+	@$(call _fix_hare_imports,cfgen)
 
 .PHONY: install-dirs
 install-dirs:
@@ -312,8 +313,9 @@ install-systemd: $(wildcard systemd/*)
 
 .PHONY: install-hax
 install-hax: HAX_INSTALL_CMD = $(PIP) install --ignore-installed --prefix $(DESTDIR)/$(PREFIX) $(HAX_WHL:hax/%=%)
-install-hax: export PYTHONPATH = $(DESTDIR)/$(PREFIX)/lib/python3.$(PY3_VERSION_MINOR)/site-packages
+install-hax: export PYTHONPATH = $(DESTDIR)/$(PREFIX)/lib64/python3.$(PY3_VERSION_MINOR)/site-packages
 install-hax: $(HAX_EXE)
+	@cd hax && $(SETUP_PY) install
 
 $(HAX_EGG_LINK) $(HAX_EXE): $(HAX_WHL)
 	@$(call _info,Installing hax with '$(HAX_INSTALL_CMD)')
@@ -385,6 +387,7 @@ devinstall: install-dirs devinstall-cfgen devinstall-hax devinstall-miniprov dev
 	     $(call _log,linking $$f -> $(MINIPROV_TMPL_DIR)); \
 	     ln -sf $(TOP_SRC_DIR)$$f $(MINIPROV_TMPL_DIR); \
 	 done
+	@$(call _fix_hare_imports,cfgen)
 
 .PHONY: devinstall-cfgen
 devinstall-cfgen: CFGEN_INSTALL_CMD = ln -sf
@@ -422,7 +425,7 @@ devinstall-systemd: $(wildcard systemd/*)
 # from our virtualenv via shebang. Those executables will be put to /opt/seagate
 # as symlinks. So it is critical to have virtualenv folder populated.
 devinstall-hax: HAX_INSTALL_CMD = $(SETUP_PY) develop
-devinstall-hax: export PYTHONPATH = $(DESTDIR)/$(PREFIX)/lib/python3.$(PY3_VERSION_MINOR)/site-packages
+devinstall-hax: export PYTHONPATH = $(DESTDIR)/$(PREFIX)/lib64/python3.$(PY3_VERSION_MINOR)/site-packages
 devinstall-hax: hax/requirements.txt $(HAX_EGG_LINK)
 	@$(call _info,Installing hax development dependencies)
 	@$(PIP) install --ignore-installed \
@@ -546,6 +549,7 @@ mypy: $(PYTHON_SCRIPTS)
 test: test-cfgen
 
 .PHONY: test-cfgen
+test-cfgen: export PYTHONPATH = $(DESTDIR)/$(PREFIX)/lib64/python3.$(PY3_VERSION_MINOR)/site-packages
 test-cfgen: $(PY_VENV_DIR) unpack-dhall-bin unpack-dhall-prelude
 	@$(call _info,Testing cfgen)
 	@$(PY_VENV); PATH=$$PWD/vendor/dhall-bin/current:$$PATH \

@@ -270,7 +270,12 @@ static void handle_nvec(const struct hax_msg *hm)
 
 	*hmsg = *hm;
 	PyObject *l = nvec_to_list(ha_notes, nr_notes);
-	PyObject_CallMethod(hc0->hc_handler, "ha_nvec_get", "(KO)", hmsg, l);
+	if (hm_nvec->hmnv_type == M0_HA_NVEC_GET)
+		PyObject_CallMethod(hc0->hc_handler, "ha_nvec_get", "(KO)", hmsg, l);
+	else if (hm_nvec->hmnv_type == M0_HA_NVEC_SET)
+		PyObject_CallMethod(hc0->hc_handler, "ha_nvec_set", "(KO)", hmsg, l);
+	else
+		M0_IMPOSSIBLE("invalid M0_HA_NVEC_type");
 
 	Py_DECREF(l);
 	PyGILState_Release(gstate);

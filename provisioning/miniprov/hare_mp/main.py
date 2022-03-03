@@ -292,7 +292,8 @@ def post_install(args):
     checkRpm('consul')
     checkRpm('cortx-hare')
     checkRpm('cortx-py-utils')
-    checkRpm('cortx-s3server')
+    # we need to check for 'rgw' rpm
+    # checkRpm('cortx-s3server')
 
     if args.report_unavailable_features:
         unsupported_feature(args.config[0])
@@ -890,8 +891,15 @@ def generate_config(url: str, path_to_cdf: str) -> None:
            '--log-dir', get_log_dir(url),
            '--log-file', LOG_FILE,
            '--uuid', provider.get_machine_id()]
-    execute(cmd, env={'PYTHONPATH': python_path, 'PATH': path,
-                      'LC_ALL': "en_US.utf-8", 'LANG': "en_US.utf-8"})
+
+    locale_info = execute(['locale', '-a'])
+    env = {'PYTHONPATH': python_path, 'PATH': path}
+
+    if 'en_US.utf-8' in locale_info or 'en_US.utf8' in locale_info:
+        env.update({'LC_ALL': "en_US.utf-8", 'LANG': "en_US.utf-8"})
+
+    execute(cmd, env)
+
     utils.copy_conf_files(conf_dir)
     utils.copy_consul_files(conf_dir, mode='client')
     utils.import_kv(conf_dir)
