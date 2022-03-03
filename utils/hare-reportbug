@@ -43,8 +43,6 @@ Positional arguments:
                         config files are present.
   -l                    The directory where the Hare related log files
                         are present.
-  --no-systemd          When set, systemd facilities will not be used to
-                        generate the logs
 
 Options:
   -h, --help   Show this help and exit.
@@ -55,10 +53,9 @@ bundle_id=$HOSTNAME
 dest_dir=$DEFAULT_DEST_DIR
 log_dir=$DEFAULT_LOG_DIR
 conf_dir=$DEFAULT_CONF_DIR
-use_systemd=true
 
 TEMP=$(getopt --options hm:b:t:c:l: \
-              --longoptions help,systemd-disabled,no-systemd \
+              --longoptions help,systemd-disabled \
               --name "$PROG" -- "$@" || true)
 
 eval set -- "$TEMP"
@@ -69,7 +66,6 @@ while true; do
         -t)                   dest_dir=$2; shift 2 ;;
         -c)                   conf_dir=$2; shift 2 ;;
         -l)                   log_dir=$2; shift 2 ;;
-        --no-systemd)         use_systemd=false; shift ;;
         --)                   shift; break ;;
         *)                    echo 'getopt: internal error...'; exit 1 ;;
     esac
@@ -124,17 +120,15 @@ cd "$dest_dir/hare/$HOSTNAME"
 exec 5>&2
 exec 2> >(tee _reportbug.stderr >&2)
 
-if $use_systemd; then
-    systemd_journal
+systemd_journal
 
-    sudo journalctl --no-pager --full --utc --output=json --unit=pacemaker.service \
-         > syslog-pacemaker.json || true
+sudo journalctl --no-pager --full --utc --output=json --unit=pacemaker.service \
+     > syslog-pacemaker.json || true
 
-    sudo systemctl --all --full --no-pager status {hare,m0,motr,s3}\* \
-         > systemctl-status.txt || true
-else
-    running_process_list
-fi
+sudo systemctl --all --full --no-pager status {hare,m0,motr,s3}\* \
+     > systemctl-status.txt || true
+
+running_process_list
 
 # cluster status
 sudo timeout --kill-after 30 15 hctl status \
