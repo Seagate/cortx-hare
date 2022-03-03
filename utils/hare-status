@@ -387,7 +387,7 @@ def show_text_status(cns: Consul, consul_util: ConsulUtil,
             echo(f'    {h} {leader_tag(cns, h)}')
             for p in processes(cns, consul_util, h):
                 fid: str = f'{p.fid}'
-                echo(f'    [{p.status}]  {p.name:<9}  {fid:<23}  {p.ep}')
+                echo(f'    [{p.status}]  {p.name:<18}  {fid:<30}  {p.ep}')
         if devices_requested:
             echo('Devices:')
             for h in node_names(cns):
