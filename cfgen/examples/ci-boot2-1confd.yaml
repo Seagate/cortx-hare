@@ -14,9 +14,9 @@ nodes:
             - path: /dev/vde
             - path: /dev/vdf
             - path: /dev/vdg
-    m0_clients: null
-     # - name: other   # name of the motr client
-     #   instances: 2   # Number of instances, this host will run
+    m0_clients:
+      - name: m0_client_other  # name of the motr client
+        instances: 2   # Number of instances, this host will run
   - hostname: ssu2
     data_iface: eth1
     transport_type: libfab
@@ -29,9 +29,9 @@ nodes:
             - path: /dev/vde
             - path: /dev/vdf
             - path: /dev/vdg
-    m0_clients: null
-     # - name: other   # name of the motr client
-     #   instances: 2   # Number of instances, this host will run
+    m0_clients:
+      - name: m0_client_other  # name of the motr client
+        instances: 2   # Number of instances, this host will run
 pools:
   - name: the pool
     disk_refs:
