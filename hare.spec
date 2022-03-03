@@ -49,7 +49,7 @@ BuildRequires: python3-pip
 BuildRequires: python3-setuptools
 %endif
 
-Requires: consul >= 1.7.0, consul < 1.10.0
+Requires: consul >= 1.9.0, consul < 1.12.0
 %if %{rhel} < 8
 Requires: puppet-agent >= 6.13.0
 %else
