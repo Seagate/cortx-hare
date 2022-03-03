@@ -17,6 +17,7 @@
 #
 
 import logging
+import logging.handlers
 from typing import List
 from threading import Event
 from hax.types import StoppableThread

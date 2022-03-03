@@ -16,15 +16,15 @@
 # please email opensource@seagate.com or cortx-questions@seagate.com.
 #
 
-# Setup utility for Hare to configure Hare related settings, e.g. logrotate,
-# report unsupported features, etc.
+# Setup utility for Hare to configure Hare related settings, e.g. logrotate
+# etc.
 
 import argparse
-import asyncio
 from dataclasses import dataclass
 import inject
 import json
 import logging
+import logging.handlers
 import os
 import shutil
 import subprocess
@@ -36,7 +36,6 @@ from typing import Any, Callable, Dict, List
 from threading import Event
 
 import yaml
-from cortx.utils.product_features import unsupported_features
 from cortx.utils.cortx import Const
 from hax.common import di_configuration
 from hax.types import KeyDelete, Fid
@@ -125,13 +124,6 @@ def get_data_from_provisioner_cli(method, output_format='json') -> str:
     return json.loads(res)['ret'] if res else 'unknown'
 
 
-def _report_unsupported_features(features_unavailable):
-    uf_db = unsupported_features.UnsupportedFeaturesDB()
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(
-        uf_db.store_unsupported_features('hare', features_unavailable))
-
-
 @func_log(func_enter, func_leave)
 def get_server_type(url: str) -> str:
     try:
@@ -206,27 +198,6 @@ def logrotate(url: str):
 
 
 @func_log(func_enter, func_leave)
-def unsupported_feature(url: str):
-    try:
-        features_unavailable = []
-        path = '/opt/seagate/cortx/hare/conf/setup_info.json'
-        with open(path) as hare_features_info:
-            hare_unavailable_features = json.load(hare_features_info)
-
-            server_type = get_server_type(url)
-            logging.info('Server type (%s)', server_type)
-
-            if server_type != 'unknown':
-                for setup in hare_unavailable_features['setup_types']:
-                    if setup['server_type'] == server_type:
-                        features_unavailable.extend(
-                            setup['unsupported_features'])
-                        _report_unsupported_features(features_unavailable)
-    except Exception as error:
-        logging.error('Error reporting hare unsupported features (%s)', error)
-
-
-@func_log(func_enter, func_leave)
 def _create_consul_namespace(hare_local_dir: str):
     log_dir = f'{hare_local_dir}/consul/log'
     if not os.path.exists(log_dir):
@@ -294,9 +265,6 @@ def post_install(args):
     checkRpm('cortx-py-utils')
     # we need to check for 'rgw' rpm
     # checkRpm('cortx-s3server')
-
-    if args.report_unavailable_features:
-        unsupported_feature(args.config[0])
 
     if args.configure_logrotate:
         logrotate_generic(args.config[0])
@@ -727,10 +695,6 @@ def generate_support_bundle(args):
         cmd.append('-c')
         cmd.append(conf_dir)
 
-        provider = ConfStoreProvider(url)
-        if provider.get('cortx>common>setup_type') == 'K8':
-            cmd.append('--no-systemd')
-
         execute(cmd)
     except Exception as error:
         raise RuntimeError(f'Error while generating support bundle : {error}')
@@ -1051,10 +1015,6 @@ def create_parser() -> argparse.ArgumentParser:
                        'post_install',
                        help_str='Validates installation',
                        handler_fn=post_install))
-    parser.add_argument(
-        '--report-unavailable-features',
-        help='Report unsupported features according to setup type',
-        action='store_true')
     parser.add_argument('--configure-logrotate',
                         help='Configure logrotate for hare',
                         action='store_true')
