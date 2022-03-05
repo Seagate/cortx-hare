@@ -32,7 +32,7 @@ from hax.motr.ffi import HaxFFI, make_array, make_c_str
 from hax.motr.planner import WorkPlanner
 from hax.types import (ByteCountStats, ConfHaProcess, Fid, FidStruct, FsStats,
                        HaLinkMessagePromise, HaNote, HaNoteStruct, HAState,
-                       MessageId, ObjT, FidTypeToObjT, Profile, PverState,
+                       MessageId, ObjT, FidTypeToObjT, Profile, PverInfo,
                        ReprebStatus, ObjHealth,
                        m0HaProcessEvent, m0HaProcessType)
 from hax.util import ConsulUtil, repeat_if_fails, FidWithType, PutKV
@@ -718,13 +718,13 @@ class Motr:
                   bytecount.pvers)
         return bytecount
 
-    def get_pver_status(self, pver_fid: Fid) -> PverState:
-        status = self._ffi.pver_status_fetch(
+    def get_pver_status(self, pver_fid: Fid) -> PverInfo:
+        status: PverInfo = self._ffi.pver_status_fetch(
             self._ha_ctx, pver_fid.to_c())
-        if status < 0:
+        if not status:
             raise RuntimeError('Pool version status unavailable')
-        LOG.debug('Pver status for pver %s: %s', pver_fid, status)
-        return PverState(status)
+        LOG.debug('Pver status for pver %s: %s', pver_fid, status.state)
+        return status
 
     def get_repair_status(self, pool_fid: Fid) -> List[ReprebStatus]:
         LOG.debug('Fetching repair status for pool %s', pool_fid)
