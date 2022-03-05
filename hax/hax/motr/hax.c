@@ -266,7 +266,7 @@ PyObject *m0_ha_proc_counters_fetch(unsigned long long ctx,
 /*
  * To be invoked from python land.
  */
-int m0_ha_pver_status(unsigned long long ctx,
+PyObject *m0_ha_pver_status(unsigned long long ctx,
 	struct m0_fid *pver_fid)
 {
 	PyGILState_STATE gstate;
@@ -285,14 +285,26 @@ int m0_ha_pver_status(unsigned long long ctx,
 	Py_END_ALLOW_THREADS if (rc != 0)
 	{
 		PyGILState_Release(gstate);
-		/* This returns error code. */
-		return M0_ERR(rc);
+		/* This returns None python object (which is a singleton)
+		   properly with respect to reference counters. */
+		Py_RETURN_NONE;
 	}
-	M0_LOG(M0_INFO, "FID:"FID_F", Status:%d",
-		FID_P(&pver_info.cpi_fid), pver_info.cpi_state);
-	enum m0_conf_pver_state status  = pver_info.cpi_state;
+	M0_LOG(M0_INFO, "FID:"FID_F", Status:%d, attributes:N=%d"
+			" K=%d, P=%d",
+		FID_P(&pver_info.cpi_fid), pver_info.cpi_state,
+		pver_info.cpi_attr.pa_N, pver_info.cpi_attr.pa_K,
+		pver_info.cpi_attr.pa_P);
+
+	PyObject *hax_mod = getModule("hax.types");
+	PyObject *pfid = toFid(&pver_info.cpi_fid);
+	PyObject *pinfo = PyObject_CallMethod(
+			hax_mod, "PverInfo", "(OIIIII)",
+			pfid, pver_info.cpi_state,
+			pver_info.cpi_attr.pa_N, pver_info.cpi_attr.pa_K,
+			pver_info.cpi_attr.pa_P, pver_info.cpi_attr.pa_unit_size);
+
 	PyGILState_Release(gstate);
-	return status;
+	return pinfo;
 }
 
 static void handle_failvec(const struct hax_msg *hm)
