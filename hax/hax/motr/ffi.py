@@ -136,7 +136,7 @@ class HaxFFI:
 
         lib.m0_ha_pver_status.argtypes = [c.c_void_p,
                                           c.POINTER(FidStruct)]
-        lib.m0_ha_pver_status.restype = c.c_int
+        lib.m0_ha_pver_status.restype = c.py_object
         self.pver_status_fetch = lib.m0_ha_pver_status
 
         lib.repair_status.argtypes = [c.c_void_p, c.POINTER(FidStruct)]

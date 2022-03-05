@@ -117,10 +117,12 @@ PyObject *m0_ha_proc_counters_fetch(unsigned long long ctx,
 	struct m0_fid *proc_fid);
 
 /*
- * Invokes XXX api to fetch the status of the pool version fid,
- * provided as an input.
+ * Invokes m0_spiel_conf_pver_status() to fetch the status and pool version
+ * attributes of the pool version fid provided as an input.
+ *
+ * @return Python object of type hax.types.PverInfo
  */
-int m0_ha_pver_status(unsigned long long ctx, struct m0_fid *pver_fid);
+PyObject *m0_ha_pver_status(unsigned long long ctx, struct m0_fid *pver_fid);
 
 PyObject *m0_hax_stop(unsigned long long ctx, const struct m0_fid *process_fid,
 		      const char *hax_endpoint);
