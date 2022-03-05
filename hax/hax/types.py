@@ -204,6 +204,14 @@ class PverState(IntEnum):
     M0_CPS_DAMAGED = 3
 
 
+PverInfo = NamedTuple('PverInfo', [('fid', Fid),
+                                   ('state', PverState),
+                                   ('data_units', int),
+                                   ('parity_units', int),
+                                   ('pool_width', int),
+                                   ('unit_size', int)])
+
+
 # enum m0_cm_status
 class SnsCmStatus(Enum):
     CM_STATUS_INVALID = 0
