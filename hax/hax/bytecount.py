@@ -16,12 +16,15 @@
 # please email opensource@seagate.com or cortx-questions@seagate.com.
 #
 
+import json
 import logging
+from math import ceil
+import re
 from threading import Event
 from typing import Dict, List, Optional, Tuple
-from hax.exception import HAConsistencyException, InterruptedException
+from hax.exception import HAConsistencyException
 from hax.motr import Motr, log_exception
-from hax.types import (ByteCountStats, Fid, ObjHealth, PverState,
+from hax.types import (ByteCountStats, Fid, ObjHealth, PverInfo,
                        StoppableThread)
 from hax.util import ConsulUtil, wait_for_event
 
@@ -45,12 +48,13 @@ class ByteCountUpdater(StoppableThread):
 
     def _get_pver_with_pver_status(self,
                                    motr: Motr) -> Optional[
-                                       Dict[str, PverState]]:
+                                       Dict[str, PverInfo]]:
         '''
-        Getting a dictionary value of pver and it's state like below example:
-        Ex: {'0x7600000000000001:0x8': PverState.M0_CPS_CRITICAL,
-             '0x7600000000000001:0x9': PverState.M0_CPS_HEALTHY
-            }
+        Storing a map of pver_fid and its state.
+        Ex of pver state:
+        PverInfo(fid=0x7600000000000001:0x3e, state=0,
+        data_units=1, parity_units=0, pool_width=10, unit_size=0)
+
         Pver data is stored in consul kv in format
         key = ioservices/0x7200000000000001:0x20/pvers/
               0x7600000000000001:0x6/users/1
@@ -61,9 +65,56 @@ class ByteCountUpdater(StoppableThread):
         if iosservice_items:
             for k in iosservice_items:
                 p_ver = k['Key'].split('/')[3]
-                pver_items[p_ver] = motr.get_pver_status(Fid.parse(p_ver))
+                pver_info: PverInfo = motr.get_pver_status(Fid.parse(p_ver))
+                pver_items[p_ver] = pver_info
             LOG.debug('Received pool version and status: %s', pver_items)
         return pver_items
+
+    def _calculate_bc_per_pver(
+            self,
+            pver_state: Dict[str, PverInfo]) -> Dict[str, int]:
+        """
+        Based on bytecount data saved in consul KV, aggregate all the
+        bytecount based on pver fid. Discard the parity buffer count based
+        on that pver configuration and return the map of pver fid : bytecount.
+
+        Pver data is stored in consul kv in format
+        key = ioservices/0x7200000000000001:0x20/pvers/
+              0x7600000000000001:0x6/users/1
+        value = {"bc": 4096, "object_cnt": 1}
+        """
+        pver_bc: Dict[str, int] = {}
+        pver_items = self.consul.kv.kv_get('ioservices/', recurse=True)
+        regex = re.compile(
+            '^ioservices\\/.*\\/pvers\\/([^/]+)')
+        if pver_items:
+            for pver in pver_items:
+                match_result = re.match(regex, pver['Key'])
+                if not match_result:
+                    continue
+                byte_count = json.loads(pver['Value'].decode())['bc']
+                pver_fid: str = match_result.group(1)
+                if pver_fid in pver_bc:
+                    pver_bc[pver_fid] += byte_count
+                else:
+                    pver_bc[pver_fid] = byte_count
+
+        LOG.debug('Bytecount with parity buffer: %s', pver_bc)
+
+        bc_without_parity: Dict[str, int] = {}
+        for pver, bc in pver_bc.items():
+            bc_without_parity[pver] = \
+                bc - self._get_parity_buffers(bc, pver_state[pver])
+        LOG.debug('Bytecount without parity buffer: %s', bc_without_parity)
+        return bc_without_parity
+
+    def _get_parity_buffers(self, bc: int, state: PverInfo) -> int:
+        """
+        Calculate the parity buffer count based on pool configuration.
+        """
+        tot_units = state.data_units + state.parity_units
+        bytes_per_unit = ceil(bc / tot_units)
+        return bytes_per_unit * state.parity_units
 
     @log_exception
     def _execute(self, motr: Motr):
@@ -100,8 +151,8 @@ class ByteCountUpdater(StoppableThread):
                 pver_items = self._get_pver_with_pver_status(motr)
                 if not pver_items:
                     continue
-                self.consul.update_bc_for_dg_category(pver_items)
-        except InterruptedException:
+                pver_bc = self._calculate_bc_per_pver(pver_items)
+                self.consul.update_bc_for_dg_category(pver_bc, pver_items)
             # No op. _sleep() has interrupted before the timeout exceeded:
             # the application is shutting down.
             # There are no resources that we need to dispose specially.
