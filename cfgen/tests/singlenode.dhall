@@ -92,7 +92,7 @@ in
                 }
             }
           ]
-      , m0_clients = None (List { name : Text, instances : Natural })
+      , m0_clients = Some [ { name = "m0_client_other", instances = 2 } ]
       }
     ]
 , pools =

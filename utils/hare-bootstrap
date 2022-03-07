@@ -510,21 +510,6 @@ bootstrap_nodes phase1
 # Start ioservices
 bootstrap_nodes phase2
 
-. update-consul-conf --server --dry-run --xprt $xprt # import MOTR_CLIENT_IDS
-if [[ -n $MOTR_CLIENT_IDS ]]; then
-    # Now the 3rd phase (motr clients).
-    say 'Starting motr clients...'
-    bootstrap-node --phase phase3 --xprt $xprt &
-    pids=($!)
-
-    while read node _; do
-        ssh_error_info "$node" "PATH=$PATH $(which bootstrap-node) --phase phase3 --xprt $xprt" &
-        pids+=($!)
-    done < <(get_all_nodes | grep -vw $(node-name) || true)
-    wait4 ${pids[@]}
-    echo ' OK'
-fi
-
 say 'Checking health of services...'
 check_service() {
     local svc=$1
@@ -533,7 +518,7 @@ check_service() {
         fgrep -v '["passing"]' || true
 }
 count=1
-for svc in confd ios s3service; do
+for svc in confd ios; do
     svc_not_ready=$(check_service $svc)
     while [[ $svc_not_ready ]]; do
         if (( $count > 30 )); then
