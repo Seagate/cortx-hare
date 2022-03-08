@@ -17,9 +17,9 @@ nodes:
             - path: /dev/disk/by-id/dm-name-mpathd
             - path: /dev/disk/by-id/dm-name-mpathe
             - path: /dev/disk/by-id/dm-name-mpathf
-    m0_clients: null
-     # - name: other   # name of the motr client
-     #   instances: 2   # Number of instances, this host will run
+    m0_clients:
+      - name: m0_client_other  # name of the motr client
+        instances: 2   # Number of instances, this host will run
   - hostname: srvnode-2
     data_iface: enp175s0f1_c2
     data_iface_type: o2ib
@@ -38,9 +38,9 @@ nodes:
             - path: /dev/disk/by-id/dm-name-mpathj
             - path: /dev/disk/by-id/dm-name-mpathk
             - path: /dev/disk/by-id/dm-name-mpathl
-    m0_clients: null
-     # - name: other   # name of the motr client
-     #   instances: 2   # Number of instances, this host will run
+    m0_clients:
+      - name: m0_client_other  # name of the motr client
+        instances: 2   # Number of instances, this host will run
 pools:
   - name: tier1-nvme
     disk_refs:

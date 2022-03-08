@@ -25,9 +25,9 @@ nodes:
             - path: /dev/loop8 
             - path: /dev/loop9 
           meta_data: null
-    m0_clients: null
-     # - name: other   # name of the motr client
-     #   instances: 2   # Number of instances, this host will run
+    m0_clients:
+      - name: m0_client_other  # name of the motr client
+        instances: 2   # Number of instances, this host will run
 create_aux: false # optional; supported values: "false" (default), "true"
 pools:
   - name: the pool

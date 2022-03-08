@@ -902,7 +902,15 @@ def generate_config(url: str, path_to_cdf: str) -> None:
 
     utils.copy_conf_files(conf_dir)
     utils.copy_consul_files(conf_dir, mode='client')
-    utils.import_kv(conf_dir)
+    # consul-kv.json contains key values for the entire cluster. Thus,
+    # it is sufficent to import consul-kv just once. We fetch one of
+    # the consul kv to check if the key-values were already imported
+    # during start up of one of the nodes in the cluster, this avoids
+    # duplicate imports and thus a possible overwriting of the updated
+    # cluster state.
+    epoch_data = utils.kv.kv_get('epoch')
+    if not epoch_data or epoch_data is None:
+        utils.import_kv(conf_dir)
 
 
 @func_log(func_enter, func_leave)
