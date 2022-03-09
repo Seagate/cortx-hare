@@ -37,6 +37,8 @@ from helper.exec import Program, Executor
 from hare_mp.store import ValueProvider
 from hare_mp.types import Disk, DList, Maybe, Text
 
+LOG_DIR_EXT = '/hare/log/'
+
 
 def func_enter(func):
     """
@@ -147,6 +149,15 @@ class Utils:
                                  'blksize': int(disk.blksize.get())})
         disk_key = path.strip('/')
         self.kv.kv_put(f'{hostname}/{disk_key}', drive_info)
+
+    @func_log(func_enter, func_leave)
+    @repeat_if_fails()
+    def save_log_path(self):
+        hostname = self.get_local_hostname()
+        machine_id = self.provider.get_machine_id()
+        log_key = self.provider.get('cortx>common>storage>log')
+        log_path = log_key + LOG_DIR_EXT + machine_id
+        self.kv.kv_put(f'{hostname}/log_path', log_path)
 
     @func_log(func_enter, func_leave)
     def is_motr_component(self, machine_id: str) -> bool:

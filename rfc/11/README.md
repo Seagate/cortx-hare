@@ -546,6 +546,55 @@ $ hctl fetch-fids -n ssc-vm-c-1813.colo.seagate.com --json
 ]
 ```
 
+In order to fetch fids via http, an endpoint has been added in hax server which returns the fids of all the services.
+The endpoint is /cluster/fetch-fids and can be accessed using a curl command.
+```
+# curl 'http://192.168.59.148:8008/v1/cluster/fetch-fids'
+[
+  {
+    "name": "localhost",
+    "svcs": [
+      {
+        "name": "ioservice",
+        "fid": "0x7200000000000001:0xc",
+        "ep": "inet:tcp:192.168.59.148@21002",
+        "ha_ep": "inet:tcp:192.168.59.148@22001",
+        "uuid": "afeb371c-a069-11ec-bc8b-566fcce40574"
+      },
+      {
+        "name": "m0_client_other",
+        "fid": "0x7200000000000001:0x29",
+        "ep": "inet:tcp:192.168.59.148@21501",
+        "ha_ep": "inet:tcp:192.168.59.148@22001",
+        "profile_fid": "0x7000000000000001:0x4f"
+      },
+      {
+        "name": "m0_client_other",
+        "fid": "0x7200000000000001:0x2c",
+        "ep": "inet:tcp:192.168.59.148@21502",
+        "ha_ep": "inet:tcp:192.168.59.148@22001",
+        "profile_fid": "0x7000000000000001:0x4f"
+      },
+      {
+        "name": "hax",
+        "fid": "0x7200000000000001:0x6",
+        "ep": "inet:tcp:192.168.59.148@22001"
+      },
+      {
+        "name": "confd",
+        "fid": "0x7200000000000001:0x9",
+        "ep": "inet:tcp:192.168.59.148@21001",
+        "ha_ep": "inet:tcp:192.168.59.148@22001",
+        "conf_xc": "/etc/motr/confd.xc",
+        "uuid": "afeb371c-a069-11ec-bc8b-566fcce40574"
+      }
+    ],
+    "ha_ep": "inet:tcp:192.168.59.148@22001",
+    "uuid": "afeb371c-a069-11ec-bc8b-566fcce40574"
+  }
+]
+```
+
 ## Node management
 
 ```
