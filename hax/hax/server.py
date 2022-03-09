@@ -91,6 +91,24 @@ def hctl_stat(request):
     return json_response(text=result)
 
 
+# This function implements the http fetch-fids request and thus, takes
+# request a parameter. The respective result is obtained by executing
+# corresponding `hctl-fetch-fids` script.
+def hctl_fetch_fids(request):
+    """This function calls the hare-fetch-fids script from the hax-server in
+    order to provide details about services configured by Hare e.g. Hax,
+    ios, confd, rgw etc
+    """
+    exec = Executor()
+    env = get_python_env()
+    result = exec.run(Program(["/opt/seagate/cortx/hare/libexec/"
+                               "hare-fetch-fids",
+                               "--all",
+                               "--use-kv-store"]),
+                      env=env)
+    return json_response(text=result)
+
+
 def to_ha_states(data: Any, consul_util: ConsulUtil) -> List[HAState]:
     """Converts a dictionary, obtained from JSON data, into a list of
     HA states.
@@ -323,6 +341,7 @@ class ServerRunner:
             web.get('/', hello_reply),
             web.get('/v1/cluster/status', hctl_stat),
             web.get('/v1/cluster/status/bytecount', bytecount_stat),
+            web.get('/v1/cluster/fetch-fids', hctl_fetch_fids),
             web.post('/', process_ha_states(planner, consul_util)),
             web.post(
                 '/watcher/bq',

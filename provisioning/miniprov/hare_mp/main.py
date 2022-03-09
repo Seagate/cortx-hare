@@ -290,6 +290,7 @@ def prepare(args):
     _create_consul_namespace(conf_dir)
     consul_starter = _start_consul(utils, stop_event, conf_dir, log_dir, url)
     utils.save_config_path(url)
+    utils.save_log_path()
     utils.save_node_facts()
     utils.save_drives_info()
     try:

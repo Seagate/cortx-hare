@@ -23,13 +23,26 @@ import argparse
 import json
 import re
 import sys
+import os
 from typing import List, Optional, Dict, Any
 import logging
+import logging.handlers
 import simplejson
+import inject
+from socket import gethostname
 from hax.types import ObjT
+from hax.common import di_configuration
+from hax.util import ConsulUtil, repeat_if_fails
+from hax.exception import HAConsistencyException
 
 from utils import get_node_name
 from helper.exec import Executor, Program
+
+# This flag will decide how details will be fetched.
+# Flag will be set to True if '--use-kv-store' is passed as argument
+# If flag is set to 'True' then KV store(for e.g. consul) will be used.
+# Default value is 'False' which means details will be fetched from KV file
+g_use_kv_store: bool = False
 
 
 class Node:
@@ -61,6 +74,46 @@ class Node:
 
     def for_json(self):
         return self.__dict__
+
+
+@repeat_if_fails(max_retries=2)
+def get_log_path():
+    cns_utils = ConsulUtil()
+    hostname = gethostname()
+    log_path_key = cns_utils.kv.kv_get(f'{hostname}/log_path')
+
+    if log_path_key is None:
+        log_path = '/var/log/seagate/hare'
+    else:
+        log_path = log_path_key['Value'].decode()
+
+    return log_path
+
+
+def setup_logging() -> None:
+    # Currently if 'hctl fetch-fids' gets called as command then there is
+    # possibility that consul is not accessible as consul client is not
+    # running. In that case default log path will be used. In such case if we
+    # are on LC environment then this default path will not be considered and
+    # hctl.log file will not be part of support bundle generated.
+    try:
+        log_path = get_log_path()
+    except Exception:
+        log_path = '/var/log/seagate/hare'
+
+    log_file = log_path + '/hctl.log'
+    os.makedirs(log_path, exist_ok=True)
+
+    console = logging.StreamHandler(stream=sys.stdout)
+    fhandler = logging.handlers.RotatingFileHandler(log_file,
+                                                    maxBytes=1024 * 1024,
+                                                    mode='a',
+                                                    backupCount=5,
+                                                    encoding=None,
+                                                    delay=False)
+    logging.basicConfig(level=logging.INFO,
+                        handlers=[console, fhandler],
+                        format='%(asctime)s [%(levelname)s] %(message)s')
 
 
 def to_fid(container: int, key: int) -> str:
@@ -276,8 +329,26 @@ def read_file(path: str) -> List[Dict[str, str]]:
     return data
 
 
+@repeat_if_fails(max_retries=5)
+def read_kv() -> Optional[List[Dict[str, str]]]:
+    cns_utils = ConsulUtil()
+    data: List[Dict[str, str]] = []
+    for key in ["m0conf", "m0_client_types"]:
+        kv_data = cns_utils.kv.kv_get(key, recurse=True)
+        if not kv_data:
+            raise RuntimeError(f"'{key}' not found in KV store")
+        for d in kv_data:
+            data.append({'key': d['Key'], 'value': d['Value']})
+
+    return data
+
+
 def get_nodes_for_cluster(path: str) -> List[Node]:
-    file_data: List[Dict[str, str]] = read_file(path)
+    file_data: List[Dict[str, str]] = []
+    if g_use_kv_store:
+        file_data = read_kv()
+    else:
+        file_data = read_file(path)
     nodes: List[Node] = []
     for n in node_names(file_data):
         nodes.append(Node(n))
@@ -350,13 +421,21 @@ def parse_opts(argv):
     p.add_argument('--json',
                    help='show output in JSON format',
                    action='store_true')
+    p.add_argument('--use-kv-store',
+                   help='use KV store for e.g. consul to get data',
+                   action='store_true')
 
     return p.parse_args(argv)
 
 
 def main(argv=None):
     opts = parse_opts(argv)
+    inject.configure(di_configuration)
+    setup_logging()
     try:
+        if opts.use_kv_store:
+            global g_use_kv_store
+            g_use_kv_store = True
         nodes = get_nodes_for_cluster(opts.conf_dir)
 
         if opts.all:
@@ -375,8 +454,12 @@ def main(argv=None):
             else:
                 print(simplejson.dumps(svcs, indent=2, for_json=True))
 
+    except HAConsistencyException as err:
+        logging.error(f"Could not read data from KV store '{err}'")
+        return -1
     except (RuntimeError, FileNotFoundError) as e:
-        print(e, file=sys.stderr)
+        logging.error(e)
+        return -1
 
     return 0
 
