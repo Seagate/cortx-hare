@@ -200,7 +200,7 @@ class Motr:
             util = self.consul_util
             # Disabling dynamic fids allocation until dtm is ready to consume.
             if util.is_proc_client(process_fid) and message.is_first_request:
-                util.alloc_next_process_fid(process_fid)
+                util.update_process_fid(process_fid)
 
             # When stopping, there's a possibility that hax may receive
             # an entrypoint request from motr land. In order to unblock
@@ -321,7 +321,7 @@ class Motr:
             # XXX Commenting until dtm is ready to consume dynamic fids.
             if (st.fid.container == ObjT.PROCESS.value and
                     self.consul_util.is_proc_client(st.fid)):
-                proc_full_fid = self.consul_util.get_process_full_fid(st.fid)
+                proc_full_fid = self.consul_util.get_obj_full_fid(st.fid)
                 st.fid = proc_full_fid
             note = HaNoteStruct(st.fid.to_c(), st.status.to_ha_note_status())
             notes.append(note)
@@ -519,15 +519,17 @@ class Motr:
                                note: HaNoteStruct,
                                cns: ConsulUtil,
                                notify_devices=True,
+                               alloc_fid=False,
                                kv_cache=None) -> List[HaNoteStruct]:
         new_state = note.no_state
-        fid = Fid.from_struct(note.no_id)
-        service_list = cns.get_services_by_parent_process(fid,
+        proc_fid = Fid.from_struct(note.no_id)
+        service_list = cns.get_services_by_parent_process(proc_fid,
                                                           kv_cache=kv_cache)
-        LOG.debug('Process fid=%s encloses %s services as follows: %s', fid,
-                  len(service_list), service_list)
+        LOG.debug('Process fid=%s encloses %s services as follows: %s',
+                  proc_fid, len(service_list), service_list)
         service_notes = [
-            HaNoteStruct(no_id=x.fid.to_c(), no_state=new_state)
+            HaNoteStruct(no_id=cns.get_obj_full_fid(x.fid).to_c(),
+                         no_state=new_state)
             for x in service_list
         ]
         if notify_devices:

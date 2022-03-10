@@ -799,6 +799,13 @@ def create_stub_get(process_type: str) -> Callable[[str, bool], Any]:
                     "name": "localhost",
                     "state": "M0_NC_UNKNOWN"
                 }))
+        elif key == '0x7300000000000001:0x10':
+            return new_kv('0x7300000000000001:0x10',
+                          json.dumps('0x7300000000000001:0x10'))
+        elif key == '0x7300000000000001:0x11':
+            return new_kv('0x7300000000000001:0x11',
+                          json.dumps('0x7300000000000001:0x11'))
+ 
         raise RuntimeError(f'Unexpected call: key={key}, recurse={recurse}')
 
     return my_get
@@ -849,6 +856,9 @@ def test_nonmkfs_process_stop_causes_drive_offline(mocker, motr, consul_util):
                         'get_node_health_status',
                         return_value='passing')
     mocker.patch.object(consul_util, 'update_drive_state')
+    mocker.patch.object(consul_util,
+                        'get_node_health_status',
+                        return_value='passing')
     mocker.patch.object(consul_util,
                         'get_hax_fid',
                         return_value=Fid(0x7200000000000001, 0x6))
