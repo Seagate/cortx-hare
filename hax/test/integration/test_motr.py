@@ -698,6 +698,10 @@ def create_stub_get(process_type: str) -> Callable[[str, bool], Any]:
             return [
                 new_kv(k, v) for k, v in
                 [('m0conf/sites/0x5300000000000001:0x1/racks'
+                  '/0x6100000000000001:0x2/encls/0x6500000000000001:0x4',
+                  json.dumps({"node": "0x6e00000000000001:0x3",
+                              "state": "M0_NC_UNKNOWN"})),
+                 ('m0conf/sites/0x5300000000000001:0x1/racks'
                   '/0x6100000000000001:0x2/encls/0x6500000000000001:0x4'
                   '/ctrls/0x6300000000000001:0x5',
                   json.dumps({"state": "M0_NC_UNKNOWN"})),
@@ -711,6 +715,15 @@ def create_stub_get(process_type: str) -> Callable[[str, bool], Any]:
                   '/ctrls/0x6300000000000001:0x6',
                   json.dumps({"state": "M0_NC_UNKNOWN"}))]
             ]
+        elif (key == 'm0conf/sites/0x5300000000000001:0x1/racks'
+              '/0x6100000000000001:0x2/encls/0x6500000000000001:0x4'):
+            return new_kv(
+                'm0conf/sites/0x5300000000000001:0x1/racks'
+                '/0x6100000000000001:0x2/encls/0x6500000000000001:0x4',
+                json.dumps({
+                    "node": "0x6e00000000000001:0x3",
+                    "state": "M0_NC_UNKNOWN"
+                }))
         elif key == 'processes/0x7200000000000001:0x15':
             return new_kv(
                 'processes/0x7200000000000001',
@@ -832,6 +845,9 @@ def test_nonmkfs_process_stop_causes_drive_offline(mocker, motr, consul_util):
                         'kv_get',
                         side_effect=create_stub_get('M0_CONF_HA_PROCESS_M0D'))
     mocker.patch.object(consul_util.kv, 'kv_put', return_value=0)
+    mocker.patch.object(consul_util,
+                        'get_node_health_status',
+                        return_value='passing')
     mocker.patch.object(consul_util, 'update_drive_state')
     mocker.patch.object(consul_util,
                         'get_hax_fid',

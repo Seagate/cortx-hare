@@ -330,10 +330,11 @@ class m0HaProcessType(IntEnum):
 
 
 class m0HaObjState(IntEnum):
-    M0_NC_UNKNOWN = HaNoteStruct.M0_NC_UNKNOWN
+    M0_NC_UNKNOWN = HaNoteStruct.M0_NC_TRANSIENT
     M0_NC_ONLINE = HaNoteStruct.M0_NC_ONLINE
     M0_NC_FAILED = HaNoteStruct.M0_NC_FAILED
     M0_NC_TRANSIENT = HaNoteStruct.M0_NC_TRANSIENT
+    M0_NC_REPAIR = HaNoteStruct.M0_NC_REPAIR
     M0_NC_REPAIRED = HaNoteStruct.M0_NC_REPAIRED
     M0_NC_REBALANCE = HaNoteStruct.M0_NC_REBALANCE
     M0_NC_NR = HaNoteStruct.M0_NC_NR
@@ -345,10 +346,11 @@ class m0HaObjState(IntEnum):
     def parse(state: str) -> 'm0HaObjState':
 
         states = {
-            'M0_NC_UNKNOWN': m0HaObjState.M0_NC_UNKNOWN,
+            'M0_NC_UNKNOWN': m0HaObjState.M0_NC_TRANSIENT,
             'M0_NC_ONLINE': m0HaObjState.M0_NC_ONLINE,
             'M0_NC_FAILED': m0HaObjState.M0_NC_FAILED,
             'M0_NC_TRANSIENT': m0HaObjState.M0_NC_TRANSIENT,
+            'M0_NC_REPAIR': m0HaObjState.M0_NC_REPAIR,
             'M0_NC_REPAIRED': m0HaObjState.M0_NC_REPAIRED,
             'M0_NC_REBALANCE': m0HaObjState.M0_NC_REBALANCE,
             'M0_NC_NR': m0HaObjState.M0_NC_NR

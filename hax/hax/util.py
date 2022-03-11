@@ -1075,10 +1075,14 @@ class ConsulUtil:
     def get_device_ha_state(self, status: ObjHealth) -> str:
 
         device_ha_state_map = {
-            ObjHealth.UNKNOWN: m0HaObjState.M0_NC_UNKNOWN,
+            ObjHealth.UNKNOWN: m0HaObjState.M0_NC_TRANSIENT,
             ObjHealth.OK: m0HaObjState.M0_NC_ONLINE,
             ObjHealth.OFFLINE: m0HaObjState.M0_NC_TRANSIENT,
-            ObjHealth.FAILED: m0HaObjState.M0_NC_FAILED}
+            ObjHealth.FAILED: m0HaObjState.M0_NC_FAILED,
+            ObjHealth.REPAIR: m0HaObjState.M0_NC_REPAIR,
+            ObjHealth.REPAIRED: m0HaObjState.M0_NC_REPAIRED,
+            ObjHealth.REBALANCE: m0HaObjState.M0_NC_REBALANCE
+            }
         return device_ha_state_map[status].name
 
     @repeat_if_fails()
@@ -1174,16 +1178,14 @@ class ConsulUtil:
             val = json.loads(ctrl['Value'])
             state = val['state']
             LOG.debug('Controller=%s state=%s', ctrl_fid, state)
-            if state == m0HaObjState.M0_NC_ONLINE.name:
-                return m0HaObjState.parse(state)
-            elif state in (m0HaObjState.M0_NC_TRANSIENT.name,
-                           m0HaObjState.M0_NC_FAILED.name):
+            if state in (m0HaObjState.M0_NC_TRANSIENT.name,
+                         m0HaObjState.M0_NC_FAILED.name):
                 node = self.get_ctrl_node(ctrl_fid, kv_cache=kv_cache)
                 if (self.get_node_health_status(node, kv_cache=kv_cache) ==
                         'passing'):
                     return m0HaObjState.M0_NC_ONLINE
-                else:
-                    return m0HaObjState.parse(state)
+            else:
+                return m0HaObjState.parse(state)
         return m0HaObjState.M0_NC_ONLINE
 
     @repeat_if_fails()
@@ -1201,16 +1203,14 @@ class ConsulUtil:
             val = json.loads(encl['Value'])
             state = val['state']
             LOG.debug('Enclosure=%s state=%s', encl_fid, state)
-            if state == m0HaObjState.M0_NC_ONLINE.name:
-                return m0HaObjState.parse(state)
-            elif state in (m0HaObjState.M0_NC_TRANSIENT.name,
-                           m0HaObjState.M0_NC_FAILED.name):
+            if state in (m0HaObjState.M0_NC_TRANSIENT.name,
+                         m0HaObjState.M0_NC_FAILED.name):
                 node = self.get_encl_node(encl_fid, kv_cache=kv_cache)
                 if (self.get_node_health_status(node, kv_cache=kv_cache) ==
                         'passing'):
                     return m0HaObjState.M0_NC_ONLINE
-                else:
-                    return m0HaObjState.parse(state)
+            else:
+                return m0HaObjState.parse(state)
         return m0HaObjState.M0_NC_ONLINE
 
     @repeat_if_fails()
@@ -1225,15 +1225,13 @@ class ConsulUtil:
             val = json.loads(node['Value'])
             state = val['state']
             LOG.debug('Node=%s state=%s', node_fid, state)
-            if state == m0HaObjState.M0_NC_ONLINE.name:
-                return m0HaObjState.parse(state)
-            elif state in (m0HaObjState.M0_NC_TRANSIENT.name,
-                           m0HaObjState.M0_NC_FAILED.name):
+            if state in (m0HaObjState.M0_NC_TRANSIENT.name,
+                         m0HaObjState.M0_NC_FAILED.name):
                 if (self.get_node_health_status(node, kv_cache=kv_cache) ==
                         'passing'):
                     return m0HaObjState.M0_NC_ONLINE
-                else:
-                    return m0HaObjState.parse(state)
+            else:
+                return m0HaObjState.parse(state)
         return m0HaObjState.M0_NC_ONLINE
 
     @staticmethod
@@ -1305,9 +1303,6 @@ class ConsulUtil:
                               device_event=True,
                               kv_cache=None) -> List[PutKV]:
         LOG.debug('Setting sdev=%s in KV with state=%s', sdev_fid, state)
-        # sdev_items = self.kv.kv_get('m0conf/nodes',
-        #                             recurse=True,
-        #                             kv_cache=kv_cache)
         sdev_items = self.get_all_nodes(kv_cache=kv_cache)
         regex = re.compile(f'^m0conf\\/.*\\/sdevs\\/{sdev_fid}$')
         result: List[PutKV] = []
@@ -1326,18 +1321,19 @@ class ConsulUtil:
     @uses_consul_cache
     def get_sdev_state(self, obj_t: ObjT, fidk: int, kv_cache=None) -> int:
         drive_to_ha_state_map = {
-            'unknown': HaNoteStruct.M0_NC_UNKNOWN,
+            'unknown': HaNoteStruct.M0_NC_ONLINE,
+            'm0_nc_unknown': HaNoteStruct.M0_NC_ONLINE,
             'online': HaNoteStruct.M0_NC_ONLINE,
             'offline': HaNoteStruct.M0_NC_TRANSIENT,
-            'failed': HaNoteStruct.M0_NC_FAILED}
+            'failed': HaNoteStruct.M0_NC_FAILED,
+            'repairing': HaNoteStruct.M0_NC_REPAIR,
+            'repaired': HaNoteStruct.M0_NC_REPAIRED,
+            'rebalancing': HaNoteStruct.M0_NC_REBALANCE}
         if obj_t.name == ObjT.DRIVE.name:
             drive_fid = create_drive_fid(fidk)
             sdev_fid = self.drive_to_sdev_fid(drive_fid, kv_cache=kv_cache)
         else:
             sdev_fid = create_sdev_fid(fidk)
-        # sdev_items = self.kv.kv_get('m0conf/nodes',
-        #                             recurse=True,
-        #                             kv_cache=kv_cache)
         sdev_items = self.get_all_nodes(kv_cache=kv_cache)
         regex = re.compile(
             f'^m0conf\\/.*\\/sdevs\\/{sdev_fid}$')
@@ -1347,8 +1343,7 @@ class ConsulUtil:
                 continue
             val = json.loads(sdev['Value'])
             LOG.debug('Sdev=%s state=%s', str(sdev_fid), val['state'])
-            if str(val['state']).lower() in ('unknown', 'offline', 'failed'):
-                return drive_to_ha_state_map[str(val['state']).lower()]
+            return drive_to_ha_state_map[str(val['state']).lower()]
 
         return HaNoteStruct.M0_NC_ONLINE
 
