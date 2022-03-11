@@ -140,20 +140,19 @@ class ConsumerThread(StoppableThread):
                 # will do it.
                 # Corressponding process ONLINE event will be updated when
                 # the process notifies so to Hare.
-                if (current_status == ObjHealth.OFFLINE and (
+                if (current_status in (ObjHealth.OFFLINE,
+                                       ObjHealth.FAILED) and (
                         proc_status_remote.proc_status !=
                         'M0_CONF_HA_PROCESS_STOPPED')):
-                    if self.consul.am_i_rc():
-                        proc_status = (
-                            m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED)
-                        self.consul.update_process_status(
-                            ConfHaProcess(chp_event=proc_status,
-                                          chp_type=proc_type,
-                                          chp_pid=0,
-                                          fid=state.fid))
-                        new_ha_states.append(
-                            HAState(fid=state.fid, status=current_status))
-                    continue
+                    proc_status = (
+                        m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED)
+                    self.consul.update_process_status(
+                        ConfHaProcess(chp_event=proc_status,
+                                      chp_type=proc_type,
+                                      chp_pid=0,
+                                      fid=state.fid))
+                    new_ha_states.append(
+                        HAState(fid=state.fid, status=current_status))
                 if not self.consul.is_proc_local(state.fid):
                     proc_status_local = self.consul.get_process_status_local(
                                             state.fid)
@@ -170,7 +169,8 @@ class ConsumerThread(StoppableThread):
                              'M0_CONF_HA_PROCESS_STARTED')):
                         proc_status = (
                             m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED)
-                    elif current_status == ObjHealth.OFFLINE:
+                    elif current_status in (ObjHealth.OFFLINE,
+                                            ObjHealth.FAILED):
                         if (proc_status_local.proc_status !=
                                 'M0_CONF_HA_PROCESS_STOPPED'):
                             proc_status = (
