@@ -156,7 +156,7 @@ ensure that
 --- | --- | ---
 1 | passwordless `sudo` works for \<user\> | all machines
 2 | \<user\> can `ssh` from \<origin\> to other machines | \<origin\>
-3 | `cortx-hare` and `cortx-s3server` RPMs are installed | all machines
+3 | `cortx-hare` and motr client packages (e.g. `cortx-rgw`, `cortx-s3server`, etc.) RPMs are installed | all machines
 4 | `/opt/seagate/cortx/hare/bin` is in \<user\>'s PATH | all machines
 5 | \<user\> is a member of `hare` group | all machines
 6 | CDF exists and corresponds to the actual cluster configuration | \<origin\>
