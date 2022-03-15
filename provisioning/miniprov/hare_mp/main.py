@@ -556,8 +556,37 @@ def reset(args):
         raise RuntimeError(f'Error during reset : {error}')
 
 
-def kv_cleanup():
+@func_log(func_enter, func_leave)
+@repeat_if_fails()
+def cleanup_node_facts(utils: Utils, cns_utils: ConsulUtil):
+    hostname = utils.get_local_hostname()
+    keys: List[KeyDelete] = [
+        KeyDelete(name=f'{hostname}/facts', recurse=True),
+    ]
+
+    if not cns_utils.kv.kv_delete_in_transaction(keys):
+        logging.error('Delete transaction failed for %s', keys)
+
+
+@func_log(func_enter, func_leave)
+@repeat_if_fails()
+def cleanup_disks_info(utils: Utils, cns_utils: ConsulUtil):
+    hostname = utils.get_local_hostname()
+    keys: List[KeyDelete] = [
+        KeyDelete(name=f'{hostname}/drives', recurse=True),
+    ]
+
+    if not cns_utils.kv.kv_delete_in_transaction(keys):
+        logging.error('Delete transaction failed for %s', keys)
+
+
+@func_log(func_enter, func_leave)
+def kv_cleanup(url):
     util: ConsulUtil = ConsulUtil()
+    conf = ConfStoreProvider(url)
+    utils = Utils(conf)
+    cleanup_disks_info(utils, util)
+    cleanup_node_facts(utils, util)
 
     if is_cluster_running():
         logging.info('Cluster is running, shutting down')
@@ -571,7 +600,11 @@ def kv_cleanup():
         KeyDelete(name='m0conf/', recurse=True),
         KeyDelete(name='processes/', recurse=True),
         KeyDelete(name='stats/', recurse=True),
-        KeyDelete(name='mkfs/', recurse=True)
+        KeyDelete(name='mkfs/', recurse=True),
+        KeyDelete(name='bytecount/', recurse=True),
+        KeyDelete(name='config_path', recurse=False),
+        KeyDelete(name='failvec', recurse=False),
+        KeyDelete(name='m0_client_types', recurse=True)
     ]
 
     logging.info('Deleting Hare KV entries (%s)', keys)
@@ -601,10 +634,11 @@ def get_config_dir(url) -> str:
     return config_path + CONF_DIR_EXT + '/' + machine_id
 
 
+@func_log(func_enter, func_leave)
 def cleanup(args):
     try:
-        kv_cleanup()
         url = args.config[0]
+        kv_cleanup(url)
         logs_cleanup(url)
         config_cleanup(url)
         if args.pre_factory:
