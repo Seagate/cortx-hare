@@ -148,7 +148,7 @@ class Utils:
                                  'size': int(disk.size.get()),
                                  'blksize': int(disk.blksize.get())})
         disk_key = path.strip('/')
-        self.kv.kv_put(f'{hostname}/{disk_key}', drive_info)
+        self.kv.kv_put(f'{hostname}/drives/{disk_key}', drive_info)
 
     @func_log(func_enter, func_leave)
     @repeat_if_fails()
@@ -202,7 +202,7 @@ class Utils:
         drive_info = None
         while (not drive_data or drive_data is None):
             try:
-                drive_data = self.kv.kv_get(f'{hostname}/{disk_path}')
+                drive_data = self.kv.kv_get(f'{hostname}/drives/{disk_path}')
                 drive_info = json.loads(drive_data['Value'])
             except TypeError:
                 logging.info('%s details are not available yet, retrying...',
