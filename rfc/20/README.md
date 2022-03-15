@@ -146,7 +146,8 @@ Exit codes: 0 if no issues found, 1 otherwise.
 | data_iface      | `cluster>{$server-node}>network>data>interfaces` | This is actually a comma-separated list of strings. The first iface will be taken from that list. |
 | io_disks        | `cluster>{$server-node}>storage>data_devices`    |                                                                                                   |
 | data_iface_type | `cluster>{$server-node}>network>data>interface_type` | Data interface type (tcp|o2ib)                                                                |
-| s3_client_count | `cluster>{$server-node}>s3_instances`            | No of s3 server instances                                                                         |
+| name            | `cortx>motr>clients[N]>name`                     | This will give name of the motr clients (e.g. rgw, s3server, etc.)                                |
+| instances       | `cortx>motr>clients[N]>num_instances`            | No of motr clients (e.g. rgw, s3server, etc.) instances                                           |
 
 #### init
 ```
