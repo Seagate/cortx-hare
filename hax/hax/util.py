@@ -206,9 +206,13 @@ class KVAdapter:
             raise HAConsistencyException('Could not access Consul KV') from e
 
     @uses_consul_cache
-    def kv_get(self, key: str, kv_cache=None, **kwargs) -> Any:
+    def kv_get(self, key: str, kv_cache=None,
+               allow_null=False, **kwargs) -> Any:
         LOG.debug('KVGET key=%s, kwargs=%s', key, kwargs)
-        return self.kv_get_raw(key, **kwargs)[1]
+        data = self.kv_get_raw(key, **kwargs)[1]
+        if data is None and allow_null is False:
+            raise HAConsistencyException('Could not get data from Consul KV')
+        return data
 
     @invalidates_consul_cache
     def kv_put(self, key: str, data: str, kv_cache=None, **kwargs) -> bool:
@@ -384,6 +388,7 @@ class ConsulUtil:
         svc = self._local_service_by_name('hax')
         return mk_fid(ObjT.SERVICE, int(svc['ServiceID']) + 1)
 
+    @repeat_if_fails()
     @uses_consul_cache
     def get_rm_fid(self, kv_cache=None) -> Fid:
         rm_node = self.get_session_node(self.get_leader_session())
@@ -401,6 +406,7 @@ class ConsulUtil:
     def get_hax_ip_address(self, kv_cache=None) -> str:
         return self._service_data(kv_cache=kv_cache).ip_addr
 
+    @repeat_if_fails()
     def fid_to_endpoint(self, proc_fid: Fid) -> Optional[str]:
         pfidk = int(proc_fid.key)
         # process_items = self.kv.kv_get('m0conf/nodes', recurse=True)
@@ -425,7 +431,7 @@ class ConsulUtil:
         more details).
         """
 
-        leader = self.kv.kv_get('leader')
+        leader = self.kv.kv_get('leader', allow_null=True)
         if leader is None:
             raise HAConsistencyException('No leader key exists yet')
 
@@ -442,22 +448,22 @@ class ConsulUtil:
         The method either returns the RC leader session or blocks until the
         session becomes available.
         """
-        return self.get_leader_session_no_wait()
+        return str(self.get_leader_session_no_wait())
 
     def get_leader_session_no_wait(self) -> str:
         """
         Returns the RC leader session. HAConsistencyException is raised
         immediately if there is no RC leader selected at the moment.
         """
-        leader = self.kv.kv_get('leader')
         try:
+            leader = self.kv.kv_get('leader')
             return str(leader['Session'])
         except KeyError:
             raise HAConsistencyException(
                 'Could not get the leader from Consul')
 
     def is_leader_value_present_for_session(self) -> bool:
-        leader = self.kv.kv_get('leader')
+        leader = self.kv.kv_get('leader', allow_null=True)
         if leader is None:
             return False
 
@@ -1028,8 +1034,6 @@ class ConsulUtil:
                 process = self.kv.kv_get(p_key,
                                          recurse=False,
                                          kv_cache=kv_cache)
-                if not process:
-                    raise HAConsistencyException('Failed to get process key')
 
                 state = json.loads(process['Value'])['state']
                 if state not in ('stopped', 'failed', 'offline'):
@@ -1440,7 +1444,7 @@ class ConsulUtil:
         if not proc_node:
             proc_node = self.get_process_node(fid, kv_cache=kv_cache)
         key = f'processes/{fid}'
-        status = self.kv.kv_get(key, kv_cache=kv_cache)
+        status = self.kv.kv_get(key, kv_cache=kv_cache, allow_null=True)
         if status:
             val = json.loads(status['Value'])
             return MotrConsulProcInfo(val['state'], val['type'])
@@ -1454,7 +1458,7 @@ class ConsulUtil:
                                  kv_cache=None) -> MotrConsulProcInfo:
         this_node = self.get_local_nodename()
         key = f'{this_node}/processes/{proc_fid}'
-        status = self.kv.kv_get(key, kv_cache=kv_cache)
+        status = self.kv.kv_get(key, kv_cache=kv_cache, allow_null=True)
         if status:
             val = json.loads(status['Value'])
             return MotrConsulProcInfo(val['state'], val['type'])
@@ -1464,7 +1468,7 @@ class ConsulUtil:
     def is_proc_local(self, pfid: Fid) -> bool:
         local_node = self.get_local_nodename()
         proc_node = self.get_process_node(pfid)
-        return proc_node == local_node
+        return bool(proc_node == local_node)
 
     @repeat_if_fails()
     def update_process_status_local(self, event: ConfHaProcess) -> None:
@@ -1662,6 +1666,7 @@ class ConsulUtil:
                                          'to Consul Agent') from e
         return status
 
+    @repeat_if_fails()
     @uses_consul_cache
     def get_process_node(self, proc_fid: Fid, kv_cache=None) -> str:
         fidk = proc_fid.key
@@ -1680,6 +1685,7 @@ class ConsulUtil:
         data = node_val['Value']
         return str(json.loads(data)['name'])
 
+    @repeat_if_fails()
     @uses_consul_cache
     def get_encl_node(self, encl: Fid, kv_cache=None) -> str:
         # 'node/<node_name>/process/<process_fidk>/service/type'
@@ -1704,6 +1710,7 @@ class ConsulUtil:
                   encl, node_fid, node_name)
         return node_name
 
+    @repeat_if_fails()
     @uses_consul_cache
     def get_ctrl_encl(self, ctrl: Fid, kv_cache=None) -> Fid:
         site_items = self.kv.kv_get('m0conf/sites',
@@ -1728,7 +1735,7 @@ class ConsulUtil:
         LOG.debug('ctrl fid: %s encl fid: %s node_name:%s',
                   ctrl, encl_fid, node_name)
 
-        return node_name
+        return str(node_name)
 
     def get_service_process_fid(self, svc_fid: Fid, kv_cache=None) -> Fid:
         assert ObjT.SERVICE.value == svc_fid.container
@@ -1743,6 +1750,7 @@ class ConsulUtil:
         pfid = Fid.parse(process_fid)
         return pfid
 
+    @repeat_if_fails()
     @uses_consul_cache
     def get_profiles(self, kv_cache=None) -> List[Profile]:
         def to_profile(k: str, v: Dict[str, Any]) -> Profile:
@@ -1864,8 +1872,6 @@ class ConsulUtil:
     def get_configpath(self):
         logging.info('Getting config_path')
         config_path = self.kv.kv_get('config_path')
-        if config_path is None:
-            raise HAConsistencyException('config path not present in consul')
 
         return config_path['Value'].decode("utf-8")
 

@@ -436,7 +436,9 @@ def is_mkfs_done_on_all_nodes(utils: Utils,
                               cns_utils: ConsulUtil,
                               nodes: List[str]) -> bool:
     for node in nodes:
-        if not cns_utils.kv.kv_get(f'mkfs_done/{node}', recurse=True):
+        if not cns_utils.kv.kv_get(f'mkfs_done/{node}',
+                                   recurse=True,
+                                   allow_null=True):
             return False
     return True
 
@@ -748,7 +750,9 @@ def all_services_started(url: str, processes: Dict[str, List[Fid]]) -> bool:
         return False
     for key in processes.keys():
         for proc_fid in processes[key]:
-            proc_state = kv.kv_get(f'{key}/processes/{proc_fid}', recurse=True)
+            proc_state = kv.kv_get(f'{key}/processes/{proc_fid}',
+                                   recurse=True,
+                                   allow_null=True)
             if proc_state:
                 proc_state_val = proc_state[0]['Value']
                 state = json.loads(proc_state_val.decode('utf8'))['state']
@@ -872,7 +876,7 @@ def generate_config(url: str, path_to_cdf: str) -> None:
     # during start up of one of the nodes in the cluster, this avoids
     # duplicate imports and thus a possible overwriting of the updated
     # cluster state.
-    epoch_data = utils.kv.kv_get('epoch')
+    epoch_data = utils.kv.kv_get('epoch', allow_null=True)
     if not epoch_data or epoch_data is None:
         utils.import_kv(conf_dir)
 
