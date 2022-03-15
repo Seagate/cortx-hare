@@ -113,8 +113,9 @@ class ByteCountUpdater(StoppableThread):
         Calculate the parity buffer count based on pool configuration.
         """
         tot_units = state.data_units + state.parity_units
-        bytes_per_unit = ceil(bc / tot_units)
-        return bytes_per_unit * state.parity_units
+        percent = state.parity_units / tot_units
+        LOG.debug('Parity buffer percentage %s', percent)
+        return ceil(bc * percent)
 
     @log_exception
     def _execute(self, motr: Motr):
