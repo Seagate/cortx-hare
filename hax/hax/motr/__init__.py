@@ -80,7 +80,7 @@ class Motr:
         self._profile = profile
 
         @repeat_if_fails()
-        def _get_rm_fid() -> Fid:
+        def _get_rm_fid():
             return self.consul_util.get_rm_fid()
 
         rm_fid = _get_rm_fid()
@@ -206,7 +206,7 @@ class Motr:
             if self.is_stopping:
                 confds = []
             else:
-                sess = util.get_leader_session_no_wait()
+                sess = util.get_leader_session()
                 principal_rm = util.get_session_node(sess)
                 confds = util.get_confd_list()
 

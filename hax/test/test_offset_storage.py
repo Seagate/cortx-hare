@@ -55,5 +55,5 @@ class TestOffsetStorage(unittest.TestCase):
         epoch = storage.get_last_read_epoch()
 
         kv.kv_put.assert_called_with('somequeue/server1', '120')
-        kv.kv_get.assert_called_with('somequeue/server1')
+        kv.kv_get.assert_called_with('somequeue/server1', allow_null=True)
         self.assertEqual(120, epoch)

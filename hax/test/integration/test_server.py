@@ -132,7 +132,7 @@ class ContainsStates:
 
 async def test_bq_stob_message_type_recognized(hax_client, planner, herald,
                                                consul_util, mocker):
-    def fake_get(key):
+    def fake_get(key, allow_null):
         ret = {'bq-delivered/192.168.0.28': ''}
         return ret[key]
 
@@ -175,7 +175,7 @@ async def test_bq_stob_message_type_recognized(hax_client, planner, herald,
 
 async def test_bq_stob_message_deserialized(hax_client, planner, herald,
                                             consul_util, mocker):
-    def fake_get(key):
+    def fake_get(key, allow_null):
         ret = {'bq-delivered/192.168.0.28': ''}
         return ret[key]
 

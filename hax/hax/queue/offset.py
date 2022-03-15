@@ -34,7 +34,7 @@ class OffsetStorage:
     @repeat_if_fails()
     def get_last_read_epoch(self) -> int:
         key = get_key_by_node(self.key_prefix, self.node_name)
-        raw = self.kv.kv_get(key)
+        raw = self.kv.kv_get(key, allow_null=True)
         if not raw:
             return -1
         value = raw['Value']
