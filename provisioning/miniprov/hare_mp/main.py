@@ -29,6 +29,7 @@ import os
 import shutil
 import subprocess
 import sys
+import socket
 from enum import Enum
 from sys import exit
 from time import sleep, perf_counter
@@ -222,6 +223,7 @@ def _start_consul(utils: Utils,
 
     provider = ConfStoreProvider(url)
     consul_endpoints = provider.get('cortx>external>consul>endpoints')
+    hostname = utils.get_local_hostname()
 
     # remove tcp://
     peers = []
@@ -233,9 +235,11 @@ def _start_consul(utils: Utils,
         peer = ('/'.join(key[2:]))
         peers.append(peer)
 
+    bind_addr = socket.gethostbyname(hostname)
     consul_starter = ConsulStarter(utils=utils, stop_event=stop_event,
                                    log_dir=log_dir, data_dir=data_dir,
-                                   config_dir=config_dir, peers=peers)
+                                   config_dir=config_dir, peers=peers,
+                                   bind_addr=bind_addr)
     consul_starter.start()
 
     return consul_starter
