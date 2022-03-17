@@ -23,6 +23,16 @@
       }
     },
     {
+      "type": "keyprefix",
+      "prefix": "processes/",
+      "handler_type": "http",
+      "http_handler_config": {
+        "path": "http://localhost:8008/watcher/processes",
+        "method": "POST",
+        "timeout": "10s"
+      }
+    },
+    {
       "type": "service",
       "service": "ios",
       "args": [ "/opt/seagate/cortx/hare/libexec/consul-watch-handler",
