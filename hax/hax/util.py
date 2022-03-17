@@ -703,6 +703,12 @@ class ConsulUtil:
         else:
             pfid = create_process_fid(fidk)
         proc_node = self.get_process_node(pfid, kv_cache=kv_cache)
+        local_node = self.get_local_nodename()
+        # Every motr process requests the entire cluster status, thus if
+        # its the requesting process is the same as the processing one,
+        # we just reply itself as ONLINE instead of running self checks.
+        if proc_node == local_node:
+            return HaNoteStruct.M0_NC_ONLINE
         proc_status: ObjHealth = self.get_service_health(proc_node, pfid.key,
                                                          kv_cache=kv_cache)
         return proc_status.to_ha_note_status()
@@ -1249,8 +1255,12 @@ class ConsulUtil:
     def update_process_status(self, event: ConfHaProcess) -> None:
         assert 0 <= event.chp_event < len(ha_process_events), \
             f'Invalid event type: {event.chp_event}'
+        if event.fid == self.get_hax_fid():
+            event_type = 'M0_CONF_HA_PROCESS_HA'
+        else:
+            event_type = m0HaProcessType(event.chp_type).name
         data = json.dumps({'state': ha_process_events[event.chp_event],
-                           'type': m0HaProcessType(event.chp_type).name})
+                           'type': event_type})
         # Maintain statuses for all the motr processes in the cluster
         # for every node so that in case of 1 or more node failures,
         # as every node will receive the node failure event, the failed
@@ -1552,8 +1562,8 @@ class ConsulUtil:
             local_remote_health_ret(ObjHealth.OK,
                                     ObjHealth.OK),
             cur_consul_status('passing', 'M0_CONF_HA_PROCESS_STOPPED'):
-            local_remote_health_ret(ObjHealth.OFFLINE,
-                                    ObjHealth.OFFLINE),
+            local_remote_health_ret(ObjHealth.OK,
+                                    ObjHealth.OK),
             cur_consul_status('passing', 'Unknown'):
             local_remote_health_ret(ObjHealth.UNKNOWN,
                                     ObjHealth.UNKNOWN),

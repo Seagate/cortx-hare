@@ -132,20 +132,50 @@ class ConsumerThread(StoppableThread):
                     continue
                 proc_type = m0HaProcessType.str_to_Enum(
                      proc_status_remote.proc_type)
-                # Consul reports process failure, if that process died
-                # abruptly, its corresponding status might not have been
-                # persisted. Thus, its the RC's responsibility to update
-                # its status. So, we check the current status of the
-                # process and if the status was persisted, if not then RC
-                # will do it.
-                # Corressponding process ONLINE event will be updated when
-                # the process notifies so to Hare.
-                if (current_status in (ObjHealth.OFFLINE,
-                                       ObjHealth.FAILED) and (
+                # Following cases are handled here,
+                # 1. Delayed consul service failure notification:
+                # -  We re-confirm the current process state before notifying
+                #    the process as offline/failed.
+                # 2. Consul reported process failure, current process
+                #    state is offline (this means the corresponding node is
+                #    online, i.e. hax and consul are online):
+                # -  So process's status in consul kv might not be updated
+                #    as the process died abruptly. In this case we handle it
+                #    as local process failure, update the process status
+                #    in consul kv and notify motr.
+                # 3. Consul reported process failure, current process state is
+                #    failed (this means the node corresponding to the process
+                #    also failed, i.e. hax and consul are no more):
+                # -  Process's status in consul kv might not be updated as the
+                #    node went down abruptly. In this case, when consul reports
+                #    failure for corresponding node processes, Hare verifies
+                #    the node status and accordingly Hare RC node processes the
+                #    failures. This may take some time if Consul server loose
+                #    the quorum and take time sync up the state.
+                # 4. Consul reported process failure, probably due to mkfs
+                #    process completion (m0tr mkfs and m0ds share the same
+                #    fid). which got delayed and process has starting now:
+                # -  Hare checks the current status of the process but it is
+                #    possible that the process state is not synced up yet
+                #    within the quorum. In this case, we continue processing
+                #    the failure event but once the process starts successfully
+                #    Hare will update and notify the process state eventually.
+                if ((current_status in (ObjHealth.OFFLINE,
+                                        ObjHealth.FAILED) and (
                         proc_status_remote.proc_status !=
-                        'M0_CONF_HA_PROCESS_STOPPED')):
-                    proc_status = (
-                        m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED)
+                        'M0_CONF_HA_PROCESS_STOPPED')) or
+                    (current_status == ObjHealth.OK and (
+                        proc_status_remote.proc_status !=
+                        'M0_CONF_HA_PROCESS_STARTED'))):
+                    if ((self.consul.am_i_rc() and
+                            current_status == ObjHealth.FAILED) or
+                            (self.consul.is_proc_local(state.fid) and
+                             current_status == ObjHealth.OFFLINE)):
+                        proc_status = (
+                            m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED)
+                    else:
+                        proc_status = (
+                            m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED)
                     self.consul.update_process_status(
                         ConfHaProcess(chp_event=proc_status,
                                       chp_type=proc_type,
