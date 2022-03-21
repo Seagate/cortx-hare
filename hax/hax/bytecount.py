@@ -22,7 +22,7 @@ from math import ceil
 import re
 from threading import Event
 from typing import Dict, List, Optional, Tuple
-from hax.exception import HAConsistencyException
+from hax.exception import HAConsistencyException, InterruptedException
 from hax.motr import Motr, log_exception
 from hax.types import (ByteCountStats, Fid, ObjHealth, PverInfo,
                        StoppableThread)
@@ -146,13 +146,14 @@ class ByteCountUpdater(StoppableThread):
                                       'error is swallowed since new attempts '
                                       'will be made timely')
 
-                wait_for_event(self.event, self.interval_sec)
-
                 pver_items = self._get_pver_with_pver_status(motr)
                 if not pver_items:
                     continue
                 pver_bc = self._calculate_bc_per_pver(pver_items)
                 self.consul.update_bc_for_dg_category(pver_bc, pver_items)
+
+                wait_for_event(self.event, self.interval_sec)
+        except InterruptedException:
             # No op. _sleep() has interrupted before the timeout exceeded:
             # the application is shutting down.
             # There are no resources that we need to dispose specially.
