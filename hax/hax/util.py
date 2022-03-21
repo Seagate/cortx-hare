@@ -525,7 +525,7 @@ class ConsulUtil:
                 svc_health = self.get_service_health(node,
                                                      item.fid.key,
                                                      kv_cache=kv_cache)
-            result += [(item, svc_health) for item in data]
+                result += [(item, svc_health)]
         return result
 
     def get_service_data_by_name(self, name: str) -> List[ServiceData]:
