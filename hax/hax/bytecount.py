@@ -131,26 +131,26 @@ class ByteCountUpdater(StoppableThread):
                     self.consul.get_proc_fids_with_status(['ios'])
                 if not processes:
                     continue
-                for ios, status in processes:
-                    if status == ObjHealth.OK:
-                        byte_count: ByteCountStats = motr.get_proc_bytecount(
-                            ios)
-                        LOG.debug('Received bytecount: %s', byte_count)
-                        if not byte_count:
-                            continue
-                        try:
+                try:
+                    for ios, status in processes:
+                        if status == ObjHealth.OK:
+                            byte_count: ByteCountStats = \
+                                motr.get_proc_bytecount(ios)
+                            LOG.debug('Received bytecount: %s', byte_count)
+                            if not byte_count:
+                                continue
                             self.consul.update_pver_bc(byte_count)
-                        except HAConsistencyException:
-                            LOG.debug('Failed to update Consul KV '
-                                      'due to an intermittent error. The '
-                                      'error is swallowed since new attempts '
-                                      'will be made timely')
 
-                pver_items = self._get_pver_with_pver_status(motr)
-                if not pver_items:
-                    continue
-                pver_bc = self._calculate_bc_per_pver(pver_items)
-                self.consul.update_bc_for_dg_category(pver_bc, pver_items)
+                    pver_items = self._get_pver_with_pver_status(motr)
+                    if not pver_items:
+                        continue
+                    pver_bc = self._calculate_bc_per_pver(pver_items)
+                    self.consul.update_bc_for_dg_category(pver_bc, pver_items)
+                except HAConsistencyException:
+                    LOG.debug('Failed to update Consul KV '
+                              'due to an intermittent error. The '
+                              'error is swallowed since new attempts '
+                              'will be made timely')
 
                 wait_for_event(self.event, self.interval_sec)
         except InterruptedException:
