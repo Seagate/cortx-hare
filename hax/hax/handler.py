@@ -128,7 +128,7 @@ class ConsumerThread(StoppableThread):
                 # processes.
                 if proc_status_remote.proc_type in (
                         'Unknown',
-                        str(m0HaProcessType.M0_CONF_HA_PROCESS_M0MKFS)):
+                        m0HaProcessType.M0_CONF_HA_PROCESS_M0MKFS.name):
                     continue
                 proc_type = m0HaProcessType.str_to_Enum(
                      proc_status_remote.proc_type)
@@ -160,6 +160,12 @@ class ConsumerThread(StoppableThread):
                 #    within the quorum. In this case, we continue processing
                 #    the failure event but once the process starts successfully
                 #    Hare will update and notify the process state eventually.
+                # 5. For some reason Consul may report a process as offline and
+                #    subsequently report it as online, this may happen due to
+                #    intermittent monitor failure:
+                # -  Hare must handle the change in process states accordingly
+                #    in-order to maintain the eventual consistency of the
+                #    cluster state.
                 if ((current_status in (ObjHealth.OFFLINE,
                                         ObjHealth.FAILED) and (
                         proc_status_remote.proc_status !=
@@ -167,20 +173,31 @@ class ConsumerThread(StoppableThread):
                     (current_status == ObjHealth.OK and (
                         proc_status_remote.proc_status !=
                         'M0_CONF_HA_PROCESS_STARTED'))):
-                    if ((self.consul.am_i_rc() and
-                            current_status == ObjHealth.FAILED) or
-                            (self.consul.is_proc_local(state.fid) and
-                             current_status == ObjHealth.OFFLINE)):
+                    if (self.consul.am_i_rc() and
+                            current_status == ObjHealth.FAILED):
+                        # This means that the process's node is not alive
+                        # thus, in such a case, only RC must be allowed to
+                        # update the process's persistent state.
                         proc_status = (
                             m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED)
-                    else:
-                        proc_status = (
-                            m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED)
-                    self.consul.update_process_status(
-                        ConfHaProcess(chp_event=proc_status,
-                                      chp_type=proc_type,
-                                      chp_pid=0,
-                                      fid=state.fid))
+                    elif self.consul.is_proc_local(state.fid):
+                        # If the process's node is alive then allow the node
+                        # to update the local process's state.
+                        if current_status == ObjHealth.OFFLINE:
+                            proc_status = (
+                                m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED)
+                        elif current_status == ObjHealth.OK:
+                            proc_status = (
+                                m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED)
+                    if proc_status is not None:
+                        self.consul.update_process_status(
+                            ConfHaProcess(chp_event=proc_status,
+                                          chp_type=proc_type,
+                                          chp_pid=0,
+                                          fid=state.fid))
+                    # RC or not RC, i.e. even without persistent state update,
+                    # it is important that the notification to local motr
+                    # processes must still be sent.
                     new_ha_states.append(
                         HAState(fid=state.fid, status=current_status))
                 if not self.consul.is_proc_local(state.fid):
