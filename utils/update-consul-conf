@@ -158,6 +158,11 @@ get_profile_from_kv_file() {
     eval $cmd || true
 }
 
+get_hax_http_port_from_kv_file() {
+    local cmd="jq -r '.[] | select (.key==\"ports/hax\") | .value' $kv_file | jq -r '.http'"
+    eval $cmd || true
+}
+
 get_service_addr() {
     if [[ $xprt == 'lnet' ]]; then
         echo ${1%:*}
@@ -282,6 +287,8 @@ fi
 
 SVCS_CONF=''
 
+hax_http_port=$(get_hax_http_port_from_kv_file)
+
 append_hax_svc() {
     local id=$1
     local ep=$(get_service_ep_from_kv_file $id)
@@ -295,7 +302,8 @@ append_hax_svc() {
       \"port\": $port,
       \"meta\":
           {
-            \"transport_type\": \"$xprt\"
+            \"transport_type\": \"$xprt\",
+            \"http_port\": \"$hax_http_port\"
           },
       \"checks\": [
           {
@@ -470,6 +478,7 @@ fi
 
 sed -i "s|TMP_CONF_DIR|$conf_dir|" $tmpfile
 sed -i "s|TMP_LOG_DIR|$log_dir|" $tmpfile
+sed -i "s|HAX_HTTP_PORT|$hax_http_port|" $tmpfile
 
 sudo cp $tmpfile $CONF_FILE
 # Copy consul-server-conf for this node to consul dir.

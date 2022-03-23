@@ -57,6 +57,7 @@ pools:
 #    substrings: ["Bucket-Name", "Object-Name", "Object-URI"]
 #network_ports:
 #    hax: 22000
+#    hax_http: 8008
 #    m0_server: 21000
 #    m0_client_s3: 22500
 #    m0_client_other: 21500

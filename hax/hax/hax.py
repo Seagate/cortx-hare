@@ -173,6 +173,7 @@ def main():
     # bootstrapping operations.
     _remove_stale_session(util)
     cfg: HL_Fids = _get_motr_fids(util)
+    hax_http_port = util.get_hax_http_port()
 
     LOG.info('Welcome to HaX')
     LOG.info(f'Setting up ha_link interface with the options as follows: '
@@ -212,10 +213,13 @@ def main():
                               herald,
                               consul_util=util,
                               hax_state=state)
-        server.run(threads_to_wait=[
-            *consumer_threads, stats_updater, bc_updater, rconfc_starter,
-            event_poller
-        ])
+        server.run(threads_to_wait=[*consumer_threads,
+                                    stats_updater,
+                                    bc_updater,
+                                    rconfc_starter,
+                                    event_poller
+                                    ],
+                   port=hax_http_port)
     except Exception:
         LOG.exception('Exiting due to an exception')
     finally:
