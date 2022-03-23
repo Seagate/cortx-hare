@@ -1376,7 +1376,10 @@ class ConsulUtil:
             if not match_result:
                 continue
             value = json.loads(sdev['Value'])
-            if not device_event and value['state'] == 'failed':
+            if not device_event and value['state'] in ('failed',
+                                                       'repairing',
+                                                       'repaired',
+                                                       'rebalancing'):
                 continue
             value['state'] = state
             result.append(PutKV(key=sdev['Key'], value=json.dumps(value)))
