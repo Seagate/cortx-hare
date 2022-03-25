@@ -146,7 +146,7 @@ def is_mkfs_required(url: str) -> bool:
         conf = ConfStoreProvider(url)
         utils = Utils(conf)
         machine_id = conf.get_machine_id()
-        return utils.is_motr_component(machine_id)
+        return utils.is_motr_io_present(machine_id)
     except Exception as error:
         logging.warn('Failed to get pod type (%s). Current stage will '
                      'be assumed as not required by default', error)
