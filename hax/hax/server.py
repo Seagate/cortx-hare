@@ -119,14 +119,19 @@ def to_ha_states(data: Any, consul_util: ConsulUtil) -> List[HAState]:
     if not data:
         return []
 
-    def get_status(checks: List[Dict[str, Any]]) -> ObjHealth:
-        ok = all(x.get('Status') == 'passing' for x in checks)
-        return ObjHealth.OK if ok else ObjHealth.FAILED
-
-    return [
-        HAState(fid=create_process_fid(int(t['Service']['ID'])),
-                status=get_status(t['Checks'])) for t in data
-    ]
+    ha_states = []
+    for node in data:
+        svc_status = ObjHealth.OK
+        for check in node['Checks']:
+            if check.get('Status') != 'passing':
+                svc_status = ObjHealth.FAILED
+            svc_id = check.get('ServiceID')
+            if svc_id:
+                ha_states.append(HAState(
+                    fid=create_process_fid(int(svc_id)),
+                    status=svc_status))
+    LOG.debug('Reporting ha states: %s', ha_states)
+    return ha_states
 
 
 def process_ha_states(planner: WorkPlanner, consul_util: ConsulUtil):

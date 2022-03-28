@@ -340,6 +340,7 @@ class m0HaProcessType(IntEnum):
     M0_CONF_HA_PROCESS_KERNEL = 1
     M0_CONF_HA_PROCESS_M0MKFS = 2
     M0_CONF_HA_PROCESS_M0D = 3
+    M0_CONF_HA_PROCESS_HA = 4
 
     @staticmethod
     def str_to_Enum(t: str):
@@ -350,7 +351,9 @@ class m0HaProcessType(IntEnum):
                  'M0_CONF_HA_PROCESS_M0MKFS':
                  m0HaProcessType.M0_CONF_HA_PROCESS_M0MKFS,
                  'M0_CONF_HA_PROCESS_M0D':
-                 m0HaProcessType.M0_CONF_HA_PROCESS_M0D}
+                 m0HaProcessType.M0_CONF_HA_PROCESS_M0D,
+                 'M0_CONF_HA_PROCESS_HA':
+                 m0HaProcessType.M0_CONF_HA_PROCESS_HA}
         return types[t]
 
     def __repr__(self):

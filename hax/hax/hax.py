@@ -30,6 +30,7 @@ import codecs
 import os
 
 from hax.common import HaxGlobalState, di_configuration
+from hax.exception import HAConsistencyException
 from hax.filestats import FsStatsUpdater
 from hax.ha import create_ha_thread
 from hax.handler import ConsumerThread
@@ -108,13 +109,16 @@ def _remove_stale_session(util: ConsulUtil) -> None:
 
 @repeat_if_fails()
 def _get_motr_fids(util: ConsulUtil) -> HL_Fids:
-    hax_ep: str = util.get_hax_endpoint()
-    hax_fid: Fid = util.get_hax_fid()
-    ha_fid: Fid = util.get_ha_fid()
-    profiles = util.get_profiles()
-    if not profiles:
-        raise RuntimeError('Configuration error: no profile '
-                           'is found in Consul KV')
+    try:
+        hax_ep: str = util.get_hax_endpoint()
+        hax_fid: Fid = util.get_hax_fid()
+        ha_fid: Fid = util.get_ha_fid()
+        profiles = util.get_profiles()
+        if (not hax_ep or not hax_fid or not ha_fid
+                or not profiles):
+            raise HAConsistencyException('failed to get motr fids')
+    except Exception as e:
+        raise HAConsistencyException('failed to get motr fids') from e
     return HL_Fids(hax_ep, hax_fid, ha_fid, profiles)
 
 
