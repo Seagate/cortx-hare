@@ -1318,7 +1318,7 @@ class ConsulUtil:
         assert 0 <= event.chp_event < len(ha_process_events), \
             f'Invalid event type: {event.chp_event}'
         if event.fid == self.get_hax_fid():
-            event_type = 'M0_CONF_HA_PROCESS_HA'
+            event_type = m0HaProcessType.M0_CONF_HA_PROCESS_HA.name
         else:
             event_type = m0HaProcessType(event.chp_type).name
         data = json.dumps({'state': ha_process_events[event.chp_event],
@@ -1710,20 +1710,26 @@ class ConsulUtil:
     @repeat_if_fails()
     @uses_consul_cache
     def get_process_node(self, proc_fid: Fid, kv_cache=None) -> str:
-        fidk = proc_fid.key
-        # 'node/<node_name>/process/<process_fidk>/service/type'
-        # node_items = self.kv.kv_get('m0conf/nodes',
-        #                             recurse=True,
-        #                             kv_cache=kv_cache)
-        node_items = self.get_all_nodes(kv_cache=kv_cache)
-        if ObjT.PROCESS.value == proc_fid.container:
-            keys = self.get_process_keys(node_items, fidk)
-        elif ObjT.SERVICE.value == proc_fid.container:
-            keys = self.get_service_keys(node_items, fidk)
-        key = keys[0].split('/')
-        node_key = ('/'.join(key[:3]))
-        node_val = self.kv.kv_get(node_key, kv_cache=kv_cache)
-        data = node_val['Value']
+        try:
+            fidk = proc_fid.key
+            # 'node/<node_name>/process/<process_fidk>/service/type'
+            # node_items = self.kv.kv_get('m0conf/nodes',
+            #                             recurse=True,
+            #                             kv_cache=kv_cache)
+            node_items = self.get_all_nodes(kv_cache=kv_cache)
+            if ObjT.PROCESS.value == proc_fid.container:
+                keys = self.get_process_keys(node_items, fidk)
+            elif ObjT.SERVICE.value == proc_fid.container:
+                keys = self.get_service_keys(node_items, fidk)
+            LOG.debug('proc_fid: %s keys: %s', proc_fid, keys)
+            if not keys:
+                raise HAConsistencyException('Failed to get process node')
+            key = keys[0].split('/')
+            node_key = ('/'.join(key[:3]))
+            node_val = self.kv.kv_get(node_key, kv_cache=kv_cache)
+            data = node_val['Value']
+        except Exception as e:
+            raise HAConsistencyException('failed to get process node') from e
         return str(json.loads(data)['name'])
 
     @repeat_if_fails()
