@@ -20,10 +20,17 @@ import logging
 from dataclasses import dataclass
 from typing import List, Optional
 
-from cortx.utils.message_bus import MessageConsumer
+from cortx.utils.message_bus import (MessageConsumer, MessageProducer,
+                                     MessageBus, MessageBusAdmin)
 
 from ha.core.event_manager.subscribe_event import SubscribeEvent
 from ha.core.event_manager.const import EVENT_MANAGER_KEYS
+from ha.fault_tolerance.const import (FAULT_TOLERANCE_KEYS, NOT_DEFINED,
+                                      HEALTH_EVENT_SOURCES)
+from cortx.utils.event_framework.health import HealthAttr, HealthEvent
+
+from hax.util import ConsulUtil
+from cortx.utils.conf_store import Conf
 
 COMPONENT_ID = 'hare'
 
@@ -145,3 +152,81 @@ class EventListener():
            that message using ack method
         """
         self.consumer.ack()
+
+
+class EventProducer():
+    """
+    Module responsible for publishing the event to message bus
+    """
+
+    ADMIN_ID = "hare_admin"
+    __instance = None
+
+    @staticmethod
+    def get_instance():
+        """
+        Static method to fetch the current instance.
+        Performs initialization related to common database and message bus
+        """
+        if not EventProducer.__instance:
+            EventProducer()
+        return EventProducer.__instance
+
+    def __init__(self):
+        logging.debug('Inside EventProducer')
+
+        if EventProducer.__instance is None:
+            EventProducer.__instance = self
+        else:
+            raise Exception("EventProducer is singleton class,"
+                            " use EventProducer.get_instance().")
+
+        message_type = FAULT_TOLERANCE_KEYS.HARE_HA_MESSAGE_TYPE.value
+        self._register_message_type(message_type)
+
+        self.producer = MessageProducer(producer_id=HEALTH_EVENT_SOURCES.HARE,
+                                        message_type=message_type)
+
+    def _register_message_type(self, message_type,
+                               partitions: int = 1):
+        util: ConsulUtil = ConsulUtil()
+        configpath = util.get_configpath()
+        Conf.load('cortx_conf', configpath)
+
+        message_server_endpoints = Conf.get('cortx_conf',
+                                            'cortx>external>kafka>endpoints')
+        MessageBus.init(message_server_endpoints)
+
+        admin = MessageBusAdmin(admin_id=self.ADMIN_ID)
+        try:
+            if message_type not in admin.list_message_types():
+                admin.register_message_type(message_types=[message_type],
+                                            partitions=partitions)
+        except Exception as e:
+            if "TOPIC_ALREADY_EXISTS" not in str(e):
+                raise(e)
+
+    def create_node_event(self, res_name, health_status, generation_id):
+        self.payload = {
+            HealthAttr.SOURCE.value: HEALTH_EVENT_SOURCES.HARE.value,
+            HealthAttr.CLUSTER_ID.value: NOT_DEFINED,
+            HealthAttr.SITE_ID.value: NOT_DEFINED,
+            HealthAttr.RACK_ID.value: NOT_DEFINED,
+            HealthAttr.STORAGESET_ID.value: NOT_DEFINED,
+            HealthAttr.NODE_ID.value: res_name,
+            HealthAttr.RESOURCE_TYPE.value: 'node',
+            HealthAttr.RESOURCE_ID.value: res_name,
+            HealthAttr.RESOURCE_STATUS.value: health_status,
+            HealthAttr.SPECIFIC_INFO.value: {}
+            }
+
+        self.event = HealthEvent(**self.payload)
+
+        # 'specific_info' is resource type specific information.
+        # For e.g. incase of Node 'generation_id' will be pod name
+        self.event.set_specific_info({"generation_id": generation_id})
+        return self.event.json
+
+    def publish(self, event: HealthEvent):
+        event_to_send = json.dumps(event)
+        self.producer.send([event_to_send])
