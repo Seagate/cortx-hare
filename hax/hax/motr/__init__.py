@@ -23,7 +23,8 @@ from typing import Any, List, Optional, Tuple
 from time import sleep
 
 from hax.consul.cache import supports_consul_cache, uses_consul_cache
-from hax.exception import ConfdQuorumException, RepairRebalanceException
+from hax.exception import (BytecountException, ConfdQuorumException,
+                           RepairRebalanceException)
 from hax.message import (EntrypointRequest, FirstEntrypointRequest,
                          HaNvecGetEvent, HaNvecSetEvent, ProcessEvent,
                          StobIoqError)
@@ -712,7 +713,7 @@ class Motr:
         bytecount: ByteCountStats = self._ffi.proc_bytecount_fetch(
             self._ha_ctx, proc_fid.to_c())
         if not bytecount:
-            raise RuntimeError('Bytecount stats unavailable')
+            raise BytecountException('Bytecount stats unavailable')
         LOG.debug('Bytecount status for proc fid: %s, stats =%s',
                   str(bytecount.proc_fid),
                   bytecount.pvers)
@@ -722,7 +723,7 @@ class Motr:
         status: PverInfo = self._ffi.pver_status_fetch(
             self._ha_ctx, pver_fid.to_c())
         if not status:
-            raise RuntimeError('Pool version status unavailable')
+            raise BytecountException('Pool version status unavailable')
         LOG.debug('Pver status for pver %s: %s', pver_fid, status.state)
         return status
 

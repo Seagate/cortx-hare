@@ -22,7 +22,8 @@ from math import ceil
 import re
 from threading import Event
 from typing import Dict, List, Optional, Tuple
-from hax.exception import HAConsistencyException, InterruptedException
+from hax.exception import (BytecountException, HAConsistencyException,
+                           InterruptedException)
 from hax.motr import Motr, log_exception
 from hax.types import (ByteCountStats, Fid, ObjHealth, PverInfo,
                        StoppableThread)
@@ -65,8 +66,10 @@ class ByteCountUpdater(StoppableThread):
         if iosservice_items:
             for k in iosservice_items:
                 p_ver = k['Key'].split('/')[3]
-                pver_info: PverInfo = motr.get_pver_status(Fid.parse(p_ver))
-                pver_items[p_ver] = pver_info
+                if p_ver not in pver_items:
+                    pver_info: PverInfo = motr.get_pver_status(
+                        Fid.parse(p_ver))
+                    pver_items[p_ver] = pver_info
             LOG.debug('Received pool version and status: %s', pver_items)
         return pver_items
 
@@ -147,11 +150,13 @@ class ByteCountUpdater(StoppableThread):
                     pver_bc = self._calculate_bc_per_pver(pver_items)
                     self.consul.update_bc_for_dg_category(pver_bc, pver_items)
                 except HAConsistencyException:
-                    LOG.debug('Failed to update Consul KV '
-                              'due to an intermittent error. The '
-                              'error is swallowed since new attempts '
-                              'will be made timely')
-
+                    LOG.exception('Failed to update Consul KV '
+                                  'due to an intermittent error. The '
+                                  'error is swallowed since new attempts '
+                                  'will be made timely')
+                except BytecountException as e:
+                    LOG.exception('Failed due to %s. Aborting this iteration.'
+                                  ' Waiting for next attempt.', e.message)
                 wait_for_event(self.event, self.interval_sec)
         except InterruptedException:
             # No op. _sleep() has interrupted before the timeout exceeded:
@@ -161,4 +166,4 @@ class ByteCountUpdater(StoppableThread):
         except Exception:
             LOG.exception('Aborting due to an error')
         finally:
-            LOG.debug('byte-count updater thread exited')
+            LOG.exception('byte-count updater thread exited')
