@@ -26,6 +26,16 @@ let M0ClientDesc =
       , instances : Natural
       }
 
+let ClientPort =
+      { name: Text
+      , port: Natural
+      }
+
+let ServerPort =
+      { name: Text
+      , port: Natural
+      }
+
 let NodeInfo =
       { hostname : Text
       , machine_id : Optional Text
