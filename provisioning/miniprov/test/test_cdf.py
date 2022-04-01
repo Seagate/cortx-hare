@@ -115,33 +115,33 @@ class TestCDF(unittest.TestCase):
             utils = Utils(store)
             kv = KVAdapter()
             def my_get(key: str, recurse: bool = False):
-                if key == 'srvnode-1.data.private/dev/sda':
-                    return new_kv('srvnode-1.data.private/dev/sda',
+                if key == 'srvnode-1.data.private/drives/dev/sda':
+                    return new_kv('srvnode-1.data.private/drives/dev/sda',
                                   json.dumps({"path": "/dev/sda",
                                               "size": "4096000",
                                               "blksize": "4096"}))
-                elif key == 'srvnode-1.data.private/dev/sdb':
-                    return new_kv('srvnode-1.data.private/dev/sdb',
+                elif key == 'srvnode-1.data.private/drives/dev/sdb':
+                    return new_kv('srvnode-1.data.private/drives/dev/sdb',
                                   json.dumps({"path": "/dev/sdb",
                                               "size": "4096000",
                                               "blksize": "4096"}))
-                elif key == 'srvnode-1.data.private/dev/sdc':
-                    return new_kv('srvnode-1.data.private/dev/sdc',
+                elif key == 'srvnode-1.data.private/drives/dev/sdc':
+                    return new_kv('srvnode-1.data.private/drives/dev/sdc',
                                   json.dumps({"path": "/dev/sdc",
                                               "size": "4096000",
                                               "blksize": "4096"}))
-                elif key == 'srvnode-1.data.private/dev/sdg':
-                    return new_kv('srvnode-1.data.private/dev/sdg',
+                elif key == 'srvnode-1.data.private/drives/dev/sdg':
+                    return new_kv('srvnode-1.data.private/drives/dev/sdg',
                                   json.dumps({"path": "/dev/sdg",
                                               "size": "4096000",
                                               "blksize": "4096"}))
-                elif key == 'srvnode-1.data.private/dev/sdh':
-                    return new_kv('srvnode-1.data.private/dev/sdh',
+                elif key == 'srvnode-1.data.private/drives/dev/sdh':
+                    return new_kv('srvnode-1.data.private/drives/dev/sdh',
                                   json.dumps({"path": "/dev/sdh",
                                               "size": "4096000",
                                               "blksize": "4096"}))
-                elif key == 'srvnode-1.data.private/dev/sdi':
-                    return new_kv('srvnode-1.data.private/dev/sdi',
+                elif key == 'srvnode-1.data.private/drives/dev/sdi':
+                    return new_kv('srvnode-1.data.private/drives/dev/sdi',
                                   json.dumps({"path": "/dev/sdi",
                                               "size": "4096000",
                                               "blksize": "4096"}))
@@ -239,13 +239,13 @@ class TestCDF(unittest.TestCase):
         utils = Utils(store)
         kv = KVAdapter()
         def my_get(key: str, recurse: bool = False):
-            if key == 'srvnode-1.data.private/dev/sdb':
-                return new_kv('srvnode-1.data.private/dev/sdb',
+            if key == 'srvnode-1.data.private/drives/dev/sdb':
+                return new_kv('srvnode-1.data.private/drives/dev/sdb',
                               json.dumps({"path": "/dev/sdb",
                                           "size": "4096000",
                                           "blksize": "4096"}))
-            elif key == 'srvnode-1.data.private/dev/sdc':
-                return new_kv('srvnode-1.data.private/dev/sdc',
+            elif key == 'srvnode-1.data.private/drives/dev/sdc':
+                return new_kv('srvnode-1.data.private/drives/dev/sdc',
                               json.dumps({"path": "/dev/sdb",
                                           "size": "4096000",
                                           "blksize": "4096"}))
@@ -339,13 +339,13 @@ class TestCDF(unittest.TestCase):
         utils = Utils(store)
         kv = KVAdapter()
         def my_get(key: str, recurse: bool = False):
-            if key == 'srvnode-1.data.private/dev/sdb':
-                return new_kv('srvnode-1.data.private/dev/sdb',
+            if key == 'srvnode-1.data.private/drives/dev/sdb':
+                return new_kv('srvnode-1.data.private/drives/dev/sdb',
                               json.dumps({"path": "/dev/sdb",
                                           "size": "4096000",
                                           "blksize": "4096"}))
-            elif key == 'srvnode-1.data.private/dev/sdc':
-                return new_kv('srvnode-1.data.private/dev/sdc',
+            elif key == 'srvnode-1.data.private/drives/dev/sdc':
+                return new_kv('srvnode-1.data.private/drives/dev/sdc',
                               json.dumps({"path": "/dev/sdb",
                                           "size": "4096000",
                                           "blksize": "4096"}))
@@ -601,13 +601,13 @@ class TestCDF(unittest.TestCase):
         utils = Utils(store)
         kv = KVAdapter()
         def my_get(key: str, recurse: bool = False):
-            if key == 'srvnode-1.data.private/dev/sdb':
-                return new_kv('srvnode-1.data.private/dev/sdb',
+            if key == 'srvnode-1.data.private/drives/dev/sdb':
+                return new_kv('srvnode-1.data.private/drives/dev/sdb',
                               json.dumps({"path": "/dev/sdb",
                                           "size": "4096000",
                                           "blksize": "4096"}))
-            elif key == 'srvnode-1.data.private/dev/sdc':
-                return new_kv('srvnode-1.data.private/dev/sdc',
+            elif key == 'srvnode-1.data.private/drives/dev/sdc':
+                return new_kv('srvnode-1.data.private/drives/dev/sdc',
                               json.dumps({"path": "/dev/sdb",
                                           "size": "4096000",
                                           "blksize": "4096"}))
@@ -924,13 +924,13 @@ class TestCDF(unittest.TestCase):
         utils = Utils(store)
         kv = KVAdapter()
         def my_get(key: str, recurse: bool = False):
-            if key == 'srvnode-1.data.private/dev/sdb':
-                return new_kv('srvnode-1.data.private/dev/sdb',
+            if key == 'srvnode-1.data.private/drives/dev/sdb':
+                return new_kv('srvnode-1.data.private/drives/dev/sdb',
                               json.dumps({"path": "/dev/sdb",
                                           "size": "4096000",
                                           "blksize": "4096"}))
-            elif key == 'srvnode-1.data.private/dev/sdc':
-                return new_kv('srvnode-1.data.private/dev/sdc',
+            elif key == 'srvnode-1.data.private/drives/dev/sdc':
+                return new_kv('srvnode-1.data.private/drives/dev/sdc',
                               json.dumps({"path": "/dev/sdb",
                                           "size": "4096000",
                                           "blksize": "4096"}))
@@ -1055,13 +1055,13 @@ class TestCDF(unittest.TestCase):
         utils = Utils(store)
         kv = KVAdapter()
         def my_get(key: str, recurse: bool = False):
-            if key == 'srvnode-1.data.private/dev/sdb':
-                return new_kv('srvnode-1.data.private/dev/sdb',
+            if key == 'srvnode-1.data.private/drives/dev/sdb':
+                return new_kv('srvnode-1.data.private/drives/dev/sdb',
                               json.dumps({"path": "/dev/sdb",
                                           "size": "4096000",
                                           "blksize": "4096"}))
-            elif key == 'srvnode-1.data.private/dev/sdc':
-                return new_kv('srvnode-1.data.private/dev/sdc',
+            elif key == 'srvnode-1.data.private/drives/dev/sdc':
+                return new_kv('srvnode-1.data.private/drives/dev/sdc',
                               json.dumps({"path": "/dev/sdb",
                                           "size": "4096000",
                                           "blksize": "4096"}))
@@ -1069,13 +1069,13 @@ class TestCDF(unittest.TestCase):
                 return new_kv('srvnode-1.data.private/facts',
                               json.dumps({"processorcount": "16",
                                           "memorysize_mb": "4096.123"}))
-            elif key == 'srvnode-2.data.private/dev/sdb':
-                return new_kv('srvnode-1.data.private/dev/sdb',
+            elif key == 'srvnode-2.data.private/drives/dev/sdb':
+                return new_kv('srvnode-1.data.private/drives/dev/sdb',
                               json.dumps({"path": "/dev/sdb",
                                           "size": "4096000",
                                           "blksize": "4096"}))
-            elif key == 'srvnode-2.data.private/dev/sdc':
-                return new_kv('srvnode-1.data.private/dev/sdc',
+            elif key == 'srvnode-2.data.private/drives/dev/sdc':
+                return new_kv('srvnode-1.data.private/drives/dev/sdc',
                               json.dumps({"path": "/dev/sdb",
                                           "size": "4096000",
                                           "blksize": "4096"}))
@@ -1172,13 +1172,13 @@ class TestCDF(unittest.TestCase):
         utils = Utils(store)
         kv = KVAdapter()
         def my_get(key: str, recurse: bool = False):
-            if key == 'srvnode-1.data.private/dev/sdb':
-                return new_kv('srvnode-1.data.private/dev/sdb',
+            if key == 'srvnode-1.data.private/drives/dev/sdb':
+                return new_kv('srvnode-1.data.private/drives/dev/sdb',
                               json.dumps({"path": "/dev/sdb",
                                           "size": "4096000",
                                           "blksize": "4096"}))
-            elif key == 'srvnode-1.data.private/dev/sdc':
-                return new_kv('srvnode-1.data.private/dev/sdc',
+            elif key == 'srvnode-1.data.private/drives/dev/sdc':
+                return new_kv('srvnode-1.data.private/drives/dev/sdc',
                               json.dumps({"path": "/dev/sdb",
                                           "size": "4096000",
                                           "blksize": "4096"}))
