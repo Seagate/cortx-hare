@@ -98,7 +98,7 @@ and health-checking mechanisms.
   with the below steps to build Hare using Motr sources.
 
   ```sh
-  cd cortx-motr && sudo scripts/install-motr-service --link
+  cd cortx-motr && sudo ./scripts/install-motr-service --link
   export M0_SRC_DIR=$PWD
   cd -
   ```
