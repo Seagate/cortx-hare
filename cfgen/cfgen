@@ -2182,7 +2182,8 @@ Cluster = NamedTuple('Cluster', [('m0conf', Dict[Oid, Any]),
                                  ('consul_servers', List[ConsulAgent]),
                                  ('consul_clients', List[ConsulAgent]),
                                  ('m0_clients', Dict[Oid, Oid]),
-                                 ('m0_client_types', List[str])])
+                                 ('m0_client_types', List[str]),
+                                 ('network_ports', Dict[str, int])])
 
 
 def generate_consul_agents(cluster: Cluster) -> str:
@@ -2305,6 +2306,7 @@ def generate_consul_kv(cluster: Cluster, dhall_dir: str) -> str:
                         root.imeta_pver not in m0conf[x].pvers]
         raise RuntimeError('Impossible happened')
 
+    hax_http_port = cluster.network_ports.get('hax_http', 8008)
     return json.dumps([dict(key=k, value=v) for k, v in (
         ('epoch', 1),
         ('eq-epoch', 1),
@@ -2315,6 +2317,7 @@ def generate_consul_kv(cluster: Cluster, dhall_dir: str) -> str:
         ('bytecount/degraded', 0),
         ('bytecount/critical', 0),
         ('bytecount/damaged', 0),
+        ('ports/hax', json.dumps({'http': hax_http_port})),
         ('m0_client_types', json.dumps(cluster.m0_client_types)),
         *[(node.machine_id, node.name)
           for node_id, node in m0conf.items() if (node_id.type is ObjT.node
@@ -2520,7 +2523,7 @@ def aux_pool_list(pool_desc: Dict[str, Any],
 
 def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
     cluster = Cluster(m0conf={}, consul_servers=[], consul_clients=[],
-                      m0_clients={}, m0_client_types=[])
+                      m0_clients={}, m0_client_types=[], network_ports={})
     conf = cluster.m0conf
     root_id = ConfRoot.build(conf)
     # XXX Move all the logic into ConfRoot.build?
@@ -2532,6 +2535,7 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
 
     ports = cluster_desc.get('network_ports')
     if ports:
+        cluster.network_ports.update({k: v for k, v in ports.items()})
         lnet_portals = get_lnet_portal_group(
                            hax=ports['hax'],
                            m0_server=ports['m0_server'],

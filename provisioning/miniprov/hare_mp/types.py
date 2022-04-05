@@ -166,6 +166,7 @@ class FdmiFilterDesc(DhallTuple):
 @dataclass(repr=False)
 class NetworkPorts(DhallTuple):
     hax: Maybe[int]
+    hax_http: Maybe[int]
     m0_server: Maybe[int]
     m0_client_s3: Maybe[int]
     m0_client_other: Maybe[int]
