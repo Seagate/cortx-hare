@@ -406,6 +406,10 @@ class ConsulUtil:
     def get_hax_ip_address(self, kv_cache=None) -> str:
         return self._service_data(kv_cache=kv_cache).ip_addr
 
+    def get_hax_http_port(self) -> int:
+        return int(self._local_service_by_name('hax')['ServiceMeta'].get(
+            'http_port', 8008))
+
     @repeat_if_fails()
     def fid_to_endpoint(self, proc_fid: Fid) -> Optional[str]:
         pfidk = int(proc_fid.key)

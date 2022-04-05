@@ -261,6 +261,11 @@ class CdfGenerator:
                 url = conf.get('cortx>hare>hax>endpoints', allow_null=True)
                 _hax = url if url is None else \
                     round(urlparse(url[0]).port / 100) * 100
+                _hax_http = None
+                for u in url or ():
+                    _parsed_url = urlparse(u)
+                    if _parsed_url.scheme in ('http', 'https'):
+                        _hax_http = _parsed_url.port
             elif srv == 'm0_client_other':
                 _client_other = None
             elif srv == 'm0_server':
@@ -274,6 +279,7 @@ class CdfGenerator:
 
         return NetworkPorts(
             hax=Maybe(_hax, 'Natural'),
+            hax_http=Maybe(_hax_http, 'Natural'),
             m0_server=Maybe(_ios, 'Natural'),
             m0_client_other=Maybe(_client_other, 'Natural'),
             m0_client_s3=Maybe(_client_s3, 'Natural'))

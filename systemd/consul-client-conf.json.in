@@ -7,7 +7,7 @@
       "service": "ios",
       "handler_type": "http",
       "http_handler_config": {
-        "path": "http://localhost:8008",
+        "path": "http://localhost:HAX_HTTP_PORT",
         "method": "POST",
         "timeout": "10s"
       }
@@ -17,7 +17,7 @@
       "prefix": "bq/",
       "handler_type": "http",
       "http_handler_config": {
-        "path": "http://localhost:8008/watcher/bq",
+        "path": "http://localhost:HAX_HTTP_PORT/watcher/bq",
         "method": "POST",
         "timeout": "10s"
       }
@@ -27,7 +27,7 @@
       "prefix": "processes/",
       "handler_type": "http",
       "http_handler_config": {
-        "path": "http://localhost:8008/watcher/processes",
+        "path": "http://localhost:HAX_HTTP_PORT/watcher/processes",
         "method": "POST",
         "timeout": "10s"
       }
@@ -43,7 +43,7 @@
       "service": "s3service",
       "handler_type": "http",
       "http_handler_config": {
-        "path": "http://localhost:8008",
+        "path": "http://localhost:HAX_HTTP_PORT",
         "method": "POST",
         "timeout": "10s"
       }
