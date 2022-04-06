@@ -42,8 +42,8 @@ and health-checking mechanisms.
 
 * Download `hare`.
   ```sh
-  git clone https://github.com/Seagate/cortx-hare.git hare
-  cd hare
+  git clone https://github.com/Seagate/cortx-hare.git
+  cd cortx-hare
   ```
 
 * Install Python (&ge; 3.6), libraries and header files needed to
