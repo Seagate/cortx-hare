@@ -81,7 +81,7 @@ $ hctl bootstrap --mkfs --xprt libfab /opt/seagate/cortx/hare/share/cfgen/exampl
 2021-12-29 10:39:10: Starting Consul server on this node............ OK
 2021-12-29 10:39:20: Importing configuration into the KV store... OK
 2021-12-29 10:39:20: Starting Consul on other nodes...Consul ready on all nodes
-2021-12-29 10:39:20: Updating Consul configuraton from the KV store... OK
+2021-12-29 10:39:20: Updating Consul configuration from the KV store... OK
 2021-12-29 10:39:21: Waiting for the RC Leader to get elected.......... OK
 2021-12-29 10:39:28: Starting Motr (phase1, mkfs)... OK
 2021-12-29 10:39:35: Starting Motr (phase1, m0d)... OK

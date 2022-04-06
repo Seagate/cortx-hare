@@ -429,7 +429,7 @@ done
 echo 'Consul ready on all nodes'
 
 if [[ $opt_mkfs ]]; then
-    say 'Updating Consul configuraton from the KV store...'
+    say 'Updating Consul configuration from the KV store...'
     update-consul-conf --server --xprt $xprt &
     pid=($!)
     wait4 ${pid[@]}
