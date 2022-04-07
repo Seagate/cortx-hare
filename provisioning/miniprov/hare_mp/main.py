@@ -16,19 +16,20 @@
 # please email opensource@seagate.com or cortx-questions@seagate.com.
 #
 
-# Setup utility for Hare to configure Hare related settings, e.g. logrotate,
-# report unsupported features, etc.
+# Setup utility for Hare to configure Hare related settings, e.g. logrotate
+# etc.
 
 import argparse
-import asyncio
 from dataclasses import dataclass
 import inject
 import json
 import logging
+import logging.handlers
 import os
 import shutil
 import subprocess
 import sys
+import socket
 from enum import Enum
 from sys import exit
 from time import sleep, perf_counter
@@ -36,7 +37,6 @@ from typing import Any, Callable, Dict, List
 from threading import Event
 
 import yaml
-from cortx.utils.product_features import unsupported_features
 from cortx.utils.cortx import Const
 from hax.common import di_configuration
 from hax.types import KeyDelete, Fid
@@ -125,13 +125,6 @@ def get_data_from_provisioner_cli(method, output_format='json') -> str:
     return json.loads(res)['ret'] if res else 'unknown'
 
 
-def _report_unsupported_features(features_unavailable):
-    uf_db = unsupported_features.UnsupportedFeaturesDB()
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(
-        uf_db.store_unsupported_features('hare', features_unavailable))
-
-
 @func_log(func_enter, func_leave)
 def get_server_type(url: str) -> str:
     try:
@@ -206,27 +199,6 @@ def logrotate(url: str):
 
 
 @func_log(func_enter, func_leave)
-def unsupported_feature(url: str):
-    try:
-        features_unavailable = []
-        path = '/opt/seagate/cortx/hare/conf/setup_info.json'
-        with open(path) as hare_features_info:
-            hare_unavailable_features = json.load(hare_features_info)
-
-            server_type = get_server_type(url)
-            logging.info('Server type (%s)', server_type)
-
-            if server_type != 'unknown':
-                for setup in hare_unavailable_features['setup_types']:
-                    if setup['server_type'] == server_type:
-                        features_unavailable.extend(
-                            setup['unsupported_features'])
-                        _report_unsupported_features(features_unavailable)
-    except Exception as error:
-        logging.error('Error reporting hare unsupported features (%s)', error)
-
-
-@func_log(func_enter, func_leave)
 def _create_consul_namespace(hare_local_dir: str):
     log_dir = f'{hare_local_dir}/consul/log'
     if not os.path.exists(log_dir):
@@ -251,6 +223,7 @@ def _start_consul(utils: Utils,
 
     provider = ConfStoreProvider(url)
     consul_endpoints = provider.get('cortx>external>consul>endpoints')
+    hostname = utils.get_local_hostname()
 
     # remove tcp://
     peers = []
@@ -262,9 +235,11 @@ def _start_consul(utils: Utils,
         peer = ('/'.join(key[2:]))
         peers.append(peer)
 
+    bind_addr = socket.gethostbyname(hostname)
     consul_starter = ConsulStarter(utils=utils, stop_event=stop_event,
                                    log_dir=log_dir, data_dir=data_dir,
-                                   config_dir=config_dir, peers=peers)
+                                   config_dir=config_dir, peers=peers,
+                                   bind_addr=bind_addr)
     consul_starter.start()
 
     return consul_starter
@@ -292,10 +267,8 @@ def post_install(args):
     checkRpm('consul')
     checkRpm('cortx-hare')
     checkRpm('cortx-py-utils')
-    checkRpm('cortx-s3server')
-
-    if args.report_unavailable_features:
-        unsupported_feature(args.config[0])
+    # we need to check for 'rgw' rpm
+    # checkRpm('cortx-s3server')
 
     if args.configure_logrotate:
         logrotate_generic(args.config[0])
@@ -321,6 +294,7 @@ def prepare(args):
     _create_consul_namespace(conf_dir)
     consul_starter = _start_consul(utils, stop_event, conf_dir, log_dir, url)
     utils.save_config_path(url)
+    utils.save_log_path()
     utils.save_node_facts()
     utils.save_drives_info()
     try:
@@ -467,7 +441,9 @@ def is_mkfs_done_on_all_nodes(utils: Utils,
                               cns_utils: ConsulUtil,
                               nodes: List[str]) -> bool:
     for node in nodes:
-        if not cns_utils.kv.kv_get(f'mkfs_done/{node}', recurse=True):
+        if not cns_utils.kv.kv_get(f'mkfs_done/{node}',
+                                   recurse=True,
+                                   allow_null=True):
             return False
     return True
 
@@ -587,8 +563,37 @@ def reset(args):
         raise RuntimeError(f'Error during reset : {error}')
 
 
-def kv_cleanup():
+@func_log(func_enter, func_leave)
+@repeat_if_fails()
+def cleanup_node_facts(utils: Utils, cns_utils: ConsulUtil):
+    hostname = utils.get_local_hostname()
+    keys: List[KeyDelete] = [
+        KeyDelete(name=f'{hostname}/facts', recurse=True),
+    ]
+
+    if not cns_utils.kv.kv_delete_in_transaction(keys):
+        logging.error('Delete transaction failed for %s', keys)
+
+
+@func_log(func_enter, func_leave)
+@repeat_if_fails()
+def cleanup_disks_info(utils: Utils, cns_utils: ConsulUtil):
+    hostname = utils.get_local_hostname()
+    keys: List[KeyDelete] = [
+        KeyDelete(name=f'{hostname}/drives', recurse=True),
+    ]
+
+    if not cns_utils.kv.kv_delete_in_transaction(keys):
+        logging.error('Delete transaction failed for %s', keys)
+
+
+@func_log(func_enter, func_leave)
+def kv_cleanup(url):
     util: ConsulUtil = ConsulUtil()
+    conf = ConfStoreProvider(url)
+    utils = Utils(conf)
+    cleanup_disks_info(utils, util)
+    cleanup_node_facts(utils, util)
 
     if is_cluster_running():
         logging.info('Cluster is running, shutting down')
@@ -602,7 +607,11 @@ def kv_cleanup():
         KeyDelete(name='m0conf/', recurse=True),
         KeyDelete(name='processes/', recurse=True),
         KeyDelete(name='stats/', recurse=True),
-        KeyDelete(name='mkfs/', recurse=True)
+        KeyDelete(name='mkfs/', recurse=True),
+        KeyDelete(name='bytecount/', recurse=True),
+        KeyDelete(name='config_path', recurse=False),
+        KeyDelete(name='failvec', recurse=False),
+        KeyDelete(name='m0_client_types', recurse=True)
     ]
 
     logging.info('Deleting Hare KV entries (%s)', keys)
@@ -632,10 +641,11 @@ def get_config_dir(url) -> str:
     return config_path + CONF_DIR_EXT + '/' + machine_id
 
 
+@func_log(func_enter, func_leave)
 def cleanup(args):
     try:
-        kv_cleanup()
         url = args.config[0]
+        kv_cleanup(url)
         logs_cleanup(url)
         config_cleanup(url)
         if args.pre_factory:
@@ -726,10 +736,6 @@ def generate_support_bundle(args):
         cmd.append('-c')
         cmd.append(conf_dir)
 
-        provider = ConfStoreProvider(url)
-        if provider.get('cortx>common>setup_type') == 'K8':
-            cmd.append('--no-systemd')
-
         execute(cmd)
     except Exception as error:
         raise RuntimeError(f'Error while generating support bundle : {error}')
@@ -783,7 +789,9 @@ def all_services_started(url: str, processes: Dict[str, List[Fid]]) -> bool:
         return False
     for key in processes.keys():
         for proc_fid in processes[key]:
-            proc_state = kv.kv_get(f'{key}/processes/{proc_fid}', recurse=True)
+            proc_state = kv.kv_get(f'{key}/processes/{proc_fid}',
+                                   recurse=True,
+                                   allow_null=True)
             if proc_state:
                 proc_state_val = proc_state[0]['Value']
                 state = json.loads(proc_state_val.decode('utf8'))['state']
@@ -891,11 +899,26 @@ def generate_config(url: str, path_to_cdf: str) -> None:
            '--log-dir', get_log_dir(url),
            '--log-file', LOG_FILE,
            '--uuid', provider.get_machine_id()]
-    execute(cmd, env={'PYTHONPATH': python_path, 'PATH': path,
-                      'LC_ALL': "en_US.utf-8", 'LANG': "en_US.utf-8"})
+
+    locale_info = execute(['locale', '-a'])
+    env = {'PYTHONPATH': python_path, 'PATH': path}
+
+    if 'en_US.utf-8' in locale_info or 'en_US.utf8' in locale_info:
+        env.update({'LC_ALL': "en_US.utf-8", 'LANG': "en_US.utf-8"})
+
+    execute(cmd, env)
+
     utils.copy_conf_files(conf_dir)
     utils.copy_consul_files(conf_dir, mode='client')
-    utils.import_kv(conf_dir)
+    # consul-kv.json contains key values for the entire cluster. Thus,
+    # it is sufficent to import consul-kv just once. We fetch one of
+    # the consul kv to check if the key-values were already imported
+    # during start up of one of the nodes in the cluster, this avoids
+    # duplicate imports and thus a possible overwriting of the updated
+    # cluster state.
+    epoch_data = utils.kv.kv_get('epoch', allow_null=True)
+    if not epoch_data or epoch_data is None:
+        utils.import_kv(conf_dir)
 
 
 @func_log(func_enter, func_leave)
@@ -1036,10 +1059,6 @@ def create_parser() -> argparse.ArgumentParser:
                        'post_install',
                        help_str='Validates installation',
                        handler_fn=post_install))
-    parser.add_argument(
-        '--report-unavailable-features',
-        help='Report unsupported features according to setup type',
-        action='store_true')
     parser.add_argument('--configure-logrotate',
                         help='Configure logrotate for hare',
                         action='store_true')

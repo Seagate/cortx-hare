@@ -122,6 +122,13 @@ is_systemd_enabled() {
    fi
 }
 
+locale_set() {
+    if [[ `locale -a 2>/dev/null | grep "en_US.utf8"` ]]; then
+        export LANG="en_US.UTF-8"
+        export LC_ALL="en_US.UTF-8"
+    fi
+}
+
 # process commands
 case $cmd in
     help) usage; exit ;;
@@ -133,6 +140,7 @@ case $cmd in
         PATH="$HARE_BASE_DIR/libexec:$PATH"
         PATH="$HARE_BASE_DIR/bin:$PATH"
         export PATH
+        locale_set
 
         # TODO: python3.6 version can be different
         PYTHONPATH="$HARE_BASE_DIR/lib/python3.6/site-packages"
@@ -154,6 +162,7 @@ case $cmd in
         PATH="$HARE_BASE_DIR/libexec:$PATH"
         PATH="$HARE_BASE_DIR/bin:$PATH"
         export PATH
+        locale_set
 
         # TODO: python3.6 version can be different
         PYTHONPATH="$HARE_BASE_DIR/lib/python3.6/site-packages"

@@ -17,6 +17,7 @@
 #
 
 import logging
+import logging.handlers
 from typing import List
 from threading import Event
 from hax.types import StoppableThread
@@ -67,7 +68,9 @@ class ConsulStarter(StoppableThread):
                                                       delay=False)
             LOG.addHandler(fh)
             cmd = ['consul', 'agent', f'-bind={self.bind_addr}',
-                   f'-client={self.client_addr}', '-datacenter=dc1',
+                   f'-advertise={self.bind_addr}',
+                   f'-client=127.0.0.1 {self.bind_addr}',
+                   '-datacenter=dc1',
                    f'-data-dir={self.data_dir}', '-enable-script-checks',
                    f'-config-dir={self.config_dir}', '-domain=consul',
                    '-serf-lan-port=8301']

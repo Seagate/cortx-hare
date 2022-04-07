@@ -42,8 +42,8 @@ and health-checking mechanisms.
 
 * Download `hare`.
   ```sh
-  git clone https://github.com/Seagate/cortx-hare.git hare
-  cd hare
+  git clone https://github.com/Seagate/cortx-hare.git
+  cd cortx-hare
   ```
 
 * Install Python (&ge; 3.6), libraries and header files needed to
@@ -98,7 +98,7 @@ and health-checking mechanisms.
   with the below steps to build Hare using Motr sources.
 
   ```sh
-  cd cortx-motr && sudo scripts/install-motr-service --link
+  cd cortx-motr && sudo ./scripts/install-motr-service --link
   export M0_SRC_DIR=$PWD
   cd -
   ```
@@ -156,7 +156,7 @@ ensure that
 --- | --- | ---
 1 | passwordless `sudo` works for \<user\> | all machines
 2 | \<user\> can `ssh` from \<origin\> to other machines | \<origin\>
-3 | `cortx-hare` and `cortx-s3server` RPMs are installed | all machines
+3 | `cortx-hare` and motr client packages (e.g. `cortx-rgw`, `cortx-s3server`, etc.) RPMs are installed | all machines
 4 | `/opt/seagate/cortx/hare/bin` is in \<user\>'s PATH | all machines
 5 | \<user\> is a member of `hare` group | all machines
 6 | CDF exists and corresponds to the actual cluster configuration | \<origin\>

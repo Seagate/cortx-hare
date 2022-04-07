@@ -39,8 +39,8 @@ nodes:
           data: [ <str> ]   # e.g. [ "/dev/loop0", "/dev/loop1", "/dev/loop2" ]
                             # Empty list means no IO service.
     m0_clients:
-        s3: <int>     # number of S3 servers to start
-        other: <int>  # max quantity of other Motr clients this host may have
+      - name: m0_client_other  # name of the motr client
+        instances: 2   # Number of instances, this host will run
 pools:
   - name: <str>
     type: sns|dix|md   # optional, defaults to "sns";

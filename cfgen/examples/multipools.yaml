@@ -18,8 +18,8 @@ nodes:
             - path: /dev/disk/by-id/dm-name-mpathe
             - path: /dev/disk/by-id/dm-name-mpathf
     m0_clients:
-      s3: 11
-      other: 3
+      - name: m0_client_other  # name of the motr client
+        instances: 2   # Number of instances, this host will run
   - hostname: srvnode-2
     data_iface: enp175s0f1_c2
     data_iface_type: o2ib
@@ -39,8 +39,8 @@ nodes:
             - path: /dev/disk/by-id/dm-name-mpathk
             - path: /dev/disk/by-id/dm-name-mpathl
     m0_clients:
-      s3: 11
-      other: 3
+      - name: m0_client_other  # name of the motr client
+        instances: 2   # Number of instances, this host will run
 pools:
   - name: tier1-nvme
     disk_refs:
@@ -81,6 +81,7 @@ profiles:
     pools: [ tier1-nvme, tier2-ssd, tier3-hdd ]
 #network_ports:
 #    hax: 22000
+#    hax_http: 8008
 #    m0_server: 21000
 #    m0_client_s3: 22500
 #    m0_client_other: 21500

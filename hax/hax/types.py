@@ -213,6 +213,34 @@ FsStatsWithTime = NamedTuple('FsStatsWithTime', [('stats', FsStats),
                                                  ('timestamp', float),
                                                  ('date', str)])
 
+# pver byte count
+PverBC = NamedTuple('PverBC', [('pver_fid', Fid),
+                               ('user_id', int),
+                               ('byte_count', int),
+                               ('object_count', int)])
+
+
+# struct m0_proc_counter
+class ByteCountStats(NamedTuple):
+    proc_fid: Fid
+    pvers: List[PverBC]
+
+
+# enum m0_conf_pver_state
+class PverState(IntEnum):
+    M0_CPS_HEALTHY = 0
+    M0_CPS_DEGRADED = 1
+    M0_CPS_CRITICAL = 2
+    M0_CPS_DAMAGED = 3
+
+
+PverInfo = NamedTuple('PverInfo', [('fid', Fid),
+                                   ('state', PverState),
+                                   ('data_units', int),
+                                   ('parity_units', int),
+                                   ('pool_width', int),
+                                   ('unit_size', int)])
+
 
 # enum m0_cm_status
 class SnsCmStatus(Enum):
@@ -348,6 +376,7 @@ class m0HaProcessType(IntEnum):
     M0_CONF_HA_PROCESS_KERNEL = 1
     M0_CONF_HA_PROCESS_M0MKFS = 2
     M0_CONF_HA_PROCESS_M0D = 3
+    M0_CONF_HA_PROCESS_HA = 4
 
     @staticmethod
     def str_to_Enum(t: str):
@@ -358,7 +387,9 @@ class m0HaProcessType(IntEnum):
                  'M0_CONF_HA_PROCESS_M0MKFS':
                  m0HaProcessType.M0_CONF_HA_PROCESS_M0MKFS,
                  'M0_CONF_HA_PROCESS_M0D':
-                 m0HaProcessType.M0_CONF_HA_PROCESS_M0D}
+                 m0HaProcessType.M0_CONF_HA_PROCESS_M0D,
+                 'M0_CONF_HA_PROCESS_HA':
+                 m0HaProcessType.M0_CONF_HA_PROCESS_HA}
         return types[t]
 
     def __repr__(self):
@@ -366,10 +397,11 @@ class m0HaProcessType(IntEnum):
 
 
 class m0HaObjState(IntEnum):
-    M0_NC_UNKNOWN = HaNoteStruct.M0_NC_UNKNOWN
+    M0_NC_UNKNOWN = HaNoteStruct.M0_NC_TRANSIENT
     M0_NC_ONLINE = HaNoteStruct.M0_NC_ONLINE
     M0_NC_FAILED = HaNoteStruct.M0_NC_FAILED
     M0_NC_TRANSIENT = HaNoteStruct.M0_NC_TRANSIENT
+    M0_NC_REPAIR = HaNoteStruct.M0_NC_REPAIR
     M0_NC_REPAIRED = HaNoteStruct.M0_NC_REPAIRED
     M0_NC_REBALANCE = HaNoteStruct.M0_NC_REBALANCE
     M0_NC_DTM_RECOVERING = HaNoteStruct.M0_NC_DTM_RECOVERING
@@ -382,10 +414,11 @@ class m0HaObjState(IntEnum):
     def parse(state: str) -> 'm0HaObjState':
 
         states = {
-            'M0_NC_UNKNOWN': m0HaObjState.M0_NC_UNKNOWN,
+            'M0_NC_UNKNOWN': m0HaObjState.M0_NC_TRANSIENT,
             'M0_NC_ONLINE': m0HaObjState.M0_NC_ONLINE,
             'M0_NC_FAILED': m0HaObjState.M0_NC_FAILED,
             'M0_NC_TRANSIENT': m0HaObjState.M0_NC_TRANSIENT,
+            'M0_NC_REPAIR': m0HaObjState.M0_NC_REPAIR,
             'M0_NC_REPAIRED': m0HaObjState.M0_NC_REPAIRED,
             'M0_NC_REBALANCE': m0HaObjState.M0_NC_REBALANCE,
             'M0_NC_DTM_RECOVERING': m0HaObjState.M0_NC_DTM_RECOVERING,

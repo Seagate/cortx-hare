@@ -191,8 +191,8 @@ nodes:
           data: [ <str> ]   # e.g. [ "/dev/loop0", "/dev/loop1", "/dev/loop2" ]
                             # Empty list means no IO service.
     m0_clients:
-        s3: <int>     # number of S3 servers to start
-        other: <int>  # max quantity of other Motr clients this host may have
+        - name: <str>      # name of the motr client to start(e.g. s3, rgw)
+          instances: <int> # number of client instances to start
 pools:
   - name: <str>
     type: sns|dix|md   # optional, defaults to "sns";
@@ -513,8 +513,13 @@ Make sure the value of data_iface in the CDF is correct.""")
                 f'Node {name}: The same disk is used by several IO services')
         total_nr_disks += len(disks)
 
+        nr_clients = 0
+        if 'm0_clients' in node and node['m0_clients'] is not None:
+            for client in node['m0_clients']:
+                nr_clients += client['instances']
+
         _assert(
-            nr_confds + node['m0_clients']['s3'] + node['m0_clients']['other']
+            nr_confds + nr_clients
             > 0, f'Node {name}: At least one Motr server or '
             'client is required')
 
@@ -1152,13 +1157,15 @@ class ConfProcess(ToDhall):
 
     def __init__(self, nr_cpu: int, memsize_MB: int,
                  endpoint,
-                 services: List[Oid], meta_data: str = None):
+                 services: List[Oid], meta_data: str = None,
+                 proc_name: str = None):
         _assert(nr_cpu > 0, 'nr_cpu must be positive')
         self.nr_cpu = nr_cpu
         _assert(memsize_MB > 0, 'memsize_MB must be positive')
         self.memsize_MB = memsize_MB
         self.endpoint = endpoint
         self.meta_data = meta_data
+        self.proc_name = proc_name
         _assert(all(x.type is ObjT.service for x in services),
                 'All services must be of ObjT.service type')
         self.services = services
@@ -1188,7 +1195,8 @@ class ConfProcess(ToDhall):
               node_desc: Dict[str, Any],
               proc_t: ProcT,
               proc_desc: Dict[str, Any] = None,
-              ctrl: Optional[Oid] = None) -> Oid:
+              ctrl: Optional[Oid] = None,
+              proc_name: str = None) -> Oid:
         _assert(parent.type is ObjT.node,
                 f'Parent must be ObjT.node but {parent.type} was given')
         if ctrl is not None:
@@ -1220,7 +1228,8 @@ class ConfProcess(ToDhall):
                               memsize_MB=facts['_memsize_MB'],
                               endpoint=ep,
                               meta_data=meta_data,
-                              services=[])
+                              services=[],
+                              proc_name=proc_name)
         m0conf[parent].processes.append(proc_id)
 
         params = []
@@ -2270,7 +2279,9 @@ ConsulAgent = NamedTuple('ConsulAgent', [('node_name', str), ('ipaddr', str)])
 Cluster = NamedTuple('Cluster', [('m0conf', Dict[Oid, Any]),
                                  ('consul_servers', List[ConsulAgent]),
                                  ('consul_clients', List[ConsulAgent]),
-                                 ('m0_clients', Dict[Oid, Oid])])
+                                 ('m0_clients', Dict[Oid, Oid]),
+                                 ('m0_client_types', List[str]),
+                                 ('network_ports', Dict[str, int])])
 
 
 def generate_consul_agents(cluster: Cluster) -> str:
@@ -2387,12 +2398,11 @@ def generate_consul_kv(cluster: Cluster, dhall_dir: str) -> str:
                                         meta_data=proc.meta_data)
                 # Add Motr clients to consul kv
                 if proc_id in cluster.m0_clients:
-                    proc_ep = m0conf[proc_id].endpoint
                     yield ConsulService(node_name=node.name,
                                         proc_id=proc_id,
                                         ep=proc.endpoint,
                                         svc_id=cluster.m0_clients[proc_id],
-                                        stype=proc_ep.portalgroup.name,
+                                        stype=m0conf[proc_id].proc_name,
                                         meta_data=None)
 
     def sns_pools() -> List[Oid]:
@@ -2403,16 +2413,19 @@ def generate_consul_kv(cluster: Cluster, dhall_dir: str) -> str:
                         root.imeta_pver not in m0conf[x].pvers]
         raise RuntimeError('Impossible happened')
 
+    hax_http_port = cluster.network_ports.get('hax_http', 8008)
     return json.dumps([dict(key=k, value=v) for k, v in (
         ('epoch', 1),
         ('eq-epoch', 1),
         ('leader', ''),
         *consul_kv_fidk().items(),
         ('failvec', ''),
-        ('bytecount/healthy_byte_count', 0),
-        ('bytecount/degraded_byte_count', 0),
-        ('bytecount/critical_byte_count', 0),
-        ('bytecount/damaged_byte_count', 0),
+        ('bytecount/healthy', 0),
+        ('bytecount/degraded', 0),
+        ('bytecount/critical', 0),
+        ('bytecount/damaged', 0),
+        ('ports/hax', json.dumps({'http': hax_http_port})),
+        ('m0_client_types', json.dumps(cluster.m0_client_types)),
         *[(node.machine_id, node.name)
           for node_id, node in m0conf.items() if (node_id.type is ObjT.node
                                                   and node.machine_id)],
@@ -2617,7 +2630,7 @@ def aux_pool_list(pool_desc: Dict[str, Any],
 
 def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
     cluster = Cluster(m0conf={}, consul_servers=[], consul_clients=[],
-                      m0_clients={})
+                      m0_clients={}, m0_client_types=[], network_ports={})
     conf = cluster.m0conf
     root_id = ConfRoot.build(conf)
     # XXX Move all the logic into ConfRoot.build?
@@ -2629,6 +2642,7 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
 
     ports = cluster_desc.get('network_ports')
     if ports:
+        cluster.network_ports.update({k: v for k, v in ports.items()})
         lnet_portals = get_lnet_portal_group(
                            hax=ports['hax'],
                            m0_server=ports['m0_server'],
@@ -2681,16 +2695,15 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
                                # XXX use 'mgmt_iface' for consul?
                                ipaddr=ipaddr))
 
-        for client_t, proc_t in [('s3', ProcT.m0_client_s3),
-                                 ('other', ProcT.m0_client_other)]:
-            for _ in range(node['m0_clients'][client_t]):
-                proc_id = ConfProcess.build(conf, node_id, portalgroup, node,
-                                            proc_t)
-                cluster.m0_clients[proc_id] = new_oid(ObjT.service)
-                if client_t == 'other':
-                    if node['hostname'] not in other_clients:
-                        other_clients[node['hostname']] = []
-                    other_clients[node['hostname']].append((node_id, proc_id))
+        if 'm0_clients' in node and node['m0_clients'] is not None:
+            for client in node['m0_clients']:
+                for _ in range(client['instances']):
+                    proc_id = ConfProcess.build(conf, node_id, portalgroup,
+                                                node, ProcT.m0_client_other,
+                                                proc_name=client['name'])
+                    cluster.m0_clients[proc_id] = new_oid(ObjT.service)
+                    if client['name'] not in cluster.m0_client_types:
+                        cluster.m0_client_types.append(client['name'])
 
     # Motr requires all the data devices together in-order to map a data object
     # to its corresponding device and further to its ioservice. Motr maintains

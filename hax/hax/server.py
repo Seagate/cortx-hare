@@ -17,9 +17,11 @@
 #
 
 import asyncio
+import base64
 import logging
 import os
 import sys
+import json
 from json.decoder import JSONDecodeError
 from queue import Queue
 from typing import Any, Callable, Dict, List, Type, Union
@@ -89,6 +91,24 @@ def hctl_stat(request):
     return json_response(text=result)
 
 
+# This function implements the http fetch-fids request and thus, takes
+# request a parameter. The respective result is obtained by executing
+# corresponding `hctl-fetch-fids` script.
+def hctl_fetch_fids(request):
+    """This function calls the hare-fetch-fids script from the hax-server in
+    order to provide details about services configured by Hare e.g. Hax,
+    ios, confd, rgw etc
+    """
+    exec = Executor()
+    env = get_python_env()
+    result = exec.run(Program(["/opt/seagate/cortx/hare/libexec/"
+                               "hare-fetch-fids",
+                               "--all",
+                               "--use-kv-store"]),
+                      env=env)
+    return json_response(text=result)
+
+
 def to_ha_states(data: Any, consul_util: ConsulUtil) -> List[HAState]:
     """Converts a dictionary, obtained from JSON data, into a list of
     HA states.
@@ -99,14 +119,19 @@ def to_ha_states(data: Any, consul_util: ConsulUtil) -> List[HAState]:
     if not data:
         return []
 
-    def get_status(checks: List[Dict[str, Any]]) -> ObjHealth:
-        ok = all(x.get('Status') == 'passing' for x in checks)
-        return ObjHealth.OK if ok else ObjHealth.FAILED
-
-    return [
-        HAState(fid=create_process_fid(int(t['Service']['ID'])),
-                status=get_status(t['Checks'])) for t in data
-    ]
+    ha_states = []
+    for node in data:
+        svc_status = ObjHealth.OK
+        for check in node['Checks']:
+            if check.get('Status') != 'passing':
+                svc_status = ObjHealth.FAILED
+            svc_id = check.get('ServiceID')
+            if svc_id:
+                ha_states.append(HAState(
+                    fid=create_process_fid(int(svc_id)),
+                    status=svc_status))
+    LOG.debug('Reporting ha states: %s', ha_states)
+    return ha_states
 
 
 def process_ha_states(planner: WorkPlanner, consul_util: ConsulUtil):
@@ -210,6 +235,50 @@ def process_bq_update(inbox_filter: InboxFilter, processor: BQProcessor):
     return _process
 
 
+def process_state_update(planner: WorkPlanner):
+    async def _process(request):
+        data = await request.json()
+
+        loop = asyncio.get_event_loop()
+
+        def fn():
+            proc_state_to_objhealth = {
+                'M0_CONF_HA_PROCESS_STARTING': ObjHealth.OFFLINE,
+                'M0_CONF_HA_PROCESS_STARTED': ObjHealth.OK,
+                'M0_CONF_HA_PROCESS_STOPPING': ObjHealth.OFFLINE,
+                'M0_CONF_HA_PROCESS_STOPPED': ObjHealth.OFFLINE
+            }
+            # import pudb.remote
+            # pudb.remote.set_trace(term_size=(80, 40), port=9998)
+            ha_states: List[HAState] = []
+            LOG.debug('process status: %s', data)
+            for item in data:
+                proc_val = base64.b64decode(item['Value'])
+                proc_status = json.loads(str(proc_val.decode('utf-8')))
+                LOG.debug('process update item key %s item val: %s',
+                          item['Key'].split('/')[1], proc_status)
+                proc_fid = Fid.parse(item['Key'].split('/')[1])
+                proc_state = proc_status['state']
+                proc_type = proc_status['type']
+                if (proc_type == 'M0_CONF_HA_PROCESS_M0D' and
+                        proc_state in ('M0_CONF_HA_PROCESS_STARTED',
+                                       'M0_CONF_HA_PROCESS_STOPPED')):
+                    ha_states.append(HAState(
+                        fid=proc_fid,
+                        status=proc_state_to_objhealth[proc_state]))
+                    planner.add_command(
+                        BroadcastHAStates(states=ha_states, reply_to=None))
+
+        # Note that planner.add_command is potentially a blocking call
+        try:
+            await loop.run_in_executor(None, fn)
+        except Exception:
+            LOG.exception("process state update error")
+        return web.Response()
+
+    return _process
+
+
 @web.middleware
 async def encode_exception(request, handler):
     def error_response(e: Exception, code=500, reason=""):
@@ -277,11 +346,15 @@ class ServerRunner:
             web.get('/', hello_reply),
             web.get('/v1/cluster/status', hctl_stat),
             web.get('/v1/cluster/status/bytecount', bytecount_stat),
+            web.get('/v1/cluster/fetch-fids', hctl_fetch_fids),
             web.post('/', process_ha_states(planner, consul_util)),
             web.post(
                 '/watcher/bq',
                 process_bq_update(inbox_filter,
                                   BQProcessor(planner, herald, conf_obj))),
+            web.post(
+                '/watcher/processes',
+                process_state_update(planner)),
             web.post('/api/v1/sns/{operation}',
                      process_sns_operation(planner)),
             web.get('/api/v1/sns/repair-status',

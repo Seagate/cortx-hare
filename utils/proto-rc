@@ -88,7 +88,8 @@ check4signal() {
 
 # Simple log helper to output to stderr and syslog
 log() {
-    logger --tag "hare/${0##*/}" --stderr "$*"
+    # logger --tag "hare/${0##*/}" --stderr "$*"
+    echo -n "$*" >> $LOGFILE
 }
 
 # Users can use this function to set timeouts.

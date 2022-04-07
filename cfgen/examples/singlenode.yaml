@@ -26,8 +26,8 @@ nodes:
             - path: /dev/loop9 
           meta_data: null
     m0_clients:
-      s3: 0         # number of S3 servers to start
-      other: 2      # max quantity of other Motr clients this host may have
+      - name: m0_client_other  # name of the motr client
+        instances: 2   # Number of instances, this host will run
 create_aux: false # optional; supported values: "false" (default), "true"
 pools:
   - name: the pool
@@ -57,6 +57,7 @@ pools:
 #    substrings: ["Bucket-Name", "Object-Name", "Object-URI"]
 #network_ports:
 #    hax: 22000
+#    hax_http: 8008
 #    m0_server: 21000
 #    m0_client_s3: 22500
 #    m0_client_other: 21500

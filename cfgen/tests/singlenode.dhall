@@ -92,10 +92,7 @@ in
                 }
             }
           ]
-      , m0_clients =
-          { s3 = 0
-          , other = 2
-          }
+      , m0_clients = Some [ { name = "m0_client_other", instances = 2 } ]
       }
     ]
 , pools =
@@ -139,6 +136,7 @@ in
 ,  network_ports =
      None
      { hax : Optional Natural
+     , hax_http: Optional Natural
      , m0_server : Optional Natural
      , m0_client_s3 : Optional Natural
      , m0_client_other : Optional Natural

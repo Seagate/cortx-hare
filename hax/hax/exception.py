@@ -35,6 +35,10 @@ class RepairRebalanceException(HaxAPIException):
     pass
 
 
+class BytecountException(HaxAPIException):
+    pass
+
+
 class NotDelivered(RuntimeError):
     def __init__(self, message: str):
         super().__init__()

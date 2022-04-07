@@ -85,9 +85,9 @@ class Text:
 
 
 @dataclass(repr=False)
-class M0Clients(DhallTuple):
-    s3: int
-    other: int
+class M0ClientDesc(DhallTuple):
+    name: Text
+    instances: int
 
 
 @dataclass(repr=False)
@@ -120,8 +120,7 @@ class NodeDesc(DhallTuple):
     data_iface_type: Maybe[Protocol]
     transport_type: Text
     m0_servers: Maybe[DList[M0ServerDesc]]
-    s3_instances: int
-    client_instances: int
+    m0_clients: Maybe[DList[M0ClientDesc]]
 
 
 @dataclass(repr=False)
@@ -167,6 +166,7 @@ class FdmiFilterDesc(DhallTuple):
 @dataclass(repr=False)
 class NetworkPorts(DhallTuple):
     hax: Maybe[int]
+    hax_http: Maybe[int]
     m0_server: Maybe[int]
     m0_client_s3: Maybe[int]
     m0_client_other: Maybe[int]

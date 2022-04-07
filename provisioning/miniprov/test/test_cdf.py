@@ -29,7 +29,7 @@ import pkg_resources
 
 from hare_mp.cdf import CdfGenerator
 from hare_mp.store import ConfStoreProvider, ValueProvider
-from hare_mp.types import (DisksDesc, Disk, DList, M0Clients, M0ServerDesc, Maybe,
+from hare_mp.types import (DisksDesc, Disk, DList, M0ClientDesc, M0ServerDesc, Maybe,
                            MissingKeyError, PoolDesc, PoolType, Protocol, Text,
                            AllowedFailures, Layout)
 from hare_mp.utils import Utils
@@ -38,8 +38,8 @@ from hax.util import KVAdapter
 
 class TestTypes(unittest.TestCase):
     def test_m0clients(self):
-        val = M0Clients(s3=5, other=2)
-        self.assertEqual('{ s3 = 5, other = 2 }', str(val))
+        val = M0ClientDesc(name='other', instances=2)
+        self.assertEqual('{ name = other, instances = 2 }', str(val))
 
     def test_protocol(self):
         self.assertEqual('P.tcp', str(Protocol.tcp))
@@ -111,36 +111,37 @@ class TestCDF(unittest.TestCase):
 
             store.get_machine_id = Mock(return_value='1114a50a6bf6f9c93ebd3c49d07d3fd4')
             store.get_machine_ids_for_service = Mock(return_value=['1114a50a6bf6f9c93ebd3c49d07d3fd4'])
+            store.get_motr_clients = Mock(return_value=[])
             utils = Utils(store)
             kv = KVAdapter()
             def my_get(key: str, recurse: bool = False):
-                if key == 'srvnode-1.data.private/dev/sda':
-                    return new_kv('srvnode-1.data.private/dev/sda',
+                if key == 'srvnode-1.data.private/drives/dev/sda':
+                    return new_kv('srvnode-1.data.private/drives/dev/sda',
                                   json.dumps({"path": "/dev/sda",
                                               "size": "4096000",
                                               "blksize": "4096"}))
-                elif key == 'srvnode-1.data.private/dev/sdb':
-                    return new_kv('srvnode-1.data.private/dev/sdb',
+                elif key == 'srvnode-1.data.private/drives/dev/sdb':
+                    return new_kv('srvnode-1.data.private/drives/dev/sdb',
                                   json.dumps({"path": "/dev/sdb",
                                               "size": "4096000",
                                               "blksize": "4096"}))
-                elif key == 'srvnode-1.data.private/dev/sdc':
-                    return new_kv('srvnode-1.data.private/dev/sdc',
+                elif key == 'srvnode-1.data.private/drives/dev/sdc':
+                    return new_kv('srvnode-1.data.private/drives/dev/sdc',
                                   json.dumps({"path": "/dev/sdc",
                                               "size": "4096000",
                                               "blksize": "4096"}))
-                elif key == 'srvnode-1.data.private/dev/sdg':
-                    return new_kv('srvnode-1.data.private/dev/sdg',
+                elif key == 'srvnode-1.data.private/drives/dev/sdg':
+                    return new_kv('srvnode-1.data.private/drives/dev/sdg',
                                   json.dumps({"path": "/dev/sdg",
                                               "size": "4096000",
                                               "blksize": "4096"}))
-                elif key == 'srvnode-1.data.private/dev/sdh':
-                    return new_kv('srvnode-1.data.private/dev/sdh',
+                elif key == 'srvnode-1.data.private/drives/dev/sdh':
+                    return new_kv('srvnode-1.data.private/drives/dev/sdh',
                                   json.dumps({"path": "/dev/sdh",
                                               "size": "4096000",
                                               "blksize": "4096"}))
-                elif key == 'srvnode-1.data.private/dev/sdi':
-                    return new_kv('srvnode-1.data.private/dev/sdi',
+                elif key == 'srvnode-1.data.private/drives/dev/sdi':
+                    return new_kv('srvnode-1.data.private/drives/dev/sdi',
                                   json.dumps({"path": "/dev/sdi",
                                               "size": "4096000",
                                               "blksize": "4096"}))
@@ -234,16 +235,17 @@ class TestCDF(unittest.TestCase):
         store._raw_get = Mock(side_effect=ret_values)
         store.get_machine_id = Mock(return_value='MACH_ID')
         store.get_machine_ids_for_service = Mock(return_value=['MACH_ID'])
+        store.get_motr_clients = Mock(return_value=[])
         utils = Utils(store)
         kv = KVAdapter()
         def my_get(key: str, recurse: bool = False):
-            if key == 'srvnode-1.data.private/dev/sdb':
-                return new_kv('srvnode-1.data.private/dev/sdb',
+            if key == 'srvnode-1.data.private/drives/dev/sdb':
+                return new_kv('srvnode-1.data.private/drives/dev/sdb',
                               json.dumps({"path": "/dev/sdb",
                                           "size": "4096000",
                                           "blksize": "4096"}))
-            elif key == 'srvnode-1.data.private/dev/sdc':
-                return new_kv('srvnode-1.data.private/dev/sdc',
+            elif key == 'srvnode-1.data.private/drives/dev/sdc':
+                return new_kv('srvnode-1.data.private/drives/dev/sdc',
                               json.dumps({"path": "/dev/sdb",
                                           "size": "4096000",
                                           "blksize": "4096"}))
@@ -307,7 +309,8 @@ class TestCDF(unittest.TestCase):
                 'node': {'MACH_ID': {'cluster_id': 'CLUSTER_ID'}},
                 'node>MACH_ID>cluster_id': 'CLUSTER_ID',
                 'node>MACH_ID>components':
-                [{'name':'hare'}, {'name': 'motr'}, {'name': 's3'}],
+                [{'name':'hare'}, {'name': 'motr'}, {'name': 's3'},
+                 {'name': 'other'}],
                 'node>MACH_ID>storage>cvg_count': 2,
                 'node>MACH_ID>storage>cvg':
                 [{'devices': {'data': ['/dev/sdb', '/dev/sdc'], 'metadata': ['/dev/meta', '/dev/meta1']}}],
@@ -323,23 +326,26 @@ class TestCDF(unittest.TestCase):
                 'node>MACH_ID>network>data>private_interfaces':                ['eth1', 'eno2'],
                 'cortx>s3>service_instances':                1,
                 'cortx>motr>interface_type':                'o2ib',
-                'cortx>motr>client_instances':                2,
             }
             return data.get(value)
 
         store._raw_get = Mock(side_effect=ret_values)
         store.get_machine_id = Mock(return_value='MACH_ID')
         store.get_machine_ids_for_service = Mock(return_value=['MACH_ID'])
+        store.get_motr_clients = Mock(return_value=
+                                      [{'name': 'other',
+                                        'num_instances' : 2}])
+        store.get_machine_ids_for_component = Mock(return_value=['MACH_ID'])
         utils = Utils(store)
         kv = KVAdapter()
         def my_get(key: str, recurse: bool = False):
-            if key == 'srvnode-1.data.private/dev/sdb':
-                return new_kv('srvnode-1.data.private/dev/sdb',
+            if key == 'srvnode-1.data.private/drives/dev/sdb':
+                return new_kv('srvnode-1.data.private/drives/dev/sdb',
                               json.dumps({"path": "/dev/sdb",
                                           "size": "4096000",
                                           "blksize": "4096"}))
-            elif key == 'srvnode-1.data.private/dev/sdc':
-                return new_kv('srvnode-1.data.private/dev/sdc',
+            elif key == 'srvnode-1.data.private/drives/dev/sdc':
+                return new_kv('srvnode-1.data.private/drives/dev/sdc',
                               json.dumps({"path": "/dev/sdb",
                                           "size": "4096000",
                                           "blksize": "4096"}))
@@ -375,8 +381,11 @@ class TestCDF(unittest.TestCase):
         self.assertEqual(1, len(ret))
         self.assertEqual(Text('srvnode-1.data.private'), ret[0].hostname)
         self.assertEqual(Text('eth1'), ret[0].data_iface)
-        self.assertEqual(1, ret[0].s3_instances)
-        self.assertEqual(2, ret[0].client_instances)
+        clients = ret[0].m0_clients.value.value
+        self.assertIsInstance(clients, list)
+        self.assertEqual(1, len(clients))
+        self.assertEqual(Text('other'), clients[0].name)
+        self.assertEqual(2, clients[0].instances)
 
 
         cdf = CdfGenerator(provider=store)
@@ -586,18 +595,19 @@ class TestCDF(unittest.TestCase):
         store._raw_get = Mock(side_effect=ret_values)
         store.get_machine_id = Mock(return_value='MACH_ID')
         store.get_machine_ids_for_service = Mock(return_value=['MACH_ID'])
+        store.get_motr_clients = Mock(return_value=[])
         cdf = CdfGenerator(provider=store)
         cdf._get_m0d_per_cvg = Mock(return_value=1)
         utils = Utils(store)
         kv = KVAdapter()
         def my_get(key: str, recurse: bool = False):
-            if key == 'srvnode-1.data.private/dev/sdb':
-                return new_kv('srvnode-1.data.private/dev/sdb',
+            if key == 'srvnode-1.data.private/drives/dev/sdb':
+                return new_kv('srvnode-1.data.private/drives/dev/sdb',
                               json.dumps({"path": "/dev/sdb",
                                           "size": "4096000",
                                           "blksize": "4096"}))
-            elif key == 'srvnode-1.data.private/dev/sdc':
-                return new_kv('srvnode-1.data.private/dev/sdc',
+            elif key == 'srvnode-1.data.private/drives/dev/sdc':
+                return new_kv('srvnode-1.data.private/drives/dev/sdc',
                               json.dumps({"path": "/dev/sdb",
                                           "size": "4096000",
                                           "blksize": "4096"}))
@@ -875,6 +885,8 @@ class TestCDF(unittest.TestCase):
                 },
                 'node>MACH_ID>hostname':
                 'myhost',
+                'cortx>hare>hax>endpoints':
+                ['tcp://myhost:22001'],
                 'node>MACH_ID>name': 'mynodename',
                 'node>MACH_ID>type': 'storage_node',
                 'node>MACH_ID>components':
@@ -908,16 +920,17 @@ class TestCDF(unittest.TestCase):
         store._raw_get = Mock(side_effect=ret_values)
         store.get_machine_id = Mock(return_value='MACH_ID')
         store.get_machine_ids_for_service = Mock(return_value=['MACH_ID'])
+        store.get_motr_clients = Mock(return_value=[])
         utils = Utils(store)
         kv = KVAdapter()
         def my_get(key: str, recurse: bool = False):
-            if key == 'srvnode-1.data.private/dev/sdb':
-                return new_kv('srvnode-1.data.private/dev/sdb',
+            if key == 'srvnode-1.data.private/drives/dev/sdb':
+                return new_kv('srvnode-1.data.private/drives/dev/sdb',
                               json.dumps({"path": "/dev/sdb",
                                           "size": "4096000",
                                           "blksize": "4096"}))
-            elif key == 'srvnode-1.data.private/dev/sdc':
-                return new_kv('srvnode-1.data.private/dev/sdc',
+            elif key == 'srvnode-1.data.private/drives/dev/sdc':
+                return new_kv('srvnode-1.data.private/drives/dev/sdc',
                               json.dumps({"path": "/dev/sdb",
                                           "size": "4096000",
                                           "blksize": "4096"}))
@@ -985,14 +998,18 @@ class TestCDF(unittest.TestCase):
                 'StorageSet-1',
                 'cluster>storage_set[0]>nodes':
                 ['srvnode_1', 'srvnode_2'],
+                'cortx>hare>hax>endpoints':
+                ['tcp://srvnode-1.data.private:22001',
+                 'tcp://srvnode-2.data.private:22001'],
                 'node>MACH_ID>hostname':
                 'myhost',
                 'node>MACH_ID>name': 'mynodename',
                 'node>MACH_ID>type': 'storage_node',
                 'node>MACH_ID>network>data>private_fqdn':
-                    'srvnode-1.data.private',
+                'srvnode-1.data.private',
                 'node>MACH_ID>components':
-                [{'name':'hare'}, {'name': 'motr'}, {'name': 's3'}],
+                [{'name':'hare'}, {'name': 'motr'}, {'name': 's3'},
+                 {'name': 'other'}],
                 'node>MACH_ID>network>data>private_interfaces':
                 ['eth1'],
                 'node>MACH_ID>storage>cvg':
@@ -1006,9 +1023,10 @@ class TestCDF(unittest.TestCase):
                 'node>MACH_2_ID>type':                'storage_node',
                 'cortx>motr>interface_type':                'tcp',
                 'node>MACH_2_ID>network>data>private_fqdn':
-                    'srvnode-2.data.private',
+                'srvnode-2.data.private',
                 'node>MACH_2_ID>components':
-                [{'name':'hare'}, {'name': 'motr'}, {'name': 's3'}],
+                [{'name':'hare'}, {'name': 'motr'}, {'name': 's3'},
+                 {'name': 'other'}],
                 'node>MACH_2_ID>network>data>private_interfaces':
                 ['eth1'],
                 'cortx>motr>transport_type':
@@ -1029,16 +1047,21 @@ class TestCDF(unittest.TestCase):
         store.get_machine_id = Mock(return_value='MACH_ID')
         store.get_machine_ids_for_service = Mock(return_value=['MACH_ID',
                                                                'MACH_2_ID'])
+        store.get_motr_clients = Mock(return_value=
+                                [{'name': 'other',
+                                'num_instances' : 2}])
+        store.get_machine_ids_for_component = Mock(return_value=['MACH_ID',
+                                                                 'MACH_2_ID'])
         utils = Utils(store)
         kv = KVAdapter()
         def my_get(key: str, recurse: bool = False):
-            if key == 'srvnode-1.data.private/dev/sdb':
-                return new_kv('srvnode-1.data.private/dev/sdb',
+            if key == 'srvnode-1.data.private/drives/dev/sdb':
+                return new_kv('srvnode-1.data.private/drives/dev/sdb',
                               json.dumps({"path": "/dev/sdb",
                                           "size": "4096000",
                                           "blksize": "4096"}))
-            elif key == 'srvnode-1.data.private/dev/sdc':
-                return new_kv('srvnode-1.data.private/dev/sdc',
+            elif key == 'srvnode-1.data.private/drives/dev/sdc':
+                return new_kv('srvnode-1.data.private/drives/dev/sdc',
                               json.dumps({"path": "/dev/sdb",
                                           "size": "4096000",
                                           "blksize": "4096"}))
@@ -1046,13 +1069,13 @@ class TestCDF(unittest.TestCase):
                 return new_kv('srvnode-1.data.private/facts',
                               json.dumps({"processorcount": "16",
                                           "memorysize_mb": "4096.123"}))
-            elif key == 'srvnode-2.data.private/dev/sdb':
-                return new_kv('srvnode-1.data.private/dev/sdb',
+            elif key == 'srvnode-2.data.private/drives/dev/sdb':
+                return new_kv('srvnode-1.data.private/drives/dev/sdb',
                               json.dumps({"path": "/dev/sdb",
                                           "size": "4096000",
                                           "blksize": "4096"}))
-            elif key == 'srvnode-2.data.private/dev/sdc':
-                return new_kv('srvnode-1.data.private/dev/sdc',
+            elif key == 'srvnode-2.data.private/drives/dev/sdc':
+                return new_kv('srvnode-1.data.private/drives/dev/sdc',
                               json.dumps({"path": "/dev/sdb",
                                           "size": "4096000",
                                           "blksize": "4096"}))
@@ -1077,13 +1100,19 @@ class TestCDF(unittest.TestCase):
         self.assertIn(Text('srvnode-1.data.private'),
                       [ret[0].hostname, ret[1].hostname])
         self.assertEqual(Text('eth1'), ret[0].data_iface)
-        self.assertEqual(1, ret[0].s3_instances)
-        self.assertEqual(2, ret[0].client_instances)
+        clients = ret[0].m0_clients.value.value
+        self.assertIsInstance(clients, list)
+        self.assertEqual(1, len(clients))
+        self.assertEqual(Text('other'), clients[0].name)
+        self.assertEqual(2, clients[0].instances)
         self.assertIn(Text('srvnode-2.data.private'),
                       [ret[0].hostname, ret[1].hostname])
         self.assertEqual(Text('eth1'), ret[1].data_iface)
-        self.assertEqual(1, ret[1].s3_instances)
-        self.assertEqual(2, ret[1].client_instances)
+        clients = ret[1].m0_clients.value.value
+        self.assertIsInstance(clients, list)
+        self.assertEqual(1, len(clients))
+        self.assertEqual(Text('other'), clients[0].name)
+        self.assertEqual(2, clients[0].instances)
         self.assertEqual('Some (P.tcp)', str(ret[0].data_iface_type))
         self.assertEqual('Some (P.tcp)', str(ret[1].data_iface_type))
 
@@ -1120,6 +1149,8 @@ class TestCDF(unittest.TestCase):
                 ['/dev/meta1'],
                 'node>MACH_ID>network>data>private_fqdn':
                     'srvnode-1.data.private',
+                'cortx>hare>hax>endpoints':
+                ['tcp://myhost:22001'],
                 'cortx>s3>service_instances':
                 1,
                 'cortx>motr>interface_type':
@@ -1136,17 +1167,18 @@ class TestCDF(unittest.TestCase):
         store._raw_get = Mock(side_effect=ret_values)
         store.get_machine_id = Mock(return_value='MACH_ID')
         store.get_machine_ids_for_service = Mock(return_value=['MACH_ID'])
+        store.get_motr_clients = Mock(return_value=[])
         cdf = CdfGenerator(provider=store)
         utils = Utils(store)
         kv = KVAdapter()
         def my_get(key: str, recurse: bool = False):
-            if key == 'srvnode-1.data.private/dev/sdb':
-                return new_kv('srvnode-1.data.private/dev/sdb',
+            if key == 'srvnode-1.data.private/drives/dev/sdb':
+                return new_kv('srvnode-1.data.private/drives/dev/sdb',
                               json.dumps({"path": "/dev/sdb",
                                           "size": "4096000",
                                           "blksize": "4096"}))
-            elif key == 'srvnode-1.data.private/dev/sdc':
-                return new_kv('srvnode-1.data.private/dev/sdc',
+            elif key == 'srvnode-1.data.private/drives/dev/sdc':
+                return new_kv('srvnode-1.data.private/drives/dev/sdc',
                               json.dumps({"path": "/dev/sdb",
                                           "size": "4096000",
                                           "blksize": "4096"}))

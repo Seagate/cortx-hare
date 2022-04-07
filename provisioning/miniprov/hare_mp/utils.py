@@ -37,6 +37,8 @@ from helper.exec import Program, Executor
 from hare_mp.store import ValueProvider
 from hare_mp.types import Disk, DList, Maybe, Text
 
+LOG_DIR_EXT = '/hare/log/'
+
 
 def func_enter(func):
     """
@@ -146,41 +148,40 @@ class Utils:
                                  'size': int(disk.size.get()),
                                  'blksize': int(disk.blksize.get())})
         disk_key = path.strip('/')
-        self.kv.kv_put(f'{hostname}/{disk_key}', drive_info)
+        self.kv.kv_put(f'{hostname}/drives/{disk_key}', drive_info)
+
+    @func_log(func_enter, func_leave)
+    @repeat_if_fails()
+    def save_log_path(self):
+        hostname = self.get_local_hostname()
+        machine_id = self.provider.get_machine_id()
+        log_key = self.provider.get('cortx>common>storage>log')
+        log_path = log_key + LOG_DIR_EXT + machine_id
+        self.kv.kv_put(f'{hostname}/log_path', log_path)
 
     @func_log(func_enter, func_leave)
     def is_motr_component(self, machine_id: str) -> bool:
         """
         Returns True if motr component is present in the components list
-        for the given node>{machine_id} according to the
-        ConfStore (ValueProvider).
+        for the given node>{machine_id}.
         """
-        comp_names = self.provider.get(f'node>{machine_id}>'
-                                       f'components')
-        for component in comp_names:
-            if(component.get('name') == Const.COMPONENT_MOTR.value):
-                rc = True
-                break
-            else:
-                rc = False
-        return rc
+        return self.is_component(machine_id, Const.COMPONENT_MOTR.value)
 
     @func_log(func_enter, func_leave)
-    def is_s3_component(self, machine_id: str) -> bool:
+    def is_component(self, machine_id: str, name: str) -> bool:
         """
-        Returns True if s3 component is present in the components list
-        for the given node>{machine_id} according to the
+        Returns True if the given component is present in the components
+        list for the given node>{machine_id} according to the
         ConfStore (ValueProvider).
         """
         comp_names = self.provider.get(f'node>{machine_id}>'
                                        f'components')
+        found = False
         for component in comp_names:
-            if(component.get('name') == Const.COMPONENT_S3.value):
-                rc = True
+            if(component.get('name') == name):
+                found = True
                 break
-            else:
-                rc = False
-        return rc
+        return found
 
     @func_log(func_enter, func_leave)
     def save_drives_info(self):
@@ -201,7 +202,7 @@ class Utils:
         drive_info = None
         while (not drive_data or drive_data is None):
             try:
-                drive_data = self.kv.kv_get(f'{hostname}/{disk_path}')
+                drive_data = self.kv.kv_get(f'{hostname}/drives/{disk_path}')
                 drive_info = json.loads(drive_data['Value'])
             except TypeError:
                 logging.info('%s details are not available yet, retrying...',
@@ -232,17 +233,28 @@ class Utils:
         machine_id = self.provider.get_machine_id()
         global_config_path = self.provider.get('cortx>common>storage>local')
 
-        dest_s3 = f'{global_config_path}/s3/sysconfig/{machine_id}'
         dest_motr = f'{global_config_path}/motr/sysconfig/{machine_id}'
-        os.makedirs(dest_s3, exist_ok=True)
         os.makedirs(dest_motr, exist_ok=True)
 
         cmd = ['/opt/seagate/cortx/hare/libexec/node-name',
                '--conf-dir', conf_dir_path]
         node_name = execute(cmd)
 
-        copy_tree(f'{conf_dir_path}/sysconfig/s3/{node_name}', dest_s3)
         copy_tree(f'{conf_dir_path}/sysconfig/motr/{node_name}', dest_motr)
+
+        with open(f'{conf_dir_path}/consul-kv.json') as f:
+            data = json.load(f)
+            for item in data:
+                item_data = json.loads(json.dumps(item))
+                if item_data['key'] == 'm0_client_types':
+                    m0_client_types = item_data['value']
+                    break
+
+        for client_type in json.loads(m0_client_types):
+            src = f'{conf_dir_path}/sysconfig/{client_type}/{node_name}'
+            dest = f'{global_config_path}/{client_type}/sysconfig/{machine_id}'
+            os.makedirs(dest, exist_ok=True)
+            copy_tree(src, dest)
 
         shutil.copyfile(
             f'{conf_dir_path}/confd.xc',

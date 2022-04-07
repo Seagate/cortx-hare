@@ -22,10 +22,15 @@ import logging
 import re
 import signal
 from typing import List, NamedTuple
+from hax.bytecount import ByteCountUpdater
 
 import inject
+import locale
+import codecs
+import os
 
 from hax.common import HaxGlobalState, di_configuration
+from hax.exception import HAConsistencyException
 from hax.filestats import FsStatsUpdater
 from hax.ha import create_ha_thread
 from hax.handler import ConsumerThread
@@ -64,6 +69,11 @@ def _run_stats_updater_thread(motr: Motr,
     return _run_thread(FsStatsUpdater(motr, consul_util, interval_sec=30))
 
 
+def _run_bc_updater_thread(motr: Motr,
+                           consul_util: ConsulUtil) -> StoppableThread:
+    return _run_thread(ByteCountUpdater(motr, consul_util, interval_sec=30))
+
+
 @repeat_if_fails()
 def _remove_stale_session(util: ConsulUtil) -> None:
     '''Destroys a stale RC leader session if it exists or does nothing otherwise.
@@ -99,13 +109,16 @@ def _remove_stale_session(util: ConsulUtil) -> None:
 
 @repeat_if_fails()
 def _get_motr_fids(util: ConsulUtil) -> HL_Fids:
-    hax_ep: str = util.get_hax_endpoint()
-    hax_fid: Fid = util.get_hax_fid()
-    ha_fid: Fid = util.get_ha_fid()
-    profiles = util.get_profiles()
-    if not profiles:
-        raise RuntimeError('Configuration error: no profile '
-                           'is found in Consul KV')
+    try:
+        hax_ep: str = util.get_hax_endpoint()
+        hax_fid: Fid = util.get_hax_fid()
+        ha_fid: Fid = util.get_ha_fid()
+        profiles = util.get_profiles()
+        if (not hax_ep or not hax_fid or not ha_fid
+                or not profiles):
+            raise HAConsistencyException('failed to get motr fids')
+    except Exception as e:
+        raise HAConsistencyException('failed to get motr fids') from e
     return HL_Fids(hax_ep, hax_fid, ha_fid, profiles)
 
 
@@ -116,10 +129,20 @@ def _run_rconfc_starter_thread(motr: Motr,
     return rconfc_starter
 
 
+def set_locale():
+    try:
+        if codecs.lookup('UTF-8').name == 'utf-8':
+            locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
+            os.environ["LANG"] = "en_US.utf-8"
+    except Exception:
+        LOG.exception('Error setting locale ')
+
+
 def main():
     # Note: no logging must happen before this call.
     # Otherwise the log configuration will not apply.
     setup_logging()
+    set_locale()
     inject.configure(di_configuration)
 
     state = inject.instance(HaxGlobalState)
@@ -150,6 +173,7 @@ def main():
     # bootstrapping operations.
     _remove_stale_session(util)
     cfg: HL_Fids = _get_motr_fids(util)
+    hax_http_port = util.get_hax_http_port()
 
     LOG.info('Welcome to HaX')
     LOG.info(f'Setting up ha_link interface with the options as follows: '
@@ -180,6 +204,7 @@ def main():
         rconfc_starter = _run_rconfc_starter_thread(motr, consul_util=util)
 
         stats_updater = _run_stats_updater_thread(motr, consul_util=util)
+        bc_updater = _run_bc_updater_thread(motr, consul_util=util)
         event_poller = _run_thread(create_ha_thread(planner, util))
         # [KN] This is a blocking call. It will work until the program is
         # terminated by signal
@@ -188,9 +213,13 @@ def main():
                               herald,
                               consul_util=util,
                               hax_state=state)
-        server.run(threads_to_wait=[
-            *consumer_threads, stats_updater, rconfc_starter, event_poller
-        ])
+        server.run(threads_to_wait=[*consumer_threads,
+                                    stats_updater,
+                                    bc_updater,
+                                    rconfc_starter,
+                                    event_poller
+                                    ],
+                   port=hax_http_port)
     except Exception:
         LOG.exception('Exiting due to an exception')
     finally:

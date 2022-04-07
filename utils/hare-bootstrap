@@ -384,18 +384,22 @@ pids=()
 while read node bind_ip; do
     if [[ $opt_mkfs ]]; then
         ssh_error_info "$node" "PATH=$PATH $(which mk-consul-env) \
-                          --mode server --bind $bind_ip --join $join_ip" &
+                          --mode server --bind $bind_ip --join $join_ip && \
+                          sudo systemctl start hare-consul-agent" &
+    else
+        ssh_error_info "$node" "sudo systemctl start hare-consul-agent" &
     fi
-    ssh_error_info sudo "$node" "systemctl start hare-consul-agent" &
     pids+=($!)
 done < <(get_server_nodes | grep -vw $(node-name) || true)
 
 while read node bind_ip; do
     if [[ $opt_mkfs ]]; then
         ssh_error_info "$node" "PATH=$PATH $(which mk-consul-env) \
-                              --mode client --bind $bind_ip --join $join_ip" &
+                          --mode client --bind $bind_ip --join $join_ip && \
+                          sudo systemctl start hare-consul-agent" &
+    else
+        ssh_error_info "$node" "sudo systemctl start hare-consul-agent" &
     fi
-    ssh_error_info "$node" "sudo systemctl start hare-consul-agent" &
     pids+=($!)
 done < <(get_client_nodes)
 wait4 ${pids[@]-}
@@ -506,21 +510,6 @@ bootstrap_nodes phase1
 # Start ioservices
 bootstrap_nodes phase2
 
-. update-consul-conf --server --dry-run --xprt $xprt # import S3_IDs
-if [[ -n $S3_IDs ]]; then
-    # Now the 3rd phase (s3servers).
-    say 'Starting S3 servers (phase3)...'
-    bootstrap-node --phase phase3 --xprt $xprt &
-    pids=($!)
-
-    while read node _; do
-        ssh_error_info "$node" "PATH=$PATH $(which bootstrap-node) --phase phase3 --xprt $xprt" &
-        pids+=($!)
-    done < <(get_all_nodes | grep -vw $(node-name) || true)
-    wait4 ${pids[@]}
-    echo ' OK'
-fi
-
 say 'Checking health of services...'
 check_service() {
     local svc=$1
@@ -529,7 +518,7 @@ check_service() {
         fgrep -v '["passing"]' || true
 }
 count=1
-for svc in confd ios s3service; do
+for svc in confd ios; do
     svc_not_ready=$(check_service $svc)
     while [[ $svc_not_ready ]]; do
         if (( $count > 30 )); then

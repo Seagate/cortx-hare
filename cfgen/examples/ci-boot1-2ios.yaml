@@ -22,8 +22,8 @@ nodes:
             - path: /dev/loop8
             - path: /dev/loop9
     m0_clients:
-        s3: 0
-        other: 2
+      - name: m0_client_other  # name of the motr client
+        instances: 2   # Number of instances, this host will run
 pools:
   - name: the pool
     disk_refs:

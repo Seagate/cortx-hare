@@ -28,14 +28,15 @@ set -e -o pipefail
 export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
 
 log() {
-    logger --stderr --tag "$0" "$*"
+    # logger --stderr --tag "$0" "$*"
+    echo -n "$*"
 }
 
 cmd=$(jq --raw-output '.cmd' <<<"$HARE_RC_EVENT_PAYLOAD")
 fid=$(jq --raw-output '.fid' <<<"$HARE_RC_EVENT_PAYLOAD")
 
 if [[ -z "$cmd" || -z "$fid" ]]; then
-    logger --stderr "Invalid payload $HARE_RC_EVENT_PAYLOAD"
+    log "Invalid payload $HARE_RC_EVENT_PAYLOAD"
     exit 1
 fi
 
@@ -51,11 +52,25 @@ case $cmd in
     ;;
 esac
 
-log "handler is called for $cmd, $fid, $op_name"
+log "handler is called for $cmd, $fid"
 
 payload=$(jq --null-input --compact-output \
-             --arg op_name "$op_name" \
+             --arg cmd "$cmd" \
              --arg fid "$fid" \
-             '{ op_name: $op_name, fid: $fid }')
+             '{ cmd: $cmd, fid: $fid }')
 
-h0q bq SNS_OP "$payload"
+get_ip_addr() {
+    curl -sX GET http://localhost:8500/v1/agent/self | jq -r .DebugConfig.BindAddr
+}
+
+ip_addr=$(get_ip_addr)
+
+status_code=$(curl http://${ip_addr}:8008/api/v1/sns/${op_name} \
+                   --silent \
+                   --output /dev/null \
+                   --request POST \
+                   --write-out '%{http_code}\n' \
+                   --data "$payload")
+rc=$?
+[[ status_code -eq 200 && rc -eq 0 ]] \
+    || log "rule failed. http: $status_code, rc: $rc"

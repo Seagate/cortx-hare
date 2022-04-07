@@ -23,17 +23,19 @@ from typing import Any, List, Optional, Tuple
 from time import sleep
 
 from hax.consul.cache import supports_consul_cache, uses_consul_cache
-from hax.exception import ConfdQuorumException, RepairRebalanceException
+from hax.exception import (BytecountException, ConfdQuorumException,
+                           RepairRebalanceException)
 from hax.message import (EntrypointRequest, FirstEntrypointRequest,
                          HaNvecGetEvent, HaNvecSetEvent, ProcessEvent,
                          StobIoqError)
 from hax.motr.delivery import DeliveryHerald
 from hax.motr.ffi import HaxFFI, make_array, make_c_str
 from hax.motr.planner import WorkPlanner
-from hax.types import (ConfHaProcess, Fid, FidStruct, FsStats,
+from hax.types import (ByteCountStats, ConfHaProcess, Fid, FidStruct, FsStats,
                        HaLinkMessagePromise, HaNote, HaNoteStruct, HAState,
-                       MessageId, ObjT, FidTypeToObjT, Profile, ReprebStatus,
-                       ObjHealth, m0HaProcessEvent, m0HaProcessType)
+                       MessageId, ObjT, FidTypeToObjT, Profile, PverInfo,
+                       ReprebStatus, ObjHealth,
+                       m0HaProcessEvent, m0HaProcessType)
 from hax.util import ConsulUtil, repeat_if_fails, FidWithType, PutKV
 
 LOG = logging.getLogger('hax')
@@ -80,7 +82,7 @@ class Motr:
         self._profile = profile
 
         @repeat_if_fails()
-        def _get_rm_fid() -> Fid:
+        def _get_rm_fid():
             return self.consul_util.get_rm_fid()
 
         rm_fid = _get_rm_fid()
@@ -210,7 +212,7 @@ class Motr:
             if self.is_stopping:
                 confds = []
             else:
-                sess = util.get_leader_session_no_wait()
+                sess = util.get_leader_session()
                 principal_rm = util.get_session_node(sess)
                 confds = util.get_confd_list()
 
@@ -721,6 +723,24 @@ class Motr:
             raise ConfdQuorumException(
                 'Confd quorum lost, filesystem statistics is unavailable')
         return stats
+
+    def get_proc_bytecount(self, proc_fid: Fid) -> ByteCountStats:
+        bytecount: ByteCountStats = self._ffi.proc_bytecount_fetch(
+            self._ha_ctx, proc_fid.to_c())
+        if not bytecount:
+            raise BytecountException('Bytecount stats unavailable')
+        LOG.debug('Bytecount status for proc fid: %s, stats =%s',
+                  str(bytecount.proc_fid),
+                  bytecount.pvers)
+        return bytecount
+
+    def get_pver_status(self, pver_fid: Fid) -> PverInfo:
+        status: PverInfo = self._ffi.pver_status_fetch(
+            self._ha_ctx, pver_fid.to_c())
+        if not status:
+            raise BytecountException('Pool version status unavailable')
+        LOG.debug('Pver status for pver %s: %s', pver_fid, status.state)
+        return status
 
     def get_repair_status(self, pool_fid: Fid) -> List[ReprebStatus]:
         LOG.debug('Fetching repair status for pool %s', pool_fid)

@@ -18,8 +18,8 @@ nodes:
             - path: /dev/sdf
             - path: /dev/sdg
     m0_clients:
-        s3: 0           # number of S3 servers to start
-        other: 2        # max quantity of other Motr clients this node may have
+      - name: m0_client_other  # name of the motr client
+        instances: 2   # Number of instances, this host will run
   - hostname: pod-c2
     data_iface: eth1_c2
     data_iface_type: o2ib
@@ -35,8 +35,8 @@ nodes:
             - path: /dev/sdj
             - path: /dev/sdk
     m0_clients:
-        s3: 0
-        other: 2
+      - name: m0_client_other  # name of the motr client
+        instances: 2   # Number of instances, this host will run
 pools:
   - name: the pool
     disk_refs:
