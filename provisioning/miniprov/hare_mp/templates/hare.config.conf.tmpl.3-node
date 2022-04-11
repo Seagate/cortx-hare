@@ -1,6 +1,6 @@
 {
   "cluster": {
-      "storage_set_count": "TMPL_STORAGESET_COUNT",
+      "num_storage_set": "TMPL_STORAGESET_COUNT",
       "storage_set": [
         {
           "durability": {

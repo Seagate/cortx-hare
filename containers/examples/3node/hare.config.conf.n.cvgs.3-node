@@ -2,7 +2,7 @@
   "cluster": {    
     "my-cluster": {
       "site": {
-        "storage_set_count": "1"
+        "num_storage_set": "1"
       },
       "storage_set": [
         {

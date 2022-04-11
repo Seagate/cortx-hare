@@ -211,7 +211,7 @@ class TestCDF(unittest.TestCase):
                 'cortx>motr>client_instances':
                 2,
                 'node>MACH_ID>storage>cvg_count': 1,
-                'cluster>storage_set_count':
+                'cluster>num_storage_set':
                 1,
                 'cluster>storage_set>server_node_count':
                 1,
@@ -295,7 +295,7 @@ class TestCDF(unittest.TestCase):
 
         def ret_values(value: str) -> Any:
             data = {
-                'cluster>storage_set_count': 1,
+                'cluster>num_storage_set': 1,
                 'cluster>storage_set>server_node_count':
                 1,
                 'cluster>storage_set[0]>name': 'StorageSet-1',
@@ -453,7 +453,7 @@ class TestCDF(unittest.TestCase):
 
         def ret_values(value: str) -> Any:
             data = {
-                'cluster>storage_set_count': 1,
+                'cluster>num_storage_set': 1,
                 'cluster>storage_set[0]>name': 'StorageSet-1',
                 'cluster>storage_set[0]>durability>sns':
                 {'data': 4, 'parity' : 2, 'spare' : 0},
@@ -545,7 +545,7 @@ class TestCDF(unittest.TestCase):
         def ret_values(value: str) -> Any:
             data = {
                 'node>MACH_ID>storage>cvg_count': 1,
-                'cluster>storage_set_count': 1,
+                'cluster>num_storage_set': 1,
                 'cluster>storage_set>server_node_count': 1,
                 'cluster>storage_set[0]>name': 'StorageSet-1',
                 'cluster>storage_set[0]>nodes': ['MACH_ID'],
@@ -632,7 +632,7 @@ class TestCDF(unittest.TestCase):
 
         def ret_values(value: str) -> Any:
             data = {
-                'cluster>storage_set_count':
+                'cluster>num_storage_set':
                 1,
                 'cluster>storage_set>server_node_count':
                 1,
@@ -688,7 +688,7 @@ class TestCDF(unittest.TestCase):
 
         def ret_values(value: str) -> Any:
             data = {
-                'cluster>storage_set_count':
+                'cluster>num_storage_set':
                 1,
                 'cluster>storage_set>server_node_count':
                 1,
@@ -736,7 +736,7 @@ class TestCDF(unittest.TestCase):
         def ret_values(value: str) -> Any:
             data = {
                 'node>MACH_ID>storage>cvg_count': 1,
-                'cluster>storage_set_count':
+                'cluster>num_storage_set':
                 1,
                 'cluster>storage_set>server_node_count':
                 1,
@@ -797,7 +797,7 @@ class TestCDF(unittest.TestCase):
         def ret_values(value: str) -> Any:
             data = {
                 'node>MACH_ID>storage>cvg_count': 1,
-                'cluster>storage_set_count':
+                'cluster>num_storage_set':
                 1,
                 'cluster>storage_set>server_node_count':
                 1,
@@ -990,7 +990,7 @@ class TestCDF(unittest.TestCase):
                     'MACH_ID': 'stub',
                     'MACH_2_ID': 'stub'
                 },
-                'cluster>storage_set_count':
+                'cluster>num_storage_set':
                 1,
                 'cluster>storage_set>server_node_count':
                 2,

@@ -224,11 +224,11 @@ class CdfGenerator:
         pools: List[PoolDesc] = []
         conf = self.provider
         cluster_id = self._get_cluster_id()
-        # cluster>storage_set_count
-        storage_set_count = int(
-            conf.get('cluster>storage_set_count'))
+        # cluster>num_storage_set
+        num_storage_set = int(
+            conf.get('cluster>num_storage_set'))
 
-        for i in range(storage_set_count):
+        for i in range(num_storage_set):
             for pool_type in ('sns', 'dix'):
                 handle = PoolHandle(cluster_id=cluster_id,
                                     pool_type=pool_type,
