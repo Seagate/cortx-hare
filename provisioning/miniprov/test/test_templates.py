@@ -82,7 +82,7 @@ def is_content_ok(content: str, mocker, kv_adapter) -> bool:
 def placeholders() -> Dict[str, str]:
     return {
         'TMPL_CLUSTER_ID': 'stub_cluster_id',
-        'TMPL_CVG_COUNT': '1',
+        'TMPL_num_cvg': '1',
         'TMPL_DATA_DEVICE_1': '/dev/sdb',
         'TMPL_DATA_DEVICE_2': '/dev/sdc',
         'TMPL_DATA_DEVICE_11': '/dev/sdb',
