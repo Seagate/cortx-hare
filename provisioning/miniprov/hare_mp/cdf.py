@@ -117,8 +117,8 @@ class CdfGenerator:
         conf = self.provider
         pool_type = pool.pool_type
         prop_name = 'data'
-        # node>{machine-id}>storage>cvg_count
-        cvg_num = int(conf.get(f'node>{node}>storage>cvg_count'))
+        # node>{machine-id}>storage>num_cvg
+        cvg_num = int(conf.get(f'node>{node}>storage>num_cvg'))
         all_cvg_devices = []
         if pool_type == 'dix':
             prop_name = 'metadata'
@@ -171,9 +171,9 @@ class CdfGenerator:
 
         node_count = len(data_nodes)
         machine_id = data_nodes[0]
-        # node>{machine-id}>storage>cvg_count
+        # node>{machine-id}>storage>num_cvg
         cvg_per_node = int(conf.get(
-            f'node>{machine_id}>storage>cvg_count'))
+            f'node>{machine_id}>storage>num_cvg'))
 
         total_unit = layout.data + layout.parity + layout.spare
         if total_unit == 0:

@@ -97,7 +97,7 @@
         }
       },
       "storage": {
-        "cvg_count": "1",
+        "num_cvg": "1",
         "cvg": [
           {
             "devices": {
