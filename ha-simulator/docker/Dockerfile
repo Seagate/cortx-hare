@@ -17,8 +17,8 @@ COPY ./patches/ /app/patches/
 RUN    python3 -m venv --system-site-packages .py-venv/ \
     && source ./.py-venv/bin/activate \
     && pip install -r ./requirements.txt
-RUN    pip3 install -r https://raw.githubusercontent.com/Seagate/cortx-utils/main/py-utils/python_requirements.txt \
-    && pip3 install -r https://raw.githubusercontent.com/Seagate/cortx-utils/main/py-utils/python_requirements.ext.txt \
+RUN    pip3 install -r "https://raw.githubusercontent.com/Seagate/cortx-utils/main/py-utils/python_requirements.txt" \
+    && pip3 install -r "https://raw.githubusercontent.com/Seagate/cortx-utils/main/py-utils/python_requirements.ext.txt" \
     && yum install -y http://cortx-storage.colo.seagate.com/releases/cortx/github/main/centos-7.9.2009/last_successful/$(curl --silent http://cortx-storage.colo.seagate.com/releases/cortx/github/main/centos-7.9.2009/last_successful/ | grep py-utils | sed 's/.*href="\([^"]*\)".*/\1/g')
 RUN    git config --global user.name "Konstantin Nekrasov" \
     && git config --global user.email "konstantin.nekrasov@seagate.com" \
