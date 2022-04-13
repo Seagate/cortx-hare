@@ -50,7 +50,7 @@
       },
       "storage_set": "TMPL_STORAGE_SET_ID",
       "storage": {
-        "num_cvg": "TMPL_num_cvg",
+        "num_cvg": "TMPL_NUM_CVG",
         "cvg": [
           {
             "devices": {
@@ -94,7 +94,7 @@
       "s3_instances": "TMPL_S3SERVER_INSTANCES_COUNT",
       "storage_set": "TMPL_STORAGE_SET_ID",
       "storage": {
-        "num_cvg": "TMPL_num_cvg",
+        "num_cvg": "TMPL_NUM_CVG",
         "cvg": [
           {
             "devices": {
@@ -138,7 +138,7 @@
       "s3_instances": "TMPL_S3SERVER_INSTANCES_COUNT",
       "storage_set": "TMPL_STORAGE_SET_ID",
       "storage": {
-        "num_cvg": "TMPL_num_cvg",
+        "num_cvg": "TMPL_NUM_CVG",
         "cvg": [
           {
             "devices": {
