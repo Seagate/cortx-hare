@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Seagate Technology LLC and/or its Affiliates
+# Copyright (c) 2022 Seagate Technology LLC and/or its Affiliates
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,16 +16,4 @@
 # please email opensource@seagate.com or cortx-questions@seagate.com.
 #
 
-"""The module contains HA Event handlers."""
-
-from abc import abstractmethod
-
-from hax.ha.message_interface.message_interface import Event
-
-
-class EventHandler:
-    """Base class (effectively - interface) for all HA event handlers"""
-    @abstractmethod
-    def handle(self, msg: Event) -> None:
-        """Handle the given HA event."""
-        ...
+# empty

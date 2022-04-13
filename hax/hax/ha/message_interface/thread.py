@@ -20,14 +20,14 @@ import logging
 import threading as thr
 from typing import Dict, Optional
 
-from hax.ha.events import Event, EventListener
 from hax.ha.handler import EventHandler
 from hax.ha.handler.node import NodeEventHandler
+from hax.ha.message_interface.message_interface import (MessageBusInterface,
+                                                        MessageInterface)
+from hax.ha.message_interface.message_interface import Event
 from hax.motr.planner import WorkPlanner
 from hax.types import StoppableThread
 from hax.util import ConsulUtil, InterruptedException, wait_for_event
-
-from ha.core.event_manager.subscribe_event import SubscribeEvent
 
 LOG = logging.getLogger('hax')
 
@@ -40,7 +40,7 @@ class EventPollingThread(StoppableThread):
     def __init__(self,
                  planner: WorkPlanner,
                  consul: ConsulUtil,
-                 listener: Optional[EventListener] = None,
+                 listener: Optional[MessageInterface] = None,
                  interval_sec: float = 1.0):
         """Constructor."""
         super().__init__(target=self._execute,
@@ -62,8 +62,8 @@ class EventPollingThread(StoppableThread):
 
     def _execute(self):
         LOG.debug('Event polling thread started')
-        self.listener = self.raw_listener or self._create_listener()
         try:
+            self.listener = self.raw_listener or self._create_listener()
             while not self.stopped:
                 self._handle_next_messages()
                 wait_for_event(self.event, self.interval_sec)
@@ -108,7 +108,7 @@ class EventPollingThread(StoppableThread):
                      message, e)
             LOG.debug("Error details:", exc_info=True)
 
-    def _create_listener(self) -> EventListener:
+    def _create_listener(self) -> MessageInterface:
         host = self.cns.get_local_nodename()
         group = f'hare_{host}'
         # group_id stands to Kafka group of consumers
@@ -118,6 +118,6 @@ class EventPollingThread(StoppableThread):
         # the messages that another hax instance receives (so every hax reads
         # the whole history of messages even if they process the messages with
         # different speed).
-        return EventListener(
-            [SubscribeEvent('node', ['offline', 'online', 'failed'])],
-            group_id=group)
+        interface = MessageBusInterface(self.cns)
+        interface.create_listener(group_id=group)
+        return interface
