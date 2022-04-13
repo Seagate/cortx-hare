@@ -185,6 +185,7 @@ def main():
     _remove_stale_session(util)
     cfg: HL_Fids = _get_motr_fids(util)
     hax_http_port = util.get_hax_http_port()
+    util.init_motr_processes_status()
 
     LOG.info('Welcome to HaX')
     LOG.info(f'Setting up ha_link interface with the options as follows: '
