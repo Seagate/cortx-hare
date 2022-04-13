@@ -71,6 +71,7 @@ class CdfGenerator:
         client_machines = []
         for client in conf.get_motr_clients():
             name = str(client.get('name'))
+            client_machines.extend(conf.get_machine_ids_for_service(name))
             client_machines.extend(conf.get_machine_ids_for_component(name))
 
         # Avoid adding duplicate machine ids if client and data node
@@ -420,10 +421,12 @@ class CdfGenerator:
         """
         for client in self.provider.get_motr_clients():
             name = str(client.get('name'))
-            if self.utils.is_component(machine_id, name):
-                yield M0ClientDesc(
-                    name=Text(name),
-                    instances=int(str(client.get('num_instances'))))
+            no_instances = int(str(client.get('num_instances')))
+            if no_instances:
+                if self.utils.is_component_or_service(machine_id, name):
+                    yield M0ClientDesc(
+                        name=Text(name),
+                        instances=no_instances)
 
     def _create_node(self, machine_id: str) -> NodeDesc:
         store = self.provider
@@ -432,7 +435,7 @@ class CdfGenerator:
         # node>{machine-id}>name
         iface = self._get_iface(machine_id)
         servers = None
-        if(self.utils.is_motr_component(machine_id)):
+        if(self.utils.is_motr_io_present(machine_id)):
             # Currently, there is 1 m0d per cvg.
             # We will create 1 IO service entry in CDF per cvg.
             # An IO service entry will use data  and metadat devices
