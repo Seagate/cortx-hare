@@ -322,8 +322,8 @@ class ServerRunner:
         return web.Application(middlewares=[encode_exception])
 
     def _get_my_hostname(self) -> str:
-        hax_ip: str = self.consul_util.get_hax_ip_address()
-        return hax_ip
+        hax_hostname: str = self.consul_util.get_hax_hostname()
+        return hax_hostname
 
     @repeat_if_fails()
     def _configure(self) -> None:
@@ -372,20 +372,29 @@ class ServerRunner:
         except Exception as e:
             raise HAConsistencyException('Failed to configure hax') from e
 
-    def _start(self, web_address: str, port: int) -> None:
-        web.run_app(self.app, host=web_address, port=port)
+    @repeat_if_fails()
+    def _start(self, port: int) -> None:
+        try:
+            web_address = self._get_my_hostname()
+            LOG.info(f'Starting HTTP server at {web_address}:{port} ...')
+            web.run_app(self.app, host=web_address, port=port)
+        except Exception as e:
+            raise HAConsistencyException(
+                'Failed to start web server, trying again...') from e
 
+    @repeat_if_fails()
     def run(
         self,
         threads_to_wait: List[StoppableThread] = [],
         port=8008,
     ):
         self._configure()
-        web_address = self._get_my_hostname()
-        LOG.info(f'Starting HTTP server at {web_address}:{port} ...')
         try:
-            self._start(web_address, port)
+            self._start(port)
             LOG.debug('Server stopped normally')
+        except Exception as e:
+            raise HAConsistencyException(
+                'Failed to start web server, trying again...') from e
         finally:
             self.hax_state.set_stopping()
             LOG.debug('Stopping the threads')

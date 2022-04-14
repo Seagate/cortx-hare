@@ -78,7 +78,10 @@ ENV_FILE=$conf_dir/consul-env
 }
 
 get_node_name() {
-    /opt/seagate/cortx/hare/libexec/node-name --conf-dir=$conf_dir
+    node_name=$(/opt/seagate/cortx/hare/libexec/node-name --conf-dir=$conf_dir)
+    node_name+=':'
+    node_name+=$(uuidgen | cut -d '-' -f 1)
+    echo $node_name
 }
 
 sed -r -e "s/^(NODE=).*/\1$(get_node_name)/" \

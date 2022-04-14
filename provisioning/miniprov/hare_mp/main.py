@@ -75,6 +75,7 @@ class Svc(Enum):
     Hax = 'hax'
 
 
+@func_log(func_enter, func_leave)
 def create_logger_directory(log_dir):
     """Create log directory if not exists."""
     if not os.path.isdir(log_dir):
@@ -229,6 +230,12 @@ def has_process_stopped(proc_name: str) -> bool:
     return True
 
 
+@repeat_if_fails()
+def save_consul_node_name(cns_utils: ConsulUtil, consul_nodename: str,
+                          hostname: str):
+    cns_utils.kv.kv_put(f'consul/node/{hostname}', consul_nodename)
+
+
 @func_log(func_enter, func_leave)
 def _start_consul(utils: Utils,
                   stop_event: Event,
@@ -240,8 +247,7 @@ def _start_consul(utils: Utils,
     config_dir = f'{hare_local_dir}/consul/config'
 
     provider = ConfStoreProvider(url)
-    machine_id = provider.get_machine_id()
-    node_id = uuid.UUID(f'{machine_id}')
+    node_id = uuid.uuid4()
     consul_endpoints = provider.get('cortx>external>consul>endpoints')
     cns_utils: ConsulUtil = ConsulUtil()
     hostname = utils.get_local_hostname()
@@ -257,13 +263,16 @@ def _start_consul(utils: Utils,
         peers.append(peer)
 
     bind_addr = socket.gethostbyname(hostname)
+    consul_nodename = hostname + ':' + str(node_id)[:8]
     consul_starter = ConsulStarter(utils=utils, cns_utils=cns_utils,
                                    stop_event=stop_event,
                                    log_dir=log_dir, data_dir=data_dir,
-                                   config_dir=config_dir, node_name=hostname,
+                                   config_dir=config_dir,
                                    node_id=str(node_id),
+                                   node_name=consul_nodename,
                                    peers=peers, bind_addr=bind_addr)
     consul_starter.start()
+    save_consul_node_name(cns_utils, consul_nodename, hostname)
 
     return consul_starter
 
@@ -879,6 +888,7 @@ def wait_for_cluster_start(url: str):
         sleep(2)
 
 
+@func_log(func_enter, func_leave)
 def shutdown_cluster():
     while is_cluster_running():
         os.system('hctl shutdown --skip-consul-stop')
@@ -943,6 +953,18 @@ def save(filename: str, contents: str) -> None:
 
 
 @func_log(func_enter, func_leave)
+@repeat_if_fails()
+def is_kv_imported(utils: Utils) -> bool:
+    try:
+        leader = utils.kv.kv_get('leader', allow_null=True)
+        if not leader or leader is None:
+            return False
+    except Exception:
+        raise RuntimeError('Failed to get leader key')
+    return True
+
+
+@func_log(func_enter, func_leave)
 def generate_config(url: str, path_to_cdf: str) -> None:
     provider = ConfStoreProvider(url)
     utils = Utils(provider)
@@ -974,8 +996,7 @@ def generate_config(url: str, path_to_cdf: str) -> None:
     # during start up of one of the nodes in the cluster, this avoids
     # duplicate imports and thus a possible overwriting of the updated
     # cluster state.
-    epoch_data = utils.kv.kv_get('epoch', allow_null=True)
-    if not epoch_data or epoch_data is None:
+    if not is_kv_imported(utils):
         utils.import_kv(conf_dir)
 
 

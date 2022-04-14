@@ -48,8 +48,8 @@ class ConsulStarter(StoppableThread):
         self.log_dir = log_dir
         self.data_dir = data_dir
         self.config_dir = config_dir
-        self.node_name = node_name
         self.node_id = node_id
+        self.node_name = node_name
         self.peers = peers
         self.bind_addr = bind_addr
         self.client_addr = client_addr
@@ -79,9 +79,9 @@ class ConsulStarter(StoppableThread):
                    '-datacenter=dc1',
                    f'-data-dir={self.data_dir}', '-enable-script-checks',
                    f'-config-dir={self.config_dir}',
-                   f'-node={self.node_name}', f'-node-id={self.node_id}',
-                   '-domain=consul',
-                   '-serf-lan-port=8301']
+                   f'-node={self.node_name}',
+                   f'-node-id={self.node_id}',
+                   '-domain=consul']
             for peer in self.peers:
                 cmd.append(f'-retry-join={peer}')
 
