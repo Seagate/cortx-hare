@@ -118,8 +118,8 @@ class CdfGenerator:
         conf = self.provider
         pool_type = pool.pool_type
         prop_name = 'data'
-        # node>{machine-id}>storage>cvg_count
-        cvg_num = int(conf.get(f'node>{node}>storage>cvg_count'))
+        # node>{machine-id}>storage>num_cvg
+        cvg_num = int(conf.get(f'node>{node}>storage>num_cvg'))
         all_cvg_devices = []
         if pool_type == 'dix':
             prop_name = 'metadata'
@@ -172,9 +172,9 @@ class CdfGenerator:
 
         node_count = len(data_nodes)
         machine_id = data_nodes[0]
-        # node>{machine-id}>storage>cvg_count
+        # node>{machine-id}>storage>num_cvg
         cvg_per_node = int(conf.get(
-            f'node>{machine_id}>storage>cvg_count'))
+            f'node>{machine_id}>storage>num_cvg'))
 
         total_unit = layout.data + layout.parity + layout.spare
         if total_unit == 0:
@@ -225,11 +225,11 @@ class CdfGenerator:
         pools: List[PoolDesc] = []
         conf = self.provider
         cluster_id = self._get_cluster_id()
-        # cluster>storage_set_count
-        storage_set_count = int(
-            conf.get('cluster>storage_set_count'))
+        # cluster>num_storage_set
+        num_storage_set = int(
+            conf.get('cluster>num_storage_set'))
 
-        for i in range(storage_set_count):
+        for i in range(num_storage_set):
             for pool_type in ('sns', 'dix'):
                 handle = PoolHandle(cluster_id=cluster_id,
                                     pool_type=pool_type,

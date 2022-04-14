@@ -32,7 +32,7 @@
   "cluster": {
     "name": "cortx_cluster",
     "site_count": "1",
-    "storage_set_count": "1",
+    "num_storage_set": "1",
     "network": {
       "management": {
         "virtual_host": "None"
@@ -97,7 +97,7 @@
         }
       },
       "storage": {
-        "cvg_count": "1",
+        "num_cvg": "1",
         "cvg": [
           {
             "devices": {
