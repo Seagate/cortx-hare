@@ -69,6 +69,10 @@ MotrProcStatusLocalRemote = NamedTuple('MotrProcStatusLocalRemote', [(
                                 ('motr_proc_status_remote', ObjHealth)])
 
 
+def consul_to_local_nodename(consul_node: str) -> str:
+    return consul_node.split(':')[0]
+
+
 def mkServiceData(service: Dict[str, Any]) -> ServiceData:
     transport_type = service['ServiceMeta']['transport_type']
     if transport_type == 'lnet':
@@ -78,7 +82,7 @@ def mkServiceData(service: Dict[str, Any]) -> ServiceData:
         addr = '{}@{}'.format(service['ServiceAddress'],
                               service['ServicePort'])
     return ServiceData(
-        node=service['Node'],
+        node=consul_to_local_nodename(service['Node']),
         fid=mk_fid(
             ObjT.PROCESS,  # XXX s/PROCESS/SERVICE/ ?
             int(service['ServiceID'])),
@@ -332,10 +336,26 @@ class ConsulUtil:
             ObjT.CONTROLLER.name: self.get_ctrl_state
         }
 
+    @repeat_if_fails()
+    def get_consul_node(self, node: str) -> Optional[str]:
+        LOG.debug('fetching consul node for node: %s', node)
+        consul_node_data = self.kv.kv_get(f'consul/node/{node}')
+        if consul_node_data:
+            consul_node_val: bytes = consul_node_data['Value']
+            consul_node = consul_node_val.decode('utf-8')
+            LOG.debug('consul node %s node: %s', consul_node, node)
+            return consul_node
+        return None
+
     def _service_by_name(self, hostname: str, svc_name: str) -> Dict[str, Any]:
         cat = self.catalog
+        consul_node = self.get_consul_node(hostname)
+        if not consul_node or consul_node is None:
+            raise HAConsistencyException(
+                f'Node {hostname!r} is not ready yet')
+        LOG.debug('consul_node: %s node: %s', consul_node, hostname)
         for svc in cat.get_services(svc_name):
-            if svc['Node'] == hostname:
+            if str(svc['Node']) in consul_node:
                 return svc
         raise HAConsistencyException(
             f'No {svc_name!r} Consul service found at node {hostname!r}')
@@ -349,7 +369,7 @@ class ConsulUtil:
         try:
             local_nodename = os.environ.get('HARE_HAX_NODE_NAME') or \
                 self.cns.agent.self()['Config']['NodeName']
-            return local_nodename
+            return consul_to_local_nodename(str(local_nodename))
         except (ConsulException, HTTPError, RequestException) as e:
             raise HAConsistencyException('Failed to communicate '
                                          'to Consul Agent') from e
@@ -358,8 +378,8 @@ class ConsulUtil:
     def force_leave(self, node: str):
         try:
             self.cns.agent.force_leave(node)
-        except Exception:
-            LOG.error('force leaving the agent failed, trying again...')
+        except Exception as e:
+            raise HAConsistencyException('Force leaving agent') from e
 
     @uses_consul_cache
     def _local_service_by_name(self,
@@ -388,11 +408,15 @@ class ConsulUtil:
         "my own" fid)
         """
         svc: Dict[str, Any] = self._local_service_by_name('hax')
+        if not svc or svc is None:
+            raise HAConsistencyException('Error fetching hax svc')
         return mk_fid(ObjT.PROCESS, int(svc['ServiceID']))
 
     @uses_consul_cache
     def get_ha_fid(self, kv_cache=None) -> Fid:
         svc = self._local_service_by_name('hax')
+        if not svc or svc is None:
+            raise HAConsistencyException('Error fetching hax svc')
         return mk_fid(ObjT.SERVICE, int(svc['ServiceID']) + 1)
 
     @repeat_if_fails()
@@ -407,7 +431,10 @@ class ConsulUtil:
 
     @uses_consul_cache
     def get_hax_endpoint(self, kv_cache=None) -> str:
-        return self._service_data(kv_cache=kv_cache).address
+        hax_ep = self._service_data(kv_cache=kv_cache).address
+        if not hax_ep or hax_ep is None:
+            raise HAConsistencyException('Error fetching hax endpoint')
+        return hax_ep
 
     @uses_consul_cache
     @repeat_if_fails()
@@ -416,6 +443,14 @@ class ConsulUtil:
         if not hax_ip or hax_ip is None:
             raise HAConsistencyException('Error fetching hax ip address')
         return str(hax_ip)
+
+    @uses_consul_cache
+    @repeat_if_fails()
+    def get_hax_hostname(self, kv_cache=None) -> str:
+        hax_hostname = self._service_data(kv_cache=kv_cache).node
+        if not hax_hostname or hax_hostname is None:
+            raise HAConsistencyException('Error fetching hax hostname')
+        return str(hax_hostname)
 
     def get_hax_http_port(self) -> int:
         return int(self._local_service_by_name('hax')['ServiceMeta'].get(
@@ -512,7 +547,8 @@ class ConsulUtil:
             if session is None or session.get('Node') is None:
                 raise HAConsistencyException('Failed to get session'
                                              ' node')
-            return str(session['Node'])  # principal RM
+            # Principal RM
+            return consul_to_local_nodename(str(session['Node']))
         except (ConsulException, HTTPError, RequestException) as e:
             raise HAConsistencyException('Failed to communicate to'
                                          ' Consul Agent') from e
@@ -552,7 +588,10 @@ class ConsulUtil:
     def get_service_data_by_name(self, name: str) -> List[ServiceData]:
         services = self.catalog.get_services(name)
         LOG.log(TRACE, 'Services "%s" received: %s', name, services)
-        return [mkServiceData(i) for i in services]
+        services_dict = {}
+        for svc in services:
+            services_dict[int(svc['ServiceID'])] = mkServiceData(svc)
+        return [services_dict[key] for key in services_dict]
 
     def get_confd_list(self) -> List[ServiceData]:
         return self.get_service_data_by_name('confd')
@@ -732,12 +771,12 @@ class ConsulUtil:
         else:
             pfid = create_process_fid(fidk)
         proc_node = self.get_process_node(pfid, kv_cache=kv_cache)
-        local_node = self.get_local_nodename()
+        # local_node = self.get_local_nodename()
         # Every motr process requests the entire cluster status, thus if
         # its the requesting process is the same as the processing one,
         # we just reply itself as ONLINE instead of running self checks.
-        if proc_node == local_node:
-            return HaNoteStruct.M0_NC_ONLINE
+        # if proc_node == local_node:
+        #     return HaNoteStruct.M0_NC_ONLINE
         proc_status: ObjHealth = self.get_service_health(proc_node, pfid.key,
                                                          kv_cache=kv_cache)
         return proc_status.to_ha_note_status()
@@ -796,7 +835,7 @@ class ConsulUtil:
             members_data = self.cns.agent.members()
             LOG.log(TRACE, "members: %s", members_data)
             for member in members_data:
-                if member['Name'] == node:
+                if consul_to_local_nodename(member['Name']) == node:
                     return int(member['Status']) == 1
             return True
         except (ConsulException, HTTPError, RequestException) as e:
@@ -804,16 +843,19 @@ class ConsulUtil:
                 'Failed to members data from Consul') from e
 
     @uses_consul_cache
-    def get_node_health_details(self,
-                                node: str,
-                                kv_cache=None) -> List[Dict[str, Any]]:
+    def get_node_health_details(
+            self, node: str,
+            kv_cache=None) -> Optional[List[Dict[str, Any]]]:
         """
         Returns the list of health checks (as it is reported by Consul, see
         'Health: node' section at
         https://python-consul.readthedocs.io/en/latest/).
         """
         try:
-            return self.cns.health.node(node)[1]
+            consul_node = self.get_consul_node(node)
+            if not consul_node or consul_node is None:
+                return None
+            return self.cns.health.node(consul_node)[1]
         except (ConsulException, HTTPError, RequestException) as e:
             raise HAConsistencyException(
                 f'Failed to get {node} node health: {e}')
@@ -826,9 +868,10 @@ class ConsulUtil:
         """
         try:
             node_data = self.get_node_health_details(node, kv_cache=kv_cache)
-            if not node_data or (not self.is_node_alive(node,
-                                                        kv_cache=kv_cache)):
-                return 'failed'
+            # if not node_data or (not self.is_node_alive(node,
+            #                                             kv_cache=kv_cache)):
+            if not node_data:
+                return 'offline'
             return str(node_data[0]['Status'])
         except (ConsulException, HTTPError, RequestException) as e:
             raise HAConsistencyException(
@@ -936,7 +979,7 @@ class ConsulUtil:
             configured and running on @node.
         """
         services = ['hax', 'ios', 'confd', 's3service']
-        node_data: List[Dict[str, Any]] = self.get_node_health_details(node)
+        node_data = self.get_node_health_details(node)
         fids: List[Fid] = []
         if not node_data:
             return []
@@ -1252,10 +1295,12 @@ class ConsulUtil:
         if node:
             val = json.loads(node['Value'])
             state = val['state']
+            node_name = val['name']
             LOG.debug('Node=%s state=%s', node_fid, state)
             if state in (m0HaObjState.M0_NC_TRANSIENT.name,
                          m0HaObjState.M0_NC_FAILED.name):
-                if (self.get_node_health_status(node, kv_cache=kv_cache) ==
+                if (self.get_node_health_status(node_name,
+                                                kv_cache=kv_cache) ==
                         'passing'):
                     return m0HaObjState.M0_NC_ONLINE
             else:
@@ -1633,11 +1678,11 @@ class ConsulUtil:
 
         svc_to_motr_status_map = {
             cur_consul_status('passing', 'M0_CONF_HA_PROCESS_STARTING'):
-            local_remote_health_ret(ObjHealth.UNKNOWN,
-                                    ObjHealth.UNKNOWN),
+            local_remote_health_ret(ObjHealth.OFFLINE,
+                                    ObjHealth.OFFLINE),
             cur_consul_status('passing', 'M0_CONF_HA_PROCESS_STOPPING'):
-            local_remote_health_ret(ObjHealth.UNKNOWN,
-                                    ObjHealth.UNKNOWN),
+            local_remote_health_ret(ObjHealth.OFFLINE,
+                                    ObjHealth.OFFLINE),
             cur_consul_status('passing', 'M0_CONF_HA_PROCESS_STARTED'):
             local_remote_health_ret(ObjHealth.OK,
                                     ObjHealth.OK),
@@ -1645,8 +1690,8 @@ class ConsulUtil:
             local_remote_health_ret(ObjHealth.OK,
                                     ObjHealth.OK),
             cur_consul_status('passing', 'Unknown'):
-            local_remote_health_ret(ObjHealth.UNKNOWN,
-                                    ObjHealth.UNKNOWN),
+            local_remote_health_ret(ObjHealth.OFFLINE,
+                                    ObjHealth.OFFLINE),
             cur_consul_status('warning', 'M0_CONF_HA_PROCESS_STOPPING'):
             local_remote_health_ret(ObjHealth.OFFLINE,
                                     ObjHealth.OFFLINE),
@@ -1660,35 +1705,26 @@ class ConsulUtil:
             local_remote_health_ret(ObjHealth.OFFLINE,
                                     ObjHealth.OFFLINE),
             cur_consul_status('warning', 'Unknown'):
-            local_remote_health_ret(ObjHealth.UNKNOWN,
-                                    ObjHealth.UNKNOWN)}
+            local_remote_health_ret(ObjHealth.OFFLINE,
+                                    ObjHealth.OFFLINE)}
         try:
-            node_data: List[Dict[str, Any]] = self.get_node_health_details(
+            node_data = self.get_node_health_details(
                 node, kv_cache=kv_cache)
             if not node_data:
                 return ObjHealth.OFFLINE
             node_status = str(node_data[0]['Status'])
-            if node_status != 'passing' or (not self.is_node_alive(
-                    node, kv_cache=kv_cache)):
+            # if node_status != 'passing' or (not self.is_node_alive(
+            if node_status != 'passing':
                 return ObjHealth.OFFLINE
             status = ObjHealth.UNKNOWN
             for item in node_data:
                 if item['ServiceID'] == str(svc_id):
                     pfid = create_process_fid(svc_id)
+                    LOG.debug('item.status %s', item['Status'])
+                    if item['Status'] in ('critical', 'warning'):
+                        return ObjHealth.OFFLINE
                     cns_status = self.get_process_status(pfid,
                                                          kv_cache=kv_cache)
-                    LOG.debug('item.status %s', item['Status'])
-                    if item['Status'] == 'critical':
-                        if (cns_status.proc_type in
-                            (m0HaProcessType.M0_CONF_HA_PROCESS_M0MKFS.name,
-                             'Unknown')):
-                            return ObjHealth.OFFLINE
-                        elif (cns_status.proc_status !=
-                              'M0_CONF_HA_PROCESS_STOPPED'):
-                            return ObjHealth.OFFLINE
-                        else:
-                            return ObjHealth.OFFLINE
-
                     svc_health = svc_to_motr_status_map[MotrConsulProcStatus(
                                          item['Status'],
                                          cns_status.proc_status)]
@@ -1700,22 +1736,6 @@ class ConsulUtil:
                         status = svc_health.motr_proc_status_local
                     else:
                         status = svc_health.motr_proc_status_remote
-                    if (status != ObjHealth.OK and
-                            cns_status.proc_type in (
-                            m0HaProcessType.M0_CONF_HA_PROCESS_M0MKFS.name,
-                            'Unknown')):
-                        status = ObjHealth.OFFLINE
-
-                    # This situation is not expected but we handle
-                    # the same. Hax may end up here if the process has stopped
-                    # already and its current status is also reported as
-                    # 'unknown' by Consul. Hax will do nothing in this case
-                    # and will report OFFLINE for that process.
-                    if (item['Status'] == 'warning' and
-                            cns_status.proc_status == 'Unknown' and
-                            status == ObjHealth.UNKNOWN):
-                        status = ObjHealth.OFFLINE
-
                     return status
         except (ConsulException, HTTPError, RequestException) as e:
             raise HAConsistencyException('Failed to communicate '
@@ -1732,6 +1752,7 @@ class ConsulUtil:
             #                             recurse=True,
             #                             kv_cache=kv_cache)
             node_items = self.get_all_nodes(kv_cache=kv_cache)
+            LOG.debug('node items: %s', node_items)
             if ObjT.PROCESS.value == proc_fid.container:
                 keys = self.get_process_keys(node_items, fidk)
             elif ObjT.SERVICE.value == proc_fid.container:
