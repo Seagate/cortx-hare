@@ -2,7 +2,7 @@
   "cluster": {    
     "my-cluster": {
       "site": {
-        "storage_set_count": "1"
+        "num_storage_set": "1"
       },
       "storage_set": [
         {
@@ -59,7 +59,7 @@
       "s3_instances": "2",
       "storage_set_id": "storage1",
       "storage": {
-        "cvg_count": "1",
+        "num_cvg": "1",
         "cvg": [
           {
             "data_devices": [
@@ -96,7 +96,7 @@
       "s3_instances": "2",
       "storage_set_id": "storage1",
       "storage": {
-        "cvg_count": "1",
+        "num_cvg": "1",
         "cvg": [
           {
             "data_devices": [
@@ -133,7 +133,7 @@
       "s3_instances": "2",
       "storage_set_id": "storage1",
       "storage": {
-        "cvg_count": "1",
+        "num_cvg": "1",
         "cvg": [
           {
             "data_devices": [

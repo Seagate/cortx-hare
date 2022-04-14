@@ -196,7 +196,7 @@ class TestCDF(unittest.TestCase):
                 ['/dev/sdc'],
                 'node>MACH_ID>network>data>private_interfaces':
                 ['eth1', 'eno2'],
-                'node>MACH_ID>storage>cvg_count':
+                'node>MACH_ID>storage>num_cvg':
                 2,
                 'node>MACH_ID>storage>cvg':
                 [{'devices': {'data': ['/dev/sdb', '/dev/sdc'], 'metadata': ['/dev/meta', '/dev/meta1']}}],
@@ -210,8 +210,8 @@ class TestCDF(unittest.TestCase):
                 'tcp',
                 'cortx>motr>client_instances':
                 2,
-                'node>MACH_ID>storage>cvg_count': 1,
-                'cluster>storage_set_count':
+                'node>MACH_ID>storage>num_cvg': 1,
+                'cluster>num_storage_set':
                 1,
                 'cluster>storage_set>server_node_count':
                 1,
@@ -295,7 +295,7 @@ class TestCDF(unittest.TestCase):
 
         def ret_values(value: str) -> Any:
             data = {
-                'cluster>storage_set_count': 1,
+                'cluster>num_storage_set': 1,
                 'cluster>storage_set>server_node_count':
                 1,
                 'cluster>storage_set[0]>name': 'StorageSet-1',
@@ -311,7 +311,7 @@ class TestCDF(unittest.TestCase):
                 'node>MACH_ID>components':
                 [{'name':'hare'}, {'name': 'motr'}, {'name': 's3'},
                  {'name': 'other'}],
-                'node>MACH_ID>storage>cvg_count': 2,
+                'node>MACH_ID>storage>num_cvg': 2,
                 'node>MACH_ID>storage>cvg':
                 [{'devices': {'data': ['/dev/sdb', '/dev/sdc'], 'metadata': ['/dev/meta', '/dev/meta1']}}],
                 'node>MACH_ID>storage>cvg[0]>devices>data': ['/dev/sdb'],
@@ -453,7 +453,7 @@ class TestCDF(unittest.TestCase):
 
         def ret_values(value: str) -> Any:
             data = {
-                'cluster>storage_set_count': 1,
+                'cluster>num_storage_set': 1,
                 'cluster>storage_set[0]>name': 'StorageSet-1',
                 'cluster>storage_set[0]>durability>sns':
                 {'data': 4, 'parity' : 2, 'spare' : 0},
@@ -476,7 +476,7 @@ class TestCDF(unittest.TestCase):
                 'node>MACH_ID3>storage>cvg':
                 [{'devices': {'data': ['/dev/sda', '/dev/sdb', '/dev/sdc', '/dev/sdd'], 'metadata': ['/dev/meta1']}},
                  {'devices': {'data': ['/dev/sde', '/dev/sdf', '/dev/sdg', '/dev/sdh'], 'metadata': ['/dev/meta2']}}],
-                'node>MACH_ID1>storage>cvg_count': '2',
+                'node>MACH_ID1>storage>num_cvg': '2',
                 'node>MACH_ID1>storage>cvg[0]>devices>data': ['/dev/sda', '/dev/sdb', '/dev/sdc', '/dev/sdd'],
                 'node>MACH_ID1>storage>cvg[1]>devices>data': ['/dev/sde', '/dev/sdf', '/dev/sdg', '/dev/sdh'],
                 'node>MACH_ID1>storage>cvg[0]>devices>metadata': ['/dev/meta1'],
@@ -489,7 +489,7 @@ class TestCDF(unittest.TestCase):
                 'node>MACH_ID1>network>data>private_interfaces':                ['eth1', 'eno2'],
                 'cortx>s3>service_instances':                1,
                 'cortx>motr>interface_type':                'o2ib',
-                'node>MACH_ID2>storage>cvg_count': '2',
+                'node>MACH_ID2>storage>num_cvg': '2',
                 'node>MACH_ID2>storage>cvg[0]>devices>data': ['/dev/sda', '/dev/sdb', '/dev/sdc', '/dev/sdd'],
                 'node>MACH_ID2>storage>cvg[1]>devices>data': ['/dev/sde', '/dev/sdf', '/dev/sdg', '/dev/sdh'],
                 'node>MACH_ID2>storage>cvg[0]>devices>metadata': ['/dev/meta1'],
@@ -502,7 +502,7 @@ class TestCDF(unittest.TestCase):
                 'node>MACH_ID2>network>data>private_interfaces':                ['eth1', 'eno2'],
                 'cortx>s3>service_instances':                1,
                 'cortx>motr>interface_type':                'o2ib',
-                'node>MACH_ID3>storage>cvg_count': '2',
+                'node>MACH_ID3>storage>num_cvg': '2',
                 'node>MACH_ID3>storage>cvg[0]>devices>data': ['/dev/sda', '/dev/sdb', '/dev/sdc', '/dev/sdd'],
                 'node>MACH_ID3>storage>cvg[1]>devices>data': ['/dev/sde', '/dev/sdf', '/dev/sdg', '/dev/sdh'],
                 'node>MACH_ID3>storage>cvg[0]>devices>metadata': ['/dev/meta1'],
@@ -544,8 +544,8 @@ class TestCDF(unittest.TestCase):
 
         def ret_values(value: str) -> Any:
             data = {
-                'node>MACH_ID>storage>cvg_count': 1,
-                'cluster>storage_set_count': 1,
+                'node>MACH_ID>storage>num_cvg': 1,
+                'cluster>num_storage_set': 1,
                 'cluster>storage_set>server_node_count': 1,
                 'cluster>storage_set[0]>name': 'StorageSet-1',
                 'cluster>storage_set[0]>nodes': ['MACH_ID'],
@@ -575,7 +575,7 @@ class TestCDF(unittest.TestCase):
                 ['eth1', 'eno2'],
                 'cortx>s3>service_instances':
                 1,
-                'node>MACH_ID>storage>cvg_count':
+                'node>MACH_ID>storage>num_cvg':
                 2,
                 'cortx>motr>interface_type':
                 'o2ib',
@@ -632,7 +632,7 @@ class TestCDF(unittest.TestCase):
 
         def ret_values(value: str) -> Any:
             data = {
-                'cluster>storage_set_count':
+                'cluster>num_storage_set':
                 1,
                 'cluster>storage_set>server_node_count':
                 1,
@@ -659,7 +659,7 @@ class TestCDF(unittest.TestCase):
                 ['eth1', 'eno2'],
                 'cortx>s3>service_instances':
                 1,
-                'node>MACH_ID>storage>cvg_count':
+                'node>MACH_ID>storage>num_cvg':
                 2,
                 'cortx>motr>interface_type':
                 'o2ib',
@@ -688,7 +688,7 @@ class TestCDF(unittest.TestCase):
 
         def ret_values(value: str) -> Any:
             data = {
-                'cluster>storage_set_count':
+                'cluster>num_storage_set':
                 1,
                 'cluster>storage_set>server_node_count':
                 1,
@@ -735,8 +735,8 @@ class TestCDF(unittest.TestCase):
 
         def ret_values(value: str) -> Any:
             data = {
-                'node>MACH_ID>storage>cvg_count': 1,
-                'cluster>storage_set_count':
+                'node>MACH_ID>storage>num_cvg': 1,
+                'cluster>num_storage_set':
                 1,
                 'cluster>storage_set>server_node_count':
                 1,
@@ -765,7 +765,7 @@ class TestCDF(unittest.TestCase):
                 ['eth1', 'eno2'],
                 'cortx>s3>service_instances':
                 1,
-                'node>MACH_ID>storage>cvg_count':
+                'node>MACH_ID>storage>num_cvg':
                 2,
                 'cortx>motr>interface_type':
                 'o2ib',
@@ -796,8 +796,8 @@ class TestCDF(unittest.TestCase):
 
         def ret_values(value: str) -> Any:
             data = {
-                'node>MACH_ID>storage>cvg_count': 1,
-                'cluster>storage_set_count':
+                'node>MACH_ID>storage>num_cvg': 1,
+                'cluster>num_storage_set':
                 1,
                 'cluster>storage_set>server_node_count':
                 1,
@@ -830,7 +830,7 @@ class TestCDF(unittest.TestCase):
                 ['eth1', 'eno2'],
                 'cortx>s3>service_instances':
                 1,
-                'node>MACH_ID>storage>cvg_count':
+                'node>MACH_ID>storage>num_cvg':
                 2,
                 'cortx>motr>interface_type':
                 'o2ib',
@@ -990,7 +990,7 @@ class TestCDF(unittest.TestCase):
                     'MACH_ID': 'stub',
                     'MACH_2_ID': 'stub'
                 },
-                'cluster>storage_set_count':
+                'cluster>num_storage_set':
                 1,
                 'cluster>storage_set>server_node_count':
                 2,
