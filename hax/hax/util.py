@@ -801,12 +801,6 @@ class ConsulUtil:
         else:
             pfid = create_process_fid(fidk)
         proc_node = self.get_process_node(pfid, kv_cache=kv_cache)
-        # local_node = self.get_local_nodename()
-        # Every motr process requests the entire cluster status, thus if
-        # its the requesting process is the same as the processing one,
-        # we just reply itself as ONLINE instead of running self checks.
-        # if proc_node == local_node:
-        #     return HaNoteStruct.M0_NC_ONLINE
         proc_status: ObjHealth = self.get_service_health(proc_node, pfid.key,
                                                          kv_cache=kv_cache)
         # Report ONLINE for hax and confd if they are already started.
