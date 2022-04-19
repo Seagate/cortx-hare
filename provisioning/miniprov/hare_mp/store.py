@@ -178,7 +178,14 @@ class ConfStoreProvider(ValueProvider):
         -   name: other
             num_instances: 2
         """
-        return self.get('cortx>motr>clients')
+        clients = self.get('cortx>motr>clients', allow_null=True)
+        if clients is None:
+            return []
+        for client in clients:
+            instances = int(str(client.get('num_instances')))
+            if instances == 0:
+                clients.remove(client)
+        return clients
 
 
 def get_machine_id() -> str:

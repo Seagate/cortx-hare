@@ -160,12 +160,14 @@ class Utils:
         self.kv.kv_put(f'{hostname}/log_path', log_path)
 
     @func_log(func_enter, func_leave)
-    def is_motr_component(self, machine_id: str) -> bool:
+    def is_motr_io_present(self, machine_id: str) -> bool:
         """
         Returns True if motr component is present in the components list
         for the given node>{machine_id}.
         """
-        return self.is_component(machine_id, Const.COMPONENT_MOTR.value)
+        return self.is_component_and_service(machine_id,
+                                             Const.COMPONENT_MOTR.value,
+                                             Const.SERVICE_MOTR_IO.value)
 
     @func_log(func_enter, func_leave)
     def is_component(self, machine_id: str, name: str) -> bool:
@@ -184,9 +186,49 @@ class Utils:
         return found
 
     @func_log(func_enter, func_leave)
+    def is_component_and_service(self, machine_id: str,
+                                 comp_name: str, svc_name: str) -> bool:
+        """
+        Returns True if the given service and component is present in the
+        components list for the given node>{machine_id} according to the
+        ConfStore (ValueProvider).
+        """
+        return self.is_component(machine_id, comp_name) and \
+            self.is_service(machine_id, svc_name)
+
+    @func_log(func_enter, func_leave)
+    def is_component_or_service(self, machine_id: str, name: str) -> bool:
+        """
+        Returns True if the given service or component is present in the
+        components list for the given node>{machine_id} according to the
+        ConfStore (ValueProvider).
+        """
+        return self.is_component(machine_id, name) or \
+            self.is_service(machine_id, name)
+
+    @func_log(func_enter, func_leave)
+    def is_service(self, machine_id: str, svc_name: str) -> bool:
+        """
+        Returns True if the given service is present in the components
+        list for the given node>{machine_id} according to the
+        ConfStore (ValueProvider).
+        """
+        comp_names = self.provider.get(f'node>{machine_id}>'
+                                       f'components')
+        found: bool = False
+        for component in comp_names:
+            svc_names = component.get('services')
+            if svc_names:
+                for service in svc_names:
+                    if(service == svc_name):
+                        found = True
+                        break
+        return found
+
+    @func_log(func_enter, func_leave)
     def save_drives_info(self):
         machine_id = self.provider.get_machine_id()
-        if(self.is_motr_component(machine_id)):
+        if(self.is_motr_io_present(machine_id)):
             cvgs_key: str = f'node>{machine_id}>storage>cvg'
             for cvg in range(len(self.provider.get(cvgs_key))):
                 data_devs = self.get_data_devices(machine_id, cvg)
