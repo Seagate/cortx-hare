@@ -6,18 +6,63 @@ from typing import Iterator, List, Optional, Tuple
 from math import floor, ceil
 import pkg_resources
 from urllib.parse import urlparse
+from enum import Enum, auto
 
 from cortx.utils.cortx import Const
 from hare_mp.store import ValueProvider
 from hare_mp.types import (ClusterDesc, DiskRef, DList, Maybe, NodeDesc,
                            PoolDesc, PoolType, ProfileDesc, Protocol, Text,
                            M0ServerDesc, DisksDesc, AllowedFailures, Layout,
-                           FdmiFilterDesc, NetworkPorts, M0ClientDesc)
+                           FdmiFilterDesc, NetworkPorts, M0ClientDesc,
+                           ClientPort, ServerPort)
 from hare_mp.utils import func_log, func_enter, func_leave, Utils
 
 DHALL_PATH = '/opt/seagate/cortx/hare/share/cfgen/dhall'
 DHALL_EXE = '/opt/seagate/cortx/hare/bin/dhall'
 DHALL_TO_YAML_EXE = '/opt/seagate/cortx/hare/bin/dhall-to-yaml'
+
+
+class procT(Enum):
+    """Motr service type
+    """
+    M0_CST_MDS = 1
+    M0_CST_IOS = auto()
+    M0_CST_CONFD = auto()
+    M0_CST_RMS = auto()
+    M0_CST_STATS = auto()
+    M0_CST_HA = auto()
+    M0_CST_SSS = auto()
+    M0_CST_SNS_REP = auto()
+    M0_CST_SNS_REB = auto()
+    M0_CST_ADDB2 = auto()
+    M0_CST_CAS = auto()
+    M0_CST_DIX_REP = auto()
+    M0_CST_DIX_REB = auto()
+    M0_CST_DS1 = auto()
+    M0_CST_DS2 = auto()
+    M0_CST_FIS = auto()
+    M0_CST_FDMI = auto()
+    M0_CST_BE = auto()
+    M0_CST_M0T1FS = auto()
+    M0_CST_CLIENT = auto()
+    M0_CST_ISCS = auto()
+
+    '''def SvcT_to_proc(stype: SvcT) -> str:
+        svcT_to_proc = {
+            M0_CST_MDS: 'mds',
+            M0_CST_IOS: 'ios',
+            M0_CST_CONFD: 'confd',
+            M0_CST_RMS: 'rms',
+            M0_CST_STATS: 'stats',
+            M0_CST_HA: 'ha',
+            M0_CST_SSS: 'sss',
+            M0_CST_SNS_REP: 'sns_repair',
+            M0_CST_SNS_REB: 'sns_rebalance',
+            M0_CST_ADDB2: 'addb',
+            M0_CST_CAS: 'cas'}'''
+
+    def __repr__(self):
+        return self.name
 
 
 @dataclass
@@ -118,8 +163,8 @@ class CdfGenerator:
         conf = self.provider
         pool_type = pool.pool_type
         prop_name = 'data'
-        # node>{machine-id}>storage>cvg_count
-        cvg_num = int(conf.get(f'node>{node}>storage>cvg_count'))
+        # node>{machine-id}>storage>num_cvg
+        cvg_num = int(conf.get(f'node>{node}>storage>num_cvg'))
         all_cvg_devices = []
         if pool_type == 'dix':
             prop_name = 'metadata'
@@ -172,9 +217,9 @@ class CdfGenerator:
 
         node_count = len(data_nodes)
         machine_id = data_nodes[0]
-        # node>{machine-id}>storage>cvg_count
+        # node>{machine-id}>storage>num_cvg
         cvg_per_node = int(conf.get(
-            f'node>{machine_id}>storage>cvg_count'))
+            f'node>{machine_id}>storage>num_cvg'))
 
         total_unit = layout.data + layout.parity + layout.spare
         if total_unit == 0:
@@ -225,11 +270,11 @@ class CdfGenerator:
         pools: List[PoolDesc] = []
         conf = self.provider
         cluster_id = self._get_cluster_id()
-        # cluster>storage_set_count
-        storage_set_count = int(
-            conf.get('cluster>storage_set_count'))
+        # cluster>num_storage_set
+        num_storage_set = int(
+            conf.get('cluster>num_storage_set'))
 
-        for i in range(storage_set_count):
+        for i in range(num_storage_set):
             for pool_type in ('sns', 'dix'):
                 handle = PoolHandle(cluster_id=cluster_id,
                                     pool_type=pool_type,
@@ -256,7 +301,9 @@ class CdfGenerator:
 
     def _create_ports_descriptions(self) -> NetworkPorts:
         conf = self.provider
-
+        m0serverT = ['ios', 'confd']
+        m0server_ports = []
+        m0client_ports = []
         for srv in NetworkPorts.__annotations__.keys():
             if srv == 'hax':
                 url = conf.get('cortx>hare>hax>endpoints', allow_null=True)
@@ -268,11 +315,23 @@ class CdfGenerator:
                     if _parsed_url.scheme in ('http', 'https'):
                         _hax_http = _parsed_url.port
             elif srv == 'm0_client_other':
-                _client_other = None
+                for client in self.provider.get_motr_clients():
+                    url = client.get('endpoints')
+                    if url:
+                        port = round(urlparse(url[0]).port / 100) * 100
+                        client_name = str(client.get('name'))
+                        m0client_ports.append(
+                            ClientPort(name=Text(client_name),
+                                       port=int(port)))
             elif srv == 'm0_server':
-                url = conf.get('cortx>motr>ios>endpoints', allow_null=True)
-                _ios = url if url is None else \
-                    round(urlparse(url[0]).port / 100) * 100
+                for server in m0serverT:
+                    url = conf.get(f'cortx>motr>{server}>endpoints',
+                                   allow_null=True)
+                    port = 0 if url is None else \
+                        round(urlparse(url[0]).port / 100) * 100
+                    m0server_ports.append(
+                        ServerPort(name=Text(server),
+                                   port=int(port)))
             else:
                 url = conf.get('cortx>motr>client>endpoints', allow_null=True)
                 _client_s3 = url if url is None else \
@@ -281,8 +340,10 @@ class CdfGenerator:
         return NetworkPorts(
             hax=Maybe(_hax, 'Natural'),
             hax_http=Maybe(_hax_http, 'Natural'),
-            m0_server=Maybe(_ios, 'Natural'),
-            m0_client_other=Maybe(_client_other, 'Natural'),
+            m0_server=Maybe(DList(m0server_ports, 'List ServerPort'),
+                            'List ServerPort'),
+            m0_client_other=Maybe(DList(m0client_ports, 'List ClientPort'),
+                                  'List ClientPort'),
             m0_client_s3=Maybe(_client_s3, 'Natural'))
 
     def _get_cdf_dhall(self) -> str:

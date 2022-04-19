@@ -137,8 +137,8 @@ in
      None
      { hax : Optional Natural
      , hax_http: Optional Natural
-     , m0_server : Optional Natural
+     , m0_server : Optional (List { name: Text, port: Natural })
      , m0_client_s3 : Optional Natural
-     , m0_client_other : Optional Natural
+     , m0_client_other : Optional (List { name: Text, port: Natural })
      }
 } : types.ClusterDesc

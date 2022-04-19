@@ -4,7 +4,7 @@ import abc
 import argparse
 import ast
 import sys
-from enum import Enum, auto, IntEnum
+from enum import Enum, auto
 from functools import lru_cache, wraps
 import itertools
 import json
@@ -430,7 +430,7 @@ def enrich_cluster_desc(desc: Dict[str, Any], mock_p: bool) -> None:
                                  for port_type in portalgroup}
     else:
         for key, value in desc['network_ports'].items():
-            if value is None:
+            if not value:
                 desc['network_ports'][key] = portalgroup[key].value
         for srv in [port_type.name for port_type in portalgroup]:
             if srv not in desc['network_ports']:
@@ -852,40 +852,65 @@ ProcT = Enum('ProcT', 'hax m0_server m0_client_s3 m0_client_other')
 ProcT.__doc__ = 'Type of process'
 
 
-class PortalGroup(IntEnum):
-    hax = 22000,
-    m0_server = 21000,
-    m0_client_s3 = 22500,
-    m0_client_other = 21500
+class m0ProcT(Enum):
+    confd = 21001
+    ios = 21002
+
+
+class PortalGroup(Enum):
+    hax = 22000
+    m0_server = [{'name': 'confd', 'port': m0ProcT.confd},
+                 {'name': 'ios', 'port': m0ProcT.ios}]
+    m0_client_s3 = 22500
+    m0_client_other = [{'name': 'default', 'port': 22500}]
 
 
 class Portals:
-    def __init__(self, hax=22000, m0_server=21000, m0_client_s3=22500,
-                 m0_client_other=21500):
+    def __init__(self, hax=22000,
+                 m0_server=[{'name': 'confd', 'port': m0ProcT.confd},
+                            {'name': 'ios', 'port': m0ProcT.ios}],
+                 m0_client_s3=22500,
+                 m0_client_other=[{'name': 'default', 'port': 4}]):
         self.hax = hax
         self.m0_server = m0_server
-        self.m0_client_s3 = m0_client_s3
+        self.m0_client_s3 = [m0_client_s3]
         self.m0_client_other = m0_client_other
 
     def get_portal_group(self):
-        return IntEnum('PortalGroup',
-                       {'hax': self.hax,
-                        'm0_server': self.m0_server,
-                        'm0_client_s3': self.m0_client_s3,
-                        'm0_client_other': self.m0_client_other})
+        return {'hax': self.hax,
+                'm0_server': self.m0_server,
+                'm0_client_s3': self.m0_client_s3,
+                'm0_client_other': self.m0_client_other}
 
 
-def get_lnet_portal_group(hax=1, m0_server=2,
-                          m0_client_s3=3, m0_client_other=4) -> Portals:
-    return Portals(hax=hax, m0_server=m0_server, m0_client_s3=m0_client_s3,
-                   m0_client_other=m0_client_other)
+def get_lnet_portal_group(
+        hax=1,
+        m0_server=[{'name': 'confd', 'port': 2},
+                   {'name': 'ios', 'port': 2}],
+        m0_client_s3=3,
+        m0_client_other=[]
+        ) -> Portals:
+    protal_group = Portals(hax=hax, m0_server=m0_server,
+                           m0_client_s3=m0_client_s3,
+                           m0_client_other=m0_client_other)
+    protal_group.m0_client_other.append({'name': 'default',
+                                         'port': 4})
+    return protal_group
 
 
-def get_libfab_portal_group(hax=22000, m0_server=21000,
-                            m0_client_s3=22500,
-                            m0_client_other=21500) -> Portals:
-    return Portals(hax=hax, m0_server=m0_server, m0_client_s3=m0_client_s3,
-                   m0_client_other=m0_client_other)
+def get_libfab_portal_group(
+        hax=22000,
+        m0_server=[{'name': 'confd', 'port': m0ProcT.confd},
+                   {'name': 'ios', 'port': m0ProcT.ios}],
+        m0_client_s3=22500,
+        m0_client_other=[]
+        ) -> Portals:
+    protal_group = Portals(hax=hax, m0_server=m0_server,
+                           m0_client_s3=m0_client_s3,
+                           m0_client_other=m0_client_other)
+    protal_group.m0_client_other.append({'name': 'default',
+                                         'port': 22500})
+    return protal_group
 
 
 class Endpoint:
@@ -896,16 +921,20 @@ class LnetEndpoint(Endpoint):
     _tmids: Dict[Tuple[str, int], int] = {}
 
     def __init__(self, proto: NetProtocol, ipaddr: str,
-                 portalgroup: PortalGroup,
+                 portalgroup: Tuple[str, Any],
                  tmid: int = None):
         self.proto = proto
         assert ipaddr
         self.ipaddr = ipaddr
-        assert portalgroup.value > 0
         self.portalgroup = portalgroup
+        if isinstance(portalgroup[1], int):
+            portal = portalgroup[1]
+        else:
+            portal = portalgroup[1].value
+        assert portal > 0
         if tmid is None:
-            self.tmid = self._tmids.setdefault((ipaddr, portalgroup.value), 1)
-            self._tmids[(ipaddr, portalgroup.value)] += 1
+            self.tmid = self._tmids.setdefault((ipaddr, portal), 1)
+            self._tmids[(ipaddr, portal)] += 1
         else:
             assert tmid > 0
             self.tmid = tmid
@@ -931,17 +960,21 @@ class LibfabricEndpoint(Endpoint):
     ep_map: Dict[Tuple[str, int], int] = {}
 
     def __init__(self, NetFamily: str, proto: NetProtocol, ipaddr: str,
-                 portalgroup: PortalGroup):
+                 portalgroup: Tuple[str, Any]):
         self.netfamily = NetFamily
         self.proto = proto
         assert ipaddr
         self.ipaddr = ipaddr
-        assert portalgroup.value > 0
         self.portalgroup = portalgroup
+        if isinstance(portalgroup[1], int):
+            portal = portalgroup[1]
+        else:
+            portal = portalgroup[1].value
+        assert portal > 0
         self.portal = 0
-        self.portal = self.ep_map.setdefault((ipaddr, portalgroup.value),
-                                             (portalgroup.value + 1))
-        self.ep_map[(ipaddr, portalgroup.value)] += 1
+        self.portal = self.ep_map.setdefault((ipaddr, portal),
+                                             (portal + 1))
+        self.ep_map[(ipaddr, portal)] += 1
 
     def __repr__(self):
         args = ', '.join([f'netfamily={self.netfamily!r}',
@@ -1138,17 +1171,31 @@ class ConfProcess(ToDhall):
         proto = node_desc.get('data_iface_type', 'tcp')
         transport_type = node_desc.get('transport_type', 'libfab')
         portal_group = portalgroup.get_portal_group()
+        if proc_t.name in ['m0_server', 'm0_client_other']:
+            found = False
+            for item in portal_group[proc_t.name]:
+                if item['name'] == proc_name:
+                    portal = (proc_t.name, item['port'])
+                    found = True
+                    break
+            if not found:
+                for client in portal_group[proc_t.name]:
+                    if item['name'] == 'default':
+                        portal = ('m0_client_other', item['port'])
+                        break
+        else:
+            portal = (proc_t.name, portal_group[proc_t.name])
         ep: Any = (
             LibfabricEndpoint(NetFamily='inet', proto=NetProtocol[proto],
                               ipaddr=facts[ipaddr_key(
                                            node_desc['data_iface'])],
-                              portalgroup=portal_group[proc_t.name]))
+                              portalgroup=portal))
         if transport_type == 'lnet':
             # Creates Lnet endpoint, remove once deprecated.
             ep = LnetEndpoint(proto=NetProtocol[proto],
                               ipaddr=facts[ipaddr_key(
                                            node_desc['data_iface'])],
-                              portalgroup=portal_group[proc_t.name])
+                              portalgroup=portal)
         proc_id = new_oid(ObjT.process)
         meta_data = None
         if proc_desc is not None and proc_t is ProcT.m0_server:
@@ -2242,7 +2289,7 @@ def consul_kv_sdevs(m0conf: Dict[Oid, Any]) -> Dict[str, str]:
             assert proc_id.type is ObjT.process
             proc_key = f'{node_key}/processes/' + oid_to_fidstr(proc_id)
             # XXX-VERIFYME Can we really convert from portal (int) to name?
-            proc_name = m0conf[proc_id].endpoint.portalgroup.name
+            proc_name = m0conf[proc_id].endpoint.portalgroup[0]
             d[proc_key] = json.dumps({'name': proc_name,
                                       'state': 'M0_NC_UNKNOWN'})
             for svc_id in m0conf[proc_id].services:
@@ -2540,12 +2587,12 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
         cluster.network_ports.update({k: v for k, v in ports.items()})
         lnet_portals = get_lnet_portal_group(
                            hax=ports['hax'],
-                           m0_server=ports['m0_server'],
+                           m0_server=tuple(ports['m0_server']),
                            m0_client_s3=ports['m0_client_s3'],
                            m0_client_other=ports['m0_client_other'])
         libfab_portals = get_libfab_portal_group(
                              hax=ports['hax'],
-                             m0_server=ports['m0_server'],
+                             m0_server=tuple(ports['m0_server']),
                              m0_client_s3=ports['m0_client_s3'],
                              m0_client_other=ports['m0_client_other'])
     else:
@@ -2579,10 +2626,15 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
             for ctrl_id in ctrl_ids:
                 m0d = ctrl_id[1]
                 conf_ctrl_id: Optional[Oid] = ctrl_id[0]
-                ConfProcess.build(conf, node_id, portalgroup, node,
-                                  ProcT.m0_server, m0d, conf_ctrl_id)
                 if m0d['runs_confd']:
                     confd_p = True
+                    ConfProcess.build(conf, node_id, portalgroup, node,
+                                      ProcT.m0_server, m0d, conf_ctrl_id,
+                                      proc_name='confd')
+                else:
+                    ConfProcess.build(conf, node_id, portalgroup, node,
+                                      ProcT.m0_server, m0d, conf_ctrl_id,
+                                      proc_name='ios')
 
         ipaddr = node['facts'][ipaddr_key(node['data_iface'])]
         (cluster.consul_servers if confd_p else cluster.consul_clients).\
