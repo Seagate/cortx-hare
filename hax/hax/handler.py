@@ -36,6 +36,8 @@ from hax.types import (ConfHaProcess, HAState, MessageId,
                        ObjT, ObjHealth, StoppableThread, m0HaProcessEvent,
                        m0HaProcessType)
 from hax.util import ConsulUtil, dump_json, repeat_if_fails
+from hax.ha import get_producer
+
 
 LOG = logging.getLogger('hax')
 
@@ -67,6 +69,7 @@ class ConsumerThread(StoppableThread):
     @repeat_if_fails(wait_seconds=1)
     def _update_process_status(self, p: WorkPlanner, motr: Motr,
                                event: ConfHaProcess) -> None:
+        LOG.info('Updating process status: %s', event.fid)
         # If a consul-related exception appears, it will
         # be processed by repeat_if_fails.
         #
@@ -113,6 +116,24 @@ class ConsumerThread(StoppableThread):
                 broadcast_hax_only=broadcast_hax_only)
         self.consul.update_process_status(event)
 
+        # If we are receiving M0_CONF_HA_PROCESS_STARTED for M0D processes
+        # then we will check if all the M0D processes on the local node are
+        # started. If yes then we are going to send node online event to
+        # MessageBus
+        if event.chp_event == m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED:
+            try:
+                util: ConsulUtil = ConsulUtil()
+                producer = get_producer(util)
+                if producer:
+                    producer.check_and_send(parent_resource_type=ObjT.NODE,
+                                            fid=event.fid,
+                                            resource_status='online')
+                else:
+                    LOG.warning('Could not sent an event as producer'
+                                ' is not available')
+            except Exception as e:
+                LOG.warning("Send event failed due to '%s'", e)
+
     @repeat_if_fails(wait_seconds=1)
     def update_process_failure(self, planner: WorkPlanner,
                                ha_states: List[HAState]) -> List[HAState]:
@@ -127,6 +148,8 @@ class ConsumerThread(StoppableThread):
                 if state.fid.container == ObjT.PROCESS.value:
                     current_status = self.consul.get_process_current_status(
                         state.status, state.fid)
+                    if current_status == ObjHealth.UNKNOWN:
+                        continue
                     proc_status_remote = self.consul.get_process_status(
                                              state.fid)
                     proc_status: Any = None
@@ -135,8 +158,7 @@ class ConsumerThread(StoppableThread):
                     # processes.
                     if proc_status_remote.proc_type in (
                             'Unknown',
-                            m0HaProcessType.M0_CONF_HA_PROCESS_M0MKFS.name,
-                            m0HaProcessType.M0_CONF_HA_PROCESS_HA.name):
+                            m0HaProcessType.M0_CONF_HA_PROCESS_M0MKFS.name):
                         continue
                     proc_type = m0HaProcessType.str_to_Enum(
                          proc_status_remote.proc_type)

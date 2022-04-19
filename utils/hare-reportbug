@@ -148,6 +148,14 @@ for f in ${extra_files[@]}; do
     fi
 done
 
+find "$conf_dir" -type f -name 'm0trace.*' | while read trace; do
+    ## Disable stderr output to suppress these messages:
+    ##
+    ## > lt-m0tracedump: Warning: skipping non-existing trace
+    ## > descriptor 0x7f977d0bdb00 (orig 0x7ff6ad5c9b00)
+    m0tracedump -s -i "$trace" 2>/dev/null | xz > "$trace.yaml.xz" || true
+done
+
 cp --parents $conf_dir/* . 2>/dev/null || true
 cp -r --parents $conf_dir/consul-{env,server,client}-* . 2>/dev/null || true
 cp -r --parents $log_dir/ . 2>/dev/null || true

@@ -195,6 +195,22 @@ case $phase in
        ;;
 esac
 
+
+get_node_name() {
+    /opt/seagate/cortx/hare/libexec/node-name
+}
+
+get_consul_node_name() {
+    curl -s http://localhost:8500/v1/agent/self | jq -r .Config.NodeName
+}
+
+save_node_to_consul_node() {
+    hostname=$(get_node_name)
+    consul_node_name=$(get_consul_node_name)
+
+    consul kv put consul/node/$hostname $consul_node_name >/dev/null
+}
+
 # It's critical to check for the service state in Consul catalogue.
 # Otherwise, if synchronisation of service status between Consul
 # servers delays (for some reason), hax may get 'offline' state from
@@ -215,6 +231,8 @@ wait_m0mkfs_done() {
     # and finish ha_link before m0d process is started.
     sleep 2
 }
+
+save_node_to_consul_node
 
 for id in $IDs; do
     if [[ $phase == 'phase3' ]]; then

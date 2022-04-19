@@ -37,6 +37,7 @@ from hax.message import (BaseMessage, BroadcastHAStates, SnsDiskAttach,
                          SnsRepairStart, SnsRepairStatus, SnsRepairStop)
 from hax.common import HaxGlobalState
 from hax.motr.delivery import DeliveryHerald
+from hax.exception import HAConsistencyException
 from hax.motr.planner import WorkPlanner
 from hax.queue import BQProcessor
 from hax.queue.confobjutil import ConfObjUtil
@@ -44,6 +45,7 @@ from hax.queue.offset import InboxFilter, OffsetStorage
 from hax.types import Fid, HAState, ObjHealth, StoppableThread
 from hax.util import ConsulUtil, create_process_fid, dump_json
 from helper.exec import Executor, Program
+from hax.util import repeat_if_fails
 LOG = logging.getLogger('hax')
 
 
@@ -260,7 +262,7 @@ def process_state_update(planner: WorkPlanner):
                 proc_fid = Fid.parse(item['Key'].split('/')[1])
                 proc_state = proc_status['state']
                 proc_type = proc_status['type']
-                if (proc_type == 'M0_CONF_HA_PROCESS_M0D' and
+                if (proc_type != 'M0_CONF_HA_PROCESS_M0MKFS' and
                         proc_state in ('M0_CONF_HA_PROCESS_STARTED',
                                        'M0_CONF_HA_PROCESS_STOPPED')):
                     ha_states.append(HAState(
@@ -320,64 +322,79 @@ class ServerRunner:
         return web.Application(middlewares=[encode_exception])
 
     def _get_my_hostname(self) -> str:
-        return self.consul_util.get_hax_ip_address()
+        hax_hostname: str = self.consul_util.get_hax_hostname()
+        return hax_hostname
 
+    @repeat_if_fails()
     def _configure(self) -> None:
-        # We can't use broad 0.0.0.0 IP address to make it possible to run
-        # multiple hax instances at the same machine (i.e. in failover
-        # situation).
-        # Instead, every hax will use a private IP only.
-        node_address = self._get_my_hostname()
+        try:
+            # We can't use broad 0.0.0.0 IP address to make it possible to run
+            # multiple hax instances at the same machine (i.e. in failover
+            # situation).
+            # Instead, every hax will use a private IP only.
+            node_address = self._get_my_hostname()
 
-        # Note that bq-delivered mechanism must use a unique node name rather
-        # than broad '0.0.0.0' that doesn't identify the node from outside.
-        inbox_filter = InboxFilter(
-            OffsetStorage(node_address,
-                          key_prefix='bq-delivered',
-                          kv=self.consul_util.kv))
+            # Note that bq-delivered mechanism must use a unique
+            # node name rather than broad '0.0.0.0' that doesn't
+            # identify the node from outside.
+            inbox_filter = InboxFilter(
+                OffsetStorage(node_address,
+                              key_prefix='bq-delivered',
+                              kv=self.consul_util.kv))
 
-        conf_obj = ConfObjUtil(self.consul_util)
-        planner = self.planner
-        herald = self.herald
-        consul_util = self.consul_util
+            conf_obj = ConfObjUtil(self.consul_util)
+            planner = self.planner
+            herald = self.herald
+            consul_util = self.consul_util
 
-        app = self._create_server()
-        app.add_routes([
-            web.get('/', hello_reply),
-            web.get('/v1/cluster/status', hctl_stat),
-            web.get('/v1/cluster/status/bytecount', bytecount_stat),
-            web.get('/v1/cluster/fetch-fids', hctl_fetch_fids),
-            web.post('/', process_ha_states(planner, consul_util)),
-            web.post(
-                '/watcher/bq',
-                process_bq_update(inbox_filter,
-                                  BQProcessor(planner, herald, conf_obj))),
-            web.post(
-                '/watcher/processes',
-                process_state_update(planner)),
-            web.post('/api/v1/sns/{operation}',
-                     process_sns_operation(planner)),
-            web.get('/api/v1/sns/repair-status',
-                    get_sns_status(planner, SnsRepairStatus)),
-            web.get('/api/v1/sns/rebalance-status',
-                    get_sns_status(planner, SnsRebalanceStatus)),
-        ])
-        self.app = app
+            app = self._create_server()
+            app.add_routes([
+                web.get('/', hello_reply),
+                web.get('/v1/cluster/status', hctl_stat),
+                web.get('/v1/cluster/status/bytecount', bytecount_stat),
+                web.get('/v1/cluster/fetch-fids', hctl_fetch_fids),
+                web.post('/', process_ha_states(planner, consul_util)),
+                web.post(
+                    '/watcher/bq',
+                    process_bq_update(inbox_filter,
+                                      BQProcessor(planner, herald, conf_obj))),
+                web.post(
+                    '/watcher/processes',
+                    process_state_update(planner)),
+                web.post('/api/v1/sns/{operation}',
+                         process_sns_operation(planner)),
+                web.get('/api/v1/sns/repair-status',
+                        get_sns_status(planner, SnsRepairStatus)),
+                web.get('/api/v1/sns/rebalance-status',
+                        get_sns_status(planner, SnsRebalanceStatus)),
+            ])
+            self.app = app
+        except Exception as e:
+            raise HAConsistencyException('Failed to configure hax') from e
 
-    def _start(self, web_address: str, port: int) -> None:
-        web.run_app(self.app, host=web_address, port=port)
+    @repeat_if_fails()
+    def _start(self, port: int) -> None:
+        try:
+            web_address = self._get_my_hostname()
+            LOG.info(f'Starting HTTP server at {web_address}:{port} ...')
+            web.run_app(self.app, host=web_address, port=port)
+        except Exception as e:
+            raise HAConsistencyException(
+                'Failed to start web server, trying again...') from e
 
+    @repeat_if_fails()
     def run(
         self,
         threads_to_wait: List[StoppableThread] = [],
         port=8008,
     ):
         self._configure()
-        web_address = self._get_my_hostname()
-        LOG.info(f'Starting HTTP server at {web_address}:{port} ...')
         try:
-            self._start(web_address, port)
+            self._start(port)
             LOG.debug('Server stopped normally')
+        except Exception as e:
+            raise HAConsistencyException(
+                'Failed to start web server, trying again...') from e
         finally:
             self.hax_state.set_stopping()
             LOG.debug('Stopping the threads')

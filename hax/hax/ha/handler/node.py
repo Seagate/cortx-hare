@@ -19,7 +19,7 @@
 import logging
 from typing import Dict
 
-from hax.ha.events import Event
+from hax.ha.message_interface.message_interface import Event
 from hax.ha.handler import EventHandler
 from hax.message import BroadcastHAStates
 from hax.motr.planner import WorkPlanner
@@ -50,7 +50,8 @@ class NodeEventHandler(EventHandler):
         self.planner = planner
 
     def handle(self, msg: Event) -> None:
-        node_name = self.cns.get_node_name_by_machineid(msg.resource_id)
+        node_name = self.cns.get_node_name_by_machineid(msg.resource_id,
+                                                        allow_null=True)
         if not node_name:
             LOG.warn('Unknown [resource_id=%s] provided. HA event is ignored',
                      msg.resource_id)
