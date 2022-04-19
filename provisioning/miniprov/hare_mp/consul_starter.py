@@ -21,6 +21,7 @@ import logging.handlers
 from typing import List
 from threading import Event
 from hax.types import StoppableThread
+from hax.util import ConsulUtil
 from hare_mp.utils import (execute_no_communicate, func_log, func_enter,
                            func_leave, LogWriter, Utils)
 
@@ -32,18 +33,23 @@ class ConsulStarter(StoppableThread):
     """
     Starts consul agent and blocks until terminated.
     """
-    def __init__(self, utils: Utils, stop_event: Event, log_dir: str,
-                 data_dir: str, config_dir: str, peers: List[str],
+    def __init__(self, utils: Utils, cns_utils: ConsulUtil, stop_event: Event,
+                 log_dir: str, data_dir: str, config_dir: str, node_name: str,
+                 node_id: str,
+                 peers: List[str],
                  bind_addr: str = '0.0.0.0',
                  client_addr: str = '0.0.0.0'):
         super().__init__(target=self._execute,
                          name='consul-starter')
         self.utils = utils
+        self.cns_utils = cns_utils
         self.stop_event = stop_event
         self.process = None
         self.log_dir = log_dir
         self.data_dir = data_dir
         self.config_dir = config_dir
+        self.node_id = node_id
+        self.node_name = node_name
         self.peers = peers
         self.bind_addr = bind_addr
         self.client_addr = client_addr
@@ -72,8 +78,10 @@ class ConsulStarter(StoppableThread):
                    f'-client=127.0.0.1 {self.bind_addr}',
                    '-datacenter=dc1',
                    f'-data-dir={self.data_dir}', '-enable-script-checks',
-                   f'-config-dir={self.config_dir}', '-domain=consul',
-                   '-serf-lan-port=8301']
+                   f'-config-dir={self.config_dir}',
+                   f'-node={self.node_name}',
+                   f'-node-id={self.node_id}',
+                   '-domain=consul']
             for peer in self.peers:
                 cmd.append(f'-retry-join={peer}')
 

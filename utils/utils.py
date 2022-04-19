@@ -30,7 +30,7 @@ from consul import Consul, ConsulException
 from requests.exceptions import RequestException
 from urllib3.exceptions import HTTPError
 from hax.exception import HAConsistencyException
-from hax.util import ConsulUtil
+from hax.util import ConsulUtil, consul_to_local_nodename
 
 Process = NamedTuple('Process', [('node', str), ('consul_name', str),
                                  ('systemd_name', str), ('fidk', int),
@@ -169,6 +169,9 @@ def is_fake_leader_name(leader: str) -> bool:
 
 
 def ssh_prefix(hostname: str) -> str:
+    # Extracting actual hostname from consul node name.
+    # e.g. localhost:1231245
+    hostname = consul_to_local_nodename(hostname)
     assert hostname
     return '' if is_localhost(hostname) else f'ssh {hostname} '
 

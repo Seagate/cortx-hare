@@ -53,6 +53,16 @@ HL_Fids = NamedTuple('HL_Fids', [('hax_ep', str), ('hax_fid', Fid),
 LOG = logging.getLogger('hax')
 
 
+def log_exception(fn):
+    def wrapper(*args, **kwargs):
+        try:
+            return fn(*args, **kwargs)
+        except Exception:
+            LOG.exception('**ERROR**')
+
+    return wrapper
+
+
 def _run_thread(thread: StoppableThread) -> StoppableThread:
     thread.start()
     return thread
@@ -107,6 +117,7 @@ def _remove_stale_session(util: ConsulUtil) -> None:
         LOG.debug('Stale session %s destroyed to enable RC re-election', sess)
 
 
+@log_exception
 @repeat_if_fails()
 def _get_motr_fids(util: ConsulUtil) -> HL_Fids:
     try:
@@ -116,7 +127,7 @@ def _get_motr_fids(util: ConsulUtil) -> HL_Fids:
         profiles = util.get_profiles()
         if (not hax_ep or not hax_fid or not ha_fid
                 or not profiles):
-            raise HAConsistencyException('failed to get motr fids')
+            raise HAConsistencyException('fids and profiles unavailable')
     except Exception as e:
         raise HAConsistencyException('failed to get motr fids') from e
     return HL_Fids(hax_ep, hax_fid, ha_fid, profiles)
@@ -174,6 +185,7 @@ def main():
     _remove_stale_session(util)
     cfg: HL_Fids = _get_motr_fids(util)
     hax_http_port = util.get_hax_http_port()
+    util.init_motr_processes_status()
 
     LOG.info('Welcome to HaX')
     LOG.info(f'Setting up ha_link interface with the options as follows: '

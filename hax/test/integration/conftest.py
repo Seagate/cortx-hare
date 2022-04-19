@@ -17,6 +17,7 @@ def consul_util(mocker):
     mock(consul.catalog, 'get_services', side_effect=exc)
     mock(consul.catalog, 'get_service_names', side_effect=exc)
     mock(consul, 'get_local_nodename', return_value='localhost')
+    mock(consul, 'get_hax_hostname', return_value='localhost')
     mock(consul, 'get_hax_ip_address', return_value='192.168.0.28')
     return consul
 

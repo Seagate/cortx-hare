@@ -618,7 +618,7 @@ Commands:
 
 **Note:** error messages are sent to stderr and duplicated to journald logs.
 
-* Use `--username` and `--password` current Linux user credentials to authenticate in `pcsd` Pacemaker daemon.  These parameters can be helpful when the command is executed by a non-root user.  This pair of options is optional; when omitted, no local authentication will be issued while communicating to Pacemaker.
+*   Use `--username` and `--password` current Linux user credentials to authenticate in `pcsd` Pacemaker daemon.  These parameters can be helpful when the command is executed by a non-root user.  This pair of options is optional; when omitted, no local authentication will be issued while communicating to Pacemaker.
 
 ### hctl-node subcommands
 
@@ -639,8 +639,8 @@ Options:
 
 Puts the cluster into "smart maintenance" mode.  This mode includes the following sequence:
 
-1. Disable STONITH resources. Wait until these resources are stopped (no longer than `timeout-sec` seconds).
-2. Put all the nodes to 'standby' mode. Wait until all resources are stopped (no longer than `timeout-sec` seconds).
+1.  Disable STONITH resources. Wait until these resources are stopped (no longer than `timeout-sec` seconds).
+2.  Put all the nodes to 'standby' mode. Wait until all resources are stopped (no longer than `timeout-sec` seconds).
 
 **Note:** If any of the steps fail, the cluster will remain in an unstable state: if STONITH resources are disabled, split-brain becomes a real risk. The user will need to issue `hctl node unmaintenance --all` manually to return the cluster back to normal state (note that this command can lead to fencing).
 
@@ -660,14 +660,14 @@ Options:
 
 Powers off the node via IPMI interface (the corresponding IPMI address and credentials are taken from Pacemaker's STONITH resources).  Shutdown procedure:
 
-1. Switch the node to standby (so that all the resources get stopped for sure)
-2. Once all resources are stopped, trigger shutdown.
+1.  Switch the node to standby (so that all the resources get stopped for sure)
+2.  Once all resources are stopped, trigger shutdown.
 
 **Notes:**
 
-1. Item \[1] waits until all the resources are stopped for sure. It waits no more than `timeout-sec` seconds. Once timeout is exceeded, the tool exits with an exception and non-zero exit code.
-2. As a result, if the resources take too much time to shutdown (by any reason), shutdown will not happen but the node will remain in 'standby' mode. The user will need to 'unstandby' the node manually in this case.
-3. If shutdown fails (e.g. due to IPMI failure), the node will also remain in 'standby' mode.
+1.  Item \[1] waits until all the resources are stopped for sure. It waits no more than `timeout-sec` seconds. Once timeout is exceeded, the tool exits with an exception and non-zero exit code.
+2.  As a result, if the resources take too much time to shutdown (by any reason), shutdown will not happen but the node will remain in 'standby' mode. The user will need to 'unstandby' the node manually in this case.
+3.  If shutdown fails (e.g. due to IPMI failure), the node will also remain in 'standby' mode.
 
 #### hctl node standby
 
@@ -724,8 +724,8 @@ Options:
 
 Disables "smart maintenance" mode.  Steps:
 
-1. Revoke all the nodes from 'standby' mode. Wait until all resources are stopped (no longer than `timeout-sec` seconds).
-2. Enable STONITH resources. Wait until these resources are running (no longer than `timeout-sec` seconds).
+1.  Revoke all the nodes from 'standby' mode. Wait until all resources are stopped (no longer than `timeout-sec` seconds).
+2.  Enable STONITH resources. Wait until these resources are running (no longer than `timeout-sec` seconds).
 
 **Note:** This command can be used as a general way to return the cluster back to normal mode (so it can 'cure' the cluster after 'standby --all' or after an unsuccessful shutdown).
 

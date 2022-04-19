@@ -85,10 +85,15 @@ cleanup() {
     pkill -f 'sh.*proto-rc' || true
 }
 
+get_consul_node_name()
+{
+    curl -s http://127.0.0.1:8500/v1/agent/self | jq -r .Config.NodeName
+}
+
 # If the session is already set - the leader is elected, so
 # there is nothing to do (except cleanup after ourself).
 get_session_id | grep -q ^- || {
-    if [[ $(get_leader_node) != $(get_node_name) ]]; then
+    if [[ $(get_leader_node) != $(get_consul_node_name) ]]; then
         cleanup
     fi
     exit 0
@@ -103,10 +108,10 @@ create_session() {
                       sed -r 's/.*processes.([0-9]+).*/"service:\1"/'))
     # Join array items into a comma-separated string.
     local checks=$(IFS=,; echo "[\"serfHealth\", ${checks_a[*]}]")
-    local payld="{\"Name\": \"leader\", \"Checks\": $checks, \"LockDelay\": \"2s\"}"
+    local payld="{\"Name\": \"leader\", \"Node\": \"$(get_consul_node_name)\", \"Checks\": $checks, \"LockDelay\": \"2s\"}"
     # XXX Allowing leader election to happen immediately without any health checkers
     # temporarily for container environment. Re-visit.
-    local res=$(curl -sX PUT -d "" http://localhost:8500/v1/session/create)
+    local res=$(curl -sX PUT -d "$payld" http://localhost:8500/v1/session/create)
     local sid=$(echo "$res" | jq -r '.ID' 2>/dev/null || true)
 
     [[ $sid ]] || {
@@ -131,7 +136,8 @@ while true; do
     if [[ $SID ]]; then
         consul kv put -acquire -session=$SID leader $(get_node_name) \
                       2>/dev/null && break
-        destroy_session $SID
+        # consul kv put -acquire -session=$SID leader $(get_node_name) && break
+        # destroy_session $SID
     fi
 done
 
