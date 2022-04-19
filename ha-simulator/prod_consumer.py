@@ -103,6 +103,7 @@ class EventConsumer:
                 break
 
     def _parse(self, message):
+        @staticmethod
         return json.loads(message.decode('utf-8'))
 
 
