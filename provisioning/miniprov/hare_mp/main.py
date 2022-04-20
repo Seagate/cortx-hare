@@ -75,7 +75,8 @@ class Svc(Enum):
     Hax = 'hax'
 
 
-@func_log(func_enter, func_leave)
+# Note: func_log method will not work for this function as the
+# relevant log dir does not exists.
 def create_logger_directory(log_dir):
     """Create log directory if not exists."""
     if not os.path.isdir(log_dir):
