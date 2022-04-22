@@ -336,10 +336,10 @@ class ConsulUtil:
             ObjT.CONTROLLER.name: self.get_ctrl_state
         }
 
-    @repeat_if_fails()
     def get_consul_node(self, node: str) -> Optional[str]:
         LOG.debug('fetching consul node for node: %s', node)
-        consul_node_data = self.kv.kv_get(f'consul/node/{node}')
+        consul_node_data = self.kv.kv_get(f'consul/node/{node}',
+                                          allow_null=True)
         if consul_node_data:
             consul_node_val: bytes = consul_node_data['Value']
             consul_node = consul_node_val.decode('utf-8')
@@ -347,12 +347,12 @@ class ConsulUtil:
             return consul_node
         return None
 
-    def _service_by_name(self, hostname: str, svc_name: str) -> Dict[str, Any]:
+    def _service_by_name(self, hostname: str,
+                         svc_name: str) -> Optional[Dict[str, Any]]:
         cat = self.catalog
         consul_node = self.get_consul_node(hostname)
         if not consul_node or consul_node is None:
-            raise HAConsistencyException(
-                f'Node {hostname!r} is not ready yet')
+            return None
         LOG.debug('consul_node: %s node: %s', consul_node, hostname)
         for svc in cat.get_services(svc_name):
             if str(svc['Node']) in consul_node:
@@ -384,7 +384,7 @@ class ConsulUtil:
     @uses_consul_cache
     def _local_service_by_name(self,
                                name: str,
-                               kv_cache=None) -> Dict[str, Any]:
+                               kv_cache=None) -> Optional[Dict[str, Any]]:
         """
         Returns the service data by its name assuming that it runs at the same
         node to the current hax process.
@@ -407,7 +407,7 @@ class ConsulUtil:
         Returns the fid of the current hax process (in other words, returns
         "my own" fid)
         """
-        svc: Dict[str, Any] = self._local_service_by_name('hax')
+        svc: Optional[Dict[str, Any]] = self._local_service_by_name('hax')
         if not svc or svc is None:
             raise HAConsistencyException('Error fetching hax svc')
         return mk_fid(ObjT.PROCESS, int(svc['ServiceID']))
@@ -424,6 +424,8 @@ class ConsulUtil:
     def get_rm_fid(self, kv_cache=None) -> Fid:
         rm_node = self.get_session_node(self.get_leader_session())
         confd = self._service_by_name(rm_node, 'confd')
+        if not confd or confd is None:
+            raise HAConsistencyException('Error fetching confd svc')
         pfidk = int(confd['ServiceID'])
         fidk = self.kv.kv_get(f'm0conf/nodes/{rm_node}/processes/{pfidk}/'
                               'services/rms', kv_cache=kv_cache)
@@ -453,8 +455,10 @@ class ConsulUtil:
         return str(hax_hostname)
 
     def get_hax_http_port(self) -> int:
-        return int(self._local_service_by_name('hax')['ServiceMeta'].get(
-            'http_port', 8008))
+        service_data = self._local_service_by_name('hax')
+        if not service_data:
+            raise HAConsistencyException('Error fetching hax svc')
+        return int(service_data['ServiceMeta'].get('http_port', 8008))
 
     @repeat_if_fails()
     def fid_to_endpoint(self, proc_fid: Fid) -> Optional[str]:
