@@ -262,7 +262,7 @@ def process_state_update(planner: WorkPlanner):
                 proc_fid = Fid.parse(item['Key'].split('/')[1])
                 proc_state = proc_status['state']
                 proc_type = proc_status['type']
-                if (proc_type == 'M0_CONF_HA_PROCESS_M0D' and
+                if (proc_type != 'M0_CONF_HA_PROCESS_M0MKFS' and
                         proc_state in ('M0_CONF_HA_PROCESS_STARTED',
                                        'M0_CONF_HA_PROCESS_STOPPED')):
                     ha_states.append(HAState(

@@ -580,7 +580,7 @@ class ConsulUtil:
             if service_name not in motr_services:
                 continue
             data = self.get_service_data_by_name(service_name)
-            LOG.debug('svc data: %s', data)
+            LOG.log(TRACE, 'svc data: %s', data)
             for item in data:
                 node = self.get_process_node(item.fid, kv_cache=kv_cache)
                 svc_health = self.get_service_health(node,
@@ -1756,7 +1756,7 @@ class ConsulUtil:
             #                             recurse=True,
             #                             kv_cache=kv_cache)
             node_items = self.get_all_nodes(kv_cache=kv_cache)
-            LOG.debug('node items: %s', node_items)
+            LOG.log(TRACE, 'node items: %s', node_items)
             if ObjT.PROCESS.value == proc_fid.container:
                 keys = self.get_process_keys(node_items, fidk)
             elif ObjT.SERVICE.value == proc_fid.container:

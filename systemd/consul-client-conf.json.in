@@ -34,6 +34,38 @@
     },
     {
       "type": "service",
+      "service": "hax",
+      "handler_type": "http",
+      "http_handler_config": {
+        "path": "http://localhost:HAX_HTTP_PORT",
+        "method": "POST",
+        "timeout": "10s"
+      }
+    },
+    {
+      "type": "service",
+      "service": "hax",
+      "args": [ "/opt/seagate/cortx/hare/libexec/consul-watch-handler",
+                "--log-dir", "TMP_LOG_DIR" ]
+    },
+    {
+      "type": "service",
+      "service": "confd",
+      "handler_type": "http",
+      "http_handler_config": {
+        "path": "http://localhost:HAX_HTTP_PORT",
+        "method": "POST",
+        "timeout": "10s"
+      }
+    },
+    {
+      "type": "service",
+      "service": "confd",
+      "args": [ "/opt/seagate/cortx/hare/libexec/consul-watch-handler",
+                "--log-dir", "TMP_LOG_DIR" ]
+    },
+    {
+      "type": "service",
       "service": "ios",
       "args": [ "/opt/seagate/cortx/hare/libexec/consul-watch-handler",
                 "--log-dir", "TMP_LOG_DIR" ]

@@ -137,8 +137,7 @@ class ConsumerThread(StoppableThread):
                     # processes.
                     if proc_status_remote.proc_type in (
                             'Unknown',
-                            m0HaProcessType.M0_CONF_HA_PROCESS_M0MKFS.name,
-                            m0HaProcessType.M0_CONF_HA_PROCESS_HA.name):
+                            m0HaProcessType.M0_CONF_HA_PROCESS_M0MKFS.name):
                         continue
                     proc_type = m0HaProcessType.str_to_Enum(
                          proc_status_remote.proc_type)
