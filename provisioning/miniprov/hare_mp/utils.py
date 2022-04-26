@@ -186,6 +186,34 @@ class Utils:
         return found
 
     @func_log(func_enter, func_leave)
+    def get_components(self, machine_id: str) -> List[str]:
+        """
+        Returns True if the given component is present in the components
+        list for the given node>{machine_id} according to the
+        ConfStore (ValueProvider).
+        """
+        comp_names = self.provider.get(f'node>{machine_id}>'
+                                       f'components')
+        logging.info("Component list:%s", comp_names)
+        return comp_names
+
+    @func_log(func_enter, func_leave)
+    def get_component_services(self, machine_id: str, name: str) -> List[str]:
+        """
+        Returns True if the given services are present in the components
+        list for the given node>{machine_id} according to the
+        ConfStore (ValueProvider).
+        """
+        comp_names = self.get_components(machine_id)
+        for component in comp_names:
+            svc_names = component.get('services')
+            if(component.get('name') == name):
+                if svc_names:
+                    logging.info("Component Service list:%s", svc_names)
+                    return svc_names
+        return svc_names
+
+    @func_log(func_enter, func_leave)
     def is_component_and_service(self, machine_id: str,
                                  comp_name: str, svc_name: str) -> bool:
         """

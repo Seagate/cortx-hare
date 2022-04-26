@@ -489,47 +489,65 @@ class CdfGenerator:
                         name=Text(name),
                         instances=no_instances)
 
-    def _create_node(self, machine_id: str) -> NodeDesc:
+    def build_motr(self, machine_id: str):
         store = self.provider
+        svcs = self.utils.get_component_services(machine_id,
+                                                 Const.COMPONENT_MOTR.value)
 
-        hostname = self.utils.get_hostname(machine_id)
-        # node>{machine-id}>name
-        iface = self._get_iface(machine_id)
         servers = None
-        if(self.utils.is_motr_io_present(machine_id)):
-            # Currently, there is 1 m0d per cvg.
-            # We will create 1 IO service entry in CDF per cvg.
-            # An IO service entry will use data  and metadat devices
-            # from corresponding cvg.
-            servers = DList([
-                M0ServerDesc(
+        for service in svcs:
+            if service == Const.SERVICE_MOTR_IO.value:
+                # Currently, there is 1 m0d per cvg.
+                # We will create 1 IO service entry in CDF per cvg.
+                # An IO service entry will use data  and metadat devices
+                # from corresponding cvg.
+                servers = DList([
+                    M0ServerDesc(
+                        io_disks=DisksDesc(
+                            data=self.utils.get_drives_info_for(cvg,
+                                                                machine_id),
+                            meta_data=Maybe(
+                                self._get_metadata_device(
+                                    machine_id, cvg), 'Text')),
+                        runs_confd=Maybe(False, 'Bool'))
+                    # node>{machine_id}>storage>cvg
+                    for cvg in range(len(store.get(
+                        f'node>{machine_id}>storage>cvg')))
+                    for m0d in range(self._get_m0d_per_cvg(machine_id, cvg))
+                ], 'List M0ServerDesc')
+
+                # Adding a Motr confd entry per server node in CDF.
+                # The `runs_confd` value (true/false) determines
+                # if Motr confd process will be started on the node or not.
+                servers.value.append(M0ServerDesc(
                     io_disks=DisksDesc(
-                        data=self.utils.get_drives_info_for(cvg, machine_id),
-                        meta_data=Maybe(
-                            self._get_metadata_device(
-                                machine_id, cvg), 'Text')),
-                    runs_confd=Maybe(False, 'Bool'))
-                # node>{machine_id}>storage>cvg
-                for cvg in range(len(store.get(
-                    f'node>{machine_id}>storage>cvg')))
-                for m0d in range(self._get_m0d_per_cvg(machine_id, cvg))
-            ], 'List M0ServerDesc')
+                        data=DList([], 'List Disk'),
+                        meta_data=Maybe(None, 'Text')),
+                    runs_confd=Maybe(True, 'Bool')))
+                return servers
 
-            # Adding a Motr confd entry per server node in CDF.
-            # The `runs_confd` value (true/false) determines
-            # if Motr confd process will be started on the node or not.
-            servers.value.append(M0ServerDesc(
-                io_disks=DisksDesc(
-                    data=DList([], 'List Disk'),
-                    meta_data=Maybe(None, 'Text')),
-                runs_confd=Maybe(True, 'Bool')))
-
+    def build_client(self, machine_id: str):
         # adding clients
         clients = DList([
             client
             for client in self._get_node_clients(machine_id)
         ], 'List M0ClientDesc')
         m0_clients = clients if clients else None
+        return m0_clients
+
+    def _create_node(self, machine_id: str) -> NodeDesc:
+        components = self.utils.get_components(machine_id)
+        component_build_map = {Const.COMPONENT_MOTR.value: self.build_motr}
+
+        servers = None
+        for component in components:
+            if component['name'] in component_build_map:
+                servers = component_build_map[component['name']](machine_id)
+
+        hostname = self.utils.get_hostname(machine_id)
+        # node>{machine-id}>name
+        iface = self._get_iface(machine_id)
+        m0_clients = self.build_client(machine_id)
 
         node_facts = self.utils.get_node_facts()
         return NodeDesc(
