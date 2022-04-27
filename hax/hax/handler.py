@@ -144,6 +144,8 @@ class ConsumerThread(StoppableThread):
                 if state.fid.container == ObjT.PROCESS.value:
                     current_status = self.consul.get_process_current_status(
                         state.status, state.fid)
+                    if current_status == ObjHealth.UNKNOWN:
+                        continue
                     proc_status_remote = self.consul.get_process_status(
                                              state.fid)
                     proc_status: Any = None

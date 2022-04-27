@@ -54,6 +54,8 @@
 , PoolsRef     = ./types/PoolsRef.dhall
 , FdmiFilterDesc = ./types/FdmiFilterDesc.dhall
 , NetworkPorts = ./types/Ports.dhall
+, ClientPort   = ./types/ClientPort.dhall
+, ServerPort   = ./types/ServerPort.dhall
 
 , Obj         = ./types/Obj.dhall
 , ObjT        = ./types/ObjT.dhall

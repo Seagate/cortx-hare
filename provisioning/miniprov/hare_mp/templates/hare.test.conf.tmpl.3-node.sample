@@ -1,6 +1,6 @@
 {
   "cluster": {
-    "storage_set_count": "1",
+    "num_storage_set": "1",
     "my-cluster": {
       "storage_set": [
         {
@@ -49,7 +49,7 @@
         }
       },
       "storage": {
-        "cvg_count": "2",
+        "num_cvg": "2",
         "cvg": [
           {
             "devices": {
@@ -91,7 +91,7 @@
         }
       },
       "storage": {
-        "cvg_count": "2",
+        "num_cvg": "2",
         "cvg": [
           {
             "devices": {
@@ -133,7 +133,7 @@
         }
       },
       "storage": {
-        "cvg_count": "2",
+        "num_cvg": "2",
         "cvg": [
           {
             "devices": {

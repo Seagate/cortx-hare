@@ -1,6 +1,6 @@
 {
   "cluster": {
-    "storage_set_count": "1",
+    "num_storage_set": "1",
     "storage_set": [
       {
         "durability": {
@@ -55,7 +55,7 @@
       },
       "storage_set": "storage1",
       "storage": {
-        "cvg_count": "2",
+        "num_cvg": "2",
         "cvg": [
           {
             "devices": {
@@ -100,7 +100,7 @@
       },
       "storage_set": "storage1",
       "storage": {
-        "cvg_count": "2",
+        "num_cvg": "2",
         "cvg": [
           {
             "devices": {
@@ -145,7 +145,7 @@
       },
       "storage_set": "storage1",
       "storage": {
-        "cvg_count": "2",
+        "num_cvg": "2",
         "cvg": [
           {
             "devices": {

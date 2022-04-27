@@ -82,7 +82,7 @@ def is_content_ok(content: str, mocker, kv_adapter) -> bool:
 def placeholders() -> Dict[str, str]:
     return {
         'TMPL_CLUSTER_ID': 'stub_cluster_id',
-        'TMPL_CVG_COUNT': '1',
+        'TMPL_NUM_CVG': '1',
         'TMPL_DATA_DEVICE_1': '/dev/sdb',
         'TMPL_DATA_DEVICE_2': '/dev/sdc',
         'TMPL_DATA_DEVICE_11': '/dev/sdb',
@@ -103,7 +103,7 @@ def placeholders() -> Dict[str, str]:
         'TMPL_S3SERVER_INSTANCES_COUNT': '4',
         'TMPL_SERVER_NODE_NAME': 'srvnode-1',
         'TMPL_SPARE_UNITS_COUNT': '0',
-        'TMPL_STORAGESET_COUNT': '1',
+        'TMPL_NUM_STORAGESET': '1',
         'TMPL_STORAGESET_NAME': 'storage-set',
         'TMPL_STORAGE_SET_ID': 'storage-set',
         'TMPL_PRIVATE_FQDN': 'my-node-1',
