@@ -188,9 +188,8 @@ class Utils:
     @func_log(func_enter, func_leave)
     def get_components(self, machine_id: str) -> List[str]:
         """
-        Returns True if the given component is present in the components
-        list for the given node>{machine_id} according to the
-        ConfStore (ValueProvider).
+        Returns components list for the given node>{machine_id} 
+        according to the ConfStore (ValueProvider).
         """
         comp_names = self.provider.get(f'node>{machine_id}>'
                                        f'components')
@@ -200,7 +199,7 @@ class Utils:
     @func_log(func_enter, func_leave)
     def get_component_services(self, machine_id: str, name: str) -> List[str]:
         """
-        Returns True if the given services are present in the components
+        Returns list of the services if it's present in the components
         list for the given node>{machine_id} according to the
         ConfStore (ValueProvider).
         """

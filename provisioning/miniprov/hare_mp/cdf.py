@@ -489,19 +489,20 @@ class CdfGenerator:
                         name=Text(name),
                         instances=no_instances)
 
-    def build_motr(self, machine_id: str):
+    @func_log(func_enter, func_leave)
+    def build_motr(self, machine_id: str, node: dict):
         store = self.provider
         svcs = self.utils.get_component_services(machine_id,
                                                  Const.COMPONENT_MOTR.value)
 
-        servers = None
         for service in svcs:
+            # logging.info("checking io:%s", Const.SERVICE_MOTR_IO.value)
             if service == Const.SERVICE_MOTR_IO.value:
                 # Currently, there is 1 m0d per cvg.
                 # We will create 1 IO service entry in CDF per cvg.
                 # An IO service entry will use data  and metadat devices
                 # from corresponding cvg.
-                servers = DList([
+                node['servers'] = DList([
                     M0ServerDesc(
                         io_disks=DisksDesc(
                             data=self.utils.get_drives_info_for(cvg,
@@ -519,37 +520,34 @@ class CdfGenerator:
                 # Adding a Motr confd entry per server node in CDF.
                 # The `runs_confd` value (true/false) determines
                 # if Motr confd process will be started on the node or not.
-                servers.value.append(M0ServerDesc(
+                node['servers'].value.append(M0ServerDesc(
                     io_disks=DisksDesc(
                         data=DList([], 'List Disk'),
                         meta_data=Maybe(None, 'Text')),
                     runs_confd=Maybe(True, 'Bool')))
-                return servers
 
-    def build_client(self, machine_id: str):
+    def build_client(self, machine_id: str, node: dict):
         # adding clients
         clients = DList([
             client
             for client in self._get_node_clients(machine_id)
         ], 'List M0ClientDesc')
-        m0_clients = clients if clients else None
-        return m0_clients
+        node['clients'] = clients if clients else None
 
     def _create_node(self, machine_id: str) -> NodeDesc:
         components = self.utils.get_components(machine_id)
         component_build_map = {Const.COMPONENT_MOTR.value: self.build_motr}
 
-        servers = None
+        hostname = self.utils.get_hostname(machine_id)
+        iface = self._get_iface(machine_id)
+        node_facts = self.utils.get_node_facts()
+
+        node = {'servers': None,
+                'clients': None}
         for component in components:
             if component['name'] in component_build_map:
-                servers = component_build_map[component['name']](machine_id)
-
-        hostname = self.utils.get_hostname(machine_id)
-        # node>{machine-id}>name
-        iface = self._get_iface(machine_id)
-        m0_clients = self.build_client(machine_id)
-
-        node_facts = self.utils.get_node_facts()
+                component_build_map[component['name']](machine_id, node)
+        self.build_client(machine_id, node)
         return NodeDesc(
             hostname=Text(hostname),
             machine_id=Maybe(Text(machine_id), 'Text'),
@@ -559,6 +557,6 @@ class CdfGenerator:
             data_iface_ip_addr=Maybe(Text(hostname), 'Text'),
             data_iface_type=Maybe(self._get_iface_type(machine_id), 'P'),
             transport_type=Text(self.utils.get_transport_type()),
-            m0_servers=Maybe(servers, 'List M0ServerDesc'),
-            m0_clients=Maybe(m0_clients, 'List M0ClientDesc')
+            m0_servers=Maybe(node['servers'], 'List M0ServerDesc'),
+            m0_clients=Maybe(node['clients'], 'List M0ClientDesc')
         )
