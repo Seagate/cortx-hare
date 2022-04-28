@@ -58,13 +58,18 @@ payload=$(jq --null-input --compact-output \
              --arg fid "$fid" \
              '{ cmd: $cmd, fid: $fid }')
 
-get_ip_addr() {
-    curl -sX GET http://localhost:8500/v1/agent/self | jq -r .DebugConfig.BindAddr
+get_hax_node_name() {
+    curl -s http://localhost:8500/v1/agent/host | jq -r .Host.hostname
 }
 
-ip_addr=$(get_ip_addr)
+get_hax_port() {
+    consul kv get ports/hax | jq -r .http
+}
 
-status_code=$(curl http://${ip_addr}:8008/api/v1/sns/${op_name} \
+hax_node_name=$(get_hax_node_name)
+hax_port=$(get_hax_port)
+
+status_code=$(curl http://${hax_node_name}:${hax_port}/api/v1/sns/${op_name} \
                    --silent \
                    --output /dev/null \
                    --request POST \
