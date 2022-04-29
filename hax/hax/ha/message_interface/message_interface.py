@@ -34,7 +34,7 @@ ADMIN_ID = "hare_admin"
 @dataclass
 class Event:
     version: str
-    event_type: str
+    resource_status: str
     event_id: str
     resource_type: str
     cluster_id: str
@@ -159,7 +159,7 @@ class MessageBusInterface(MessageInterface):
         payload = data['payload']
         header = data['header']
         return Event(version=header['version'],
-                     event_type='NOT_DEFINED',
+                     resource_status=payload['resource_status'],
                      event_id=header['event_id'],
                      resource_type=payload['resource_type'],
                      cluster_id=payload['cluster_id'],
