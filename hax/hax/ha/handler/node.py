@@ -66,7 +66,7 @@ class NodeEventHandler(EventHandler):
 
         self.planner.add_command(
             BroadcastHAStates(states=[
-                HAState(fid=node_fid, status=get_health(msg.event_type))
+                HAState(fid=node_fid, status=get_health(msg.resource_status))
             ],
                               reply_to=None))
 
