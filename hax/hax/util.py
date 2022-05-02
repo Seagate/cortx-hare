@@ -465,6 +465,16 @@ class ConsulUtil:
             raise HAConsistencyException('Error fetching hax svc')
         return int(service_data['ServiceMeta'].get('http_port', 8008))
 
+    @uses_consul_cache
+    @repeat_if_fails()
+    def get_hax_ssl_config(self, kv_cache=None) -> Optional[Dict[str, str]]:
+        ssl_data = self.kv.kv_get('ssl/hax', kv_cache=kv_cache,
+                                  allow_null=True)
+        if not ssl_data:
+            return None
+        data: Optional[Dict[str, str]] = json.loads(ssl_data['Value'])
+        return data
+
     @repeat_if_fails()
     def fid_to_endpoint(self, proc_fid: Fid) -> Optional[str]:
         pfidk = int(proc_fid.key)
