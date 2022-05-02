@@ -64,13 +64,20 @@ get_hax_node_name() {
 }
 
 get_hax_port() {
-    consul kv get ports/hax | jq -r .http
+    consul kv get ports/$(get_hax_node_name)/hax | jq -r .http
+}
+
+get_hax_http_protocol() {
+    proto=$(consul kv get ssl/hax 2>/dev/null | jq -r .http_protocol)
+    [[ "$proto" == "https" ]] && echo "https" || echo "http"
 }
 
 hax_node_name=$(get_hax_node_name)
 hax_port=$(get_hax_port)
+hax_protocol=$(get_hax_http_protocol)
 
-status_code=$(curl http://${hax_node_name}:${hax_port}/api/v1/sns/${op_name} \
+status_code=$(curl -k \
+    ${hax_protocol}://${hax_node_name}:${hax_port}/api/v1/sns/${op_name} \
                    --silent \
                    --output /dev/null \
                    --request POST \

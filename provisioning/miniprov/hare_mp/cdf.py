@@ -436,7 +436,7 @@ class CdfGenerator:
         for e in endpoints:
             key = e.split(':')
 
-            if key[0] == 'https':
+            if key[0] in ('http', 'https'):
                 continue
 
             if key[1].split('/')[2] == hostname:

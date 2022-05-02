@@ -171,6 +171,12 @@ get_hax_http_port_from_kv_file() {
     eval $cmd || true
 }
 
+get_hax_ssl_config() {
+    local cmd="consul kv get ssl/hax"
+    # Avoid printing error message if the key does not exist
+    eval $cmd 2>/dev/null || true
+}
+
 get_service_addr() {
     if [[ $xprt == 'lnet' ]]; then
         echo ${1%:*}
@@ -307,6 +313,13 @@ fi
 SVCS_CONF=''
 
 hax_http_port=$(get_hax_http_port_from_kv_file)
+hax_ssl_config=$(get_hax_ssl_config)
+hax_http_protocol=$(jq -r ".http_protocol" <<<$hax_ssl_config)
+if [[ "$hax_http_protocol" != "https" ]]; then
+    hax_http_protocol="http"
+fi
+hax_ssl_cert_path=$(jq -r ".cert_path" <<<$hax_ssl_config)
+hax_ssl_key_path=$(jq -r ".key_path" <<<$hax_ssl_config)
 
 append_hax_svc() {
     local id=$1
@@ -322,7 +335,10 @@ append_hax_svc() {
       \"meta\":
           {
             \"transport_type\": \"$xprt\",
-            \"http_port\": \"$hax_http_port\"
+            \"http_port\": \"$hax_http_port\",
+            \"http_protocol\": \"$hax_http_protocol\",
+            \"ssl_cert_path\": \"$hax_ssl_cert_path\",
+            \"ssl_key_path\": \"$hax_ssl_key_path\"
           },
       \"checks\": [
           {
@@ -504,8 +520,9 @@ append_hax_svc_watch() {
                           "key": $k,
                           "handler_type": "http",
                           "http_handler_config": {
-                          "path": "http://localhost:HAX_HTTP_PORT/watcher/processes",
+                          "path": "HAX_HTTP_PROTOCOL://localhost:HAX_HTTP_PORT/watcher/processes",
                           "method": "POST",
+                          "tls_skip_verify": true,
                           "timeout": "10s"}}]' $tmpfile > $tmpfile.tmp && mv -f $tmpfile.tmp $tmpfile
 }
 
@@ -518,8 +535,9 @@ append_confd_svc_watch() {
                           "key": $k,
                           "handler_type": "http",
                           "http_handler_config": {
-                          "path": "http://localhost:HAX_HTTP_PORT/watcher/processes",
+                          "path": "HAX_HTTP_PROTOCOL://localhost:HAX_HTTP_PORT/watcher/processes",
                           "method": "POST",
+                          "tls_skip_verify": true,
                           "timeout": "10s"}}]' $tmpfile > $tmpfile.tmp && mv -f $tmpfile.tmp $tmpfile
 }
 
@@ -532,8 +550,9 @@ append_ios_svc_watch() {
                           "key": $k,
                           "handler_type": "http",
                           "http_handler_config": {
-                          "path": "http://localhost:HAX_HTTP_PORT/watcher/processes",
+                          "path": "HAX_HTTP_PROTOCOL://localhost:HAX_HTTP_PORT/watcher/processes",
                           "method": "POST",
+                          "tls_skip_verify": true,
                           "timeout": "10s"}}]' $tmpfile > $tmpfile.tmp && mv -f $tmpfile.tmp $tmpfile
 }
 
@@ -546,8 +565,9 @@ append_motr_client_watch() {
                           "key": $k,
                           "handler_type": "http",
                           "http_handler_config": {
-                          "path": "http://localhost:HAX_HTTP_PORT/watcher/processes",
+                          "path": "HAX_HTTP_PROTOCOL://localhost:HAX_HTTP_PORT/watcher/processes",
                           "method": "POST",
+                          "tls_skip_verify": true,
                           "timeout": "10s"}}]' $tmpfile > $tmpfile.tmp && mv -f $tmpfile.tmp $tmpfile
 }
 
@@ -571,6 +591,7 @@ done
 
 sed -i "s|TMP_CONF_DIR|$conf_dir|" $tmpfile
 sed -i "s|TMP_LOG_DIR|$log_dir|" $tmpfile
+sed -i "s|HAX_HTTP_PROTOCOL|$hax_http_protocol|" $tmpfile
 sed -i "s|HAX_HTTP_PORT|$hax_http_port|" $tmpfile
 
 sudo cp $tmpfile $CONF_FILE
@@ -578,7 +599,7 @@ sudo cp $tmpfile $CONF_FILE
 mkdir -p /etc/consul.d/
 sudo cp $CONF_FILE /etc/consul.d/
 
-sudo sed -r "s;(http://)localhost;\1$(get_node_name);" \
+sudo sed -r "s;($hax_http_protocol://)localhost;\1$(get_node_name);" \
          -i $CONF_FILE
 
 consul reload > /dev/null
