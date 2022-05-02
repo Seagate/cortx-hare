@@ -282,6 +282,7 @@ class Generator:
 
     def append_ipaddr_to_file(self, hax_ep: str, conf_file: str):
         ipaddr = self.get_service_ipaddr(hax_ep)
+        regex = re.compile(r'(https?://)localhost')
         # in-place filtering: if the keyword argument inplace=True is
         # passed to FileInput constructor, the file is moved to a
         # backup file and standard output is directed to the input
@@ -290,8 +291,7 @@ class Generator:
         with fileinput.FileInput(conf_file, inplace=True,
                                  backup='.bak') as file:
             for line in file:
-                print(line.replace('http://localhost',
-                                   f'http://{ipaddr}'), end='')
+                print(re.sub(regex, rf'\g<1>{ipaddr}', line), end='')
 
     def get_service_addr(self, ep: str) -> str:
         return ep.rsplit('@', 1)[0]

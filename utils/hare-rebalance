@@ -79,6 +79,11 @@ get_hax_port() {
     consul kv get ports/$(get_nodename)/hax | jq -r .http
 }
 
+get_hax_http_protocol() {
+    proto=$(consul kv get ssl/hax 2>/dev/null | jq -r .http_protocol)
+    [[ "$proto" == "https" ]] && echo "https" || echo "http"
+}
+
 # process commands
 case $cmd in
     help) usage; exit ;;
@@ -98,7 +103,8 @@ case $cmd in
         # This request is synchronous.
         ip_addr=$(get_ip_addr)
         hax_port=$(get_hax_port)
-        curl "http://$ip_addr:${hax_port}/api/v1/sns/rebalance-status?pool_fid=$pool_fid"
+        hax_protocol=$(get_hax_http_protocol)
+        curl -k "${hax_protocol}://$ip_addr:${hax_port}/api/v1/sns/rebalance-status?pool_fid=$pool_fid"
         echo
         # TODO: JSON is expected. Additional processing may be needed depending on
         # output.

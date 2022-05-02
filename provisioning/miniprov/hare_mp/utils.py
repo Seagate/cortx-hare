@@ -330,6 +330,18 @@ class Utils:
     def save_config_path(self, path: str):
         self.kv.kv_put('config_path', path)
 
+    @func_log(func_enter, func_leave)
+    @repeat_if_fails()
+    def save_ssl_config(self):
+        cert_path = self.provider.get('cortx>common>security>ssl_certificate')
+        ssl_enabled = cert_path and os.path.exists(cert_path)
+        ssl_hax = json.dumps({
+            'http_protocol': ssl_enabled and "https" or "http",
+            'cert_path': cert_path,
+            'key_path': cert_path,
+        })
+        self.kv.kv_put('ssl/hax', ssl_hax)
+
 
 class LogWriter:
     def __init__(self, logger: logging.Logger, logging_handler):

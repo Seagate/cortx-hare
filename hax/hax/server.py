@@ -20,11 +20,12 @@ import asyncio
 import base64
 import logging
 import os
+import ssl
 import sys
 import json
 from json.decoder import JSONDecodeError
 from queue import Queue
-from typing import Any, Callable, Dict, List, Type, Union
+from typing import Any, Callable, Dict, List, Type, Union, Optional
 
 from aiohttp import web
 from aiohttp.web import HTTPError, HTTPNotFound
@@ -372,12 +373,32 @@ class ServerRunner:
         except Exception as e:
             raise HAConsistencyException('Failed to configure hax') from e
 
+    def _get_ssl_context(self) -> Optional[ssl.SSLContext]:
+        ssl_config = self.consul_util.get_hax_ssl_config()
+        if not ssl_config or ssl_config.get('http_protocol') != "https":
+            return None
+
+        certificate_path = ssl_config.get('cert_path', '')
+        private_key_path = ssl_config.get('key_path', '')
+        if not all(map(os.path.exists,
+                       (certificate_path, private_key_path))):
+            LOG.warning("Invalid path to certificate/private key. "
+                        "Fallback to HTTP")
+            return None
+
+        ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+        ssl_context.load_cert_chain(certificate_path, private_key_path)
+        return ssl_context
+
     @repeat_if_fails()
     def _start(self, port: int) -> None:
         try:
             web_address = self._get_my_hostname()
-            LOG.info(f'Starting HTTP server at {web_address}:{port} ...')
-            web.run_app(self.app, host=web_address, port=port)
+            ssl_context = self._get_ssl_context()
+            LOG.info(f'Starting HTTP{ssl_context and "S" or ""} server at '
+                     f'{web_address}:{port} ...')
+            web.run_app(self.app, host=web_address, port=port,
+                        ssl_context=ssl_context)
         except Exception as e:
             raise HAConsistencyException(
                 'Failed to start web server, trying again...') from e
