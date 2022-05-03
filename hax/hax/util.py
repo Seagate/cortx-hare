@@ -25,7 +25,7 @@ from base64 import b64encode
 from functools import wraps
 from typing import Any, Dict, List, NamedTuple, Optional, Tuple
 from hax.log import TRACE
-from threading import Event
+from threading import Event, Lock
 from time import sleep
 
 import simplejson
@@ -49,6 +49,8 @@ __all__ = ['ConsulUtil', 'create_process_fid', 'create_service_fid',
 
 LOG = logging.getLogger('hax')
 
+motr_processes_status: dict = {}
+
 # XXX What is the difference between `ip_addr` and `address`?
 # The names are hard to discern.
 ServiceData = NamedTuple('ServiceData', [('node', str), ('fid', Fid),
@@ -67,6 +69,8 @@ MotrConsulProcStatus = NamedTuple('MotrConsulProcStatus', [(
 MotrProcStatusLocalRemote = NamedTuple('MotrProcStatusLocalRemote', [(
                                 'motr_proc_status_local', ObjHealth),
                                 ('motr_proc_status_remote', ObjHealth)])
+
+ObjStatus = NamedTuple("ObjStatus", [("resource_type", ObjT), ("status", str)])
 
 
 def consul_to_local_nodename(consul_node: str) -> str:
@@ -330,6 +334,7 @@ class ConsulUtil:
         self.cns: Consul = raw_client or Consul()
         self.kv = KVAdapter(cns=self.cns)
         self.catalog = CatalogAdapter(cns=self.cns)
+        self.lock = Lock()
         self.object_state_getters = {
             ObjT.SDEV.name: self.get_sdev_state,
             ObjT.DRIVE.name: self.get_sdev_state,
@@ -582,7 +587,7 @@ class ConsulUtil:
             if service_name not in motr_services:
                 continue
             data = self.get_service_data_by_name(service_name)
-            LOG.debug('svc data: %s', data)
+            LOG.log(TRACE, 'svc data: %s', data)
             for item in data:
                 node = self.get_process_node(item.fid, kv_cache=kv_cache)
                 svc_health = self.get_service_health(node,
@@ -965,12 +970,14 @@ class ConsulUtil:
     @uses_consul_cache
     def get_node_name_by_machineid(self,
                                    machineid: str,
-                                   kv_cache=None) -> Optional[str]:
+                                   kv_cache=None,
+                                   allow_null=False) -> Optional[str]:
         """
         Returns the node name by its machine id value or None if the given
         machine id doesn't correspond to any node.
         """
-        mid_key = self.kv.kv_get(machineid, kv_cache=kv_cache)
+        mid_key = self.kv.kv_get(machineid, kv_cache=kv_cache,
+                                 allow_null=allow_null)
         if mid_key:
             name: bytes = mid_key['Value']
             return name.decode('utf-8')
@@ -1141,6 +1148,58 @@ class ConsulUtil:
 
                 state = json.loads(process['Value'])['state']
                 if state not in ('stopped', 'failed', 'offline'):
+                    return False
+
+        return True
+
+    # TO_BE_USED: This function can be used in future
+    @repeat_if_fails()
+    def check_resource_status(self,
+                              resource_type: ObjT,
+                              fid: str,
+                              status: str,
+                              kv_cache=None) -> Optional[bool]:
+        """
+        Checks if all the motr services of given node are in given state.
+        Motr services include 'ios' and 'confd'
+        """
+
+        status_map = {ObjStatus(resource_type=ObjT.NODE,
+                                status='online'):
+                      'M0_CONF_HA_PROCESS_STARTED'}
+
+        if resource_type is ObjT.NODE:
+            children = self.kv.kv_get(f'm0conf/nodes/{fid}/processes',
+                                      recurse=True,
+                                      kv_cache=kv_cache)
+            search_filter: List[str] = ['ios', 'confd']
+        else:
+            return None
+
+        for item in children or []:
+            if 'name' not in json.loads(item['Value']).keys():
+                continue
+
+            if json.loads(item['Value'])['name'] not in search_filter:
+                continue
+
+            # m0conf/nodes/0x6e00000000000001:0x3/processes/
+            # 0x7200000000000001:0xa:
+            # {"name": "m0_server", "state": "online"}
+            p_fid = item['Key'].split('/')[4]
+            p_key = f"processes/{p_fid}"
+            process = self.kv.kv_get(p_key,
+                                     recurse=False,
+                                     kv_cache=kv_cache)
+
+            if not process:
+                return False
+
+            state = json.loads(process['Value'])['state']
+            if status == 'online':
+                if (state !=
+                        status_map[ObjStatus(resource_type=resource_type,
+                                             status='online')]):
                     return False
 
         return True
@@ -1429,6 +1488,9 @@ class ConsulUtil:
         key = f'processes/{event.fid}'
         LOG.debug('Setting process status in KV: %s:%s', key, data)
         self.kv.kv_put(key, data)
+
+        self.set_motr_processes_status(str(event.fid), ha_process_events[
+                                                  event.chp_event])
 
     @supports_consul_cache
     def update_drive_state(self,
@@ -2003,10 +2065,13 @@ class ConsulUtil:
         if not self.kv.kv_delete_in_transaction(keys):
             raise HAConsistencyException('KV deletion failed')
 
-    def get_configpath(self):
+    @repeat_if_fails()
+    def get_configpath(self, allow_null=False):
         logging.info('Getting config_path')
-        config_path = self.kv.kv_get('config_path')
+        config_path = self.kv.kv_get('config_path', allow_null=allow_null)
 
+        if config_path is None:
+            return None
         return config_path['Value'].decode("utf-8")
 
     @repeat_if_fails()
@@ -2074,6 +2139,56 @@ class ConsulUtil:
         # The call doesn't communicate via Consul REST API
         this_node = self.get_local_nodename()
         return leader == this_node
+
+    def init_motr_processes_status(self):
+        local_node = self.get_local_nodename()
+        fid = self.get_node_fid(local_node)
+        children = self.kv.kv_get(f'm0conf/nodes/{fid}/processes',
+                                  recurse=True)
+        for item in children or []:
+            if 'name' not in json.loads(item['Value']).keys():
+                continue
+
+            # m0conf/nodes/0x6e00000000000001:0x3/processes/
+            # 0x7200000000000001:0xa:
+            # {"name": "m0_server", "state": "online"}
+            if len(item['Key'].split('/')) != 5:
+                continue
+
+            p_fid = item['Key'].split('/')[4]
+            self.set_motr_processes_status(str(p_fid), ha_process_events[3],
+                                           True)
+
+    def get_local_node_status(self):
+        total_processes = 0
+        started_processes = 0
+        for item in self.get_motr_processes_status().values():
+            total_processes += 1
+            # Checking if status is M0_CONF_HA_PROCESS_STARTED
+            if item == ha_process_events[1]:
+                started_processes += 1
+
+        if total_processes == started_processes:
+            return 'online'
+        elif started_processes == 0:
+            return 'offline'
+        else:
+            return 'degraded'
+
+    def get_motr_processes_status(self):
+        with self.lock:
+            LOG.debug('Current motr_processes_status: %s',
+                      motr_processes_status)
+            return motr_processes_status
+
+    # bAdd indicate whether new entry should be added or status should be
+    # updated only if fid is already present
+    def set_motr_processes_status(self, fid, status, bAdd=False):
+        with self.lock:
+            if fid in motr_processes_status or bAdd:
+                motr_processes_status[fid] = status
+            LOG.debug('Updated motr_processes_status: %s',
+                      motr_processes_status)
 
 
 def dump_json(obj) -> str:
