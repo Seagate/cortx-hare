@@ -2140,9 +2140,13 @@ class ConsulUtil:
         this_node = self.get_local_nodename()
         return leader == this_node
 
+    @repeat_if_fails()
     def init_motr_processes_status(self):
         local_node = self.get_local_nodename()
         fid = self.get_node_fid(local_node)
+        if not fid or fid is None:
+            raise HAConsistencyException(
+                f'node fid not available yet for {local_node}')
         children = self.kv.kv_get(f'm0conf/nodes/{fid}/processes',
                                   recurse=True)
         for item in children or []:
