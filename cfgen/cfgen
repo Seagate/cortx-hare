@@ -2367,6 +2367,16 @@ def generate_consul_kv(cluster: Cluster, dhall_dir: str) -> str:
                         root.imeta_pver not in m0conf[x].pvers]
         raise RuntimeError('Impossible happened')
 
+    def node_machine_id_map() -> List[Tuple[str, str]]:
+        ids = []
+        for node_id, node in m0conf.items():
+            if (node_id.type is ObjT.node and node.machine_id):
+                # Store machine-id to node-name mapping
+                ids.append((node.machine_id, node.name))
+                # Store node-name to machine-id mapping
+                ids.append((node.name, node.machine_id))
+        return ids
+
     return json.dumps([dict(key=k, value=v) for k, v in (
         ('epoch', 1),
         ('eq-epoch', 1),
@@ -2381,9 +2391,7 @@ def generate_consul_kv(cluster: Cluster, dhall_dir: str) -> str:
            json.dumps({'http': node.network_ports.get('hax_http', 8008)}))
           for node_id, node in m0conf.items() if (node_id.type is ObjT.node)],
         ('m0_client_types', json.dumps(cluster.m0_client_types)),
-        *[(node.machine_id, node.name)
-          for node_id, node in m0conf.items() if (node_id.type is ObjT.node
-                                                  and node.machine_id)],
+        *node_machine_id_map(),
         *[('m0conf/pools/' + oid_to_fidstr(pool_id), m0conf[pool_id]._name)
           for pool_id in sns_pools()],
         *[('m0conf/profiles/' + oid_to_fidstr(prof_id),

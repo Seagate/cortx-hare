@@ -306,6 +306,12 @@ class ConsumerThread(StoppableThread):
                             planner, item.states)
                         result: List[MessageId] = motr.broadcast_ha_states(
                             ha_states)
+                        ha = get_producer(self.consul)
+                        if ha:
+                            ha.broadcast(ha_states)
+                        else:
+                            LOG.warning('Could not sent an event as producer'
+                                        ' is not available')
                         if item.reply_to:
                             item.reply_to.put(result)
                     elif isinstance(item, StobIoqError):
