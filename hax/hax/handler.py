@@ -114,7 +114,7 @@ class ConsumerThread(StoppableThread):
                     (event.chp_type ==
                      m0HaProcessType.M0_CONF_HA_PROCESS_M0D) and
                     self.consul.is_process_confd(event.fid)):
-                svc_status = ServiceHealth.OK
+                svc_status = ObjHealth.OK
             broadcast_hax_only = False
             if ((event.chp_type ==
                  m0HaProcessType.M0_CONF_HA_PROCESS_M0MKFS) or
@@ -157,7 +157,8 @@ class ConsumerThread(StoppableThread):
         proc_Health_to_status = {
             ObjHealth.OFFLINE: m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED,
             ObjHealth.FAILED: m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED,
-            ObjHealth.OK: m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED
+            ObjHealth.OK: m0HaProcessEvent.M0_CONF_HA_PROCESS_DTM_RECOVERED,
+            ObjHealth.RECOVERING: m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED
         }
         try:
             for state in ha_states:

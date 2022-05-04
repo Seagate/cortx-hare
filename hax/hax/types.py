@@ -322,10 +322,10 @@ class ObjHealth(Enum):
     UNKNOWN = (2, HaNoteStruct.M0_NC_TRANSIENT)
     OFFLINE = (3, HaNoteStruct.M0_NC_TRANSIENT)
     STOPPED = (4, HaNoteStruct.M0_NC_TRANSIENT)
-    REPAIR = (5, HaNoteStruct.M0_NC_REPAIR)
-    REPAIRED = (6, HaNoteStruct.M0_NC_REPAIRED)
-    REBALANCE = (7, HaNoteStruct.M0_NC_REBALANCE)
-    RECOVERING = (8, HaNoteStruct.M0_NC_DTM_RECOVERING)
+    RECOVERING = (5, HaNoteStruct.M0_NC_DTM_RECOVERING)
+    REPAIR = (6, HaNoteStruct.M0_NC_REPAIR)
+    REPAIRED = (7, HaNoteStruct.M0_NC_REPAIRED)
+    REBALANCE = (8, HaNoteStruct.M0_NC_REBALANCE)
 
     def __repr__(self):
         """Return human-readable constant name (useful in log output)."""

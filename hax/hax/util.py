@@ -37,9 +37,9 @@ from urllib3.exceptions import HTTPError
 from hax.common import HaxGlobalState
 from hax.exception import HAConsistencyException, InterruptedException
 from hax.types import (ByteCountStats, ConfHaProcess, Fid, FsStatsWithTime,
-                       ObjT, ObjHealth, ObjTMaskMap, Profile, PverInfo, PverState,
-                       m0HaProcessEvent, m0HaProcessType, KeyDelete,
-                       HaNoteStruct, m0HaObjState)
+                       ObjT, ObjHealth, ObjTMaskMap, Profile, PverInfo,
+                       PverState, m0HaProcessEvent, m0HaProcessType,
+                       KeyDelete, HaNoteStruct, m0HaObjState)
 
 from hax.consul.cache import (uses_consul_cache, invalidates_consul_cache,
                               supports_consul_cache)
@@ -1659,28 +1659,12 @@ class ConsulUtil:
         proc_base_fid = self.get_process_base_fid(fid)
         this_node = self.get_local_nodename()
         key = f'{this_node}/processes/{proc_base_fid}'
-        status = self.kv.kv_get(key, kv_cache=kv_cache)
+        status = self.kv.kv_get(key, kv_cache=kv_cache, allow_null=True)
         if status:
             val = json.loads(status['Value'])
             return MotrConsulProcInfo(val['state'], val['type'])
         else:
             return MotrConsulProcInfo('Unknown', 'Unknown')
-
-    @repeat_if_fails()
-    def get_process_full_fid(self, proc_base_fid: Fid) -> Optional[Fid]:
-        proc_fid = self.kv.kv_get(str(proc_base_fid), recurse=False)
-        if proc_fid is not None:
-            pfid: Fid = Fid.parse(json.loads(proc_fid['Value']))
-            return pfid
-        return proc_base_fid
-
-    @repeat_if_fails()
-    def get_process_full_fid(self, proc_base_fid: Fid) -> Optional[Fid]:
-        proc_fid = self.kv.kv_get(str(proc_base_fid), recurse=False)
-        if proc_fid is not None:
-            pfid: Fid = Fid.parse(json.loads(proc_fid['Value']))
-            return pfid
-        return proc_base_fid
 
     @repeat_if_fails()
     def get_process_full_fid(self, proc_base_fid: Fid) -> Optional[Fid]:
@@ -1793,8 +1777,8 @@ class ConsulUtil:
             local_remote_health_ret(ObjHealth.OK,
                                     ObjHealth.OK),
             cur_consul_status('passing', 'Unknown'):
-            local_remote_health_ret(ObjHealth.OFFLINE,
-                                    ObjHealth.OFFLINE),
+            local_remote_health_ret(ObjHealth.UNKNOWN,
+                                    ObjHealth.UNKNOWN),
             cur_consul_status('warning', 'M0_CONF_HA_PROCESS_STOPPING'):
             local_remote_health_ret(ObjHealth.OFFLINE,
                                     ObjHealth.OFFLINE),
