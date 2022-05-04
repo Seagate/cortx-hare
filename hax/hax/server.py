@@ -246,7 +246,8 @@ def process_state_update(planner: WorkPlanner):
         def fn():
             proc_state_to_objhealth = {
                 'M0_CONF_HA_PROCESS_STARTING': ObjHealth.OFFLINE,
-                'M0_CONF_HA_PROCESS_STARTED': ObjHealth.OK,
+                'M0_CONF_HA_PROCESS_STARTED': ObjHealth.RECOVERING,
+                'M0_CONF_HA_PROCESS_DTM_RECOVERED': ObjHealth.OK,
                 'M0_CONF_HA_PROCESS_STOPPING': ObjHealth.OFFLINE,
                 'M0_CONF_HA_PROCESS_STOPPED': ObjHealth.OFFLINE
             }
@@ -264,6 +265,7 @@ def process_state_update(planner: WorkPlanner):
                 proc_type = proc_status['type']
                 if (proc_type != 'M0_CONF_HA_PROCESS_M0MKFS' and
                         proc_state in ('M0_CONF_HA_PROCESS_STARTED',
+                                       'M0_CONF_HA_PROCESS_DTM_RECOVERED',
                                        'M0_CONF_HA_PROCESS_STOPPED')):
                     ha_states.append(HAState(
                         fid=proc_fid,

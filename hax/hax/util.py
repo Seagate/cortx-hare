@@ -1667,7 +1667,7 @@ class ConsulUtil:
         proc_base_fid = self.get_process_base_fid(fid)
         this_node = self.get_local_nodename()
         key = f'{this_node}/processes/{proc_base_fid}'
-        status = self.kv.kv_get(key, kv_cache=kv_cache)
+        status = self.kv.kv_get(key, kv_cache=kv_cache, allow_null=True)
         if status:
             val = json.loads(status['Value'])
             return MotrConsulProcInfo(val['state'], val['type'])
