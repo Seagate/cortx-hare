@@ -102,6 +102,7 @@ class EventConsumer:
                 print('No more events in the bus. Consumer exiting.')
                 break
 
+    @staticmethod
     def _parse(self, message):
         return json.loads(message.decode('utf-8'))
 

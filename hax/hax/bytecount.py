@@ -111,6 +111,7 @@ class ByteCountUpdater(StoppableThread):
         LOG.debug('Bytecount without parity buffer: %s', bc_without_parity)
         return bc_without_parity
 
+    @staticmethod
     def _get_parity_buffers(self, bc: int, state: PverInfo) -> int:
         """
         Calculate the parity buffer count based on pool configuration.
