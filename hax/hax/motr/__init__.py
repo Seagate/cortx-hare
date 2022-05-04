@@ -315,10 +315,10 @@ class Motr:
                 continue
             # If its a client process then update the base fid to its full
             # fid.
-            if (st.fid.container == ObjT.PROCESS.value and
-                    self.consul_util.is_proc_client(st.fid)):
-                proc_full_fid = self.consul_util.get_process_full_fid(st.fid)
-                st.fid = proc_full_fid
+            # if (st.fid.container == ObjT.PROCESS.value and
+            #         self.consul_util.is_proc_client(st.fid)):
+            #     proc_full_fid = self.consul_util.get_process_full_fid(st.fid)
+            #     st.fid = proc_full_fid
             note = HaNoteStruct(st.fid.to_c(), st.status.to_ha_note_status())
             # if (st.fid.container == ObjT.PROCESS.value and
             #         self.consul_util.is_proc_client(st.fid)):
