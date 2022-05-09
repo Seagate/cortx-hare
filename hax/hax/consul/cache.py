@@ -53,7 +53,6 @@ class InvocationCache:
         fun_dict[param_key] = ret_value
         self._calls[fn_name] = fun_dict
 
-    @staticmethod
     def _create_key_by_args(self, *args, **kwargs) -> str:
         return f'{args}{kwargs}'
 
