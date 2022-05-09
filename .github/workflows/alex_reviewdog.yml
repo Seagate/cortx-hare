@@ -35,6 +35,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
+      
+      - name: "Enable the permissions"
+        run: |
+          sudo chown -R root:root $GITHUB_WORKSPACE
+      
       - uses: seagate/action-alex@v1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -42,4 +47,3 @@ jobs:
           reporter: github-pr-review
           fail_on_error: true
           level: warning
-          
