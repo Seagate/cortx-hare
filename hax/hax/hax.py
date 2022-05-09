@@ -74,14 +74,18 @@ def _run_qconsumer_thread(planner: WorkPlanner, motr: Motr,
     return _run_thread(ConsumerThread(planner, motr, herald, consul, idx))
 
 
+# TODO this is work around and once the proper fix for CORTX-27707 is in
+# place, this will be reverted
 def _run_stats_updater_thread(motr: Motr,
                               consul_util: ConsulUtil) -> StoppableThread:
-    return _run_thread(FsStatsUpdater(motr, consul_util, interval_sec=30))
+    return _run_thread(FsStatsUpdater(motr, consul_util, interval_sec=600))
 
 
+# TODO this is work around and once the proper fix for CORTX-27707 is in
+# place, this will be reverted
 def _run_bc_updater_thread(motr: Motr,
                            consul_util: ConsulUtil) -> StoppableThread:
-    return _run_thread(ByteCountUpdater(motr, consul_util, interval_sec=30))
+    return _run_thread(ByteCountUpdater(motr, consul_util, interval_sec=600))
 
 
 @repeat_if_fails()
