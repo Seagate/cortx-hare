@@ -375,6 +375,14 @@ def ipaddr_key(iface: str) -> str:
     return 'ipaddress_' + iface
 
 
+def get_network_ports(node) -> Optional[Dict[str, Any]]:
+    network_ports = None
+    if 'network_ports' in node:
+        network_ports = node['network_ports']
+
+    return network_ports
+
+
 def enrich_cluster_desc(desc: Dict[str, Any], mock_p: bool) -> None:
     logging.debug('Enriching cluster description')
     for node in desc['nodes']:
@@ -401,6 +409,20 @@ def enrich_cluster_desc(desc: Dict[str, Any], mock_p: bool) -> None:
                 float(node['facts']['memorysize_mb']))
 
         logging.debug('Node [hostname=%s] facts=%s', host, node['facts'])
+
+        portalgroup = PortalGroup
+        network_ports = get_network_ports(node)
+        if network_ports is None:
+            node['network_ports'] = {port_type.name: port_type.value
+                                     for port_type in portalgroup}
+        else:
+            for key, value in network_ports.items():
+                if not value:
+                    network_ports[key] = portalgroup[key].value
+            for srv in [port_type.name for port_type in portalgroup]:
+                if srv not in network_ports:
+                    network_ports[srv] = portalgroup[srv].value
+
         if 'm0_servers' not in node:
             continue
 
@@ -423,18 +445,6 @@ def enrich_cluster_desc(desc: Dict[str, Any], mock_p: bool) -> None:
         sns_pools = [pool['name'] for pool in desc['pools']
                      if pool_type(pool) is PoolT.sns]
         desc['profiles'] = [{'name': 'default', 'pools': sns_pools}]
-
-    portalgroup = PortalGroup
-    if 'network_ports' not in desc or not bool(desc['network_ports']):
-        desc['network_ports'] = {port_type.name: port_type.value
-                                 for port_type in portalgroup}
-    else:
-        for key, value in desc['network_ports'].items():
-            if not value:
-                desc['network_ports'][key] = portalgroup[key].value
-        for srv in [port_type.name for port_type in portalgroup]:
-            if srv not in desc['network_ports']:
-                desc['network_ports'][srv] = portalgroup[srv].value
 
 
 def validate_cluster_desc(desc: Dict[str, Any]) -> None:
@@ -1074,11 +1084,13 @@ class ConfNode(ToDhall):
     _downlinks = {Downlink('processes', ObjT.process)}
 
     def __init__(self, name: str, nr_cpu: int, memsize_MB: int,
-                 processes: List[Oid], machine_id: Optional[str] = None):
+                 processes: List[Oid], machine_id: Optional[str] = None,
+                 network_ports: Dict[str, Any] = None):
         self.name = name
         self.nr_cpu = nr_cpu
         self.memsize_MB = memsize_MB
         self.machine_id = machine_id
+        self.network_ports = network_ports
 
         _assert(all(x.type is ObjT.process for x in processes),
                 'All processes must be of ObjT.process type')
@@ -1109,7 +1121,8 @@ class ConfNode(ToDhall):
                               nr_cpu=facts['processorcount'],
                               memsize_MB=facts['_memsize_MB'],
                               processes=[],
-                              machine_id=node_desc.get('machine_id'))
+                              machine_id=node_desc.get('machine_id'),
+                              network_ports=node_desc.get('network_ports'))
         m0conf[parent].nodes.append(node_id)
         return node_id
 
@@ -2231,8 +2244,7 @@ Cluster = NamedTuple('Cluster', [('m0conf', Dict[Oid, Any]),
                                  ('consul_servers', List[ConsulAgent]),
                                  ('consul_clients', List[ConsulAgent]),
                                  ('m0_clients', Dict[Oid, Oid]),
-                                 ('m0_client_types', List[str]),
-                                 ('network_ports', Dict[str, int])])
+                                 ('m0_client_types', List[str])])
 
 
 def generate_consul_agents(cluster: Cluster) -> str:
@@ -2355,7 +2367,6 @@ def generate_consul_kv(cluster: Cluster, dhall_dir: str) -> str:
                         root.imeta_pver not in m0conf[x].pvers]
         raise RuntimeError('Impossible happened')
 
-    hax_http_port = cluster.network_ports.get('hax_http', 8008)
     return json.dumps([dict(key=k, value=v) for k, v in (
         ('epoch', 1),
         ('eq-epoch', 1),
@@ -2366,7 +2377,9 @@ def generate_consul_kv(cluster: Cluster, dhall_dir: str) -> str:
         ('bytecount/degraded', 0),
         ('bytecount/critical', 0),
         ('bytecount/damaged', 0),
-        ('ports/hax', json.dumps({'http': hax_http_port})),
+        *[(f'ports/{node.name}/hax',
+           json.dumps({'http': node.network_ports.get('hax_http', 8008)}))
+          for node_id, node in m0conf.items() if (node_id.type is ObjT.node)],
         ('m0_client_types', json.dumps(cluster.m0_client_types)),
         *[(node.machine_id, node.name)
           for node_id, node in m0conf.items() if (node_id.type is ObjT.node
@@ -2572,7 +2585,7 @@ def aux_pool_list(pool_desc: Dict[str, Any],
 
 def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
     cluster = Cluster(m0conf={}, consul_servers=[], consul_clients=[],
-                      m0_clients={}, m0_client_types=[], network_ports={})
+                      m0_clients={}, m0_client_types=[])
     conf = cluster.m0conf
     root_id = ConfRoot.build(conf)
     # XXX Move all the logic into ConfRoot.build?
@@ -2581,23 +2594,6 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
 
     other_clients: Dict[str, List[Tuple[Oid, Oid]]] = {}
     io_ctrls: Dict[Oid, Any] = {}
-
-    ports = cluster_desc.get('network_ports')
-    if ports:
-        cluster.network_ports.update({k: v for k, v in ports.items()})
-        lnet_portals = get_lnet_portal_group(
-                           hax=ports['hax'],
-                           m0_server=tuple(ports['m0_server']),
-                           m0_client_s3=ports['m0_client_s3'],
-                           m0_client_other=ports['m0_client_other'])
-        libfab_portals = get_libfab_portal_group(
-                             hax=ports['hax'],
-                             m0_server=tuple(ports['m0_server']),
-                             m0_client_s3=ports['m0_client_s3'],
-                             m0_client_other=ports['m0_client_other'])
-    else:
-        lnet_portals = get_lnet_portal_group()
-        libfab_portals = get_libfab_portal_group()
 
     for node in cluster_desc['nodes']:
         node_id = ConfNode.build(conf, root_id, node)
@@ -2612,6 +2608,23 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
                     io_ctrls[ctrl_oid] = m0d
                 else:
                     ctrl_ids.append((None, m0d))
+
+        ports = node.get('network_ports')
+        if ports:
+            lnet_portals = get_lnet_portal_group(
+                               hax=ports['hax'],
+                               m0_server=tuple(ports['m0_server']),
+                               m0_client_s3=ports['m0_client_s3'],
+                               m0_client_other=ports['m0_client_other'])
+            libfab_portals = get_libfab_portal_group(
+                                 hax=ports['hax'],
+                                 m0_server=tuple(ports['m0_server']),
+                                 m0_client_s3=ports['m0_client_s3'],
+                                 m0_client_other=ports['m0_client_other'])
+        else:
+            lnet_portals = get_lnet_portal_group()
+            libfab_portals = get_libfab_portal_group()
+
         transport_type = node.get('transport_type', 'libfab')
         if transport_type == 'lnet':
             portalgroup = lnet_portals

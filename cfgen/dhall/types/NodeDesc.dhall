@@ -28,4 +28,5 @@
 , transport_type : Text
 , m0_servers : Optional (List ./M0ServerDesc.dhall)
 , m0_clients : Optional (List ./M0ClientDesc.dhall)
+, network_ports : Optional ./Ports.dhall
 }

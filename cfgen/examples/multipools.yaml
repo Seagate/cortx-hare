@@ -20,6 +20,18 @@ nodes:
     m0_clients:
       - name: m0_client_other  # name of the motr client
         instances: 2   # Number of instances, this host will run
+    # network_ports:
+    #   hax: 22000
+    #   hax_http: 8008
+    #   m0_server:
+    #   - name: ios
+    #     port: 21000
+    #   - name: confd
+    #     port: 21000
+    #   m0_client_other:
+    #   - name: m0_client_other
+    #     port: 21500
+    #   m0_client_s3: 22500
   - hostname: srvnode-2
     data_iface: enp175s0f1_c2
     data_iface_type: o2ib
@@ -41,6 +53,18 @@ nodes:
     m0_clients:
       - name: m0_client_other  # name of the motr client
         instances: 2   # Number of instances, this host will run
+    # network_ports:
+    #   hax: 22000
+    #   hax_http: 8008
+    #   m0_server:
+    #   - name: ios
+    #     port: 21000
+    #   - name: confd
+    #     port: 21000
+    #   m0_client_other:
+    #   - name: m0_client_other
+    #     port: 21500
+    #   m0_client_s3: 22500
 pools:
   - name: tier1-nvme
     disk_refs:
@@ -79,10 +103,3 @@ profiles:
     pools: [ tier3-hdd ]
   - name: all
     pools: [ tier1-nvme, tier2-ssd, tier3-hdd ]
-#network_ports:
-#    hax: 22000
-#    hax_http: 8008
-#    m0_server: 21000
-#    m0_client_s3: 22500
-#    m0_client_other: 21500
-
