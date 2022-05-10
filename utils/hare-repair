@@ -71,8 +71,12 @@ get_ip_addr() {
     curl -sX GET http://localhost:8500/v1/agent/self | jq -r .DebugConfig.BindAddr
 }
 
+get_nodename() {
+    curl -s http://localhost:8500/v1/agent/self | jq -r .Config.NodeName | cut -d':' -f 1
+}
+
 get_hax_port() {
-    consul kv get ports/hax | jq -r .http
+    consul kv get ports/$(get_nodename)/hax | jq -r .http
 }
 
 # process commands

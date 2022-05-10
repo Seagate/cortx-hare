@@ -327,7 +327,10 @@ class TestCDF(unittest.TestCase):
                 'cortx>s3>service_instances':                1,
                 'cortx>motr>interface_type':                'o2ib',
             }
-            return data.get(value)
+            if value in data:
+                return data.get(value)
+            else:
+                return None
 
         store._raw_get = Mock(side_effect=ret_values)
         store.get_machine_id = Mock(return_value='MACH_ID')
@@ -890,7 +893,7 @@ class TestCDF(unittest.TestCase):
                 'node>MACH_ID>name': 'mynodename',
                 'node>MACH_ID>type': 'storage_node',
                 'node>MACH_ID>components':
-                [{'name':'hare'}, {'name': 'motr'}, {'name': 's3'}],
+                [{'name':'hare'}, {'name': 'motr', 'services': ['io']}, {'name': 's3'}],
                 'node>MACH_ID>cvg':
                 [{'devices': {'data': ['/dev/sdb'], 'metadata': ['/dev/meta1']}},
                  {'devices': {'data': ['/dev/sdc'], 'metadata': ['/dev/meta2']}}],
@@ -915,7 +918,10 @@ class TestCDF(unittest.TestCase):
                 'node>MACH_ID>network>data>private_fqdn':
                     'srvnode-1.data.private',
             }
-            return data[value]
+            if value in data:
+                return data[value]
+            else:
+                return None
 
         store._raw_get = Mock(side_effect=ret_values)
         store.get_machine_id = Mock(return_value='MACH_ID')
@@ -1040,7 +1046,10 @@ class TestCDF(unittest.TestCase):
                 'node>MACH_2_ID>cvg[0]>devices>metadata':
                 ['/dev/meta'],
             }
-            return data[value]
+            if value in data:
+                return data[value]
+            else:
+                return None
 
         store._raw_get = Mock(side_effect=ret_values)
 
@@ -1162,7 +1171,10 @@ class TestCDF(unittest.TestCase):
                 'node>MACH_ID>network>data>private_interfaces':
                 ['eth1', 'eno2']
             }
-            return data[value]
+            if value in data:
+                return data[value]
+            else:
+                return None
 
         store._raw_get = Mock(side_effect=ret_values)
         store.get_machine_id = Mock(return_value='MACH_ID')

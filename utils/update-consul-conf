@@ -159,7 +159,7 @@ get_profile_from_kv_file() {
 }
 
 get_hax_http_port_from_kv_file() {
-    local cmd="jq -r '.[] | select (.key==\"ports/hax\") | .value' $kv_file | jq -r '.http'"
+    local cmd="jq -r '.[] | select (.key==\"ports/$(get_node_name)/hax\") | .value' $kv_file | jq -r '.http'"
     eval $cmd || true
 }
 
