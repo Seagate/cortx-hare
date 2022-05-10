@@ -270,8 +270,8 @@ def process_state_update(planner: WorkPlanner):
                     ha_states.append(HAState(
                         fid=proc_fid,
                         status=proc_state_to_objhealth[proc_state]))
-                    planner.add_command(
-                        BroadcastHAStates(states=ha_states, reply_to=None))
+            planner.add_command(BroadcastHAStates(states=ha_states,
+                                                  reply_to=None))
 
         # Note that planner.add_command is potentially a blocking call
         try:
