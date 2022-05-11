@@ -144,14 +144,18 @@ class ConsumerThread(StoppableThread):
             ObjHealth.OK: m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED
         }
         try:
+            cns = self.consul
+            am_i_rc = self.consul.am_i_rc()
             for state in ha_states:
                 if state.fid.container == ObjT.PROCESS.value:
-                    current_status = self.consul.get_process_current_status(
-                        state.status, state.fid)
+                    is_proc_local = self.consul.is_proc_local(state.fid)
+                    current_status = state.status
+                    if state.status in (ObjHealth.OFFLINE, ObjHealth.FAILED):
+                        current_status = cns.get_process_current_status(
+                            state.status, state.fid)
                     if current_status == ObjHealth.UNKNOWN:
                         continue
-                    proc_status_remote = self.consul.get_process_status(
-                                             state.fid)
+                    proc_status_remote = cns.get_process_status(state.fid)
                     proc_status: Any = None
                     # MKFS states are upated by the node corresponding to a
                     # given process. So we ignore notifications for mkfs
@@ -205,14 +209,13 @@ class ConsumerThread(StoppableThread):
                     if proc_status is not None:
                         LOG.debug('proc_status: %s', proc_status.name)
                         if proc_status_remote.proc_status != proc_status.name:
-                            if (self.consul.am_i_rc() or
-                                    self.consul.is_proc_local(state.fid)):
+                            if (am_i_rc or is_proc_local):
                                 # Probably process node failed, in such a
                                 # case, only RC must be allowed to update
                                 # the process's persistent state.
                                 # Or, if the node's alive then allow the node
                                 # to update the local process's state.
-                                self.consul.update_process_status(
+                                cns.update_process_status(
                                     ConfHaProcess(chp_event=proc_status,
                                                   chp_type=proc_type,
                                                   chp_pid=0,
@@ -222,9 +225,9 @@ class ConsumerThread(StoppableThread):
                             # local motr processes must still be sent.
                             new_ha_states.append(
                                 HAState(fid=state.fid, status=current_status))
-                        if not self.consul.is_proc_local(state.fid):
+                        if not is_proc_local:
                             proc_status_local = (
-                                self.consul.get_process_status_local(
+                                cns.get_process_status_local(
                                     state.fid))
                             # Consul monitors a process every 1 second and
                             # this notification is sent to every node. Thus
@@ -237,7 +240,7 @@ class ConsumerThread(StoppableThread):
                             # motr processes.
                             if (proc_status_local.proc_status !=
                                     proc_status.name):
-                                self.consul.update_process_status_local(
+                                cns.update_process_status_local(
                                     ConfHaProcess(chp_event=proc_status,
                                                   chp_type=proc_type,
                                                   chp_pid=0,
