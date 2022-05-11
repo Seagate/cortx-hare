@@ -48,35 +48,35 @@
           ]
         }
       },
-      "storage": {
-        "num_cvg": "2",
-        "cvg": [
-          {
-            "devices": {
-              "data": [
-                "/dev/sdb",
-                "/dev/sdc",
-                "/dev/sdd"
-              ],
-              "metadata": [
-                "/dev/sde"
-              ]
-            }
-          },
-          {
-            "devices": {
-              "data": [
-                "/dev/sdg",
-                "/dev/sdh",
-                "/dev/sdi"
-              ],
-              "metadata": [
-                "/dev/sdj"
-              ]
-            }
+      
+      "num_cvg": "2",
+      "cvg": [
+        {
+          "devices": {
+            "data": [
+              "/dev/sdb",
+              "/dev/sdc",
+              "/dev/sdd"
+            ],
+            "metadata": [
+              "/dev/sde"
+            ]
           }
-        ]
-      }
+        },
+        {
+          "devices": {
+            "data": [
+              "/dev/sdg",
+              "/dev/sdh",
+              "/dev/sdi"
+            ],
+            "metadata": [
+              "/dev/sdj"
+            ]
+          }
+        }
+      ]
+    
     },
     "9ec5de3a8b57493e8fc7bfae67ecd3b3": {
       "cluster_id": "my-cluster",
@@ -90,35 +90,33 @@
           ]
         }
       },
-      "storage": {
-        "num_cvg": "2",
-        "cvg": [
-          {
-            "devices": {
-              "data": [
-                "/dev/sdb",
-                "/dev/sdc",
-                "/dev/sdd"
-              ],
-              "metadata": [
-                "/dev/sde"
-              ]
-            }
-          },
-          {
-            "devices": {
-              "data": [
-                "/dev/sdg",
-                "/dev/sdh",
-                "/dev/sdi"
-              ],
-              "metadata": [
-                "/dev/sdj"
-              ]
-            }
+      "num_cvg": "2",
+      "cvg": [
+        {
+          "devices": {
+            "data": [
+              "/dev/sdb",
+              "/dev/sdc",
+              "/dev/sdd"
+            ],
+            "metadata": [
+              "/dev/sde"
+            ]
           }
-        ]
-      }
+        },
+        {
+          "devices": {
+            "data": [
+              "/dev/sdg",
+              "/dev/sdh",
+              "/dev/sdi"
+            ],
+            "metadata": [
+              "/dev/sdj"
+            ]
+          }
+        }
+      ]
     },
     "846fd26885f8423a8da0626538ed47bc": {
       "cluster_id": "my-cluster",
@@ -132,35 +130,33 @@
           ]
         }
       },
-      "storage": {
-        "num_cvg": "2",
-        "cvg": [
-          {
-            "devices": {
-              "data": [
-                "/dev/sdb",
-                "/dev/sdc",
-                "/dev/sdd"
-              ],
-              "metadata": [
-                "/dev/sde"
-              ]
-            }
-          },
-          {
-            "devices": {
-              "data": [
-                "/dev/sdg",
-                "/dev/sdh",
-                "/dev/sdi"
-              ],
-              "metadata": [
-                "/dev/sdj"
-              ]
-            }
+      "num_cvg": "2",
+      "cvg": [
+        {
+          "devices": {
+            "data": [
+              "/dev/sdb",
+              "/dev/sdc",
+              "/dev/sdd"
+            ],
+            "metadata": [
+              "/dev/sde"
+            ]
           }
-        ]
-      }
+        },
+        {
+          "devices": {
+            "data": [
+              "/dev/sdg",
+              "/dev/sdh",
+              "/dev/sdi"
+            ],
+            "metadata": [
+              "/dev/sdj"
+            ]
+          }
+        }
+      ]
     }
   }
 }

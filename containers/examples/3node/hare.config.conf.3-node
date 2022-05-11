@@ -58,22 +58,20 @@
       },
       "s3_instances": "2",
       "storage_set_id": "storage1",
-      "storage": {
-        "num_cvg": "1",
-        "cvg": [
-          {
-            "data_devices": [
-              "/dev/sdb",
-              "/dev/sdc",
-              "/dev/sdd",
-              "/dev/sde"
-            ],
-            "metadata_devices": [
-              "/dev/sdj"
-            ]
-          }
-        ]
-      }
+      "num_cvg": "1",
+      "cvg": [
+        {
+          "data_devices": [
+            "/dev/sdb",
+            "/dev/sdc",
+            "/dev/sdd",
+            "/dev/sde"
+          ],
+          "metadata_devices": [
+            "/dev/sdj"
+          ]
+        }
+      ]
     },
     "a6422fd1d8b04510b291c03c537c147a": {
       "cluster_id": "my-cluster",
@@ -95,22 +93,20 @@
       },
       "s3_instances": "2",
       "storage_set_id": "storage1",
-      "storage": {
-        "num_cvg": "1",
-        "cvg": [
-          {
-            "data_devices": [
-              "/dev/sdb",
-              "/dev/sdc",
-              "/dev/sdd",
-              "/dev/sde"
-            ],
-            "metadata_devices": [
-              "/dev/sdj"
-            ]
-          }
-        ]
-      }
+      "num_cvg": "1",
+      "cvg": [
+        {
+          "data_devices": [
+            "/dev/sdb",
+            "/dev/sdc",
+            "/dev/sdd",
+            "/dev/sde"
+          ],
+          "metadata_devices": [
+            "/dev/sdj"
+          ]
+        }
+      ]
     },
     "33604d428f544d9596fe0791d7d4d4b0": {
       "cluster_id": "my-cluster",
@@ -132,22 +128,20 @@
       },
       "s3_instances": "2",
       "storage_set_id": "storage1",
-      "storage": {
-        "num_cvg": "1",
-        "cvg": [
-          {
-            "data_devices": [
-              "/dev/sdb",
-              "/dev/sdc",
-              "/dev/sdd",
-              "/dev/sde"
-            ],
-            "metadata_devices": [
-              "/dev/sdj"
-            ]
-          }
-        ]
-      }
+      "num_cvg": "1",
+      "cvg": [
+        {
+          "data_devices": [
+            "/dev/sdb",
+            "/dev/sdc",
+            "/dev/sdd",
+            "/dev/sde"
+          ],
+          "metadata_devices": [
+            "/dev/sdj"
+          ]
+        }
+      ]
     }
   }
 }

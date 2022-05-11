@@ -49,33 +49,31 @@
         }
       },
       "storage_set": "TMPL_STORAGE_SET_ID",
-      "storage": {
-        "num_cvg": "TMPL_NUM_CVG",
-        "cvg": [
-          {
-            "devices": {
-              "data": [
-                "TMPL_DATA_DEVICE_11",
-                "TMPL_DATA_DEVICE_12"
-              ],
-              "metadata": [
-                "TMPL_METADATA_DEVICE_1"
-              ]
-            }
-          },
-          {
-            "devices": {
-              "data": [
-                "TMPL_DATA_DEVICE_21",
-                "TMPL_DATA_DEVICE_22"
-              ],
-              "metadata": [
-                "TMPL_METADATA_DEVICE_2"
-              ]
-            }
+      "num_cvg": "TMPL_NUM_CVG",
+      "cvg": [
+        {
+          "devices": {
+            "data": [
+              "TMPL_DATA_DEVICE_11",
+              "TMPL_DATA_DEVICE_12"
+            ],
+            "metadata": [
+              "TMPL_METADATA_DEVICE_1"
+            ]
           }
-        ]
-      }
+        },
+        {
+          "devices": {
+            "data": [
+              "TMPL_DATA_DEVICE_21",
+              "TMPL_DATA_DEVICE_22"
+            ],
+            "metadata": [
+              "TMPL_METADATA_DEVICE_2"
+            ]
+          }
+        }
+      ]
     },
     "TMPL_MACHINE_ID_2": {
       "cluster_id": "TMPL_CLUSTER_ID",
@@ -93,33 +91,31 @@
       },
       "s3_instances": "TMPL_S3SERVER_INSTANCES_COUNT",
       "storage_set": "TMPL_STORAGE_SET_ID",
-      "storage": {
-        "num_cvg": "TMPL_NUM_CVG",
-        "cvg": [
-          {
-            "devices": {
-              "data": [
-                "TMPL_DATA_DEVICE_11",
-                "TMPL_DATA_DEVICE_12"
-              ],
-              "metadata": [
-                "TMPL_METADATA_DEVICE_1"
-              ]
-            }
-          },
-          {
-            "devices": {
-              "data": [
-                "TMPL_DATA_DEVICE_21",
-                "TMPL_DATA_DEVICE_22"
-              ],
-              "metadata": [
-                "TMPL_METADATA_DEVICE_2"
-              ]
-            }
+      "num_cvg": "TMPL_NUM_CVG",
+      "cvg": [
+        {
+          "devices": {
+            "data": [
+              "TMPL_DATA_DEVICE_11",
+              "TMPL_DATA_DEVICE_12"
+            ],
+            "metadata": [
+              "TMPL_METADATA_DEVICE_1"
+            ]
           }
-        ]
-      }
+        },
+        {
+          "devices": {
+            "data": [
+              "TMPL_DATA_DEVICE_21",
+              "TMPL_DATA_DEVICE_22"
+            ],
+            "metadata": [
+              "TMPL_METADATA_DEVICE_2"
+            ]
+          }
+        }
+      ]
     },
     "TMPL_MACHINE_ID_3": {
       "cluster_id": "TMPL_CLUSTER_ID",
@@ -137,33 +133,31 @@
       },
       "s3_instances": "TMPL_S3SERVER_INSTANCES_COUNT",
       "storage_set": "TMPL_STORAGE_SET_ID",
-      "storage": {
-        "num_cvg": "TMPL_NUM_CVG",
-        "cvg": [
-          {
-            "devices": {
-              "data": [
-                "TMPL_DATA_DEVICE_11",
-                "TMPL_DATA_DEVICE_12"
-              ],
-              "metadata": [
-                "TMPL_METADATA_DEVICE_1"
-              ]
-            }
-          },
-          {
-            "devices": {
-              "data": [
-                "TMPL_DATA_DEVICE_21",
-                "TMPL_DATA_DEVICE_22"
-              ],
-              "metadata": [
-                "TMPL_METADATA_DEVICE_2"
-              ]
-            }
+      "num_cvg": "TMPL_NUM_CVG",
+      "cvg": [
+        {
+          "devices": {
+            "data": [
+              "TMPL_DATA_DEVICE_11",
+              "TMPL_DATA_DEVICE_12"
+            ],
+            "metadata": [
+              "TMPL_METADATA_DEVICE_1"
+            ]
           }
-        ]
-      }
+        },
+        {
+          "devices": {
+            "data": [
+              "TMPL_DATA_DEVICE_21",
+              "TMPL_DATA_DEVICE_22"
+            ],
+            "metadata": [
+              "TMPL_METADATA_DEVICE_2"
+            ]
+          }
+        }
+      ]
     }
   }
 }

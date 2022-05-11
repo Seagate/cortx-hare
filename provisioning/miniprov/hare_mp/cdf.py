@@ -163,15 +163,15 @@ class CdfGenerator:
         conf = self.provider
         pool_type = pool.pool_type
         prop_name = 'data'
-        # node>{machine-id}>storage>num_cvg
-        cvg_num = int(conf.get(f'node>{node}>storage>num_cvg'))
+        # node>{machine-id}>num_cvg
+        cvg_num = int(conf.get(f'node>{node}>num_cvg'))
         all_cvg_devices = []
         if pool_type == 'dix':
             prop_name = 'metadata'
         for i in range(cvg_num):
-            # node>{machine-id}>storage>cvg[N]>devices>name
+            # node>{machine-id}>cvg[N]>devices>name
             all_cvg_devices += conf.get(
-                f'node>{node}>storage>cvg[{i}]>devices>{prop_name}')
+                f'node>{node}>cvg[{i}]>devices>{prop_name}')
         return all_cvg_devices
 
     def _validate_pool(self, pool: PoolHandle) -> None:
@@ -217,9 +217,9 @@ class CdfGenerator:
 
         node_count = len(data_nodes)
         machine_id = data_nodes[0]
-        # node>{machine-id}>storage>num_cvg
+        # node>{machine-id}>num_cvg
         cvg_per_node = int(conf.get(
-            f'node>{machine_id}>storage>num_cvg'))
+            f'node>{machine_id}>num_cvg'))
 
         total_unit = layout.data + layout.parity + layout.spare
         if total_unit == 0:
@@ -441,13 +441,13 @@ class CdfGenerator:
             return None
         return Protocol[proto]
 
-    # node>{machine -id}>storage>cvg[N]>devices>data
+    # node>{machine -id}>cvg[N]>devices>data
     def _get_data_devices(self, machine_id: str, cvg: int) -> DList[Text]:
         store = self.provider
         data_devices = DList(
             [Text(device) for device in store.get(
                 f'node>{machine_id}>'
-                f'storage>cvg[{cvg}]>devices>data')], 'List Text')
+                f'cvg[{cvg}]>devices>data')], 'List Text')
         return data_devices
 
     # conf-store returns a list of devices, thus, the function
@@ -458,7 +458,7 @@ class CdfGenerator:
                              cvg: int) -> Text:
         store = self.provider
         metadata_device = Text(store.get(
-            f'node>{machine_id}>storage>cvg[{cvg}]>devices>metadata')[0])
+            f'node>{machine_id}>cvg[{cvg}]>devices>metadata')[0])
         return metadata_device
 
     # This function is kept as place holder with length returning 1,
@@ -509,9 +509,9 @@ class CdfGenerator:
                             self._get_metadata_device(
                                 machine_id, cvg), 'Text')),
                     runs_confd=Maybe(False, 'Bool'))
-                # node>{machine_id}>storage>cvg
+                # node>{machine_id}>cvg
                 for cvg in range(len(store.get(
-                    f'node>{machine_id}>storage>cvg')))
+                    f'node>{machine_id}>cvg')))
                 for m0d in range(self._get_m0d_per_cvg(machine_id, cvg))
             ], 'List M0ServerDesc')
 

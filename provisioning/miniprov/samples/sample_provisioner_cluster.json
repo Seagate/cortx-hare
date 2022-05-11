@@ -96,22 +96,21 @@
           "transport_type": "lnet"
         }
       },
-      "storage": {
-        "num_cvg": "1",
-        "cvg": [
-          {
-            "devices": {
-              "metadata": [
-                "/dev/sdb"
-              ],
-              "data": [
-                "/dev/sdc"
-              ]
-            }
+      
+      "num_cvg": "1",
+      "cvg": [
+        {
+          "devices": {
+            "metadata": [
+              "/dev/sdb"
+            ],
+            "data": [
+              "/dev/sdc"
+            ]
           }
-        ],
-        "enclosure_id": "encla971a87aace34e05b4747bb3376d6661"
-      },
+        }
+      ],
+      "enclosure_id": "encla971a87aace34e05b4747bb3376d6661",
       "site_id": "1",
       "rack_id": "1",
       "node_id": "0",
