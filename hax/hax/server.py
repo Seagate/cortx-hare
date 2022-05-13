@@ -237,6 +237,9 @@ def process_bq_update(inbox_filter: InboxFilter, processor: BQProcessor):
     return _process
 
 
+consul_cache: Dict[int, ObjHealth] = {}
+
+
 def process_state_update(planner: WorkPlanner):
     async def _process(request):
         data = await request.json()
@@ -265,9 +268,16 @@ def process_state_update(planner: WorkPlanner):
                 if (proc_type != 'M0_CONF_HA_PROCESS_M0MKFS' and
                         proc_state in ('M0_CONF_HA_PROCESS_STARTED',
                                        'M0_CONF_HA_PROCESS_STOPPED')):
-                    ha_states.append(HAState(
-                        fid=proc_fid,
-                        status=proc_state_to_objhealth[proc_state]))
+                    if (not consul_cache.get(proc_fid.key) or (
+                            consul_cache.get(proc_fid.key) !=
+                            proc_state_to_objhealth[proc_state])):
+                        LOG.debug('Adding item key %d item val: %s',
+                                  proc_fid.key, proc_status)
+                        ha_states.append(HAState(
+                            fid=proc_fid,
+                            status=proc_state_to_objhealth[proc_state]))
+                        consul_cache[proc_fid.key] = (
+                            proc_state_to_objhealth[proc_state])
             planner.add_command(
                 BroadcastHAStates(states=ha_states, reply_to=None))
 
