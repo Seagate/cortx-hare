@@ -220,11 +220,20 @@ PyObject *m0_ha_proc_counters_fetch(unsigned long long ctx,
 	struct m0_halon_interface *hi = hc->hc_hi;
 	struct m0_spiel *spiel = m0_halon_interface_spiel(hi);
 
-	struct m0_proc_counter count_stats;
+	struct m0_proc_counter *count_stats=NULL;
 	int rc;
+	/* init count_stats */
+	Py_BEGIN_ALLOW_THREADS rc = 
+	    m0_spiel_count_stats_init(&count_stats);
+	Py_END_ALLOW_THREADS if (rc != 0)
+        {
+                PyGILState_Release(gstate);
+                Py_RETURN_NONE;
+        }
+
 	/* call the motr api */
 	Py_BEGIN_ALLOW_THREADS rc =
-	    m0_spiel_proc_counters_fetch(spiel, proc_fid, &count_stats);
+	    m0_spiel_proc_counters_fetch(spiel, proc_fid, count_stats);
 	Py_END_ALLOW_THREADS if (rc != 0)
 	{
 		PyGILState_Release(gstate);
@@ -234,31 +243,32 @@ PyObject *m0_ha_proc_counters_fetch(unsigned long long ctx,
 	}
 
 	PyObject *hax_mod = getModule("hax.types");
-	PyObject *py_fid = toFid(&count_stats.pc_proc_fid);
-	int len = count_stats.pc_cnt;
+	PyObject *py_fid = toFid(&count_stats->pc_proc_fid);
+	int len = count_stats->pc_cnt;
 	/* Fetch all byte count stats per pver. */
 	PyObject *list = PyList_New(len);
 	int i;
 	for (i = 0; i < len; ++i) {
-		PyObject *pver_fid = toFid(&count_stats.pc_bckey[i]->sbk_fid);
+		PyObject *pver_fid = toFid(&count_stats->pc_bckey[i]->sbk_fid);
 		PyObject *pver_bc = PyObject_CallMethod(
 			hax_mod, "PverBC", "(OKKI)",
 			pver_fid,
-			count_stats.pc_bckey[i]->sbk_user_id,
-			count_stats.pc_bcrec[i]->sbr_byte_count,
-			count_stats.pc_bcrec[i]->sbr_object_count
+			count_stats->pc_bckey[i]->sbk_user_id,
+			count_stats->pc_bcrec[i]->sbr_byte_count,
+			count_stats->pc_bcrec[i]->sbr_object_count
 		);
 		PyList_SET_ITEM(list, i, pver_bc);
 	}
+
+	/* Free proc_count_stats */
+	m0_spiel_count_stats_fini(count_stats);
 
 	PyObject *bc_stats = PyObject_CallMethod(
 	    hax_mod, "ByteCountStats", "(OO)",
 		py_fid,
 		list);
-
 	Py_DECREF(list);
 	Py_DECREF(hax_mod);
-
 	PyGILState_Release(gstate);
 	return bc_stats;
 }
