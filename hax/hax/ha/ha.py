@@ -17,52 +17,48 @@
 
 import logging
 from typing import List, NamedTuple, Optional
-from hax.ha.event.node import NodeEvent
-from hax.ha.message_type.message_type import HealthMessage
 from hax.types import HAState, ObjHealth, ObjT, Fid
+from hax.ha.resource.node import Node
+from hax.ha.resource.resource import ResourceType
+from hax.ha.event.event import HaEvent
 from hax.util import ConsulUtil
 from cortx.utils.conf_store import Conf
 
 LOG = logging.getLogger('hax')
 
 
-Resource = NamedTuple('Resource', [('type', ObjT), ('id', str),
+Resource = NamedTuple('Resource', [('type', ResourceType), ('id', str),
                                    ('name', str), ('status', str)])
 
 
 class Ha():
-    resources = {ObjT.NODE: NodeEvent}
-    # currently only online is supported for node status
-    message_types = {ObjT.NODE: [HealthMessage]}
-
     def __init__(self, util: ConsulUtil):
         self.util = util
 
     def send_event(self, res: Resource):
-        resource = self.resources[res.type]()
-        event = resource.create_event(res.id,
-                                      res.name,
-                                      res.status)
+        event: HaEvent = res.type.create_event(res.id,
+                                               res.name,
+                                               res.status)
 
-        interfaces = self.message_types[res.type]
-        for interface in interfaces:
-            sender = interface()
-            sender.send(event, self.util)
+        event.send(self.util)
 
     def check_and_send(self,
                        parent_resource_type: ObjT,
                        fid: Fid,
                        resource_status: str):
+        resources = {ObjT.NODE: Node}
+
         # TODO Need to have generic function to get resource status
+        logging.debug('Inside check_and_send')
         if (self.util.get_local_node_status() == resource_status and
                 self.util.is_proc_local(fid)):
-            resource = self.util.get_process_node(fid)
+            resource_name = self.util.get_process_node(fid)
             resource_id = str(Conf.machine_id)
             LOG.debug('Sending %s event for resource %s',
-                      resource_status, resource)
-            self.send_event(Resource(type=parent_resource_type,
+                      resource_status, resource_name)
+            self.send_event(Resource(type=resources[parent_resource_type](),
                                      id=resource_id,
-                                     name=resource,
+                                     name=resource_name,
                                      status=resource_status))
 
     def generate_event_for_process(self,
@@ -81,7 +77,7 @@ class Ha():
             # when node is offline, rc node sends the offline event.
             resource_id = cns.get_machineid_by_nodename(node_name)
             if resource_id:
-                resource = Resource(type=ObjT.NODE,
+                resource = Resource(type=Node(),
                                     id=resource_id,
                                     name=node_name,
                                     status=state)
