@@ -149,10 +149,8 @@ class ConsumerThread(StoppableThread):
             for state in ha_states:
                 if state.fid.container == ObjT.PROCESS.value:
                     is_proc_local = self.consul.is_proc_local(state.fid)
-                    current_status = state.status
-                    if state.status in (ObjHealth.OFFLINE, ObjHealth.FAILED):
-                        current_status = cns.get_process_current_status(
-                            state.status, state.fid)
+                    current_status = cns.get_process_current_status(
+                        state.status, state.fid)
                     if current_status == ObjHealth.UNKNOWN:
                         continue
                     proc_status_remote = cns.get_process_status(state.fid)

@@ -476,6 +476,80 @@ if [[ $CONFD_IDs ]]; then
                                 "TMP_LOG_DIR" ]}]' $tmpfile > $tmpfile.tmp && mv -f $tmpfile.tmp $tmpfile
 fi
 
+append_hax_svc_watch() {
+    local id=$1
+    local fid=$(id2fid $id)
+    local key="processes/$fid"
+
+    jq --arg k "$key" '.watches += [{"type": "key",
+                          "key": $k,
+                          "handler_type": "http",
+                          "http_handler_config": {
+                          "path": "http://localhost:HAX_HTTP_PORT/watcher/processes",
+                          "method": "POST",
+                          "timeout": "10s"}}]' $tmpfile > $tmpfile.tmp && mv -f $tmpfile.tmp $tmpfile
+}
+
+append_confd_svc_watch() {
+    local id=$1
+    local fid=$(id2fid $id)
+    local key="processes/$fid"
+
+    jq --arg k "$key" '.watches += [{"type": "key",
+                          "key": $k,
+                          "handler_type": "http",
+                          "http_handler_config": {
+                          "path": "http://localhost:HAX_HTTP_PORT/watcher/processes",
+                          "method": "POST",
+                          "timeout": "10s"}}]' $tmpfile > $tmpfile.tmp && mv -f $tmpfile.tmp $tmpfile
+}
+
+append_ios_svc_watch() {
+    local id=$1
+    local fid=$(id2fid $id)
+    local key="processes/$fid"
+
+    jq --arg k "$key" '.watches += [{"type": "key",
+                          "key": $k,
+                          "handler_type": "http",
+                          "http_handler_config": {
+                          "path": "http://localhost:HAX_HTTP_PORT/watcher/processes",
+                          "method": "POST",
+                          "timeout": "10s"}}]' $tmpfile > $tmpfile.tmp && mv -f $tmpfile.tmp $tmpfile
+}
+
+append_motr_client_watch() {
+    local id=$1
+    local fid=$(id2fid $id)
+    local key="processes/$fid"
+
+    jq --arg k "$key" '.watches += [{"type": "key",
+                          "key": $k,
+                          "handler_type": "http",
+                          "http_handler_config": {
+                          "path": "http://localhost:HAX_HTTP_PORT/watcher/processes",
+                          "method": "POST",
+                          "timeout": "10s"}}]' $tmpfile > $tmpfile.tmp && mv -f $tmpfile.tmp $tmpfile
+}
+
+for id in $HAX_ID; do
+    append_hax_svc_watch $id
+done
+
+for id in $CONFD_IDs; do
+    append_confd_svc_watch $id
+done
+
+for id in $IOS_IDs; do
+    append_ios_svc_watch $id
+done
+
+for id in $MOTR_CLIENT_IDS; do
+    proc=$(echo $id| cut -d':' -f 1)
+    client_id=$(echo $id| cut -d':' -f 2)
+    append_motr_client_watch $client_id
+done
+
 sed -i "s|TMP_CONF_DIR|$conf_dir|" $tmpfile
 sed -i "s|TMP_LOG_DIR|$log_dir|" $tmpfile
 sed -i "s|HAX_HTTP_PORT|$hax_http_port|" $tmpfile
