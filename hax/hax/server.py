@@ -47,6 +47,7 @@ from hax.types import Fid, HAState, ObjHealth, StoppableThread
 from hax.util import ConsulUtil, create_process_fid, dump_json
 from helper.exec import Executor, Program
 from hax.util import repeat_if_fails
+from hax.ha.utils import HaUtils
 LOG = logging.getLogger('hax')
 
 
@@ -283,6 +284,40 @@ def process_state_update(planner: WorkPlanner):
     return _process
 
 
+def event_subscription_handle(consul_util: ConsulUtil):
+    async def _process(request):
+        data = await request.json()
+
+        loop = asyncio.get_event_loop()
+
+        try:
+            ha_util = HaUtils(consul_util)
+            await loop.run_in_executor(None, ha_util.event_subscribe, data)
+        except Exception as e:
+            LOG.exception(f'Event subscribe error: {e}')
+            return web.Response(text=f'Event subscribe error: {e}')
+        return web.Response()
+
+    return _process
+
+
+def event_unsubscription_handle(consul_util: ConsulUtil):
+    async def _process(request):
+        data = await request.json()
+
+        loop = asyncio.get_event_loop()
+
+        try:
+            ha_util = HaUtils(consul_util)
+            await loop.run_in_executor(None, ha_util.event_unsubscribe, data)
+        except Exception as e:
+            LOG.exception(f'Event unsubscribe error: {e}')
+            return web.Response(text=f'Event unsubscribe error: {e}')
+        return web.Response()
+
+    return _process
+
+
 @web.middleware
 async def encode_exception(request, handler):
     def error_response(e: Exception, code=500, reason=""):
@@ -369,6 +404,10 @@ class ServerRunner:
                         get_sns_status(planner, SnsRepairStatus)),
                 web.get('/api/v1/sns/rebalance-status',
                         get_sns_status(planner, SnsRebalanceStatus)),
+                web.post('/v1/events/subscribe',
+                         event_subscription_handle(consul_util)),
+                web.post('/v1/events/unsubscribe',
+                         event_unsubscription_handle(consul_util)),
             ])
             self.app = app
         except Exception as e:

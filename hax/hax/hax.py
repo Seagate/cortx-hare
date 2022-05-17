@@ -33,6 +33,7 @@ from hax.common import HaxGlobalState, di_configuration
 from hax.exception import HAConsistencyException
 from hax.filestats import FsStatsUpdater
 from hax.ha import create_ha_thread
+from hax.ha.utils import HaUtils
 from hax.handler import ConsumerThread
 from hax.log import setup_logging
 from hax.motr import Motr
@@ -190,6 +191,9 @@ def main():
     cfg: HL_Fids = _get_motr_fids(util)
     hax_http_port = util.get_hax_http_port()
     util.init_motr_processes_status()
+    # By default health_message will be subscribed to 'node' events
+    ha_util = HaUtils(util)
+    ha_util.event_subscribe({'node': 'health_message'})
 
     LOG.info('Welcome to HaX')
     LOG.info(f'Setting up ha_link interface with the options as follows: '

@@ -16,16 +16,11 @@
 # opensource@seagate.com or cortx-questions@seagate.com.
 
 import logging
-from hax.ha.event.event import HaEvent
-from hax.ha.types import InterfaceMapping
 
 
-class NodeEvent(HaEvent):
-    def send(self, util):
-        logging.debug('Inside NodeEvent:send')
+class ResourceType():
+    def __init__(self):
+        logging.debug('Inside ResourceType')
 
-        subscribers = self.get_subscribers(util, 'node')
-
-        for interface in subscribers:
-            sender = InterfaceMapping[interface]()
-            sender.send(self.event.json, util)
+    def create_event(self, resource_id, resource_name, resource_status):
+        raise NotImplementedError()
