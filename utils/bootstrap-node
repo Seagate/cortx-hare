@@ -150,6 +150,25 @@ process_started() {
     return 1
 }
 
+process_recovered() {
+    local fid=$1
+    if [[ $(get-process-state $fid) == M0_CONF_HA_PROCESS_DTM_RECOVERED ]]; then
+        return 0
+    fi
+    return 1
+}
+
+process_active() {
+    local fid=$1
+    if process_started $fid; then
+        return 0
+    fi
+    if process_recovered $fid; then
+        return 0
+    fi
+    return 1
+}
+
 # m0d sends 'active' to systemd before the startup is actually finished,
 # so we need to parse the output of m0d this way to make sure it is
 # really started.
@@ -158,7 +177,7 @@ wait_m0d_started() {
     local timeout=$2  # seconds
     local count=0
 
-    while ! process_started $fid; do
+    while ! process_active $fid; do
         (($count < $timeout)) || die "Unable to start m0d@$fid service"
         sleep 1
         ((++count))

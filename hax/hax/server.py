@@ -264,6 +264,7 @@ def process_state_update(planner: WorkPlanner):
             proc_type = proc_status['type']
             if (proc_type != 'M0_CONF_HA_PROCESS_M0MKFS' and
                 proc_state in ('M0_CONF_HA_PROCESS_STARTED',
+                               'M0_CONF_HA_PROCESS_DTM_RECOVERED',
                                'M0_CONF_HA_PROCESS_STOPPED')):
                 LOG.debug('Adding item key %d item val: %s',
                           proc_fid.key, proc_status)
