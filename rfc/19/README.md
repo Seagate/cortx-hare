@@ -27,7 +27,7 @@ Event payload MUST be in following JSON format:
 }
 ```
 
-#### Suported object types and values
+### Suported object types and values
 
 (Case sensitive.)
 
@@ -55,7 +55,7 @@ Event payload MUST be in following JSON format:
 
 ## Motr event types and handling
 
-#### M0_HA_MSG_STOB_IOQ
+### M0_HA_MSG_STOB_IOQ
 
 [\[stob/ioq_error.h:38\]](https://github.com/Seagate/cortx-motr/blob/dev/stob/ioq_error.h#L38)
 
@@ -77,7 +77,7 @@ Post an event to BQ to handle sns error. The handler MUST broadcast `CM_OP_REPAI
 
 ## Other events
 
-#### Device event reported via h0q
+### Device event reported via h0q
 
 - External applications will report a device failure or online event using h0q utility comprising of universal device name or identifier and the state. Hare MUST convert the universal device name or identifier to Motr specific identifier (FID) and post a `M0_NC_FAILED` event to BQ for the corresponding device's Motr FID.
 - Hare Consul KV MUST have appropriate mappings for universal device names to Motr identifiers for all the supported devices used in Motr configuration. If Hare is not able to map a device name to its corresponding Motr identifier then an appropriate error MUST be logged.
@@ -88,7 +88,7 @@ Post an event to BQ to handle sns error. The handler MUST broadcast `CM_OP_REPAI
 
 ## [HA states of Motr objects](https://github.com/Seagate/cortx-motr/blob/dev/ha/note.h#L118)
 
-#### M0_NC_FAILED
+### M0_NC_FAILED
 
 - Received by Hare from Motr or is a broadcast from Hare to Motr using BQ in case of a Motr device or service failures.
 - Hare MUST post a BQ event - `M0_NC_FAILED` - to all Motr processes for a device that is reported as failed and update the device state in Consul KV.
