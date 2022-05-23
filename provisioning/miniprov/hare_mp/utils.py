@@ -127,7 +127,7 @@ class Utils:
         data_devices = DList(
             [Text(device) for device in self.provider.get(
                 f'node>{machine_id}>'
-                f'storage>cvg[{cvg}]>devices>data')], 'List Text')
+                f'cvg[{cvg}]>devices>data')], 'List Text')
         return data_devices
 
     @func_log(func_enter, func_leave)
@@ -229,7 +229,7 @@ class Utils:
     def save_drives_info(self):
         machine_id = self.provider.get_machine_id()
         if(self.is_motr_io_present(machine_id)):
-            cvgs_key: str = f'node>{machine_id}>storage>cvg'
+            cvgs_key: str = f'node>{machine_id}>cvg'
             for cvg in range(len(self.provider.get(cvgs_key))):
                 data_devs = self.get_data_devices(machine_id, cvg)
                 for dev_path in data_devs.value:

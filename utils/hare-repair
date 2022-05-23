@@ -71,6 +71,14 @@ get_ip_addr() {
     curl -sX GET http://localhost:8500/v1/agent/self | jq -r .DebugConfig.BindAddr
 }
 
+get_nodename() {
+    curl -s http://localhost:8500/v1/agent/self | jq -r .Config.NodeName | cut -d':' -f 1
+}
+
+get_hax_port() {
+    consul kv get ports/$(get_nodename)/hax | jq -r .http
+}
+
 # process commands
 case $cmd in
     help) usage; exit ;;
@@ -91,7 +99,8 @@ case $cmd in
         # Access HTTP API request to get percentage of repair operation
         # This request is synchronous.
         ip_addr=$(get_ip_addr)
-        curl "http://$ip_addr:8008/api/v1/sns/repair-status?pool_fid=$pool_fid"
+        hax_port=$(get_hax_port)
+        curl "http://$ip_addr:${hax_port}/api/v1/sns/repair-status?pool_fid=$pool_fid"
         echo
         # TODO: JSON is expected. Additional processing may be needed depending
         # on output.

@@ -28,7 +28,6 @@ in
 { create_aux : Optional Bool
 , nodes : List Node
 , pools : List Pool
-, network_ports : Optional ./Ports.dhall
 , profiles : Optional (List ./PoolsRef.dhall)
 , fdmi_filters: Optional (List ./FdmiFilterDesc.dhall)
 }

@@ -952,6 +952,23 @@ class ConsulUtil:
 
     @repeat_if_fails()
     @uses_consul_cache
+    def get_machineid_by_nodename(self,
+                                  nodename: str,
+                                  kv_cache=None,
+                                  allow_null=False) -> Optional[str]:
+        """
+        Returns the machine id by its node-name value or None if the given
+        node-name doesn't correspond to any node.
+        """
+        node_key = self.kv.kv_get(nodename, kv_cache=kv_cache,
+                                  allow_null=allow_null)
+        if node_key:
+            machineid: bytes = node_key['Value']
+            return machineid.decode('utf-8')
+        return None
+
+    @repeat_if_fails()
+    @uses_consul_cache
     def get_node_ctrl_fids(self,
                            node: str,
                            kv_cache=None) -> Optional[List[Fid]]:
@@ -1953,6 +1970,39 @@ class ConsulUtil:
         LOG.info('node: %s proc: %s current status: %s',
                  node, proc_fid, status_current)
         return status_current
+
+    @repeat_if_fails()
+    def get_process_based_node_state(self, node_fid: Fid) -> str:
+        children = self.kv.kv_get(f'm0conf/nodes/{node_fid}/processes',
+                                  recurse=True)
+        total_processes = 0
+        started_processes = 0
+        for item in children:
+            # m0conf/nodes/0x6e00000000000001:0x3/processes/
+            # 0x7200000000000001:0xa:
+            # {"name": "m0_server", "state": "online"}
+            regex = re.compile('^m0conf\\/.*\\/processes\\/([^/]+)$')
+            match_result = re.match(regex, item['Key'])
+            if not match_result:
+                continue
+            p_fid = match_result.group(1)
+            # Counting total number of configured processes
+            total_processes += 1
+
+            p_key = f"processes/{p_fid}"
+            process = self.kv.kv_get(p_key, recurse=False)
+            if not process:
+                continue
+            state = json.loads(process['Value'])['state']
+            # Checking if status is M0_CONF_HA_PROCESS_STARTED
+            if state == ha_process_events[1]:
+                started_processes += 1
+        if total_processes == started_processes:
+            return 'online'
+        elif started_processes == 0:
+            return 'offline'
+        else:
+            return 'degraded'
 
     def svcHealthToM0Status(self, svc_health: ObjHealth):
         svcHealthToM0status: dict = {

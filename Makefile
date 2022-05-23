@@ -351,6 +351,8 @@ install-provisioning:
 	 done
 	@$(call _log,copying provisioning/logrotate/hare -> $(LOGROTATE_CONF_DIR))
 	@install --mode=0644 provisioning/logrotate/hare $(LOGROTATE_CONF_DIR)
+	@$(call _log,copying provisioning/logrotate/hare_logrotate.sh -> $(ETC_CRON_DIR))
+	@install --mode=0744 provisioning/logrotate/hare_logrotate.sh $(ETC_CRON_DIR)
 
 # devinstall {{{2
 .PHONY: devinstall

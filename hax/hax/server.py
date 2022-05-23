@@ -254,22 +254,22 @@ def process_state_update(planner: WorkPlanner):
             # pudb.remote.set_trace(term_size=(80, 40), port=9998)
             ha_states: List[HAState] = []
             LOG.debug('process status: %s', data)
-            for item in data:
-                proc_val = base64.b64decode(item['Value'])
-                proc_status = json.loads(str(proc_val.decode('utf-8')))
-                LOG.debug('process update item key %s item val: %s',
-                          item['Key'].split('/')[1], proc_status)
-                proc_fid = Fid.parse(item['Key'].split('/')[1])
-                proc_state = proc_status['state']
-                proc_type = proc_status['type']
-                if (proc_type != 'M0_CONF_HA_PROCESS_M0MKFS' and
-                        proc_state in ('M0_CONF_HA_PROCESS_STARTED',
-                                       'M0_CONF_HA_PROCESS_STOPPED')):
-                    ha_states.append(HAState(
-                        fid=proc_fid,
-                        status=proc_state_to_objhealth[proc_state]))
-                    planner.add_command(
-                        BroadcastHAStates(states=ha_states, reply_to=None))
+            proc_status_val = base64.b64decode(data['Value']).decode("utf-8")
+            proc_status = json.loads(proc_status_val)
+            LOG.debug('process status %s', proc_status)
+            proc_fid = Fid.parse(data['Key'].split('/')[1])
+            proc_state = proc_status['state']
+            proc_type = proc_status['type']
+            if (proc_type != 'M0_CONF_HA_PROCESS_M0MKFS' and
+                proc_state in ('M0_CONF_HA_PROCESS_STARTED',
+                               'M0_CONF_HA_PROCESS_STOPPED')):
+                LOG.debug('Adding item key %d item val: %s',
+                          proc_fid.key, proc_status)
+                ha_states.append(HAState(
+                    fid=proc_fid,
+                    status=proc_state_to_objhealth[proc_state]))
+                planner.add_command(
+                    BroadcastHAStates(states=ha_states, reply_to=None))
 
         # Note that planner.add_command is potentially a blocking call
         try:

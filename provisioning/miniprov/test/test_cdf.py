@@ -190,19 +190,19 @@ class TestCDF(unittest.TestCase):
                     'srvnode-1.data.private',
                 'node>MACH_ID>components':
                 [{'name':'hare'}, {'name': 'motr'}, {'name': 's3'}],
-                'node>MACH_ID>storage>cvg[0]>devices>data':
+                'node>MACH_ID>cvg[0]>devices>data':
                 ['/dev/sdb'],
-                'node>MACH_ID>storage>cvg[1]>devices>data':
+                'node>MACH_ID>cvg[1]>devices>data':
                 ['/dev/sdc'],
                 'node>MACH_ID>network>data>private_interfaces':
                 ['eth1', 'eno2'],
-                'node>MACH_ID>storage>num_cvg':
+                'node>MACH_ID>num_cvg':
                 2,
-                'node>MACH_ID>storage>cvg':
+                'node>MACH_ID>cvg':
                 [{'devices': {'data': ['/dev/sdb', '/dev/sdc'], 'metadata': ['/dev/meta', '/dev/meta1']}}],
-                'node>MACH_ID>storage>cvg[0]>devices>metadata':
+                'node>MACH_ID>cvg[0]>devices>metadata':
                 ['/dev/meta'],
-                'node>MACH_ID>storage>cvg[1]>devices>metadata':
+                'node>MACH_ID>cvg[1]>devices>metadata':
                 ['/dev/meta1'],
                 'cortx>s3>service_instances':
                 1,
@@ -210,7 +210,7 @@ class TestCDF(unittest.TestCase):
                 'tcp',
                 'cortx>motr>client_instances':
                 2,
-                'node>MACH_ID>storage>num_cvg': 1,
+                'node>MACH_ID>num_cvg': 1,
                 'cluster>num_storage_set':
                 1,
                 'cluster>storage_set>server_node_count':
@@ -311,13 +311,13 @@ class TestCDF(unittest.TestCase):
                 'node>MACH_ID>components':
                 [{'name':'hare'}, {'name': 'motr'}, {'name': 's3'},
                  {'name': 'other'}],
-                'node>MACH_ID>storage>num_cvg': 2,
-                'node>MACH_ID>storage>cvg':
+                'node>MACH_ID>num_cvg': 2,
+                'node>MACH_ID>cvg':
                 [{'devices': {'data': ['/dev/sdb', '/dev/sdc'], 'metadata': ['/dev/meta', '/dev/meta1']}}],
-                'node>MACH_ID>storage>cvg[0]>devices>data': ['/dev/sdb'],
-                'node>MACH_ID>storage>cvg[0]>devices>metadata': ['/dev/meta'],
-                'node>MACH_ID>storage>cvg[1]>devices>data': ['/dev/sdc'],
-                'node>MACH_ID>storage>cvg[1]>devices>metadata': ['/dev/meta1'],
+                'node>MACH_ID>cvg[0]>devices>data': ['/dev/sdb'],
+                'node>MACH_ID>cvg[0]>devices>metadata': ['/dev/meta'],
+                'node>MACH_ID>cvg[1]>devices>data': ['/dev/sdc'],
+                'node>MACH_ID>cvg[1]>devices>metadata': ['/dev/meta1'],
                 'node>MACH_ID>hostname':                'myhost',
                 'node>MACH_ID>name': 'mynodename',
                 'node>MACH_ID>type': 'storage_node',
@@ -327,7 +327,10 @@ class TestCDF(unittest.TestCase):
                 'cortx>s3>service_instances':                1,
                 'cortx>motr>interface_type':                'o2ib',
             }
-            return data.get(value)
+            if value in data:
+                return data.get(value)
+            else:
+                return None
 
         store._raw_get = Mock(side_effect=ret_values)
         store.get_machine_id = Mock(return_value='MACH_ID')
@@ -467,20 +470,20 @@ class TestCDF(unittest.TestCase):
                 'node>MACH_ID1>cluster_id': 'CLUSTER_ID',
                 'node>MACH_ID2>cluster_id': 'CLUSTER_ID',
                 'node>MACH_ID3>cluster_id': 'CLUSTER_ID',
-                'node>MACH_ID1>storage>cvg':
+                'node>MACH_ID1>cvg':
                 [{'devices': {'data': ['/dev/sda', '/dev/sdb', '/dev/sdc', '/dev/sdd'], 'metadata': ['/dev/meta1']}},
                  {'devices': {'data': ['/dev/sde', '/dev/sdf', '/dev/sdg', '/dev/sdh'], 'metadata': ['/dev/meta2']}}],
-                'node>MACH_ID2>storage>cvg':
+                'node>MACH_ID2>cvg':
                 [{'devices': {'data': ['/dev/sda', '/dev/sdb', '/dev/sdc', '/dev/sdd'], 'metadata': ['/dev/meta1']}},
                  {'devices': {'data': ['/dev/sde', '/dev/sdf', '/dev/sdg', '/dev/sdh'], 'metadata': ['/dev/meta2']}}],
-                'node>MACH_ID3>storage>cvg':
+                'node>MACH_ID3>cvg':
                 [{'devices': {'data': ['/dev/sda', '/dev/sdb', '/dev/sdc', '/dev/sdd'], 'metadata': ['/dev/meta1']}},
                  {'devices': {'data': ['/dev/sde', '/dev/sdf', '/dev/sdg', '/dev/sdh'], 'metadata': ['/dev/meta2']}}],
-                'node>MACH_ID1>storage>num_cvg': '2',
-                'node>MACH_ID1>storage>cvg[0]>devices>data': ['/dev/sda', '/dev/sdb', '/dev/sdc', '/dev/sdd'],
-                'node>MACH_ID1>storage>cvg[1]>devices>data': ['/dev/sde', '/dev/sdf', '/dev/sdg', '/dev/sdh'],
-                'node>MACH_ID1>storage>cvg[0]>devices>metadata': ['/dev/meta1'],
-                'node>MACH_ID1>storage>cvg[1]>devices>metadata': ['/dev/meta2'],
+                'node>MACH_ID1>num_cvg': '2',
+                'node>MACH_ID1>cvg[0]>devices>data': ['/dev/sda', '/dev/sdb', '/dev/sdc', '/dev/sdd'],
+                'node>MACH_ID1>cvg[1]>devices>data': ['/dev/sde', '/dev/sdf', '/dev/sdg', '/dev/sdh'],
+                'node>MACH_ID1>cvg[0]>devices>metadata': ['/dev/meta1'],
+                'node>MACH_ID1>cvg[1]>devices>metadata': ['/dev/meta2'],
                 'node>MACH_ID1>hostname':                'myhost',
                 'node>MACH_ID1>name': 'mynodename',
                 'node>MACH_ID1>type': 'storage_node',
@@ -489,11 +492,11 @@ class TestCDF(unittest.TestCase):
                 'node>MACH_ID1>network>data>private_interfaces':                ['eth1', 'eno2'],
                 'cortx>s3>service_instances':                1,
                 'cortx>motr>interface_type':                'o2ib',
-                'node>MACH_ID2>storage>num_cvg': '2',
-                'node>MACH_ID2>storage>cvg[0]>devices>data': ['/dev/sda', '/dev/sdb', '/dev/sdc', '/dev/sdd'],
-                'node>MACH_ID2>storage>cvg[1]>devices>data': ['/dev/sde', '/dev/sdf', '/dev/sdg', '/dev/sdh'],
-                'node>MACH_ID2>storage>cvg[0]>devices>metadata': ['/dev/meta1'],
-                'node>MACH_ID2>storage>cvg[1]>devices>metadata': ['/dev/meta2'],
+                'node>MACH_ID2>num_cvg': '2',
+                'node>MACH_ID2>cvg[0]>devices>data': ['/dev/sda', '/dev/sdb', '/dev/sdc', '/dev/sdd'],
+                'node>MACH_ID2>cvg[1]>devices>data': ['/dev/sde', '/dev/sdf', '/dev/sdg', '/dev/sdh'],
+                'node>MACH_ID2>cvg[0]>devices>metadata': ['/dev/meta1'],
+                'node>MACH_ID2>cvg[1]>devices>metadata': ['/dev/meta2'],
                 'node>MACH_ID2>hostname':                'myhost',
                 'node>MACH_ID2>name': 'mynodename',
                 'node>MACH_ID2>type': 'storage_node',
@@ -502,11 +505,11 @@ class TestCDF(unittest.TestCase):
                 'node>MACH_ID2>network>data>private_interfaces':                ['eth1', 'eno2'],
                 'cortx>s3>service_instances':                1,
                 'cortx>motr>interface_type':                'o2ib',
-                'node>MACH_ID3>storage>num_cvg': '2',
-                'node>MACH_ID3>storage>cvg[0]>devices>data': ['/dev/sda', '/dev/sdb', '/dev/sdc', '/dev/sdd'],
-                'node>MACH_ID3>storage>cvg[1]>devices>data': ['/dev/sde', '/dev/sdf', '/dev/sdg', '/dev/sdh'],
-                'node>MACH_ID3>storage>cvg[0]>devices>metadata': ['/dev/meta1'],
-                'node>MACH_ID3>storage>cvg[1]>devices>metadata': ['/dev/meta2'],
+                'node>MACH_ID3>num_cvg': '2',
+                'node>MACH_ID3>cvg[0]>devices>data': ['/dev/sda', '/dev/sdb', '/dev/sdc', '/dev/sdd'],
+                'node>MACH_ID3>cvg[1]>devices>data': ['/dev/sde', '/dev/sdf', '/dev/sdg', '/dev/sdh'],
+                'node>MACH_ID3>cvg[0]>devices>metadata': ['/dev/meta1'],
+                'node>MACH_ID3>cvg[1]>devices>metadata': ['/dev/meta2'],
                 'node>MACH_ID3>hostname':                'myhost',
                 'node>MACH_ID3>name': 'mynodename',
                 'node>MACH_ID3>type': 'storage_node',
@@ -544,7 +547,7 @@ class TestCDF(unittest.TestCase):
 
         def ret_values(value: str) -> Any:
             data = {
-                'node>MACH_ID>storage>num_cvg': 1,
+                'node>MACH_ID>num_cvg': 1,
                 'cluster>num_storage_set': 1,
                 'cluster>storage_set>server_node_count': 1,
                 'cluster>storage_set[0]>name': 'StorageSet-1',
@@ -575,19 +578,19 @@ class TestCDF(unittest.TestCase):
                 ['eth1', 'eno2'],
                 'cortx>s3>service_instances':
                 1,
-                'node>MACH_ID>storage>num_cvg':
+                'node>MACH_ID>num_cvg':
                 2,
                 'cortx>motr>interface_type':
                 'o2ib',
                 'cortx>motr>client_instances':
                 2,
-                'node>MACH_ID>storage>cvg':
+                'node>MACH_ID>cvg':
                 [{'devices': {'data': ['/dev/sdb', '/dev/sdc'], 'metadata': ['/dev/meta', '/dev/meta1']}}],
-                'node>MACH_ID>storage>cvg[0]>devices>data':
+                'node>MACH_ID>cvg[0]>devices>data':
                 ['/dev/sdb'],
-                'node>MACH_ID>storage>cvg[1]>devices>data':
+                'node>MACH_ID>cvg[1]>devices>data':
                 ['/dev/sdc'],
-                'node>MACH_ID>storage>cvg[0]>devices>metadata':
+                'node>MACH_ID>cvg[0]>devices>metadata':
                 ['/dev/meta1'],
             }
             return data.get(value)
@@ -659,19 +662,19 @@ class TestCDF(unittest.TestCase):
                 ['eth1', 'eno2'],
                 'cortx>s3>service_instances':
                 1,
-                'node>MACH_ID>storage>num_cvg':
+                'node>MACH_ID>num_cvg':
                 2,
                 'cortx>motr>interface_type':
                 'o2ib',
                 'cortx>motr>client_instances':
                 2,
-                'node>MACH_ID>storage>cvg[0]>devices>data':
+                'node>MACH_ID>cvg[0]>devices>data':
                 ['/dev/sdb'],
-                'node>MACH_ID>storage>cvg[0]>devices>metadata':
+                'node>MACH_ID>cvg[0]>devices>metadata':
                 ['/dev/meta'],
-                'node>MACH_ID>storage>cvg[1]>devices>data':
+                'node>MACH_ID>cvg[1]>devices>data':
                 ['/dev/sdc'],
-                'node>MACH_ID>storage>cvg[1]>devices>metadata':
+                'node>MACH_ID>cvg[1]>devices>metadata':
                 ['/dev/meta1'],
             }
             return data.get(value)
@@ -719,9 +722,9 @@ class TestCDF(unittest.TestCase):
                 'o2ib',
                 'cortx>motr>client_instances':
                 2,
-                'node>MACH_ID>storage>cvg[0]>devices>data':
+                'node>MACH_ID>cvg[0]>devices>data':
                 ['/dev/sdb'],
-                'node>MACH_ID>storage>cvg[0]>devices>metadata':
+                'node>MACH_ID>cvg[0]>devices>metadata':
                 ['/dev/meta'],
             }
             return data.get(value)
@@ -735,7 +738,7 @@ class TestCDF(unittest.TestCase):
 
         def ret_values(value: str) -> Any:
             data = {
-                'node>MACH_ID>storage>num_cvg': 1,
+                'node>MACH_ID>num_cvg': 1,
                 'cluster>num_storage_set':
                 1,
                 'cluster>storage_set>server_node_count':
@@ -765,19 +768,19 @@ class TestCDF(unittest.TestCase):
                 ['eth1', 'eno2'],
                 'cortx>s3>service_instances':
                 1,
-                'node>MACH_ID>storage>num_cvg':
+                'node>MACH_ID>num_cvg':
                 2,
                 'cortx>motr>interface_type':
                 'o2ib',
                 'cortx>motr>client_instances':
                 2,
-                'node>MACH_ID>storage>cvg[0]>devices>data':
+                'node>MACH_ID>cvg[0]>devices>data':
                 ['/dev/sdb'],
-                'node>MACH_ID>storage>cvg[0]>devices>metadata':
+                'node>MACH_ID>cvg[0]>devices>metadata':
                 ['/dev/meta'],
-                'node>MACH_ID>storage>cvg[1]>devices>data':
+                'node>MACH_ID>cvg[1]>devices>data':
                 ['/dev/sdc'],
-                'node>MACH_ID>storage>cvg[1]>devices>metadata':
+                'node>MACH_ID>cvg[1]>devices>metadata':
                 ['/dev/meta1'],
             }
             return data.get(value)
@@ -796,7 +799,7 @@ class TestCDF(unittest.TestCase):
 
         def ret_values(value: str) -> Any:
             data = {
-                'node>MACH_ID>storage>num_cvg': 1,
+                'node>MACH_ID>num_cvg': 1,
                 'cluster>num_storage_set':
                 1,
                 'cluster>storage_set>server_node_count':
@@ -830,19 +833,19 @@ class TestCDF(unittest.TestCase):
                 ['eth1', 'eno2'],
                 'cortx>s3>service_instances':
                 1,
-                'node>MACH_ID>storage>num_cvg':
+                'node>MACH_ID>num_cvg':
                 2,
                 'cortx>motr>interface_type':
                 'o2ib',
                 'cortx>motr>client_instances':
                 2,
-                'node>MACH_ID>storage>cvg[0]>devices>data':
+                'node>MACH_ID>cvg[0]>devices>data':
                 ['/dev/sda', '/dev/sdb'],
-                'node>MACH_ID>storage>cvg[0]>devices>metadata':
+                'node>MACH_ID>cvg[0]>devices>metadata':
                 ['/dev/meta'],
-                'node>MACH_ID>storage>cvg[1]>devices>data':
+                'node>MACH_ID>cvg[1]>devices>data':
                 ['/dev/sdc', '/dev/sdd'],
-                'node>MACH_ID>storage>cvg[1]>devices>metadata':
+                'node>MACH_ID>cvg[1]>devices>metadata':
                 ['/dev/meta1'],
             }
             return data.get(value)
@@ -890,17 +893,17 @@ class TestCDF(unittest.TestCase):
                 'node>MACH_ID>name': 'mynodename',
                 'node>MACH_ID>type': 'storage_node',
                 'node>MACH_ID>components':
-                [{'name':'hare'}, {'name': 'motr'}, {'name': 's3'}],
-                'node>MACH_ID>storage>cvg':
+                [{'name':'hare'}, {'name': 'motr', 'services': ['io']}, {'name': 's3'}],
+                'node>MACH_ID>cvg':
                 [{'devices': {'data': ['/dev/sdb'], 'metadata': ['/dev/meta1']}},
                  {'devices': {'data': ['/dev/sdc'], 'metadata': ['/dev/meta2']}}],
-                'node>MACH_ID>storage>cvg[0]>devices>data':
+                'node>MACH_ID>cvg[0]>devices>data':
                 ['/dev/sdb'],
-                'node>MACH_ID>storage>cvg[1]>devices>data':
+                'node>MACH_ID>cvg[1]>devices>data':
                 ['/dev/sdc'],
-                'node>MACH_ID>storage>cvg[0]>devices>metadata':
+                'node>MACH_ID>cvg[0]>devices>metadata':
                 ['/dev/meta1'],
-                'node>MACH_ID>storage>cvg[1]>devices>metadata':
+                'node>MACH_ID>cvg[1]>devices>metadata':
                 ['/dev/meta2'],
                 'node>MACH_ID>network>data>private_interfaces':
                 ['eth1', 'eno2'],
@@ -915,7 +918,10 @@ class TestCDF(unittest.TestCase):
                 'node>MACH_ID>network>data>private_fqdn':
                     'srvnode-1.data.private',
             }
-            return data[value]
+            if value in data:
+                return data[value]
+            else:
+                return None
 
         store._raw_get = Mock(side_effect=ret_values)
         store.get_machine_id = Mock(return_value='MACH_ID')
@@ -1012,11 +1018,11 @@ class TestCDF(unittest.TestCase):
                  {'name': 'other'}],
                 'node>MACH_ID>network>data>private_interfaces':
                 ['eth1'],
-                'node>MACH_ID>storage>cvg':
+                'node>MACH_ID>cvg':
                 [{'devices': {'data': ['/dev/sdb'], 'metadata': ['/dev/meta']}}],
-                'node>MACH_ID>storage>cvg[0]>devices>data':
+                'node>MACH_ID>cvg[0]>devices>data':
                 ['/dev/sdb'],
-                'node>MACH_ID>storage>cvg[0]>devices>metadata':
+                'node>MACH_ID>cvg[0]>devices>metadata':
                 ['/dev/meta'],
                 'node>MACH_2_ID>name':                'host-2',
                 'node>MACH_2_ID>hostname':            'host-2',
@@ -1033,14 +1039,17 @@ class TestCDF(unittest.TestCase):
                 'libfab',
                 'cortx>s3>service_instances':                1,
                 'cortx>motr>client_instances':                2,
-                'node>MACH_2_ID>storage>cvg':
+                'node>MACH_2_ID>cvg':
                 [{'devices': {'data': ['/dev/sdb'], 'metadata': ['/dev/meta']}}],
-                'node>MACH_2_ID>storage>cvg[0]>devices>data':
+                'node>MACH_2_ID>cvg[0]>devices>data':
                 ['/dev/sdb'],
-                'node>MACH_2_ID>storage>cvg[0]>devices>metadata':
+                'node>MACH_2_ID>cvg[0]>devices>metadata':
                 ['/dev/meta'],
             }
-            return data[value]
+            if value in data:
+                return data[value]
+            else:
+                return None
 
         store._raw_get = Mock(side_effect=ret_values)
 
@@ -1141,11 +1150,11 @@ class TestCDF(unittest.TestCase):
                 'node>MACH_ID>type': 'storage_node',
                 'node>MACH_ID>components':
                 [{'name':'hare'}, {'name': 'motr'}, {'name': 's3'}],
-                'node>MACH_ID>storage>cvg':
+                'node>MACH_ID>cvg':
                 [{'devices': {'data': ['/dev/sdb'], 'metadata': ['/dev/meta']}}],
-                'node>MACH_ID>storage>cvg[0]>devices>data':
+                'node>MACH_ID>cvg[0]>devices>data':
                 ['/dev/sdb'],
-                'node>MACH_ID>storage>cvg[0]>devices>metadata':
+                'node>MACH_ID>cvg[0]>devices>metadata':
                 ['/dev/meta1'],
                 'node>MACH_ID>network>data>private_fqdn':
                     'srvnode-1.data.private',
@@ -1162,7 +1171,10 @@ class TestCDF(unittest.TestCase):
                 'node>MACH_ID>network>data>private_interfaces':
                 ['eth1', 'eno2']
             }
-            return data[value]
+            if value in data:
+                return data[value]
+            else:
+                return None
 
         store._raw_get = Mock(side_effect=ret_values)
         store.get_machine_id = Mock(return_value='MACH_ID')
