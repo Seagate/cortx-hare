@@ -144,6 +144,14 @@ get_service_ids_from_kv_file() {
     eval $cmd || true
 }
 
+get_all_service_ids_from_kv_file() {
+    local filter=$1
+    local key="m0conf/nodes/*"
+    local cmd="jq -r '.[] | select(.key|test(\"$key\"))' $kv_file |
+                  $filter | sed 's/.*processes.//' | cut -d/ -f1"
+    eval $cmd || true
+}
+
 get_service_ep_from_kv_file() {
     local process_fidk=$1
     local key="m0conf/nodes/$(get_node_name)/processes/$process_fidk/endpoint"
@@ -241,6 +249,7 @@ id2fid() {
 }
 
 HAX_ID=$(get_service_ids_from_kv_file 'grep -iw "services\/ha"')
+HAX_ID_ALL=$(get_all_service_ids_from_kv_file 'grep -iw "services\/ha"')
 [[ $HAX_ID ]] || {
     cat >&2 <<.
 Cannot get information about Hax from Consul for this host ($(get_node_name)).
@@ -250,7 +259,9 @@ Please verify that the host name matches the one stored in the Consul KV.
     exit 1
 }
 CONFD_IDs=$(get_service_ids_from_kv_file 'grep -iw "services\/confd"')
+CONFD_IDs_ALL=$(get_all_service_ids_from_kv_file 'grep -iw "services\/confd"')
 IOS_IDs=$(get_service_ids_from_kv_file 'grep -iw "services\/ios"')
+IOS_IDs_ALL=$(get_all_service_ids_from_kv_file 'grep -iw "services\/ios"')
 
 MOTR_CLIENT_TYPES=$(get_motr_client_types)
 
@@ -259,6 +270,14 @@ for motr_client_type in $MOTR_CLIENT_TYPES; do
     ids=$(get_service_ids_from_kv_file "grep -iw \"services\/$motr_client_type\"")
     for client_id in $ids; do
         MOTR_CLIENT_IDS+="${motr_client_type}:${client_id} "
+    done
+done
+
+MOTR_CLIENT_IDS_ALL=
+for motr_client_type in $MOTR_CLIENT_TYPES; do
+    ids=$(get_all_service_ids_from_kv_file "grep -iw \"services\/$motr_client_type\"")
+    for client_id in $ids; do
+        MOTR_CLIENT_IDS_ALL+="${motr_client_type}:${client_id} "
     done
 done
 
@@ -532,19 +551,19 @@ append_motr_client_watch() {
                           "timeout": "10s"}}]' $tmpfile > $tmpfile.tmp && mv -f $tmpfile.tmp $tmpfile
 }
 
-for id in $HAX_ID; do
+for id in $HAX_ID_ALL; do
     append_hax_svc_watch $id
 done
 
-for id in $CONFD_IDs; do
+for id in $CONFD_IDs_ALL; do
     append_confd_svc_watch $id
 done
 
-for id in $IOS_IDs; do
+for id in $IOS_IDs_ALL; do
     append_ios_svc_watch $id
 done
 
-for id in $MOTR_CLIENT_IDS; do
+for id in $MOTR_CLIENT_IDS_ALL; do
     proc=$(echo $id| cut -d':' -f 1)
     client_id=$(echo $id| cut -d':' -f 2)
     append_motr_client_watch $client_id
