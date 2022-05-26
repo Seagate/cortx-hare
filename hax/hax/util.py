@@ -1973,11 +1973,19 @@ class ConsulUtil:
 
     @repeat_if_fails()
     def get_process_based_node_state(self, node_fid: Fid) -> str:
-        children = self.kv.kv_get(f'm0conf/nodes/{node_fid}/processes',
-                                  recurse=True)
+
+        proc_keys = self.kv.kv_get('processes', recurse=True)
+        all_procs = {}
+        for proc in proc_keys:
+            fid = proc['Key'].split('/')[1]
+            state = json.loads(proc['Value'])['state']
+            all_procs[fid] = state
+
+        node_procs = self.kv.kv_get(f'm0conf/nodes/{node_fid}/processes',
+                                    recurse=True)
         total_processes = 0
         started_processes = 0
-        for item in children:
+        for item in node_procs:
             # m0conf/nodes/0x6e00000000000001:0x3/processes/
             # 0x7200000000000001:0xa:
             # {"name": "m0_server", "state": "online"}
@@ -1988,21 +1996,21 @@ class ConsulUtil:
             p_fid = match_result.group(1)
             # Counting total number of configured processes
             total_processes += 1
-
-            p_key = f"processes/{p_fid}"
-            process = self.kv.kv_get(p_key, recurse=False)
-            if not process:
+            # if process is not found then it is considered as offline
+            if p_fid not in all_procs:
                 continue
-            state = json.loads(process['Value'])['state']
             # Checking if status is M0_CONF_HA_PROCESS_STARTED
-            if state == ha_process_events[1]:
+            if all_procs[p_fid] == \
+                    m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED.name:
                 started_processes += 1
+        LOG.debug('total procs=%s, started procs=%s', total_processes,
+                  started_processes)
+        fin_state = 'degarded'
         if total_processes == started_processes:
-            return 'online'
+            fin_state = 'online'
         elif started_processes == 0:
-            return 'offline'
-        else:
-            return 'degraded'
+            fin_state = 'offline'
+        return fin_state
 
     def svcHealthToM0Status(self, svc_health: ObjHealth):
         svcHealthToM0status: dict = {
