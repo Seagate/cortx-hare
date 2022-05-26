@@ -47,6 +47,7 @@ let NodeInfo =
       , transport_type : Text
       , m0_servers : Optional (List M0ServerDesc)
       , m0_clients : Optional (List M0ClientDesc)
+      , ports_info : Optional T.NetworkPorts 
       }
 
 let AllowedFailures =
@@ -76,7 +77,6 @@ let ClusterInfo =
       { create_aux : Optional Bool
       , node_info: List NodeInfo
       , pool_info: List PoolInfo
-      , ports_info: Optional T.NetworkPorts
       , profile_info: List ProfileInfo
       , fdmi_filter_info: Optional (List T.FdmiFilterDesc)
       }
@@ -94,6 +94,7 @@ let toNodeDesc
           , transport_type = n.transport_type
           , m0_clients = n.m0_clients
           , m0_servers = n.m0_servers
+          , network_ports = n.ports_info
           }
 
 let toPoolDesc
@@ -114,7 +115,6 @@ let genCdf
       ->  { create_aux = cluster_info.create_aux
           , nodes = Prelude.List.map NodeInfo T.NodeDesc toNodeDesc cluster_info.node_info
           , pools = Prelude.List.map PoolInfo T.PoolDesc toPoolDesc cluster_info.pool_info
-          , network_ports = cluster_info.ports_info
           , profiles = Some cluster_info.profile_info
           , fdmi_filters = cluster_info.fdmi_filter_info
           }

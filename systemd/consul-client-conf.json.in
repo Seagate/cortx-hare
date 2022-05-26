@@ -23,16 +23,6 @@
       }
     },
     {
-      "type": "keyprefix",
-      "prefix": "processes/",
-      "handler_type": "http",
-      "http_handler_config": {
-        "path": "http://localhost:HAX_HTTP_PORT/watcher/processes",
-        "method": "POST",
-        "timeout": "10s"
-      }
-    },
-    {
       "type": "service",
       "service": "hax",
       "handler_type": "http",

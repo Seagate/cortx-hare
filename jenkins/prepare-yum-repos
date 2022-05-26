@@ -24,10 +24,11 @@ export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
 export
 
 STORAGE='http://cortx-storage.colo.seagate.com'
+REPO_PATH=$1
 
 cat <<EOF > /etc/yum.repos.d/motr_last_successful.repo
 [motr-dev]
-baseurl=$STORAGE/releases/cortx/github/main/centos-7.9.2009/last_successful/
+baseurl=$REPO_PATH/last_successful/
 gpgcheck=0
 name=motr-dev
 enabled=1
@@ -35,17 +36,9 @@ EOF
 
 cat <<EOF > /etc/yum.repos.d/motr_uploads.repo
 [motr-uploads]
-baseurl=$STORAGE/releases/cortx/third-party-deps/centos/centos-7.9.2009-2.0.0-k8/motr_uploads/
+baseurl=$REPO_PATH/last_successful_prod/3rd_party/motr/
 gpgcheck=0
 name=motr-uploads
-enabled=1
-EOF
-
-cat <<EOF > /etc/yum.repos.d/lustre_release.repo
-[lustre]
-baseurl=$STORAGE/releases/cortx/third-party-deps/centos/centos-7.9.2009-2.0.0-k8/lustre/custom/tcp/
-gpgcheck=0
-name=lustre
 enabled=1
 EOF
 

@@ -163,15 +163,15 @@ class CdfGenerator:
         conf = self.provider
         pool_type = pool.pool_type
         prop_name = 'data'
-        # node>{machine-id}>storage>num_cvg
-        cvg_num = int(conf.get(f'node>{node}>storage>num_cvg'))
+        # node>{machine-id}>num_cvg
+        cvg_num = int(conf.get(f'node>{node}>num_cvg'))
         all_cvg_devices = []
         if pool_type == 'dix':
             prop_name = 'metadata'
         for i in range(cvg_num):
-            # node>{machine-id}>storage>cvg[N]>devices>name
+            # node>{machine-id}>cvg[N]>devices>name
             all_cvg_devices += conf.get(
-                f'node>{node}>storage>cvg[{i}]>devices>{prop_name}')
+                f'node>{node}>cvg[{i}]>devices>{prop_name}')
         return all_cvg_devices
 
     def _validate_pool(self, pool: PoolHandle) -> None:
@@ -217,9 +217,9 @@ class CdfGenerator:
 
         node_count = len(data_nodes)
         machine_id = data_nodes[0]
-        # node>{machine-id}>storage>num_cvg
+        # node>{machine-id}>num_cvg
         cvg_per_node = int(conf.get(
-            f'node>{machine_id}>storage>num_cvg'))
+            f'node>{machine_id}>num_cvg'))
 
         total_unit = layout.data + layout.parity + layout.spare
         if total_unit == 0:
@@ -299,7 +299,7 @@ class CdfGenerator:
             self, nodes: List[NodeDesc]) -> Maybe[List[FdmiFilterDesc]]:
         return Maybe(None, 'List T.FdmiFilterDesc')
 
-    def _create_ports_descriptions(self) -> NetworkPorts:
+    def _create_ports_descriptions(self, hostname: str) -> NetworkPorts:
         conf = self.provider
         m0serverT = ['ios', 'confd']
         m0server_ports = []
@@ -307,28 +307,36 @@ class CdfGenerator:
         for srv in NetworkPorts.__annotations__.keys():
             if srv == 'hax':
                 url = conf.get('cortx>hare>hax>endpoints', allow_null=True)
-                _hax = url if url is None else \
-                    round(urlparse(url[0]).port / 100) * 100
+                _hax = None
                 _hax_http = None
                 for u in url or ():
                     _parsed_url = urlparse(u)
                     if _parsed_url.scheme in ('http', 'https'):
                         _hax_http = _parsed_url.port
+                    else:
+                        if _parsed_url.hostname == hostname:
+                            _hax = round(_parsed_url.port / 100) * 100
             elif srv == 'm0_client_other':
                 for client in self.provider.get_motr_clients():
                     url = client.get('endpoints')
                     if url:
-                        port = round(urlparse(url[0]).port / 100) * 100
-                        client_name = str(client.get('name'))
-                        m0client_ports.append(
-                            ClientPort(name=Text(client_name),
-                                       port=int(port)))
+                        for u in url or ():
+                            _parsed_url = urlparse(u)
+                            if _parsed_url.hostname == hostname:
+                                port = round(_parsed_url.port / 100) * 100
+                                client_name = str(client.get('name'))
+                                m0client_ports.append(
+                                    ClientPort(name=Text(client_name),
+                                               port=int(port)))
             elif srv == 'm0_server':
                 for server in m0serverT:
                     url = conf.get(f'cortx>motr>{server}>endpoints',
                                    allow_null=True)
-                    port = 0 if url is None else \
-                        round(urlparse(url[0]).port / 100) * 100
+                    port = 0
+                    for u in url or ():
+                        _parsed_url = urlparse(u)
+                        if _parsed_url.hostname == hostname:
+                            port = round(_parsed_url.port / 100) * 100
                     m0server_ports.append(
                         ServerPort(name=Text(server),
                                    port=int(port)))
@@ -353,7 +361,6 @@ class CdfGenerator:
         pools = self._create_pool_descriptions()
         profiles = self._create_profile_descriptions(pools)
         fdmi_filters = self._create_fdmi_filter_descriptions(nodes)
-        network_ports = self._create_ports_descriptions()
         create_aux = conf.get('cluster>create_aux',
                               allow_null=True)
 
@@ -365,7 +372,6 @@ class CdfGenerator:
                         node_info=DList(nodes, 'List NodeInfo'),
                         pool_info=DList(pools, 'List PoolInfo'),
                         profile_info=DList(profiles, 'List ProfileInfo'),
-                        ports_info=Maybe(network_ports, 'T.NetworkPorts'),
                         fdmi_filter_info=fdmi_filters))
 
         gencdf = Template(self._gencdf()).substitute(path=dhall_path,
@@ -441,13 +447,13 @@ class CdfGenerator:
             return None
         return Protocol[proto]
 
-    # node>{machine -id}>storage>cvg[N]>devices>data
+    # node>{machine -id}>cvg[N]>devices>data
     def _get_data_devices(self, machine_id: str, cvg: int) -> DList[Text]:
         store = self.provider
         data_devices = DList(
             [Text(device) for device in store.get(
                 f'node>{machine_id}>'
-                f'storage>cvg[{cvg}]>devices>data')], 'List Text')
+                f'cvg[{cvg}]>devices>data')], 'List Text')
         return data_devices
 
     # conf-store returns a list of devices, thus, the function
@@ -458,7 +464,7 @@ class CdfGenerator:
                              cvg: int) -> Text:
         store = self.provider
         metadata_device = Text(store.get(
-            f'node>{machine_id}>storage>cvg[{cvg}]>devices>metadata')[0])
+            f'node>{machine_id}>cvg[{cvg}]>devices>metadata')[0])
         return metadata_device
 
     # This function is kept as place holder with length returning 1,
@@ -509,9 +515,9 @@ class CdfGenerator:
                             self._get_metadata_device(
                                 machine_id, cvg), 'Text')),
                     runs_confd=Maybe(False, 'Bool'))
-                # node>{machine_id}>storage>cvg
+                # node>{machine_id}>cvg
                 for cvg in range(len(store.get(
-                    f'node>{machine_id}>storage>cvg')))
+                    f'node>{machine_id}>cvg')))
                 for m0d in range(self._get_m0d_per_cvg(machine_id, cvg))
             ], 'List M0ServerDesc')
 
@@ -532,6 +538,9 @@ class CdfGenerator:
         m0_clients = clients if clients else None
 
         node_facts = self.utils.get_node_facts()
+
+        network_ports = self._create_ports_descriptions(hostname)
+
         return NodeDesc(
             hostname=Text(hostname),
             machine_id=Maybe(Text(machine_id), 'Text'),
@@ -542,5 +551,6 @@ class CdfGenerator:
             data_iface_type=Maybe(self._get_iface_type(machine_id), 'P'),
             transport_type=Text(self.utils.get_transport_type()),
             m0_servers=Maybe(servers, 'List M0ServerDesc'),
-            m0_clients=Maybe(m0_clients, 'List M0ClientDesc')
+            m0_clients=Maybe(m0_clients, 'List M0ClientDesc'),
+            ports_info=Maybe(network_ports, 'T.NetworkPorts')
         )
