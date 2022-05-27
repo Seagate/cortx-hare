@@ -29,6 +29,7 @@ LOG = logging.getLogger('hax')
 Resource = NamedTuple('Resource', [('type', ObjT), ('id', str),
                                    ('name', str), ('status', str)])
 
+
 class Ha():
     resources = {ObjT.NODE: NodeEvent}
     # currently only online is supported for node status
