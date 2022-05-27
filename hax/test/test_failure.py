@@ -20,10 +20,14 @@
 import logging
 import unittest
 from unittest.mock import Mock
+from hax.queue import BQProcessor
+from hax.motr.planner import WorkPlanner
+from hax.motr.delivery import DeliveryHerald
+from hax.message import BroadcastHAStates
 
 from hax.log import TRACE
 from hax.motr import Motr
-from hax.types import (Fid, HaNoteStruct, HAState,
+from hax.types import (Fid, HaNoteStruct, HAState, MessageId,
                                ObjHealth, m0HaObjState)
 from hax.util import (FidWithType, PutKV, ConsulUtil)
 from hax.consul.cache import InvocationCache
@@ -143,4 +147,56 @@ class TestFailure(unittest.TestCase):
         self.assertTrue(_has_failed_note(broadcast_list, ctrl_fid))
         self.assertTrue(_has_failed_note(broadcast_list, process_fid))
         self.assertTrue(_has_failed_note(broadcast_list, service_fid))
+        self.assertTrue(_has_failed_note(broadcast_list, drive_fid))
+
+    def test_drive_failure(self):
+        consul_util = ConsulUtil()
+        consul_cache = InvocationCache()
+        ffi = Mock(spec=['init_motr_api'])
+        motr = Motr(ffi, None, None, consul_util)
+        planner = WorkPlanner()
+        herald = DeliveryHerald()
+        herald.wait_for_any = Mock()
+
+        bqprocessor = BQProcessor(planner, herald, consul_util)
+        
+        svc_name = 'hax'
+        drive_fid = Fid(0x6b00000000000001, 0x11)
+        hax_fid = Fid(0x7200000000000001, 0x6)
+        
+        def fake_add(cmd):
+            if isinstance(cmd, BroadcastHAStates):
+                motr.broadcast_ha_states(cmd.states, kv_cache=consul_cache)
+            if hasattr(cmd, 'reply_to') and cmd.reply_to:
+                cmd.reply_to.put([MessageId(0, 0)])
+                
+        planner.add_command = Mock(side_effect=fake_add)
+
+        payload = {
+                "node" : "ssc-vm-g2-rhev4-1947.colo.seagate.com",
+                "source_type" : "drive",
+                "device" : "/dev/sdd",
+                "state" : "failed"
+                }
+        # Set mock return values for the necessary Consul calls
+        consul_util.drive_to_sdev_fid = Mock(return_value=drive_fid)
+        consul_util.get_hax_fid = Mock(return_value=hax_fid)
+        consul_util._local_service_by_name = Mock(return_value=svc_name)
+        
+        # We'll use these mocks to check that expected updates are happening.
+        consul_util.update_drive_state = Mock()
+        motr._ha_broadcast = Mock()
+
+        # Send the mock event for drive failure.
+        bqprocessor.handle_device_state_set(payload)
+
+        # ConsulUtil is responsible for the actual KV updates, just check
+        # here that the appropriate util function is called for drive state
+        # update.
+        consul_util.update_drive_state.assert_called_with(
+                [drive_fid],
+                ObjHealth.FAILED,
+                kv_cache=consul_cache)
+
+        broadcast_list = motr._ha_broadcast.call_args[0][0]
         self.assertTrue(_has_failed_note(broadcast_list, drive_fid))
