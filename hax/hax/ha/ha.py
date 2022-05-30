@@ -76,6 +76,7 @@ class Ha():
             node_name = cns.get_process_node(ha_state.fid)
             node_fid = cns.get_node_fid(node_name)
             state = cns.get_process_based_node_state(node_fid)
+            LOG.debug('received node state=%s node=%s', state, node_name)
             # since the node event is not always for local node
             # when node is offline, rc node sends the offline event.
             resource_id = cns.get_machineid_by_nodename(node_name)
