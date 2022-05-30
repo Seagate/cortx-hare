@@ -973,7 +973,6 @@ class ConsulUtil:
             return name.decode('utf-8')
         return None
 
-    @repeat_if_fails()
     @uses_consul_cache
     def get_machineid_by_nodename(self,
                                   nodename: str,
