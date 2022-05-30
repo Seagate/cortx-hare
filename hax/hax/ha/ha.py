@@ -80,7 +80,6 @@ class Ha():
             # since the node event is not always for local node
             # when node is offline, rc node sends the offline event.
             resource_id = cns.get_machineid_by_nodename(node_name)
-
             if resource_id:
                 resource = Resource(type=ObjT.NODE,
                                     id=resource_id,
