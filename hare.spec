@@ -87,18 +87,12 @@ rm -rf %{buildroot}
 %defattr(-,root,root,-)
 %{_bindir}/*
 %{_exec_prefix}/lib/systemd/system/*
-%{_sharedstatedir}/hare/
-%{_localstatedir}/motr/hax/
 %{_sysconfdir}/cron.hourly/*
 %{_sysconfdir}/logrotate.d/*
 /opt/seagate/cortx/hare/*
 
 %post
 systemctl daemon-reload
-install --directory --mode=0775 /var/lib/hare
-groupadd --force hare
-chgrp hare /var/lib/hare
-chmod --changes g+w /var/lib/hare
 
 %if %{rhel} < 8
 # puppet-agent provides a newer version of facter, but sometimes it might not be

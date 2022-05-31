@@ -755,7 +755,7 @@ print([dict(path=path,
 
     return [Disk(**kwargs) for kwargs in
             ast.literal_eval(run_command(hostname,
-                                         'sudo', 'python3', '-c', code))]
+                                         'python3', '-c', code))]
 
 
 # XXX see build_disk_info() in motr's `utils/m0genfacts`

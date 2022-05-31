@@ -71,7 +71,7 @@ def _setup_logging(opts: AppCtx):
 @click.option('--conf-dir',
               '-c',
               type=str,
-              default='/var/lib/hare/',
+              default='$HOME/seagate/var/lib/hare/',
               help='Target folder where Hare-related configuration will '
               'be written to.',
               show_default=True)
@@ -85,7 +85,7 @@ def _setup_logging(opts: AppCtx):
 @click.option('--log-dir',
               '-l',
               type=str,
-              default='/var/log/seagate/hare',
+              default='$HOME/seagate/var/log/seagate/hare',
               help='Target folder where log files needs to be generated',
               show_default=True)
 @click.option('--consul-server',

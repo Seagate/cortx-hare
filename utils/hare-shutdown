@@ -80,7 +80,7 @@ def stop_all_with_consul(processes: Dict[str, List[utils.Process]],
 
     if leader_node and not utils.is_fake_leader_name(leader_node):
         logging.info(f'Shutting down RC Leader at {leader_node}... ')
-        pkill: str = 'sudo pkill --exact -KILL consul &> /dev/null'
+        pkill: str = 'pkill --exact -KILL consul &> /dev/null'
         utils.exec_custom(utils.ssh_prefix(leader_node) + pkill,
                           show_err=False)
 

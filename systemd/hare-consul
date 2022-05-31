@@ -34,4 +34,5 @@ exec consul agent \
      -client "$CLIENT" \
      $JOIN \
      -config-dir=$CONF/consul-$MODE-conf \
+     -log-file=$HOME/seagate/tmp/log.dat \
      -data-dir=$CONF/consul-data-$BIND $EXTRA_OPTS

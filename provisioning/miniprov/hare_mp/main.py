@@ -302,12 +302,12 @@ def post_install(args):
 
 
 def enable_hare_consul_agent() -> None:
-    cmd = ['systemctl', 'enable', 'hare-consul-agent']
+    cmd = ['systemctl --user', 'enable', 'hare-consul-agent']
     execute(cmd)
 
 
 def disable_hare_consul_agent() -> None:
-    cmd = ['systemctl', 'disable', 'hare-consul-agent']
+    cmd = ['systemctl --user', 'disable', 'hare-consul-agent']
     execute(cmd)
 
 
@@ -360,7 +360,7 @@ def init_with_bootstrap(args):
 
 
 def start_hax_with_systemd():
-    cmd = ['systemctl', 'start', 'hare-hax']
+    cmd = ['systemctl --user', 'start', 'hare-hax']
     execute(cmd)
 
 
@@ -426,7 +426,7 @@ def start_mkfs(proc_to_start: ProcessStartInfo) -> int:
 @func_log(func_enter, func_leave)
 def start_mkfs_parallel(hostname: str, hare_config_dir: str):
     # TODO: path needs to be updated according to the new conf-store key
-    sysconfig_dir = '/etc/sysconfig/'
+    sysconfig_dir = '$HOME/seagate/etc/sysconfig/'
     src = f'{hare_config_dir}/sysconfig/motr/{hostname}'
     for file in os.listdir(src):
         shutil.copy(os.path.join(src, file), sysconfig_dir)
@@ -682,12 +682,15 @@ def deployment_logs_cleanup(url):
 
 def motr_cleanup():
     try:
-        logging.info('Cleaning up motr directory(/var/motr/hax)')
-        os.system('rm -rf /var/motr/hax')
-        logging.info('Cleaning up sysconfig files(/etc/sysconfig/m0d-*)')
-        os.system('rm -rf /etc/sysconfig/m0d-0x7200000000000001*')
-        logging.info('Cleaning up sysconfig files(/etc/sysconfig/s3server-*)')
-        os.system('rm -rf /etc/sysconfig/s3server-0x7200000000000001*')
+        logging.info('Removing motr directory\
+                ($HOME/seagate/var/motr/hax)')
+        os.system('rm -rf $HOME/seagate/var/motr/hax')
+        logging.info('Removing sysconfig files\
+                ($HOME/seagate/etc/sysconfig/m0d-*)')
+        os.system('rm -rf $HOME/seagate/etc/sysconfig/m0d-0x7200000000000001*')
+        logging.info('Removing config files HOME/etc/sysconfig/s3server-*)')
+        os.system('rm -rf $HOME/seagate/etc/\
+                sysconfig/s3server-0x7200000000000001*')
 
     except Exception as error:
         raise RuntimeError(f'Error during motr cleanup: key={error}')
@@ -982,8 +985,9 @@ def add_param_argument(parser):
 def add_factory_argument(parser):
     parser.add_argument('--pre-factory',
                         help="""Deletes contents of hare log directory,
-                        hare config dir and /var/motr. Undoes everything that
-                        is done in post-install stage of hare provisioner""",
+                        hare config dir and $HOME/seagate/var/motr. Undoes all
+                        that is done in post-install stage of hare
+                        provisioner""",
                         required=False,
                         action='store_true')
     return parser

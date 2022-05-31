@@ -40,8 +40,8 @@ TEMP=$(getopt --options h: \
 
 eval set -- "$TEMP"
 
-conf_dir=/var/lib/hare
-log_dir=/var/log/seagate/hare
+conf_dir=$HOME/seagate/var/lib/hare
+log_dir=$HOME/seagate/var/log/seagate/hare
 
 while true; do
     case "$1" in
@@ -53,7 +53,7 @@ while true; do
     esac
 done
 
-sudo mkdir -p /var/log/seagate/hare
+mkdir -p $HOME/seagate/var/log/seagate/hare
 
 # Redirect all printouts to the log file with the timestamp prefix:
 exec &>> ${log_dir}/consul-${0##*/}.log

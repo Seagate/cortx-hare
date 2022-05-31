@@ -24,6 +24,9 @@ export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
 # :help: bootstrap the cluster
 
 PROG=${0##*/}
+mkdir -p $HOME/seagate/var/lib/hare
+mkdir -p $HOME/seagate/etc/sysconfig
+mkdir -p $HOME/seagate/tmp
 
 usage() {
     cat <<EOF
@@ -155,16 +158,16 @@ abort_if_RC_leader_election_is_impossible() {
         fi
 
         for svc in hare-hax $confd_id; do
-            if $ssh sudo systemctl --quiet --state=failed is-failed $svc; then
+            if $ssh systemctl --user --quiet --state=failed is-failed $svc; then
                 # hare-hax service fails during stop which blocks the further
                 # deployment of the cluster. Remove this explicit reset-failed
                 # and enable code after this statement once the stop failure is
                 # resolved.
-                sudo systemctl reset-failed $svc
+                systemctl --user reset-failed $svc
 
                 #ok=false
                 #status_commands+=(
-                #    "${ssh:+$ssh }sudo systemctl status $svc"
+                #    "${ssh:+$ssh }systemctl --user status $svc"
                 #)
             fi
         done
@@ -215,7 +218,7 @@ is_localhost() {
 
 check_consul_failure() {
     while read node bind_ip; do
-        if ssh -n $node "sudo systemctl --quiet --state=failed is-failed hare-consul-agent"; then
+        if ssh -n $node "systemctl --user --quiet --state=failed is-failed hare-consul-agent"; then
             echo 'Failed to start agent on '$node: >&2
             true; return
         fi
@@ -234,7 +237,6 @@ TEMP=$(getopt --options hc: \
 (($? == 0)) || { usage >&2; exit 1; }
 
 eval set -- "$TEMP"
-
 conf_dir=
 opt_mkfs=
 debug_p=false
@@ -264,12 +266,12 @@ cdf=${1:-}
 
 [[ $xprt == 'lnet' ]] || [[ $xprt == 'libfab' ]] || die "Invalid transport type $xprt"
 
-if sudo systemctl --quiet is-active hare-hax; then
+if systemctl --user --quiet is-active hare-hax; then
     die 'hare-hax is active ==> cluster is already running'
 fi
 
 if [[ -z $conf_dir ]]; then
-    conf_dir=/var/lib/hare
+    conf_dir=$HOME/seagate/var/lib/hare
 
     if ! [[ -d $conf_dir ]]; then
         cat <<EOF >&2
@@ -329,20 +331,20 @@ EOF
     exit 1
 fi
 
-if sudo systemctl --quiet is-active hare-consul-agent; then
+if systemctl --user --quiet is-active hare-consul-agent; then
     say 'Stopping Consul on this node...'
-    sudo systemctl stop hare-consul-agent
+    systemctl --user stop hare-consul-agent
     echo ' OK'
 
     say 'Stopping Consul on other nodes...'
     pids=()
     while read node bind_ip; do
-        ssh_error_info "$node" "sudo systemctl stop hare-consul-agent" &
+        ssh_error_info "$node" "systemctl --user stop hare-consul-agent" &
         pids+=($!)
     done < <(get_server_nodes | grep -vw $(node-name) || true)
 
     while read node bind_ip; do
-        ssh_error_info "$node" "sudo systemctl stop hare-consul-agent" &
+        ssh_error_info "$node" "systemctl --user stop hare-consul-agent" &
         pids+=($!)
     done < <(get_client_nodes)
     wait4 ${pids[@]-}
@@ -355,7 +357,7 @@ say 'Starting Consul server on this node...'
 mk-consul-env --mode server --bind $join_ip $join_peers_opt \
               --extra-options '-ui -bootstrap-expect 1'
 
-sudo systemctl start hare-consul-agent
+systemctl --user start hare-consul-agent
 
 # Wait for Consul's internal leader to be ready.
 # (Until then the KV store won't be accessible.)
@@ -381,14 +383,14 @@ pids=()
 while read node bind_ip; do
     ssh_error_info "$node" "PATH=$PATH $(which mk-consul-env) \
                           --mode server --bind $bind_ip --join $join_ip &&
-               sudo systemctl start hare-consul-agent" &
+               systemctl --user start hare-consul-agent" &
     pids+=($!)
 done < <(get_server_nodes | grep -vw $(node-name) || true)
 
 while read node bind_ip; do
     ssh_error_info "$node" "PATH=$PATH $(which mk-consul-env) \
                           --mode client --bind $bind_ip --join $join_ip &&
-               sudo systemctl start hare-consul-agent" &
+               systemctl --user start hare-consul-agent" &
     pids+=($!)
 done < <(get_client_nodes)
 wait4 ${pids[@]-}
@@ -425,7 +427,7 @@ wait4 ${pid[@]}
 pids=
 
 while read node _; do
-    scp -qr /var/lib/hare/consul-kv.json $node:/var/lib/hare/
+    scp -qr $HOME/seagate/var/lib/hare/consul-kv.json $node:$HOME/seagate/var/lib/hare/
     ssh_error_info "$node" "PATH=$PATH $(which update-consul-conf)" --server --xprt $xprt &
     pids+=($!)
 done < <(get_all_nodes | grep -vw $(node-name) || true)

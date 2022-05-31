@@ -48,7 +48,7 @@ mode=
 bind_addr=
 join_addr=
 extra_opts=
-conf_dir="/var/lib/hare/"
+conf_dir="$HOME/seagate/var/lib/hare/"
 
 TEMP=$(getopt --options hm:b:j:e:c: \
               --longoptions help,mode:,bind:,join:,extra-options:,conf-dir: \
@@ -87,7 +87,7 @@ sed -r -e "s/^(NODE=).*/\1$(get_node_name)/" \
        -e "s|^(CONF=).*|\1$conf_dir|" \
        -e "s/^(BIND=).*/\1$bind_addr/" \
        -e "s/^(CLIENT)=.*/\1=127.0.0.1 $bind_addr/" $ENV_TEMPLATE |
-    sudo tee $ENV_FILE >/dev/null
+    tee $ENV_FILE >/dev/null
 
 if [[ -n $join_addr ]]; then
     # join_addr is not empty and it contains one or more ip addresses separated
@@ -98,17 +98,17 @@ if [[ -n $join_addr ]]; then
 
     retry_str="$(echo "$join_addr" | \
                  awk '{for (i=1; i <= NF; ++i) printf " -retry-join "$i }')"
-    sudo sed -r -e "s/^(JOIN=).*/\1$retry_str/" -i $ENV_FILE
+    sed -r -e "s/^(JOIN=).*/\1$retry_str/" -i $ENV_FILE
 fi
 
 if [[ -n $extra_opts ]]; then
-    sudo sed -r "s/^(EXTRA_OPTS=).*/\1$extra_opts/" -i $ENV_FILE
+    sed -r "s/^(EXTRA_OPTS=).*/\1$extra_opts/" -i $ENV_FILE
 fi
 
 # Prepare for consul-agent startup:
-sudo rm -rf $conf_dir/consul-data-$bind_addr
+rm -rf $conf_dir/consul-data-$bind_addr
 
 consul_conf_dir=consul-$mode-conf
-sudo mkdir -p $conf_dir/$consul_conf_dir
-sudo cp $HARE_DIR/share/consul/$consul_conf_dir.json.in \
+mkdir -p $conf_dir/$consul_conf_dir
+cp $HARE_DIR/share/consul/$consul_conf_dir.json.in \
      $conf_dir/$consul_conf_dir/$consul_conf_dir.json

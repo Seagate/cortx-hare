@@ -86,11 +86,11 @@ fi
 # anyway, with or without this check.  The purpose of the check is to
 # provide proper error message.
 #
-# Without this check `sudo systemctl start hare-hax` fails with "Failed to
+# Without this check `systemctl --user start hare-hax` fails with "Failed to
 # start hax.service: Unit not found" error message.  That error
 # message is misleading, because hax.service _is_ installed, it is
 # one of its dependencies - motr-kernel.service - which isn't.
-out_systemctl=$(systemctl list-unit-files motr-kernel.service)
+out_systemctl=$(systemctl --user list-unit-files motr-kernel.service)
 if ! grep -qE '^motr-kernel\.service\>' <<< "$out_systemctl"; then
     cat >&2 <<EOF
 **********************************************************************
@@ -119,15 +119,14 @@ EOF
 fi
 
 . update-consul-conf --dry-run --xprt $xprt # import CONFD_IDs, IOS_IDs, S3_IDs, id2fid()
-
-sysconfig_dir='/etc/sysconfig'
-[ -d $sysconfig_dir ] || sysconfig_dir='/etc/default'
+sysconfig_dir=$HOME/seagate/etc/sysconfig
+[ -d $sysconfig_dir ] || sysconfig_dir=$HOME/seagate/etc/default
 
 if [[ $do_mkfs ]] && [[ ! -e $sysconfig_dir/motr-kernel ]]; then
     # Auto-start of `motr-kernel` systemd unit will cause kernel panic
     # unless `MOTR_NODE_UUID` configuration option is provided.
     echo "MOTR_NODE_UUID='$(uuidgen --time)'" |
-        sudo tee $sysconfig_dir/motr-kernel >/dev/null
+        tee $sysconfig_dir/motr-kernel >/dev/null
 fi
 
 wait_active() {
@@ -135,7 +134,7 @@ wait_active() {
     local timeout=$2  # seconds
     local count=0
 
-    while ! systemctl --quiet is-active $svc; do
+    while ! systemctl --user --quiet is-active $svc; do
         (($count < $timeout)) || die "Unable to start $svc service"
         sleep 1
         ((++count))
@@ -166,15 +165,15 @@ wait_m0d_started() {
 }
 
 # Make sure hax is always started.
-sudo mkdir -p /var/motr/hax
-sudo systemctl start hare-hax
+mkdir -p $HOME/seagate/var/motr/hax
+systemctl --user start hare-hax
 wait_active hare-hax 5
 
 if [[ -n $CONFD_IDs && $phase == phase1 ]]; then
-    [[ -f /var/lib/hare/confd.xc ]] ||
-        die 'Cannot bootstrap server node without /var/lib/hare/confd.xc file'
-    sudo mkdir -p /etc/motr
-    sudo cp /var/lib/hare/confd.xc /etc/motr/
+    [[ -f $HOME/seagate/var/lib/hare/confd.xc ]] ||
+        die 'Cannot bootstrap server node without $HOME/seagate/var/lib/hare/confd.xc file'
+    mkdir -p $HOME/seagate/etc/motr
+    cp $HOME/seagate/var/lib/hare/confd.xc $HOME/seagate/etc/motr/
 fi
 
 case $phase in
@@ -203,11 +202,11 @@ wait_m0mkfs_done() {
     local id=$1
     local fid=$(id2fid $id)
 
-    touch /tmp/motr-mkfs-pass-$fid
+    touch $HOME/seagate/tmp/motr-mkfs-pass-$fid
     # Give time for service check to reset m0mkfs' HA state
     # (see utils/check-service also).
-    while [[ -f /tmp/motr-mkfs-pass-$fid ||
-             -f /tmp/motr-mkfs-fail-$fid ||
+    while [[ -f $HOME/seagate/tmp/motr-mkfs-pass-$fid ||
+             -f $HOME/seagate/tmp/motr-mkfs-fail-$fid ||
              $(get-service-health $id) == 'passing' ]]; do
         sleep 1
     done
@@ -219,12 +218,12 @@ wait_m0mkfs_done() {
 for id in $IDs; do
     fid=$(id2fid $id)
     if [[ $do_mkfs ]]; then
-        sudo systemctl start motr-mkfs@$fid
+        systemctl --user start motr-mkfs@$fid
         wait_m0mkfs_done $id
     fi
 
     if [[ $do_mkfs != 'mkfs-only' ]]; then
-        sudo systemctl start $proc$fid
+        systemctl --user start $proc$fid
         if [[ $proc == 'm0d@' ]]; then
             wait_m0d_started $fid 120
         fi

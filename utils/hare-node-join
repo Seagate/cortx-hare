@@ -183,14 +183,14 @@ $debug_p && set -x
 
 cdf=${1:-}
 
-if sudo systemctl --quiet is-active hare-consul-agent; then
+if systemctl --user --quiet is-active hare-consul-agent; then
     die 'hare-consul-agent is active ==> cluster is already running'
 fi
 
 [[ $xprt == 'lnet' ]] || [[ $xprt == 'libfab' ]] || die "Invalid transport type $xprt"
 
 if [[ -z $conf_dir ]]; then
-    conf_dir=/var/lib/hare
+    conf_dir=$HOME/seagate/var/lib/hare
 
     if ! [[ -d $conf_dir ]]; then
         cat <<EOF >&2
@@ -242,7 +242,7 @@ if $conf_create; then
     make_consul_env
 fi
 
-sudo systemctl start hare-consul-agent
+systemctl --user start hare-consul-agent
 
 # Wait for Consul's internal leader to be ready.
 # (Until then the KV store won't be accessible.)
@@ -263,9 +263,9 @@ pids=()
 # number of total Consul agents in the cluster.
 srvnodes=($(get_server_nodes | grep -vw $(node-name)))
 for node in ${srvnodes[@]}; do
-    if ssh -n $node "systemctl --quiet is-active hare-consul-agent"; then
+    if ssh -n $node "systemctl --user --quiet is-active hare-consul-agent"; then
         pids+=($(ssh -n $node \
-                 "systemctl --quiet show --property MainPID hare-consul-agent" |
+                 "systemctl --user --quiet show --property MainPID hare-consul-agent" |
                       cut -d '=' -f2))
     fi
 done
