@@ -762,7 +762,7 @@ class ConsulUtil:
             node_val = self.kv.kv_get(node_key, kv_cache=kv_cache)
             data = node_val['Value']
             node_name: str = json.loads(data)['name']
-            if (self.get_node_health_status(node_name, kv_cache=kv_cache) !=
+            if (self.get_node_health_status(node_name) !=
                     'passing'):
                 obj_state = ObjHealth.OFFLINE.to_ha_note_status()
 
@@ -861,10 +861,8 @@ class ConsulUtil:
             raise HAConsistencyException(
                 'Failed to members data from Consul') from e
 
-    @uses_consul_cache
     def get_node_health_details(
-            self, node: str,
-            kv_cache=None) -> Optional[List[Dict[str, Any]]]:
+            self, node: str) -> Optional[List[Dict[str, Any]]]:
         """
         Returns the list of health checks (as it is reported by Consul, see
         'Health: node' section at
@@ -879,14 +877,13 @@ class ConsulUtil:
             raise HAConsistencyException(
                 f'Failed to get {node} node health: {e}')
 
-    @uses_consul_cache
-    def get_node_health_status(self, node: str, kv_cache=None) -> str:
+    def get_node_health_status(self, node: str) -> str:
         """
         Returns the node health status string returned by Consul.
         Possible return values: passing, warning, critical
         """
         try:
-            node_data = self.get_node_health_details(node, kv_cache=kv_cache)
+            node_data = self.get_node_health_details(node)
             # if not node_data or (not self.is_node_alive(node,
             #                                             kv_cache=kv_cache)):
             if not node_data:
@@ -943,7 +940,6 @@ class ConsulUtil:
             return name
         return None
 
-    @repeat_if_fails()
     @uses_consul_cache
     def get_node_name_by_machineid(self,
                                    machineid: str,
@@ -1342,7 +1338,7 @@ class ConsulUtil:
             if state in (m0HaObjState.M0_NC_TRANSIENT.name,
                          m0HaObjState.M0_NC_FAILED.name):
                 node = self.get_ctrl_node(ctrl_fid, kv_cache=kv_cache)
-                if (self.get_node_health_status(node, kv_cache=kv_cache) ==
+                if (self.get_node_health_status(node) ==
                         'passing'):
                     return m0HaObjState.M0_NC_ONLINE
             else:
@@ -1367,7 +1363,7 @@ class ConsulUtil:
             if state in (m0HaObjState.M0_NC_TRANSIENT.name,
                          m0HaObjState.M0_NC_FAILED.name):
                 node = self.get_encl_node(encl_fid, kv_cache=kv_cache)
-                if (self.get_node_health_status(node, kv_cache=kv_cache) ==
+                if (self.get_node_health_status(node) ==
                         'passing'):
                     return m0HaObjState.M0_NC_ONLINE
             else:
@@ -1389,8 +1385,7 @@ class ConsulUtil:
             LOG.debug('Node=%s state=%s', node_fid, state)
             if state in (m0HaObjState.M0_NC_TRANSIENT.name,
                          m0HaObjState.M0_NC_FAILED.name):
-                if (self.get_node_health_status(node_name,
-                                                kv_cache=kv_cache) ==
+                if (self.get_node_health_status(node_name) ==
                         'passing'):
                     return m0HaObjState.M0_NC_ONLINE
             else:
@@ -1661,21 +1656,19 @@ class ConsulUtil:
         if not proc_node:
             proc_node = self.get_process_node(fid, kv_cache=kv_cache)
         key = f'processes/{fid}'
-        status = self.kv.kv_get(key, kv_cache=kv_cache, allow_null=True)
+        status = self.kv.kv_get(key, allow_null=True)
         if status:
             val = json.loads(status['Value'])
             return MotrConsulProcInfo(val['state'], val['type'])
         else:
             return MotrConsulProcInfo('Unknown', 'Unknown')
 
-    @uses_consul_cache
     def get_process_status_local(self,
                                  proc_fid: Fid,
-                                 proc_node=None,
-                                 kv_cache=None) -> MotrConsulProcInfo:
+                                 proc_node=None) -> MotrConsulProcInfo:
         this_node = self.get_local_nodename()
         key = f'{this_node}/processes/{proc_fid}'
-        status = self.kv.kv_get(key, kv_cache=kv_cache, allow_null=True)
+        status = self.kv.kv_get(key, allow_null=True)
         if status:
             val = json.loads(status['Value'])
             return MotrConsulProcInfo(val['state'], val['type'])
@@ -1779,6 +1772,10 @@ class ConsulUtil:
             cur_consul_status('passing', 'M0_CONF_HA_PROCESS_STARTED'):
             local_remote_health_ret(ObjHealth.OK,
                                     ObjHealth.OK),
+            # It is possible that Consul service status was reported as
+            # warning earlier and now the service is back online.
+            # Thus report the status as ONLINE for now. If the service
+            # goes offline Consul will report the same.
             cur_consul_status('passing', 'M0_CONF_HA_PROCESS_STOPPED'):
             local_remote_health_ret(ObjHealth.OK,
                                     ObjHealth.OK),
@@ -1801,8 +1798,7 @@ class ConsulUtil:
             local_remote_health_ret(ObjHealth.OFFLINE,
                                     ObjHealth.OFFLINE)}
         try:
-            node_data = self.get_node_health_details(
-                node, kv_cache=kv_cache)
+            node_data = self.get_node_health_details(node)
             if not node_data:
                 return ObjHealth.OFFLINE
             node_status = str(node_data[0]['Status'])
