@@ -575,7 +575,8 @@ class ConsulUtil:
 
     def get_svc_status(self, srv_fid: Fid, kv_cache=None) -> str:
         try:
-            return self.get_process_status(srv_fid, kv_cache=kv_cache).proc_status
+            return self.get_process_status(srv_fid,
+                                           kv_cache=kv_cache).proc_status
         except Exception:
             return 'Unknown'
 
@@ -1831,10 +1832,12 @@ class ConsulUtil:
             for item in node_data:
                 if item['ServiceID'] == str(svc_id):
                     pfid = create_process_fid(svc_id)
-                    LOG.debug('item.status %s', item['Status'])
+                    LOG.debug('item.status %s svc id: %s',
+                              item['Status'], str(svc_id))
                     if item['Status'] in ('critical', 'warning'):
                         return ObjHealth.OFFLINE
-                    cns_status = self.get_process_status(pfid, kv_cache=kv_cache)
+                    cns_status = self.get_process_status(pfid,
+                                                         kv_cache=kv_cache)
                     svc_health = svc_to_motr_status_map[MotrConsulProcStatus(
                                          item['Status'],
                                          cns_status.proc_status)]
