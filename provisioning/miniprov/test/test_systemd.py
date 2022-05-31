@@ -45,7 +45,7 @@ After=hare-consul-agent.service motr-kernel.service
 # TODO: '/opt/seagate/cortx/hare' prefix can be different, e.g. '/usr'
 SyslogIdentifier=hare-hax
 Environment=PYTHONPATH=/opt/seagate/cortx/hare/lib64/python3.6/site-packages:/opt/seagate/cortx/hare/lib/python3.6/site-packages
-ExecStart=/bin/sh -c 'cd /var/motr/hax && exec /opt/seagate/cortx/hare/bin/hax'
+ExecStart=/bin/sh -c 'cd $HOME/seagate/var/motr/hax && exec /opt/seagate/cortx/hare/bin/hax'
 KillMode=process'''
         output = HaxUnitTransformer().transform(source.splitlines())
         self.assertEqual(source, '\n'.join(output))

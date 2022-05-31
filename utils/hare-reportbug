@@ -19,14 +19,14 @@
 
 set -eu -o pipefail
 export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
-set -x
+#set -x
 
 # :help: gather Hare forensic data
 
 PROG=${0##*/}
-DEFAULT_DEST_DIR=/tmp
-DEFAULT_LOG_DIR=/var/lib/hare
-DEFAULT_CONF_DIR=/var/log/seagate/hare
+DEFAULT_DEST_DIR=$HOME/seagate/tmp
+DEFAULT_LOG_DIR=$HOME/seagate/var/lib/hare
+DEFAULT_CONF_DIR=$HOME/seagate/var/log/seagate/hare
 
 usage() {
     cat <<EOF
@@ -87,12 +87,12 @@ die() {
 
 systemd_journal() {
     local nr_boots_max=10
-    local nr_boots=$(sudo journalctl --list-boot | wc -l)
+    local nr_boots=$(journalctl --list-boot | wc -l)
     if ((nr_boots > nr_boots_max)); then
         nr_boots=$nr_boots_max
     fi
     for ((i = 0; i < nr_boots; ++i)); do
-        sudo journalctl -b -$i --utc --no-pager > systemd-journal_$i || true
+        journalctl -b -$i --utc --no-pager > systemd-journal_$i || true
     done
 }
 
@@ -127,21 +127,21 @@ exec 2> >(tee _reportbug.stderr >&2)
 if $use_systemd; then
     systemd_journal
 
-    sudo journalctl --no-pager --full --utc --output=json --unit=pacemaker.service \
+    journalctl --no-pager --full --utc --output=json --unit=pacemaker.service \
          > syslog-pacemaker.json || true
 
-    sudo systemctl --all --full --no-pager status {hare,m0,motr,s3}\* \
+    systemctl --user --all --full --no-pager status {hare,m0,motr,s3}\* \
          > systemctl-status.txt || true
 else
     running_process_list
 fi
 
 # cluster status
-sudo timeout --kill-after 30 15 hctl status \
+timeout --kill-after 30 15 hctl status \
      > hctl-status.txt || true
 
-sysconfig_dir='/etc/sysconfig'
-[ -d $sysconfig_dir ] || sysconfig_dir='/etc/default'
+sysconfig_dir=$HOME/seagate/etc/sysconfig
+[ -d $sysconfig_dir ] || sysconfig_dir=$HOME/seagate/etc/default
 
 extra_files=(
     $sysconfig_dir/motr

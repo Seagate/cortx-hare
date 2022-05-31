@@ -1,0 +1,8 @@
+#!/bin/bash
+USER_SYS_DIR=$HOME/.config/systemd/user
+mkdir -p $USER_SYS_DIR
+mkdir -p $HOME/seagate/etc/sysconfig
+find /usr/lib/systemd/ -type f \( -name "motr*" -o -name "hare*"  \
+	-o -name "m0d*" \) | xargs ln -s -t $USER_SYS_DIR
+find /etc/sysconfig/ -type f -name "motr*" | xargs ln -s -t $HOME/seagate/etc/sysconfig
+systemctl --user daemon-reload

@@ -59,7 +59,7 @@ TEMP=$(getopt --options h \
 
 eval set -- "$TEMP"
 
-conf_dir=/var/lib/hare
+conf_dir=$HOME/seagate/var/lib/hare
 xprt='lnet'
 
 while true; do
@@ -82,12 +82,12 @@ fi
 [[ $xprt == 'lnet' ]] || [[ $xprt == 'libfab' ]] || die "Invalid transport type $xprt"
 
 
-if sudo systemctl --quiet is-active hare-consul-agent; then
+if systemctl --user --quiet is-active hare-consul-agent; then
     die 'hare-consul-agent is active ==> cluster is already running'
 fi
 
 say 'Starting Consul agent on this node...'
-sudo systemctl start hare-consul-agent
+systemctl --user start hare-consul-agent
 
 # Wait for Consul's internal leader to be ready.
 # (Until then the KV store won't be accessible.)

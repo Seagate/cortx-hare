@@ -198,9 +198,9 @@ def parse_opts(argv):
         '--conf-dir',
         '-c',
         help='Path to hare config directory. '
-        'Default: /var/lib/hare',
+        'Default: $HOME/seagate/var/lib/hare',
         type=str,
-        default='/var/lib/hare',
+        default='$HOME/seagate/var/lib/hare',
         action='store')
     p.add_argument(
         '--all',

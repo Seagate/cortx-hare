@@ -63,8 +63,8 @@ TEMP=$(getopt --options hnsx: \
 eval set -- "$TEMP"
 
 conf_dir=
-log_dir=/var/log/seagate/hare
-kv_file=/var/lib/hare/consul-kv.json
+log_dir=$HOME/seagate/var/log/seagate/hare
+kv_file=$HOME/seagate/var/lib/hare/consul-kv.json
 dry_run=false
 server=false
 xprt='libfab'
@@ -92,7 +92,7 @@ while true; do
 done
 
 if [[ -z $conf_dir ]]; then
-    conf_dir=/var/lib/hare
+    conf_dir=$HOME/seagate/var/lib/hare
     custom_config=false
 fi
 
@@ -107,7 +107,7 @@ fi
 if $custom_config; then
     sysconfig_dir='sysconfig'
 else
-    sysconfig_dir='/etc/sysconfig'
+    sysconfig_dir=$HOME/seagate/etc/sysconfig
 fi
 
 get_node_name() {
@@ -189,18 +189,18 @@ get_service_host() {
 install_motr_conf() {
     local motr_conf_file=$1
     if $custom_config; then
-        sudo install $motr_conf_file $conf_dir/$sysconfig_dir/motr/$(get_node_name)/
+        install $motr_conf_file $conf_dir/$sysconfig_dir/motr/$(get_node_name)/
     else
-        sudo install $motr_conf_file $sysconfig_dir/
+        install $motr_conf_file $sysconfig_dir/
     fi
 }
 
 install_s3_conf() {
     local s3_conf_file=$1
     if $custom_config; then
-        sudo install $s3_conf_file $conf_dir/$sysconfig_dir/s3/$(get_node_name)/
+        install $s3_conf_file $conf_dir/$sysconfig_dir/s3/$(get_node_name)/
     else
-        sudo install $s3_conf_file $sysconfig_dir/
+        install $s3_conf_file $sysconfig_dir/
     fi
 }
 
@@ -218,9 +218,9 @@ if $custom_config ; then
 fi
 
 if $custom_config ; then
-    [ -d $conf_dir/$sysconfig_dir ] || sysconfig_dir='/etc/default'
+    [ -d $conf_dir/$sysconfig_dir ] || sysconfig_dir=$HOME/seagate/etc/default
 else
-    [ -d $sysconfig_dir ] || sysconfig_dir='/etc/default'
+    [ -d $sysconfig_dir ] || sysconfig_dir=$HOME/seagate/etc/default
 fi
 
 id2fid() {
@@ -312,14 +312,14 @@ append_confd_svc() {
           }
         ]
     }"
-    cat <<EOF | sudo tee /tmp/m0d-$fid > /dev/null
+    cat <<EOF | tee $HOME/seagate/tmp/m0d-$fid > /dev/null
 MOTR_M0D_EP='$ep'
 MOTR_HA_EP='$HAX_EP'
 MOTR_PROCESS_FID='$fid'
-MOTR_CONF_XC='/etc/motr/confd.xc'
+MOTR_CONF_XC='$HOME/seagate/etc/motr/confd.xc'
 MOTR_NODE_UUID='$UUID'
 EOF
-    install_motr_conf /tmp/m0d-$fid
+    install_motr_conf $HOME/seagate/tmp/m0d-$fid
 }
 
 append_ios_svc() {
@@ -350,20 +350,20 @@ append_ios_svc() {
           }
         ]
     }"
-    cat <<EOF | sudo tee /tmp/m0d-$fid > /dev/null
+    cat <<EOF | tee $HOME/seagate/tmp/m0d-$fid > /dev/null
 MOTR_M0D_EP='$ep'
 MOTR_HA_EP='$HAX_EP'
 MOTR_PROCESS_FID='$fid'
 EOF
     if [[ $meta_data ]]; then
-        cat <<EOF | sudo tee -a /tmp/m0d-$fid > /dev/null
+        cat <<EOF | tee -a $HOME/seagate/tmp/m0d-$fid > /dev/null
 MOTR_BE_SEG_PATH='$meta_data'
 EOF
     fi
-    cat <<EOF | sudo tee -a /tmp/m0d-$fid > /dev/null
+    cat <<EOF | tee -a $HOME/seagate/tmp/m0d-$fid > /dev/null
 MOTR_NODE_UUID='$UUID'
 EOF
-    install_motr_conf /tmp/m0d-$fid
+    install_motr_conf $HOME/seagate/tmp/m0d-$fid
 }
 
 append_s3_svc() {
@@ -397,14 +397,14 @@ append_s3_svc() {
     }"
     local first_profile_fid=$(get_profile_from_kv_file)
     [[ -n $first_profile_fid ]]  # assert
-    cat <<EOF | sudo tee /tmp/s3server-$fid > /dev/null
+    cat <<EOF | tee $HOME/seagate/tmp/s3server-$fid > /dev/null
 MOTR_PROFILE_FID=$first_profile_fid
 MOTR_S3SERVER_EP='$ep'
 MOTR_HA_EP='$HAX_EP'
 MOTR_PROCESS_FID='$fid'
 MOTR_S3SERVER_PORT=$s3port
 EOF
-    install_s3_conf /tmp/s3server-$fid
+    install_s3_conf $HOME/seagate/tmp/s3server-$fid
 }
 
 for id in $HAX_ID; do
@@ -425,7 +425,7 @@ for id in $S3_IDs; do
     ((s3port++))
 done
 
-tmpfile=$(mktemp /tmp/${CONF_FILE##*/}.XXXXXX)
+tmpfile=$(mktemp $HOME/seagate/tmp/${CONF_FILE##*/}.XXXXXX)
 trap "rm -f $tmpfile" EXIT # delete automatically on exit
 jq ".services = [$SVCS_CONF]" <$CONF_FILE >$tmpfile
 
@@ -442,12 +442,12 @@ fi
 sed -i "s|TMP_CONF_DIR|$conf_dir|" $tmpfile
 sed -i "s|TMP_LOG_DIR|$log_dir|" $tmpfile
 
-sudo cp $tmpfile $CONF_FILE
+cp $tmpfile $CONF_FILE
 # Copy consul-server-conf for this node to consul dir.
-mkdir -p /etc/consul.d/
-sudo cp $CONF_FILE /etc/consul.d/
+mkdir -p $HOME/seagate/etc/consul.d/
+cp $CONF_FILE $HOME/seagate/etc/consul.d/
 
-sudo sed -r "s;(http://)localhost;\1$(get_node_name);" \
+sed -r "s;(http://)localhost;\1$(get_node_name);" \
          -i $CONF_FILE
 
 consul reload > /dev/null

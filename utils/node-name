@@ -40,7 +40,7 @@ TEMP=$(getopt --options h: \
 
 eval set -- "$TEMP"
 
-conf_dir=/var/lib/hare
+conf_dir=$HOME/seagate/var/lib/hare
 
 while true; do
     case "$1" in

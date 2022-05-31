@@ -102,8 +102,8 @@ fid2id() {
 # warning (offline) status for m0mkfs process to make sure
 # its ha_link is destroyed before m0d process is started.
 if [[ $service =~ m0d ]]; then
-    pass=/tmp/motr-mkfs-pass-$fid
-    fail=/tmp/motr-mkfs-fail-$fid
+    pass=$HOME/seagate/tmp/motr-mkfs-pass-$fid
+    fail=$HOME/seagate/tmp/motr-mkfs-fail-$fid
 
     if [[ -f $pass ]]; then
         rm $pass

@@ -18,6 +18,7 @@
 # please email opensource@seagate.com or cortx-questions@seagate.com.
 
 import logging
+import os
 import re
 import threading
 import argparse
@@ -145,7 +146,8 @@ def processes_by_consul_svc_name(cns: Consul) -> Dict[str, List[Process]]:
             from e
 
 
-def get_node_name(path='/var/lib/hare') -> str:
+def get_node_name(path=os.path.expanduser('~') + '/seagate/var/lib/hare')\
+        -> str:
     with open(f'{path}/node-name') as f:
         return f.readline().strip('\n')
 
@@ -175,13 +177,13 @@ def ssh_prefix(hostname: str) -> str:
 
 def consul_is_active_at(hostname: str) -> bool:
     cmd = ssh_prefix(hostname) + \
-        'sudo systemctl is-active --quiet hare-consul-agent'
+        'systemctl --user is-active --quiet hare-consul-agent'
     return subprocess.call(cmd, shell=True) == 0
 
 
 def pcs_consul_is_active_at(hostname: str) -> bool:
     cmd = ssh_prefix(hostname) + \
-        'sudo systemctl is-active --quiet hare-consul-agent*'
+        'systemctl --user is-active --quiet hare-consul-agent*'
     return subprocess.call(cmd, shell=True) == 0
 
 
@@ -208,7 +210,7 @@ def process_stop(proc: Process) -> None:
     label = f' ({proc.consul_name})' if proc.systemd_name.startswith('m0d@') \
         else ''
     logging.info(f'Stopping {proc.systemd_name}{label} at {proc.node}... ')
-    ok = exec_silent('{}sudo systemctl stop --force {}'.format(
+    ok = exec_silent('{}systemctl --user stop --force {}'.format(
         ssh_prefix(proc.node), proc.systemd_name))
     if ok:
         logging.info(f'Stopped {proc.systemd_name}{label} at {proc.node}')

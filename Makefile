@@ -244,6 +244,10 @@ install: install-dirs install-cfgen install-hax install-miniprov install-systemd
 	@$(call _log,linking h0q -> $(DESTDIR)/usr/bin)
 	@ln -sf /$(PREFIX)/bin/h0q $(DESTDIR)/usr/bin
 	@$(call _log,copying m0trace-prune -> $(ETC_CRON_DIR))
+	@$(call _log,copying preboot-motr-setup -> $(DESTDIR)/$(PREFIX)/bin)
+	@install utils/preboot-motr-setup $(DESTDIR)/$(PREFIX)/bin
+	@$(call _log,linking preboot-motr-setup -> $(DESTDIR)/usr/bin)
+	@ln -sf /$(PREFIX)/bin/preboot-motr-setup $(DESTDIR)/usr/bin
 	@install utils/m0trace-prune $(ETC_CRON_DIR)
 	@for f in provisioning/miniprov/hare_mp/templates/hare.* \
 		  provisioning/setup.yaml \
@@ -567,7 +571,7 @@ RPMSPECS_DIR    := $(RPMBUILD_DIR)/SPECS
 dist: unpack-dhall-bin unpack-dhall-prelude
 	@$(call _info,Generating dist archive)
 	@rm -f $(DIST_FILE)
-	@git archive -v --prefix=cortx-hare/ HEAD -o $(DIST_FILE:.gz=)
+	@tar -cvf $(DIST_FILE:.gz=)  ../cortx-hare
 	@tar --append --verbose --transform 's#^vendor#cortx-hare/vendor#' \
 	     --file=$(DIST_FILE:.gz=) vendor
 	@gzip $(DIST_FILE:.gz=)
@@ -580,6 +584,7 @@ __rpm_pre: dist
 	@cp -v hare.spec $(RPMSPECS_DIR)
 	@chown $$(id -u):$$(id -g) $(RPMSOURCES_DIR)/$(DIST_FILE)
 	@chown $$(id -u):$$(id -g) $(RPMSPECS_DIR)/hare.spec
+	$(info $$TMPDIR is [${TMPDIR}])
 
 .PHONY: __rpm
 __rpm:

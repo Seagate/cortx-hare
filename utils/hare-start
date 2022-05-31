@@ -53,7 +53,7 @@ TEMP=$(getopt --options h \
 
 eval set -- "$TEMP"
 
-conf_dir=/var/lib/hare
+conf_dir=$HOME/seagate/var/lib/hare
 node=false
 xprt='libfab'
 

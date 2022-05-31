@@ -58,7 +58,7 @@ while true; do
     esac
 done
 
-hax_m0_dir=/var/motr/hax
+hax_m0_dir=$HOME/seagate/var/motr/hax
 get_max_files_by_platform() {
     if [[ $(systemd-detect-virt) = none ]]; then
         echo ${default_nr_files_to_prune[physical]}
