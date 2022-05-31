@@ -90,13 +90,16 @@ class ConsumerThread(StoppableThread):
                     ObjHealth.OK),
             (m0HaProcessType.M0_CONF_HA_PROCESS_M0D,
                 m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED): (
-                    ObjHealth.FAILED),
+                    ObjHealth.OFFLINE),
             (m0HaProcessType.M0_CONF_HA_PROCESS_OTHER,
                 m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED): (
+                    ObjHealth.RECOVERING),
+            (m0HaProcessType.M0_CONF_HA_PROCESS_OTHER,
+                m0HaProcessEvent.M0_CONF_HA_PROCESS_DTM_RECOVERED): (
                     ObjHealth.OK),
             (m0HaProcessType.M0_CONF_HA_PROCESS_OTHER,
                 m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED): (
-                    ObjHealth.FAILED)}
+                    ObjHealth.OFFLINE)}
         LOG.debug('chp_type=%d chp_event=%d',
                   event.chp_type, event.chp_event)
         if event.chp_event in (
