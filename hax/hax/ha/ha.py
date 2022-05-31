@@ -81,10 +81,11 @@ class Ha():
             # when node is offline, rc node sends the offline event.
             resource_id = cns.get_machineid_by_nodename(node_name)
 
-            resource = Resource(type=ObjT.NODE,
-                                id=resource_id,
-                                name=node_name,
-                                status=state)
+            if resource_id:
+                resource = Resource(type=ObjT.NODE,
+                                    id=resource_id,
+                                    name=node_name,
+                                    status=state)
         return resource
 
     def broadcast(self, ha_states: List[HAState]) -> None:
