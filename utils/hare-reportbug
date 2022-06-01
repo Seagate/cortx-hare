@@ -157,7 +157,7 @@ done
 cp --parents $conf_dir/* . 2>/dev/null || true
 cp -r --parents $conf_dir/consul-{env,server,client}-* . 2>/dev/null || true
 cp -r --parents $log_dir/ . 2>/dev/null || true
-cp -r --parents /var/log/cluster/ . 2>/dev/null || true
+cp -r --parents $HOME/seagate/var/log/cluster/ . 2>/dev/null || true
 
 cd ..
 

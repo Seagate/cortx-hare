@@ -299,13 +299,17 @@ def execute(cmd: List[str], env=None) -> str:
 
 
 def execute_no_communicate(cmd: List[str], env=None,
-                           working_dir: str = '/var/log/cortx/hare',
+                           working_dir: str =
+                           '/var/log/cortx/hare',
                            out_file=subprocess.PIPE):
+
+    HOME = os.getenv('HOME', '')
+    HOME += '/seagate'
     process = subprocess.Popen(cmd,
                                stdin=subprocess.PIPE,
                                stdout=out_file,
                                stderr=out_file,
-                               cwd=working_dir,
+                               cwd=(HOME + working_dir),
                                close_fds=False,
                                encoding='utf8',
                                env=env)

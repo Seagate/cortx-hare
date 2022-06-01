@@ -125,7 +125,7 @@ Exit codes: 0 if no issues found, 1 otherwise.
 
 #### config
 ```
-/opt/seagate/cortx/hare/bin/hare_setup config --config 'json:///tmp/exampleV2.json' --file '/var/lib/hare/cluster.yaml'
+/opt/seagate/cortx/hare/bin/hare_setup config --config 'json:///tmp/exampleV2.json' --file '$HOME/seagate/var/lib/hare/cluster.yaml'
 ```
 1. Generates CDF file according to the configuration provided by <str> (URL) parameter.
 2. Applies configuration to Consul.

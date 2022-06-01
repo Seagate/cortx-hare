@@ -171,8 +171,8 @@ def logrotate_generic(url: str):
         log_dir = get_log_dir(url)
         content = content.replace('TMP_LOG_PATH',
                                   log_dir)
-
-        with open('/etc/logrotate.d/hare', 'w') as f:
+        HOME = os.getenv('HOME', '')
+        with open(HOME + '/seagate/etc/logrotate.d/hare', 'w') as f:
             f.write(content)
 
     except Exception as error:
@@ -197,8 +197,8 @@ def logrotate(url: str):
             log_dir = get_log_dir(url)
             content = content.replace('TMP_LOG_PATH',
                                       log_dir)
-
-            with open('/etc/logrotate.d/hare', 'w') as f:
+            HOME = os.getenv('HOME', '')
+            with open(HOME + '/seagate/etc/logrotate.d/hare', 'w') as f:
                 f.write(content)
 
     except Exception as error:
@@ -426,7 +426,8 @@ def start_mkfs(proc_to_start: ProcessStartInfo) -> int:
 @func_log(func_enter, func_leave)
 def start_mkfs_parallel(hostname: str, hare_config_dir: str):
     # TODO: path needs to be updated according to the new conf-store key
-    sysconfig_dir = '$HOME/seagate/etc/sysconfig/'
+    HOME = os.getenv('HOME', '')
+    sysconfig_dir = HOME + '/seagate/etc/sysconfig/'
     src = f'{hare_config_dir}/sysconfig/motr/{hostname}'
     for file in os.listdir(src):
         shutil.copy(os.path.join(src, file), sysconfig_dir)
