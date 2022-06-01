@@ -2033,7 +2033,7 @@ class ConsulUtil:
                 started_processes += 1
         LOG.debug('total procs=%s, started procs=%s', total_processes,
                   started_processes)
-        fin_state = 'degarded'
+        fin_state = 'degraded'
         if total_processes == started_processes:
             fin_state = 'online'
         elif started_processes == 0:
