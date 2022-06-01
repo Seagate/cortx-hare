@@ -574,8 +574,7 @@ class ConsulUtil:
 
     def get_svc_status(self, srv_fid: Fid, kv_cache=None) -> str:
         try:
-            return self.get_process_status(srv_fid,
-                                           kv_cache=kv_cache).proc_status
+            return self.get_process_status(srv_fid, kv_cache=kv_cache).proc_status
         except Exception:
             return 'Unknown'
 
@@ -1777,8 +1776,8 @@ class ConsulUtil:
             # Thus report the status as ONLINE for now. If the service
             # goes offline Consul will report the same.
             cur_consul_status('passing', 'M0_CONF_HA_PROCESS_STOPPED'):
-            local_remote_health_ret(ObjHealth.OK,
-                                    ObjHealth.OK),
+            local_remote_health_ret(ObjHealth.UNKNOWN,
+                                    ObjHealth.UNKNOWN),
             cur_consul_status('passing', 'Unknown'):
             local_remote_health_ret(ObjHealth.OFFLINE,
                                     ObjHealth.OFFLINE),
@@ -1812,8 +1811,7 @@ class ConsulUtil:
                     LOG.debug('item.status %s', item['Status'])
                     if item['Status'] in ('critical', 'warning'):
                         return ObjHealth.OFFLINE
-                    cns_status = self.get_process_status(pfid,
-                                                         kv_cache=kv_cache)
+                    cns_status = self.get_process_status(pfid, kv_cache=kv_cache)
                     svc_health = svc_to_motr_status_map[MotrConsulProcStatus(
                                          item['Status'],
                                          cns_status.proc_status)]
