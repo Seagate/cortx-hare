@@ -89,8 +89,7 @@ class MessageBusInterface(MessageInterface):
             raise Exception('initialize_bus skipped as configpath not found')
 
     def send(self, event: HaEvent):
-        event_to_send = json.dumps(event)
-        self.producer.send([event_to_send])
+        self.producer.send([event])
 
     def _register_message_type(self, message_type,
                                partitions: int = 1):
