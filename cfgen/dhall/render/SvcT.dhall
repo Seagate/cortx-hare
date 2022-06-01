@@ -44,5 +44,6 @@ in
     , M0_CST_M0T1FS  = "M0_CST_M0T1FS"
     , M0_CST_CLIENT  = "M0_CST_CLIENT"
     , M0_CST_ISCS    = "M0_CST_ISCS"
+    , M0_CST_DTM0    = "M0_CST_DTM0"
     }
     x

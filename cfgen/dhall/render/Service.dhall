@@ -24,6 +24,11 @@ let types = ../types.dhall
 
 let named = ./RNamed.dhall
 
+let quotedTextSet
+  = \(xs : List Text)
+ ->
+    ./List.dhall Text Text/show xs
+
 in
 \(x : types.Service) ->
     "("
@@ -31,7 +36,7 @@ in
       [ ./Oid.dhall x.id
       , named.TextUnquoted "type" ("@" ++ ./SvcT.dhall x.type)
       , named.Texts "endpoints" [x.endpoint]
-      , "params=[]"
+      , "params=" ++ quotedTextSet x.params
       , named.Oids "sdevs" x.sdevs
       ]
  ++ ")"
