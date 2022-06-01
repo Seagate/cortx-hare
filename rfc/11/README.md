@@ -743,7 +743,7 @@ Services:
 ##### Restarting services on a node without regenerating configuration for the node
 
 ```
-[root@ssc-vm-c-0552 cortx-hare]# hctl node-join --conf-dir /var/lib/hare --consul-addr 192.168.9.107 --consul-port 8500
+[root@ssc-vm-c-0552 cortx-hare]# hctl node-join --conf-dir $HOME/seagate/var/lib/hare --consul-addr 192.168.9.107 --consul-port 8500
 2020-09-18 10:10:52: Starting Consul server agent on this node.... OK
 2020-09-18 10:10:54: Updating Consul agents configs from the KV store... OK
 2020-09-18 10:10:54: Waiting for the RC Leader to get elected... OK

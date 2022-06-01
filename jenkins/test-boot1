@@ -46,7 +46,7 @@ test_cluster() {
     hctl reportbug
     time hctl shutdown
 
-    time hctl bootstrap --conf-dir /var/lib/hare  # bootstrap on existing conf
+    time hctl bootstrap --conf-dir $HOME/seagate/var/lib/hare  # bootstrap on existing conf
     do_io cdf
     hctl reportbug bundle-id /tmp
     time hctl shutdown

@@ -209,10 +209,10 @@ You will probably need to modify `host`, `data_iface`, and `io_disks` values.
 
 * Sometimes it is convenient to use loop devices instead of actual disks:
   ```bash
-  sudo mkdir -p /var/motr
+  mkdir -p  $HOME/seagate/var/motr
   for i in {0..9}; do
-      sudo dd if=/dev/zero of=/var/motr/disk$i.img bs=1M seek=9999 count=1
-      sudo losetup /dev/loop$i /var/motr/disk$i.img
+      dd if=/dev/zero of= $HOME/seagate/var/motr/disk$i.img bs=1M seek=9999 count=1
+      losetup /dev/loop$i  $HOME/seagate/var/motr/disk$i.img
   done
   ```
 

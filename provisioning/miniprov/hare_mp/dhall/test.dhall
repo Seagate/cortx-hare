@@ -19,7 +19,7 @@ in  genCdf
         , machine_id = "8efd697708a8f7e428d3fd520c180795"
         , data_iface = "eth3"
         , data_iface_type = P.tcp
-        , io_disks = [ "/var/log", "/mnt/testme" ]
+        , io_disks = [ "$HOME/seagate/var/log", "/mnt/testme" ]
         }
       , { hostname = "srvnode-1"
         , machine_id = "8efd697708a8f7e428d3fd520c180796"

@@ -1,4 +1,4 @@
-/var/log/seagate/hare/*.log
+$HOME/seagate/var/log/seagate/hare/*.log
 {
     rotate 10
     maxsize 50M
