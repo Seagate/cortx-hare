@@ -29,6 +29,7 @@ from functools import wraps
 from distutils.dir_util import copy_tree
 import shutil
 from time import sleep
+from urllib.parse import urlparse
 
 from cortx.utils.cortx import Const
 from hax.util import repeat_if_fails, KVAdapter
@@ -333,10 +334,16 @@ class Utils:
     @func_log(func_enter, func_leave)
     @repeat_if_fails()
     def save_ssl_config(self):
+        url = self.provider.get('cortx>hare>hax>endpoints', allow_null=True)
+        http_protocol = 'http'
+        for u in url or ():
+            scheme = urlparse(u).scheme
+            if scheme in ('http', 'https'):
+                http_protocol = scheme
+                break
         cert_path = self.provider.get('cortx>common>security>ssl_certificate')
-        ssl_enabled = cert_path and os.path.exists(cert_path)
         ssl_hax = json.dumps({
-            'http_protocol': ssl_enabled and "https" or "http",
+            'http_protocol': http_protocol,
             'cert_path': cert_path,
             'key_path': cert_path,
         })
