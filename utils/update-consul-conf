@@ -144,6 +144,14 @@ get_service_ids_from_kv_file() {
     eval $cmd || true
 }
 
+get_all_service_ids_from_kv_file() {
+    local filter=$1
+    local key="m0conf/nodes/*"
+    local cmd="jq -r '.[] | select(.key|test(\"$key\"))' $kv_file |
+                  $filter | sed 's/.*processes.//' | cut -d/ -f1"
+    eval $cmd || true
+}
+
 get_service_ep_from_kv_file() {
     local process_fidk=$1
     local key="m0conf/nodes/$(get_node_name)/processes/$process_fidk/endpoint"
@@ -161,6 +169,12 @@ get_profile_from_kv_file() {
 get_hax_http_port_from_kv_file() {
     local cmd="jq -r '.[] | select (.key==\"ports/$(get_node_name)/hax\") | .value' $kv_file | jq -r '.http'"
     eval $cmd || true
+}
+
+get_hax_ssl_config() {
+    local cmd="consul kv get ssl/hax"
+    # Avoid printing error message if the key does not exist
+    eval $cmd 2>/dev/null || true
 }
 
 get_service_addr() {
@@ -241,6 +255,7 @@ id2fid() {
 }
 
 HAX_ID=$(get_service_ids_from_kv_file 'grep -iw "services\/ha"')
+HAX_ID_ALL=$(get_all_service_ids_from_kv_file 'grep -iw "services\/ha"')
 [[ $HAX_ID ]] || {
     cat >&2 <<.
 Cannot get information about Hax from Consul for this host ($(get_node_name)).
@@ -250,7 +265,9 @@ Please verify that the host name matches the one stored in the Consul KV.
     exit 1
 }
 CONFD_IDs=$(get_service_ids_from_kv_file 'grep -iw "services\/confd"')
+CONFD_IDs_ALL=$(get_all_service_ids_from_kv_file 'grep -iw "services\/confd"')
 IOS_IDs=$(get_service_ids_from_kv_file 'grep -iw "services\/ios"')
+IOS_IDs_ALL=$(get_all_service_ids_from_kv_file 'grep -iw "services\/ios"')
 
 MOTR_CLIENT_TYPES=$(get_motr_client_types)
 
@@ -259,6 +276,14 @@ for motr_client_type in $MOTR_CLIENT_TYPES; do
     ids=$(get_service_ids_from_kv_file "grep -iw \"services\/$motr_client_type\"")
     for client_id in $ids; do
         MOTR_CLIENT_IDS+="${motr_client_type}:${client_id} "
+    done
+done
+
+MOTR_CLIENT_IDS_ALL=
+for motr_client_type in $MOTR_CLIENT_TYPES; do
+    ids=$(get_all_service_ids_from_kv_file "grep -iw \"services\/$motr_client_type\"")
+    for client_id in $ids; do
+        MOTR_CLIENT_IDS_ALL+="${motr_client_type}:${client_id} "
     done
 done
 
@@ -288,6 +313,13 @@ fi
 SVCS_CONF=''
 
 hax_http_port=$(get_hax_http_port_from_kv_file)
+hax_ssl_config=$(get_hax_ssl_config)
+hax_http_protocol=$(jq -r ".http_protocol" <<<$hax_ssl_config)
+if [[ "$hax_http_protocol" != "https" ]]; then
+    hax_http_protocol="http"
+fi
+hax_ssl_cert_path=$(jq -r ".cert_path" <<<$hax_ssl_config)
+hax_ssl_key_path=$(jq -r ".key_path" <<<$hax_ssl_config)
 
 append_hax_svc() {
     local id=$1
@@ -303,7 +335,10 @@ append_hax_svc() {
       \"meta\":
           {
             \"transport_type\": \"$xprt\",
-            \"http_port\": \"$hax_http_port\"
+            \"http_port\": \"$hax_http_port\",
+            \"http_protocol\": \"$hax_http_protocol\",
+            \"ssl_cert_path\": \"$hax_ssl_cert_path\",
+            \"ssl_key_path\": \"$hax_ssl_key_path\"
           },
       \"checks\": [
           {
@@ -485,8 +520,9 @@ append_hax_svc_watch() {
                           "key": $k,
                           "handler_type": "http",
                           "http_handler_config": {
-                          "path": "http://localhost:HAX_HTTP_PORT/watcher/processes",
+                          "path": "HAX_HTTP_PROTOCOL://localhost:HAX_HTTP_PORT/watcher/processes",
                           "method": "POST",
+                          "tls_skip_verify": true,
                           "timeout": "10s"}}]' $tmpfile > $tmpfile.tmp && mv -f $tmpfile.tmp $tmpfile
 }
 
@@ -499,8 +535,9 @@ append_confd_svc_watch() {
                           "key": $k,
                           "handler_type": "http",
                           "http_handler_config": {
-                          "path": "http://localhost:HAX_HTTP_PORT/watcher/processes",
+                          "path": "HAX_HTTP_PROTOCOL://localhost:HAX_HTTP_PORT/watcher/processes",
                           "method": "POST",
+                          "tls_skip_verify": true,
                           "timeout": "10s"}}]' $tmpfile > $tmpfile.tmp && mv -f $tmpfile.tmp $tmpfile
 }
 
@@ -513,8 +550,9 @@ append_ios_svc_watch() {
                           "key": $k,
                           "handler_type": "http",
                           "http_handler_config": {
-                          "path": "http://localhost:HAX_HTTP_PORT/watcher/processes",
+                          "path": "HAX_HTTP_PROTOCOL://localhost:HAX_HTTP_PORT/watcher/processes",
                           "method": "POST",
+                          "tls_skip_verify": true,
                           "timeout": "10s"}}]' $tmpfile > $tmpfile.tmp && mv -f $tmpfile.tmp $tmpfile
 }
 
@@ -527,24 +565,25 @@ append_motr_client_watch() {
                           "key": $k,
                           "handler_type": "http",
                           "http_handler_config": {
-                          "path": "http://localhost:HAX_HTTP_PORT/watcher/processes",
+                          "path": "HAX_HTTP_PROTOCOL://localhost:HAX_HTTP_PORT/watcher/processes",
                           "method": "POST",
+                          "tls_skip_verify": true,
                           "timeout": "10s"}}]' $tmpfile > $tmpfile.tmp && mv -f $tmpfile.tmp $tmpfile
 }
 
-for id in $HAX_ID; do
+for id in $HAX_ID_ALL; do
     append_hax_svc_watch $id
 done
 
-for id in $CONFD_IDs; do
+for id in $CONFD_IDs_ALL; do
     append_confd_svc_watch $id
 done
 
-for id in $IOS_IDs; do
+for id in $IOS_IDs_ALL; do
     append_ios_svc_watch $id
 done
 
-for id in $MOTR_CLIENT_IDS; do
+for id in $MOTR_CLIENT_IDS_ALL; do
     proc=$(echo $id| cut -d':' -f 1)
     client_id=$(echo $id| cut -d':' -f 2)
     append_motr_client_watch $client_id
@@ -552,6 +591,7 @@ done
 
 sed -i "s|TMP_CONF_DIR|$conf_dir|" $tmpfile
 sed -i "s|TMP_LOG_DIR|$log_dir|" $tmpfile
+sed -i "s|HAX_HTTP_PROTOCOL|$hax_http_protocol|" $tmpfile
 sed -i "s|HAX_HTTP_PORT|$hax_http_port|" $tmpfile
 
 sudo cp $tmpfile $CONF_FILE
@@ -559,7 +599,7 @@ sudo cp $tmpfile $CONF_FILE
 mkdir -p /etc/consul.d/
 sudo cp $CONF_FILE /etc/consul.d/
 
-sudo sed -r "s;(http://)localhost;\1$(get_node_name);" \
+sudo sed -r "s;($hax_http_protocol://)localhost;\1$(get_node_name);" \
          -i $CONF_FILE
 
 consul reload > /dev/null
