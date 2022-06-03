@@ -1,6 +1,9 @@
 {
   "server": true,
   "leave_on_terminate": true,
+  "limits": {
+    "http_max_conns_per_client": 800
+  },
   "watches": [
     {
       "type": "keyprefix",
