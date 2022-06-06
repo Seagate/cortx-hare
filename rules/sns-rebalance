@@ -63,7 +63,7 @@ get_hax_node_name() {
 }
 
 get_hax_port() {
-    consul kv get ports/hax | jq -r .http
+    consul kv get ports/$(get_hax_node_name)/hax | jq -r .http
 }
 
 get_hax_http_protocol() {
