@@ -32,14 +32,73 @@ from hax.types import (Fid, HaNoteStruct, HAState, MessageId,
 from hax.util import (FidWithType, PutKV, ConsulUtil)
 from hax.consul.cache import InvocationCache
 
-def _has_failed_note(notes, fid):
+def _has_note(notes, fid):
     for n in notes:
         if (n.no_state == ObjHealth.FAILED.to_ha_note_status()
                 and n.no_id.f_container == fid.container
                 and n.no_id.f_key == fid.key):
             return True
+        elif (n.no_state == ObjHealth.REPAIR.to_ha_note_status()
+                and n.no_id.f_container == fid.container
+                and n.no_id.f_key == fid.key):
+            return True
+        elif (n.no_state == ObjHealth.REPAIRED.to_ha_note_status()
+                and n.no_id.f_container == fid.container
+                and n.no_id.f_key == fid.key):
+            return True
     return False
 
+def _test_drive_states(self, Process_state, drive_state):
+    consul_util = ConsulUtil()
+    consul_cache = InvocationCache()
+    ffi = Mock(spec=['init_motr_api'])
+    motr = Motr(ffi, None, None, consul_util)
+    planner = WorkPlanner()
+    herald = DeliveryHerald()
+    herald.wait_for_any = Mock()
+
+    bqprocessor = BQProcessor(planner, herald, consul_util)
+
+    svc_name = 'hax'
+    drive_fid = Fid(0x6b00000000000001, 0x11)
+    hax_fid = Fid(0x7200000000000001, 0x6)
+
+    def fake_add(cmd):
+        if isinstance(cmd, BroadcastHAStates):
+            motr.broadcast_ha_states(cmd.states, kv_cache=consul_cache)
+        if hasattr(cmd, 'reply_to') and cmd.reply_to:
+            cmd.reply_to.put([MessageId(0, 0)])
+
+    planner.add_command = Mock(side_effect=fake_add)
+
+    payload = {
+        "node": "ssc-vm-g2-rhev4-1947.colo.seagate.com",
+        "source_type": "drive",
+        "device": "/dev/sdd",
+        "state": Process_state
+    }
+    # Set mock return values for the necessary Consul calls
+    consul_util.drive_to_sdev_fid = Mock(return_value=drive_fid)
+    consul_util.get_hax_fid = Mock(return_value=hax_fid)
+    consul_util._local_service_by_name = Mock(return_value=svc_name)
+
+    # We'll use these mocks to check that expected updates are happening.
+    consul_util.update_drive_state = Mock()
+    motr._ha_broadcast = Mock()
+
+    # Send the mock event for drive failure.
+    bqprocessor.handle_device_state_set(payload)
+
+    # ConsulUtil is responsible for the actual KV updates, just check
+    # here that the appropriate util function is called for drive state
+    # update.
+    consul_util.update_drive_state.assert_called_with(
+        [drive_fid],
+        drive_state,
+        kv_cache=consul_cache)
+
+    broadcast_list = motr._ha_broadcast.call_args[0][0]
+    self.assertTrue(_has_note(broadcast_list, drive_fid))
 
 LOG = logging.getLogger('hax')
 
@@ -142,61 +201,22 @@ class TestFailure(unittest.TestCase):
 
         # Check hax broadcast. We should see states updated to FAILED.
         broadcast_list = motr._ha_broadcast.call_args[0][0]
-        self.assertTrue(_has_failed_note(broadcast_list, node_fid))
-        self.assertTrue(_has_failed_note(broadcast_list, encl_fid))
-        self.assertTrue(_has_failed_note(broadcast_list, ctrl_fid))
-        self.assertTrue(_has_failed_note(broadcast_list, process_fid))
-        self.assertTrue(_has_failed_note(broadcast_list, service_fid))
-        self.assertTrue(_has_failed_note(broadcast_list, drive_fid))
+        self.assertTrue(_has_note(broadcast_list, node_fid))
+        self.assertTrue(_has_note(broadcast_list, encl_fid))
+        self.assertTrue(_has_note(broadcast_list, ctrl_fid))
+        self.assertTrue(_has_note(broadcast_list, process_fid))
+        self.assertTrue(_has_note(broadcast_list, service_fid))
+        self.assertTrue(_has_note(broadcast_list, drive_fid))
 
-    def test_drive_failure(self):
-        consul_util = ConsulUtil()
-        consul_cache = InvocationCache()
-        ffi = Mock(spec=['init_motr_api'])
-        motr = Motr(ffi, None, None, consul_util)
-        planner = WorkPlanner()
-        herald = DeliveryHerald()
-        herald.wait_for_any = Mock()
+    def test_sns_repair(self):
+        Process_state = "failed"
+        drive_state = ObjHealth.FAILED
+        _test_drive_states(self, Process_state, drive_state)
 
-        bqprocessor = BQProcessor(planner, herald, consul_util)
-        
-        svc_name = 'hax'
-        drive_fid = Fid(0x6b00000000000001, 0x11)
-        hax_fid = Fid(0x7200000000000001, 0x6)
-        
-        def fake_add(cmd):
-            if isinstance(cmd, BroadcastHAStates):
-                motr.broadcast_ha_states(cmd.states, kv_cache=consul_cache)
-            if hasattr(cmd, 'reply_to') and cmd.reply_to:
-                cmd.reply_to.put([MessageId(0, 0)])
-                
-        planner.add_command = Mock(side_effect=fake_add)
+        Process_state = "repair"
+        drive_state = ObjHealth.REPAIR
+        _test_drive_states(self, Process_state, drive_state)
 
-        payload = {
-                "node" : "ssc-vm-g2-rhev4-1947.colo.seagate.com",
-                "source_type" : "drive",
-                "device" : "/dev/sdd",
-                "state" : "failed"
-                }
-        # Set mock return values for the necessary Consul calls
-        consul_util.drive_to_sdev_fid = Mock(return_value=drive_fid)
-        consul_util.get_hax_fid = Mock(return_value=hax_fid)
-        consul_util._local_service_by_name = Mock(return_value=svc_name)
-        
-        # We'll use these mocks to check that expected updates are happening.
-        consul_util.update_drive_state = Mock()
-        motr._ha_broadcast = Mock()
-
-        # Send the mock event for drive failure.
-        bqprocessor.handle_device_state_set(payload)
-
-        # ConsulUtil is responsible for the actual KV updates, just check
-        # here that the appropriate util function is called for drive state
-        # update.
-        consul_util.update_drive_state.assert_called_with(
-                [drive_fid],
-                ObjHealth.FAILED,
-                kv_cache=consul_cache)
-
-        broadcast_list = motr._ha_broadcast.call_args[0][0]
-        self.assertTrue(_has_failed_note(broadcast_list, drive_fid))
+        Process_state = "repaired"
+        drive_state = ObjHealth.REPAIRED
+        _test_drive_states(self, Process_state, drive_state)
