@@ -1,5 +1,6 @@
 nodes:
   - hostname: ssu1
+    node_group: ssu1
     data_iface: eth1
     transport_type: libfab
     m0_servers:
@@ -18,6 +19,7 @@ nodes:
       - name: m0_client_other  # name of the motr client
         instances: 2   # Number of instances, this host will run
   - hostname: ssu2
+    node_group: ssu2
     data_iface: eth1
     transport_type: libfab
     m0_servers:
@@ -36,6 +38,7 @@ nodes:
       - name: m0_client_other  # name of the motr client
         instances: 2   # Number of instances, this host will run
   - hostname: ssu3
+    node_group: ssu3
     data_iface: eth1
     transport_type: libfab
     m0_servers:

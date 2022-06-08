@@ -38,6 +38,7 @@ let ServerPort =
 
 let NodeInfo =
       { hostname : Text
+      , node_group : Optional Text
       , machine_id : Optional Text
       , processorcount : Optional Natural
       , memorysize_mb : Optional Double
@@ -85,6 +86,7 @@ let toNodeDesc
     : NodeInfo -> T.NodeDesc
     =     \(n : NodeInfo)
       ->  { hostname = n.hostname
+          , node_group = n.node_group
           , machine_id = n.machine_id
           , processorcount = n.processorcount
           , memorysize_mb = n.memorysize_mb

@@ -3,6 +3,7 @@
 
 nodes:
   - hostname: pod-c1        # [user@]hostname
+    node_group: pod-c1
     data_iface: eth1_c1     # name of data network interface
     data_iface_type: o2ib   # LNet type of network interface (optional);
                             # supported values: "tcp" (default), "o2ib"
@@ -21,6 +22,7 @@ nodes:
       - name: m0_client_other  # name of the motr client
         instances: 2   # Number of instances, this host will run
   - hostname: pod-c2
+    node_group: pod-c2
     data_iface: eth1_c2
     data_iface_type: o2ib
     transport_type: libfab

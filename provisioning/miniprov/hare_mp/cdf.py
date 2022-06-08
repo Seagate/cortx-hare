@@ -128,8 +128,14 @@ class CdfGenerator:
             if machine not in machines:
                 machines.append(machine)
 
+        is_node_group_supported: bool = False
+        local_node_group = self.utils.get_node_group(conf.get_machine_id(),
+                                                     allow_null=True)
+
+        if local_node_group:
+            is_node_group_supported = True
         for machine in machines:
-            nodes.append(self._create_node(machine))
+            nodes.append(self._create_node(machine, is_node_group_supported))
         return nodes
 
     # cluster>storage_set[N]>durability>{type}>data/parity/spare
@@ -495,14 +501,17 @@ class CdfGenerator:
                         name=Text(name),
                         instances=no_instances)
 
-    def _create_node(self, machine_id: str) -> NodeDesc:
+    def _create_node(self, machine_id: str,
+                     is_node_group_supported: bool) -> NodeDesc:
         store = self.provider
 
         hostname = self.utils.get_hostname(machine_id)
-        # node>{machine-id}>name
+        node_group = None
         iface = self._get_iface(machine_id)
         servers = None
         if(self.utils.is_motr_io_present(machine_id)):
+            if is_node_group_supported:
+                node_group = self.utils.get_node_group(machine_id)
             # Currently, there is 1 m0d per cvg.
             # We will create 1 IO service entry in CDF per cvg.
             # An IO service entry will use data  and metadat devices
@@ -543,6 +552,7 @@ class CdfGenerator:
 
         return NodeDesc(
             hostname=Text(hostname),
+            node_group=Maybe(Text(str(node_group)), 'Text'),
             machine_id=Maybe(Text(machine_id), 'Text'),
             processorcount=Maybe(node_facts['processorcount'], 'Natural'),
             memorysize_mb=Maybe(node_facts['memorysize_mb'], 'Double'),

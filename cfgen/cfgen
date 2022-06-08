@@ -179,6 +179,7 @@ class ShowSchema(argparse.Action):
 create_aux: <bool> # optional, defaults to false if not present in CDF
 nodes:
   - hostname: <str>    # [user@]hostname; e.g., localhost, pod-c1
+    node_group: <str>  # name of the node_group in which this node is present
     data_iface: <str>  # name of network interface; e.g., eth1, eth1:c1
     data_iface_type: tcp|o2ib  # type of network interface;
                                # optional, defaults to "tcp"

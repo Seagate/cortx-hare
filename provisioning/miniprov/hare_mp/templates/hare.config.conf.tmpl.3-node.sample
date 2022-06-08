@@ -38,6 +38,7 @@
       "cluster_id": "my-cluster",
       "hostname": "ssc-vm-1623.colo.seagate.com",
       "name": "srvnode-1",
+      "node_group": "ssc-vm-1623.colo.seagate.com",
       "type": "storage_node",
       "components": [
         { "name": "hare" },
@@ -86,6 +87,7 @@
       "cluster_id": "my-cluster",
       "hostname": "ssc-vm-1624.colo.seagate.com",
       "name": "srvnode-2",
+      "node_group": "ssc-vm-1624.colo.seagate.com",
       "type": "storage_node",
       "network": {
         "data": {
@@ -129,6 +131,7 @@
       "cluster_id": "my-cluster",
       "hostname": "ssc-vm-1625.colo.seagate.com",
       "name": "srvnode-3",
+      "node_group": "ssc-vm-1625.colo.seagate.com",
       "type": "storage_node",
       "network": {
         "data": {

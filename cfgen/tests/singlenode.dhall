@@ -26,6 +26,7 @@ in
 , nodes =
     [ { hostname = "localhost"
       , machine_id = None Text
+      , node_group = Some "localhost"
       , memorysize_mb = None Double
       , processorcount = None Natural
       , transport_type = "libfab"

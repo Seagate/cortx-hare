@@ -133,6 +133,7 @@ class NetworkPorts(DhallTuple):
 @dataclass(repr=False)
 class NodeDesc(DhallTuple):
     hostname: Text
+    node_group: Maybe[Text]
     machine_id: Maybe[Text]
     processorcount: Maybe[int]
     memorysize_mb: Maybe[int]
