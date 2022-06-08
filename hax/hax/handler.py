@@ -90,7 +90,7 @@ class ConsumerThread(StoppableThread):
                     ObjHealth.OK),
             (m0HaProcessType.M0_CONF_HA_PROCESS_M0D,
                 m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED): (
-                    ObjHealth.OFFLINE),
+                    ObjHealth.FAILED),
             (m0HaProcessType.M0_CONF_HA_PROCESS_OTHER,
                 m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED): (
                     ObjHealth.RECOVERING),
@@ -99,7 +99,7 @@ class ConsumerThread(StoppableThread):
                     ObjHealth.OK),
             (m0HaProcessType.M0_CONF_HA_PROCESS_OTHER,
                 m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED): (
-                    ObjHealth.OFFLINE)}
+                    ObjHealth.FAILED)}
         LOG.debug('chp_type=%d chp_event=%d',
                   event.chp_type, event.chp_event)
         if event.chp_event in (
@@ -116,7 +116,8 @@ class ConsumerThread(StoppableThread):
                     m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED and
                     (event.chp_type ==
                      m0HaProcessType.M0_CONF_HA_PROCESS_M0D) and
-                    self.consul.is_process_confd(event.fid)):
+                    self.consul.is_process_confd(event.fid) or
+                    event.fid == self.consul.get_hax_fid()):
                 svc_status = ObjHealth.OK
             broadcast_hax_only = False
             if ((event.chp_type ==

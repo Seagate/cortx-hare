@@ -1797,8 +1797,8 @@ class ConsulUtil:
             # Thus report the status as ONLINE for now. If the service
             # goes offline Consul will report the same.
             cur_consul_status('passing', 'M0_CONF_HA_PROCESS_STOPPED'):
-            local_remote_health_ret(ObjHealth.UNKNOWN,
-                                    ObjHealth.UNKNOWN),
+            local_remote_health_ret(ObjHealth.OK,
+                                    ObjHealth.OK),
             cur_consul_status('passing', 'Unknown'):
             local_remote_health_ret(ObjHealth.UNKNOWN,
                                     ObjHealth.UNKNOWN),
