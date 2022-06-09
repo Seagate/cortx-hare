@@ -31,7 +31,7 @@ echo 'options lnet networks=tcp(eth1) config_on_load=1' \
 
 for i in {0..9}; do
     losetup -d /dev/loop$i || true
-    sleep 1s
+    sleep 10s
     dd if=/dev/zero of=/var/motr/disk$i.img bs=1M seek=9999 count=1
     losetup /dev/loop$i /var/motr/disk$i.img
 done
