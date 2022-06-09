@@ -520,6 +520,7 @@ let service_41 = types.Obj.Service
   , type = types.SvcT.M0_CST_RMS
   , endpoint = endpoints.process_40
   , sdevs = [] : List types.Oid
+  , params = [] : List Text
   }
 
 let service_43 = types.Obj.Service
@@ -527,6 +528,7 @@ let service_43 = types.Obj.Service
   , type = types.SvcT.M0_CST_RMS
   , endpoint = endpoints.process_42
   , sdevs = [] : List types.Oid
+  , params = [] : List Text
   }
 
 let service_39 = types.Obj.Service
@@ -534,6 +536,7 @@ let service_39 = types.Obj.Service
   , type = types.SvcT.M0_CST_RMS
   , endpoint = endpoints.process_38
   , sdevs = [] : List types.Oid
+  , params = [] : List Text
   }
 
 let service_28 = types.Obj.Service
@@ -541,6 +544,7 @@ let service_28 = types.Obj.Service
   , type = types.SvcT.M0_CST_CONFD
   , endpoint = endpoints.process_27
   , sdevs = [] : List types.Oid
+  , params = [] : List Text
   }
 
 let service_29 = types.Obj.Service
@@ -548,6 +552,7 @@ let service_29 = types.Obj.Service
   , type = types.SvcT.M0_CST_RMS
   , endpoint = endpoints.process_27
   , sdevs = [] : List types.Oid
+  , params = [] : List Text
   }
 
 let service_32 = types.Obj.Service
@@ -556,6 +561,7 @@ let service_32 = types.Obj.Service
   , endpoint = endpoints.process_30
   , sdevs = [ ids.sdev_10, ids.sdev_22, ids.sdev_16, ids.sdev_8, ids.sdev_14
             , ids.sdev_18, ids.sdev_12, ids.sdev_20 ]
+  , params = [] : List Text
   }
 
 let service_34 = types.Obj.Service
@@ -563,6 +569,7 @@ let service_34 = types.Obj.Service
   , type = types.SvcT.M0_CST_SNS_REB
   , endpoint = endpoints.process_30
   , sdevs = [] : List types.Oid
+  , params = [] : List Text
   }
 
 let service_37 = types.Obj.Service
@@ -570,6 +577,7 @@ let service_37 = types.Obj.Service
   , type = types.SvcT.M0_CST_ISCS
   , endpoint = endpoints.process_30
   , sdevs = [] : List types.Oid
+  , params = [] : List Text
   }
 
 let service_33 = types.Obj.Service
@@ -577,6 +585,7 @@ let service_33 = types.Obj.Service
   , type = types.SvcT.M0_CST_SNS_REP
   , endpoint = endpoints.process_30
   , sdevs = [] : List types.Oid
+  , params = [] : List Text
   }
 
 let service_35 = types.Obj.Service
@@ -584,6 +593,7 @@ let service_35 = types.Obj.Service
   , type = types.SvcT.M0_CST_ADDB2
   , endpoint = endpoints.process_30
   , sdevs = [] : List types.Oid
+  , params = [] : List Text
   }
 
 let service_36 = types.Obj.Service
@@ -591,6 +601,7 @@ let service_36 = types.Obj.Service
   , type = types.SvcT.M0_CST_CAS
   , endpoint = endpoints.process_30
   , sdevs = [ids.sdev_70]
+  , params = [] : List Text
   }
 
 let service_31 = types.Obj.Service
@@ -598,6 +609,7 @@ let service_31 = types.Obj.Service
   , type = types.SvcT.M0_CST_RMS
   , endpoint = endpoints.process_30
   , sdevs = [] : List types.Oid
+  , params = [] : List Text
   }
 
 let service_45 = types.Obj.Service
@@ -605,6 +617,7 @@ let service_45 = types.Obj.Service
   , type = types.SvcT.M0_CST_RMS
   , endpoint = endpoints.process_44
   , sdevs = [] : List types.Oid
+  , params = [] : List Text
   }
 
 let service_47 = types.Obj.Service
@@ -612,6 +625,7 @@ let service_47 = types.Obj.Service
   , type = types.SvcT.M0_CST_RMS
   , endpoint = endpoints.process_46
   , sdevs = [] : List types.Oid
+  , params = [] : List Text
   }
 
 let service_25 = types.Obj.Service
@@ -619,6 +633,7 @@ let service_25 = types.Obj.Service
   , type = types.SvcT.M0_CST_HA
   , endpoint = endpoints.process_24
   , sdevs = [] : List types.Oid
+  , params = [] : List Text
   }
 
 let service_26 = types.Obj.Service
@@ -626,6 +641,7 @@ let service_26 = types.Obj.Service
   , type = types.SvcT.M0_CST_RMS
   , endpoint = endpoints.process_24
   , sdevs = [] : List types.Oid
+  , params = [] : List Text
   }
 
 let controller = types.Obj.Controller
