@@ -4,9 +4,9 @@
 
 ## What Hare does?
 
-1. Configures [Motr](https://github.com/seagate/cortx-motr) object store.
-2. Starts/stops Motr services.
-3. Notifies Motr of service and device faults.
+1.  Configures [Motr](https://github.com/seagate/cortx-motr) object store.
+2.  Starts/stops Motr services.
+3.  Notifies Motr of service and device faults.
 
 Hare implementation uses [Consul](https://www.consul.io) key-value store
 and health-checking mechanisms.
