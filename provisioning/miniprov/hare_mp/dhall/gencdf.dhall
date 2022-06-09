@@ -47,7 +47,12 @@ let NodeInfo =
       , transport_type : Text
       , m0_servers : Optional (List M0ServerDesc)
       , m0_clients : Optional (List M0ClientDesc)
-      , ports_info : Optional T.NetworkPorts 
+      , network_ports : Optional T.NetworkPorts 
+      }
+
+let NodeGroupInfo =
+      { name : Text
+      , nodes: List NodeInfo
       }
 
 let AllowedFailures =
@@ -75,26 +80,17 @@ let ProfileInfo =
 
 let ClusterInfo =
       { create_aux : Optional Bool
-      , node_info: List NodeInfo
+      , node_group_info: List NodeGroupInfo
       , pool_info: List PoolInfo
       , profile_info: List ProfileInfo
       , fdmi_filter_info: Optional (List T.FdmiFilterDesc)
       }
 
-let toNodeDesc
-    : NodeInfo -> T.NodeDesc
-    =     \(n : NodeInfo)
-      ->  { hostname = n.hostname
-          , machine_id = n.machine_id
-          , processorcount = n.processorcount
-          , memorysize_mb = n.memorysize_mb
-          , data_iface_ip_addr = n.data_iface_ip_addr
-          , data_iface = n.data_iface
-          , data_iface_type = n.data_iface_type
-          , transport_type = n.transport_type
-          , m0_clients = n.m0_clients
-          , m0_servers = n.m0_servers
-          , network_ports = n.ports_info
+let toNodeGroupDesc
+    : NodeGroupInfo -> T.NodeGroupDesc
+    =     \(n : NodeGroupInfo)
+      ->  { name = n.name
+          , nodes = n.nodes
           }
 
 let toPoolDesc
@@ -113,7 +109,7 @@ let genCdf
     : ClusterInfo -> T.ClusterDesc
     =     \(cluster_info : ClusterInfo)
       ->  { create_aux = cluster_info.create_aux
-          , nodes = Prelude.List.map NodeInfo T.NodeDesc toNodeDesc cluster_info.node_info
+          , node_groups = Prelude.List.map NodeGroupInfo T.NodeGroupDesc toNodeGroupDesc cluster_info.node_group_info
           , pools = Prelude.List.map PoolInfo T.PoolDesc toPoolDesc cluster_info.pool_info
           , profiles = Some cluster_info.profile_info
           , fdmi_filters = cluster_info.fdmi_filter_info

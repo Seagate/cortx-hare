@@ -142,7 +142,13 @@ class NodeDesc(DhallTuple):
     transport_type: Text
     m0_servers: Maybe[DList[M0ServerDesc]]
     m0_clients: Maybe[DList[M0ClientDesc]]
-    ports_info: Maybe[NetworkPorts]
+    network_ports: Maybe[NetworkPorts]
+
+
+@dataclass(repr=False)
+class NodeGroupDesc(DhallTuple):
+    name: Text
+    nodes: DList[NodeDesc]
 
 
 @dataclass(repr=False)
@@ -188,7 +194,7 @@ class FdmiFilterDesc(DhallTuple):
 @dataclass(repr=False)
 class ClusterDesc(DhallTuple):
     create_aux: Maybe[bool]
-    node_info: DList[NodeDesc]
+    node_group_info: DList[NodeGroupDesc]
     pool_info: DList[PoolDesc]
     profile_info: DList[ProfileDesc]
     fdmi_filter_info: Maybe[List[FdmiFilterDesc]]

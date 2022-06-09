@@ -1,58 +1,64 @@
-nodes:
-  - hostname: ssu1
-    data_iface: eth1
-    transport_type: libfab
-    m0_servers:
-      - runs_confd: true
-        io_disks:
-          data: []
-      - io_disks:
-          data:
-            - path: /dev/vdb
-            - path: /dev/vdc
-            - path: /dev/vdd
-            - path: /dev/vde
-            - path: /dev/vdf
-            - path: /dev/vdg
-    m0_clients:
-      - name: m0_client_other  # name of the motr client
-        instances: 2   # Number of instances, this host will run
-  - hostname: ssu2
-    data_iface: eth1
-    transport_type: libfab
-    m0_servers:
-      - runs_confd: true
-        io_disks:
-          data: []
-      - io_disks:
-          data:
-            - path: /dev/vdb
-            - path: /dev/vdc
-            - path: /dev/vdd
-            - path: /dev/vde
-            - path: /dev/vdf
-            - path: /dev/vdg
-    m0_clients:
-      - name: m0_client_other  # name of the motr client
-        instances: 2   # Number of instances, this host will run
-  - hostname: ssu3
-    data_iface: eth1
-    transport_type: libfab
-    m0_servers:
-      - runs_confd: true
-        io_disks:
-          data: []
-      - io_disks:
-          data:
-            - path: /dev/vdb
-            - path: /dev/vdc
-            - path: /dev/vdd
-            - path: /dev/vde
-            - path: /dev/vdf
-            - path: /dev/vdg
-    m0_clients:
-      - name: m0_client_other  # name of the motr client
-        instances: 2   # Number of instances, this host will run
+node_groups:
+  - name: ssu1
+    nodes:
+    - hostname: ssu1
+      data_iface: eth1
+      transport_type: libfab
+      m0_servers:
+        - runs_confd: true
+          io_disks:
+            data: []
+        - io_disks:
+            data:
+              - path: /dev/vdb
+              - path: /dev/vdc
+              - path: /dev/vdd
+              - path: /dev/vde
+              - path: /dev/vdf
+              - path: /dev/vdg
+      m0_clients:
+        - name: m0_client_other  # name of the motr client
+          instances: 2   # Number of instances, this host will run
+  - name: ssu2
+    nodes:
+    - hostname: ssu2
+      data_iface: eth1
+      transport_type: libfab
+      m0_servers:
+        - runs_confd: true
+          io_disks:
+            data: []
+        - io_disks:
+            data:
+              - path: /dev/vdb
+              - path: /dev/vdc
+              - path: /dev/vdd
+              - path: /dev/vde
+              - path: /dev/vdf
+              - path: /dev/vdg
+      m0_clients:
+        - name: m0_client_other  # name of the motr client
+          instances: 2   # Number of instances, this host will run
+  - name: ssu3
+    nodes:
+    - hostname: ssu3
+      data_iface: eth1
+      transport_type: libfab
+      m0_servers:
+        - runs_confd: true
+          io_disks:
+            data: []
+        - io_disks:
+            data:
+              - path: /dev/vdb
+              - path: /dev/vdc
+              - path: /dev/vdd
+              - path: /dev/vde
+              - path: /dev/vdf
+              - path: /dev/vdg
+      m0_clients:
+        - name: m0_client_other  # name of the motr client
+          instances: 2   # Number of instances, this host will run
 pools:
   - name: the pool
     disk_refs:

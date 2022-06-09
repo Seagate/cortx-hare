@@ -18,18 +18,9 @@
 
 -}
 
-let M0Server = ./M0ServerDesc.dhall
-
 let Node = ./NodeDesc.dhall
 
-let Pool = ./PoolDesc.dhall
-
-let NodeGroupDesc = ./NodeGroupDesc.dhall
-
 in
-{ create_aux : Optional Bool
-, node_groups : List NodeGroupDesc
-, pools : List Pool
-, profiles : Optional (List ./PoolsRef.dhall)
-, fdmi_filters: Optional (List ./FdmiFilterDesc.dhall)
+{ name : Text
+, nodes : List Node
 }

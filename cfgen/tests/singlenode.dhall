@@ -23,84 +23,88 @@ let types = ../dhall/types.dhall
 
 in
 { create_aux = Some False
-, nodes =
-    [ { hostname = "localhost"
-      , machine_id = None Text
-      , memorysize_mb = None Double
-      , processorcount = None Natural
-      , transport_type = "libfab"
-      , data_iface = "eth1"
-      , data_iface_ip_addr = None Text
-      , data_iface_type = None < o2ib | tcp >
-      , m0_servers =
-          Some
-          [ { runs_confd = Some True
-            , io_disks =
-                { meta_data = None Text
-                , data = [] : List
-                           { blksize : Optional Natural
-                           , path : Optional Text
-                           , size : Optional Natural
-                           }
-                }
-            }
-          , { runs_confd = None Bool
-            , io_disks =
-                { meta_data = None Text
-                , data =
-                    [ { blksize = None Natural
-                      , path = Some "/dev/loop0"
-                      , size = None Natural
+, node_groups =
+    [ { name = "localhost"
+      , nodes =
+          [ { hostname = "localhost"
+            , machine_id = None Text
+            , memorysize_mb = None Double
+            , processorcount = None Natural
+            , transport_type = "libfab"
+            , data_iface = "eth1"
+            , data_iface_ip_addr = None Text
+            , data_iface_type = None < o2ib | tcp >
+            , m0_servers =
+                Some
+                [ { runs_confd = Some True
+                  , io_disks =
+                      { meta_data = None Text
+                      , data = [] : List
+                                 { blksize : Optional Natural
+                                 , path : Optional Text
+                                 , size : Optional Natural
+                                 }
                       }
-                    , { blksize = None Natural
-                      , path = Some "/dev/loop1"
-                      , size = None Natural
+                  }
+                , { runs_confd = None Bool
+                  , io_disks =
+                      { meta_data = None Text
+                      , data =
+                          [ { blksize = None Natural
+                            , path = Some "/dev/loop0"
+                            , size = None Natural
+                            }
+                          , { blksize = None Natural
+                            , path = Some "/dev/loop1"
+                            , size = None Natural
+                            }
+                          , { blksize = None Natural
+                            , path = Some "/dev/loop2"
+                            , size = None Natural
+                            }
+                          , { blksize = None Natural
+                            , path = Some "/dev/loop3"
+                            , size = None Natural
+                            }
+                          , { blksize = None Natural
+                            , path = Some "/dev/loop4"
+                            , size = None Natural
+                            }
+                          , { blksize = None Natural
+                            , path = Some "/dev/loop5"
+                            , size = None Natural
+                            }
+                          , { blksize = None Natural
+                            , path = Some "/dev/loop6"
+                            , size = None Natural
+                            }
+                          , { blksize = None Natural
+                            , path = Some "/dev/loop7"
+                            , size = None Natural
+                            }
+                          , { blksize = None Natural
+                            , path = Some "/dev/loop8"
+                           , size = None Natural
+                            }
+                          , { blksize = None Natural
+                            , path = Some "/dev/loop9"
+                            , size = None Natural
+                            }
+                          ]
                       }
-                    , { blksize = None Natural
-                      , path = Some "/dev/loop2"
-                      , size = None Natural
-                      }
-                    , { blksize = None Natural
-                      , path = Some "/dev/loop3"
-                      , size = None Natural
-                      }
-                    , { blksize = None Natural
-                      , path = Some "/dev/loop4"
-                      , size = None Natural
-                      }
-                    , { blksize = None Natural
-                      , path = Some "/dev/loop5"
-                      , size = None Natural
-                      }
-                    , { blksize = None Natural
-                      , path = Some "/dev/loop6"
-                      , size = None Natural
-                      }
-                    , { blksize = None Natural
-                      , path = Some "/dev/loop7"
-                      , size = None Natural
-                      }
-                    , { blksize = None Natural
-                      , path = Some "/dev/loop8"
-                      , size = None Natural
-                      }
-                    , { blksize = None Natural
-                      , path = Some "/dev/loop9"
-                      , size = None Natural
-                      }
-                    ]
+                  }
+                ]
+            , m0_clients = Some [ { name = "m0_client_other", instances = 2 } ]
+            , network_ports =
+                None
+                { hax : Optional Natural
+                , hax_http: Optional Natural
+                , m0_server : Optional (List { name: Text, port: Natural })
+                , m0_client_s3 : Optional Natural
+                , m0_client_other : Optional (List { name: Text, port: Natural })
                 }
             }
           ]
-      , m0_clients = Some [ { name = "m0_client_other", instances = 2 } ]
-      , network_ports =
-          None
-          { hax : Optional Natural
-          , hax_http: Optional Natural
-          , m0_server : Optional (List { name: Text, port: Natural })
-          , m0_client_s3 : Optional Natural
-          , m0_client_other : Optional (List { name: Text, port: Natural })
-          }
       }
     ]
 , pools =

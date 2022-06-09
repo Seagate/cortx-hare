@@ -1,29 +1,31 @@
-nodes:
-  - hostname: localhost
-    data_iface: eth1
-    data_iface_type: tcp
-    transport_type: libfab
-    m0_servers:
-      - runs_confd: true
-        io_disks:
-          data: []
-      - io_disks:
-          data:
-            - path: /dev/loop0
-            - path: /dev/loop1
-            - path: /dev/loop2
-            - path: /dev/loop3
-      - io_disks:
-          data:
-            - path: /dev/loop4
-            - path: /dev/loop5
-            - path: /dev/loop6
-            - path: /dev/loop7
-            - path: /dev/loop8
-            - path: /dev/loop9
-    m0_clients:
-      - name: m0_client_other  # name of the motr client
-        instances: 2   # Number of instances, this host will run
+node_groups:
+  - name: localhost
+    nodes:
+    - hostname: localhost
+      data_iface: eth1
+      data_iface_type: tcp
+      transport_type: libfab
+      m0_servers:
+        - runs_confd: true
+          io_disks:
+            data: []
+        - io_disks:
+            data:
+              - path: /dev/loop0
+              - path: /dev/loop1
+              - path: /dev/loop2
+              - path: /dev/loop3
+        - io_disks:
+            data:
+              - path: /dev/loop4
+              - path: /dev/loop5
+              - path: /dev/loop6
+              - path: /dev/loop7
+              - path: /dev/loop8
+              - path: /dev/loop9
+      m0_clients:
+        - name: m0_client_other  # name of the motr client
+          instances: 2   # Number of instances, this host will run
 pools:
   - name: the pool
     disk_refs:

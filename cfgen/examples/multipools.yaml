@@ -1,70 +1,74 @@
-nodes:
-  - hostname: srvnode-1
-    data_iface: enp175s0f1_c1
-    data_iface_type: o2ib
-    transport_type: libfab
-    m0_servers:
-      - runs_confd: true
-        io_disks:
-          data: []
-      - io_disks:
-          meta_data: /dev/vg_metadata_srvnode-1/lv_raw_metadata
-          data:
-            - path: /dev/foo
-            - path: /dev/disk/by-id/dm-name-mpatha
-            - path: /dev/disk/by-id/dm-name-mpathb
-            - path: /dev/disk/by-id/dm-name-mpathc
-            - path: /dev/disk/by-id/dm-name-mpathd
-            - path: /dev/disk/by-id/dm-name-mpathe
-            - path: /dev/disk/by-id/dm-name-mpathf
-    m0_clients:
-      - name: m0_client_other  # name of the motr client
-        instances: 2   # Number of instances, this host will run
-    # network_ports:
-    #   hax: 22000
-    #   hax_http: 8008
-    #   m0_server:
-    #   - name: ios
-    #     port: 21000
-    #   - name: confd
-    #     port: 21000
-    #   m0_client_other:
-    #   - name: m0_client_other
-    #     port: 21500
-    #   m0_client_s3: 22500
-  - hostname: srvnode-2
-    data_iface: enp175s0f1_c2
-    data_iface_type: o2ib
-    transport_type: libfab
-    m0_servers:
-      - runs_confd: true
-        io_disks:
-          data: []
-      - io_disks:
-          meta_data: /dev/vg_metadata_srvnode-2/lv_raw_metadata
-          data:
-            - path: /dev/foo
-            - path: /dev/disk/by-id/dm-name-mpathg
-            - path: /dev/disk/by-id/dm-name-mpathh
-            - path: /dev/disk/by-id/dm-name-mpathi
-            - path: /dev/disk/by-id/dm-name-mpathj
-            - path: /dev/disk/by-id/dm-name-mpathk
-            - path: /dev/disk/by-id/dm-name-mpathl
-    m0_clients:
-      - name: m0_client_other  # name of the motr client
-        instances: 2   # Number of instances, this host will run
-    # network_ports:
-    #   hax: 22000
-    #   hax_http: 8008
-    #   m0_server:
-    #   - name: ios
-    #     port: 21000
-    #   - name: confd
-    #     port: 21000
-    #   m0_client_other:
-    #   - name: m0_client_other
-    #     port: 21500
-    #   m0_client_s3: 22500
+node_groups:
+  - name: srvnode-1
+    nodes:
+    - hostname: srvnode-1
+      data_iface: enp175s0f1_c1
+      data_iface_type: o2ib
+      transport_type: libfab
+      m0_servers:
+        - runs_confd: true
+          io_disks:
+            data: []
+        - io_disks:
+            meta_data: /dev/vg_metadata_srvnode-1/lv_raw_metadata
+            data:
+              - path: /dev/foo
+              - path: /dev/disk/by-id/dm-name-mpatha
+              - path: /dev/disk/by-id/dm-name-mpathb
+              - path: /dev/disk/by-id/dm-name-mpathc
+              - path: /dev/disk/by-id/dm-name-mpathd
+              - path: /dev/disk/by-id/dm-name-mpathe
+              - path: /dev/disk/by-id/dm-name-mpathf
+      m0_clients:
+        - name: m0_client_other  # name of the motr client
+          instances: 2   # Number of instances, this host will run
+      # network_ports:
+      #   hax: 22000
+      #   hax_http: 8008
+      #   m0_server:
+      #   - name: ios
+      #     port: 21000
+      #   - name: confd
+      #     port: 21000
+      #   m0_client_other:
+      #   - name: m0_client_other
+      #     port: 21500
+      #   m0_client_s3: 22500
+  - name: srvnode-2
+    nodes:
+    - hostname: srvnode-2
+      data_iface: enp175s0f1_c2
+      data_iface_type: o2ib
+      transport_type: libfab
+      m0_servers:
+        - runs_confd: true
+          io_disks:
+            data: []
+        - io_disks:
+            meta_data: /dev/vg_metadata_srvnode-2/lv_raw_metadata
+            data:
+              - path: /dev/foo
+              - path: /dev/disk/by-id/dm-name-mpathg
+              - path: /dev/disk/by-id/dm-name-mpathh
+              - path: /dev/disk/by-id/dm-name-mpathi
+              - path: /dev/disk/by-id/dm-name-mpathj
+              - path: /dev/disk/by-id/dm-name-mpathk
+              - path: /dev/disk/by-id/dm-name-mpathl
+      m0_clients:
+        - name: m0_client_other  # name of the motr client
+          instances: 2   # Number of instances, this host will run
+      # network_ports:
+      #   hax: 22000
+      #   hax_http: 8008
+      #   m0_server:
+      #   - name: ios
+      #     port: 21000
+      #   - name: confd
+      #     port: 21000
+      #   m0_client_other:
+      #   - name: m0_client_other
+      #     port: 21500
+      #   m0_client_s3: 22500
 pools:
   - name: tier1-nvme
     disk_refs:

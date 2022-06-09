@@ -11,6 +11,7 @@ from enum import Enum, auto
 from cortx.utils.cortx import Const
 from hare_mp.store import ValueProvider
 from hare_mp.types import (ClusterDesc, DiskRef, DList, Maybe, NodeDesc,
+                           NodeGroupDesc,
                            PoolDesc, PoolType, ProfileDesc, Protocol, Text,
                            M0ServerDesc, DisksDesc, AllowedFailures, Layout,
                            FdmiFilterDesc, NetworkPorts, M0ClientDesc,
@@ -106,8 +107,9 @@ class CdfGenerator:
         cluster_id = server_node[machine_id]['cluster_id']
         return cluster_id
 
-    def _create_node_descriptions(self) -> List[NodeDesc]:
-        nodes: List[NodeDesc] = []
+    def _create_node_group_descriptions(self) -> List[NodeGroupDesc]:
+        node_groups: List[NodeGroupDesc] = []
+        # nodes: List[NodeDesc] = []
         conf = self.provider
         # Skipping for controller and HA pod
         machines = conf.get_machine_ids_for_service(
@@ -128,9 +130,26 @@ class CdfGenerator:
             if machine not in machines:
                 machines.append(machine)
 
+        node_group_map: Dict[str, List[str]] = {}
         for machine in machines:
-            nodes.append(self._create_node(machine))
-        return nodes
+            node_group = self.utils.get_node_group(machine)
+            if node_group:
+                # node_group_map[self.utils.get_node_group(machine)] = []
+                # node_group_map[self.utils.get_node_group(machine)].append(machine)
+                node_group_map.setdefault(node_group, []).append(machine)
+            else:
+                node_group_map.setdefault(self.utils.get_hostname(machine), []).append(machine)
+                # node_group_map[self.utils.get_hostname(machine)].append(machine)
+
+        # for node_group in node_group_map:
+        for node_group, machines in node_group_map.items():
+            nodes: List[NodeDesc] = []
+            for machine in machines:
+                nodes.append(self._create_node(machine))
+            node_groups.append(NodeGroupDesc(name=Text(node_group),
+                                             nodes=nodes))
+
+        return node_groups
 
     # cluster>storage_set[N]>durability>{type}>data/parity/spare
     def _get_pool_property(self, pool: PoolHandle, prop_name: str) -> int:
@@ -296,7 +315,7 @@ class CdfGenerator:
         return profiles
 
     def _create_fdmi_filter_descriptions(
-            self, nodes: List[NodeDesc]) -> Maybe[List[FdmiFilterDesc]]:
+            self, nodes: List[NodeGroupDesc]) -> Maybe[List[FdmiFilterDesc]]:
         return Maybe(None, 'List T.FdmiFilterDesc')
 
     def _create_ports_descriptions(self, hostname: str) -> NetworkPorts:
@@ -357,19 +376,20 @@ class CdfGenerator:
     def _get_cdf_dhall(self) -> str:
         dhall_path = self._get_dhall_path()
         conf = self.provider
-        nodes = self._create_node_descriptions()
+        node_groups = self._create_node_group_descriptions()
         pools = self._create_pool_descriptions()
         profiles = self._create_profile_descriptions(pools)
-        fdmi_filters = self._create_fdmi_filter_descriptions(nodes)
+        fdmi_filters = self._create_fdmi_filter_descriptions(node_groups)
         create_aux = conf.get('cluster>create_aux',
                               allow_null=True)
 
         if create_aux is None:
             create_aux = False
 
+        import pdb; pdb.set_trace()
         params_text = str(
             ClusterDesc(create_aux=Maybe(create_aux, 'Bool'),
-                        node_info=DList(nodes, 'List NodeInfo'),
+                        node_group_info=DList(node_groups, 'List NodeGroupInfo'),
                         pool_info=DList(pools, 'List PoolInfo'),
                         profile_info=DList(profiles, 'List ProfileInfo'),
                         fdmi_filter_info=fdmi_filters))
@@ -552,5 +572,5 @@ class CdfGenerator:
             transport_type=Text(self.utils.get_transport_type()),
             m0_servers=Maybe(servers, 'List M0ServerDesc'),
             m0_clients=Maybe(m0_clients, 'List M0ClientDesc'),
-            ports_info=Maybe(network_ports, 'T.NetworkPorts')
+            network_ports=Maybe(network_ports, 'T.NetworkPorts')
         )

@@ -387,61 +387,63 @@ def get_network_ports(node) -> Optional[Dict[str, Any]]:
 
 def enrich_cluster_desc(desc: Dict[str, Any], mock_p: bool) -> None:
     logging.debug('Enriching cluster description')
-    for node in desc['nodes']:
-        # The fact names used here correspond to version 2.4.1 of `facter`.
-        # See https://puppet.com/docs/puppet/6.6/core_facts.html#legacy-facts
+    for node_group in desc['node_groups']:
+        for node in node_group['nodes']:
+            # The fact names used here correspond to version 2.4.1 of `facter`.
+            # See below
+            # https://puppet.com/docs/puppet/6.6/core_facts.html#legacy-facts
 
-        host = node['hostname']
-        if all(key in node.keys()
-               for key in ('processorcount', 'memorysize_mb')):
+            host = node['hostname']
+            if all(key in node.keys()
+                   for key in ('processorcount', 'memorysize_mb')):
 
-            logging.debug(
-                'Cluster description already has facts for '
-                '[hostname=%s]. facter tool will not be used', host)
-            node['facts'] = {
-                '_memsize_MB': int(float(node['memorysize_mb'])),
-                'processorcount': node['processorcount'],
-                ipaddr_key(node['data_iface']): node['data_iface_ip_addr']
-            }
-        else:
-            node['facts'] = get_facts(host, mock_p, 'processorcount',
-                                      'memorysize_mb',
-                                      ipaddr_key(node['data_iface']))
-            node['facts']['_memsize_MB'] = int(
-                float(node['facts']['memorysize_mb']))
+                logging.debug(
+                    'Cluster description already has facts for '
+                    '[hostname=%s]. facter tool will not be used', host)
+                node['facts'] = {
+                    '_memsize_MB': int(float(node['memorysize_mb'])),
+                    'processorcount': node['processorcount'],
+                    ipaddr_key(node['data_iface']): node['data_iface_ip_addr']
+                }
+            else:
+                node['facts'] = get_facts(host, mock_p, 'processorcount',
+                                          'memorysize_mb',
+                                          ipaddr_key(node['data_iface']))
+                node['facts']['_memsize_MB'] = int(
+                    float(node['facts']['memorysize_mb']))
 
-        logging.debug('Node [hostname=%s] facts=%s', host, node['facts'])
+            logging.debug('Node [hostname=%s] facts=%s', host, node['facts'])
 
-        portalgroup = PortalGroup
-        network_ports = get_network_ports(node)
-        if network_ports is None:
-            node['network_ports'] = {port_type.name: port_type.value
-                                     for port_type in portalgroup}
-        else:
-            for key, value in network_ports.items():
-                if not value:
-                    network_ports[key] = portalgroup[key].value
-            for srv in [port_type.name for port_type in portalgroup]:
-                if srv not in network_ports:
-                    network_ports[srv] = portalgroup[srv].value
+            portalgroup = PortalGroup
+            network_ports = get_network_ports(node)
+            if network_ports is None:
+                node['network_ports'] = {port_type.name: port_type.value
+                                         for port_type in portalgroup}
+            else:
+                for key, value in network_ports.items():
+                    if not value:
+                        network_ports[key] = portalgroup[key].value
+                for srv in [port_type.name for port_type in portalgroup]:
+                    if srv not in network_ports:
+                        network_ports[srv] = portalgroup[srv].value
 
-        if 'm0_servers' not in node:
-            continue
+            if 'm0_servers' not in node:
+                continue
 
-        m0d = node.get('m0_servers')
-        if m0d is None:
-            continue
-        for m0d in node['m0_servers']:
-            m0d.setdefault('runs_confd', False)
-            if 'meta_data' in m0d['io_disks']:
-                if m0d['io_disks']['meta_data'] is None:
-                    del m0d['io_disks']['meta_data']
-            m0d['_io_disks'] = get_disks_from_cdf(node['hostname'], mock_p,
-                                                  m0d['io_disks']['data'])
+            m0d = node.get('m0_servers')
+            if m0d is None:
+                continue
+            for m0d in node['m0_servers']:
+                m0d.setdefault('runs_confd', False)
+                if 'meta_data' in m0d['io_disks']:
+                    if m0d['io_disks']['meta_data'] is None:
+                        del m0d['io_disks']['meta_data']
+                m0d['_io_disks'] = get_disks_from_cdf(node['hostname'], mock_p,
+                                                      m0d['io_disks']['data'])
 
-            if not m0d['_io_disks']:
-                m0d['_io_disks'] = get_disks_ssh(node['hostname'], mock_p,
-                                                 m0d['io_disks']['data'])
+                if not m0d['_io_disks']:
+                    m0d['_io_disks'] = get_disks_ssh(node['hostname'], mock_p,
+                                                     m0d['io_disks']['data'])
 
     if 'profiles' not in desc:
         sns_pools = [pool['name'] for pool in desc['pools']
@@ -450,12 +452,15 @@ def enrich_cluster_desc(desc: Dict[str, Any], mock_p: bool) -> None:
 
 
 def validate_cluster_desc(desc: Dict[str, Any]) -> None:
-    validate_nodes_desc(desc['nodes'])
+    for node_group in desc['node_groups']:
+        validate_nodes_desc(node_group['nodes'])
     validate_pools_desc(desc['pools'])
     if 'profiles' in desc:
         validate_profiles_desc(desc['profiles'], desc['pools'])
     if 'fdmi_filters' in desc and desc['fdmi_filters'] is not None:
-        validate_fdmi_filters_desc(desc['fdmi_filters'], desc['nodes'])
+        for node_group in desc['node_groups']:
+            validate_fdmi_filters_desc(desc['fdmi_filters'],
+                                       node_group['nodes'])
     logging.debug('Validations passed')
 
 
@@ -2710,75 +2715,77 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
     other_clients: Dict[str, List[Tuple[Oid, Oid]]] = {}
     io_ctrls: Dict[Oid, Any] = {}
 
-    for node in cluster_desc['nodes']:
-        node_id = ConfNode.build(conf, root_id, node)
-        encl_id = ConfEnclosure.build(conf, rack_id, node_id)
-        ctrl_ids: List[Tuple[Optional[Oid], Any]] = []
-        m0srv = node.get('m0_servers')
-        if m0srv is not None:
-            for m0d in node.get('m0_servers', []):
-                if m0d['_io_disks']:
-                    ctrl_oid = ConfController.build(conf, encl_id)
-                    ctrl_ids.append((ctrl_oid, m0d))
-                    io_ctrls[ctrl_oid] = m0d
-                else:
-                    ctrl_ids.append((None, m0d))
+    for node_group in cluster_desc['node_groups']:
+        for node in node_group['nodes']:
+            node_id = ConfNode.build(conf, root_id, node)
+            encl_id = ConfEnclosure.build(conf, rack_id, node_id)
+            ctrl_ids: List[Tuple[Optional[Oid], Any]] = []
+            m0srv = node.get('m0_servers')
+            if m0srv is not None:
+                for m0d in node.get('m0_servers', []):
+                    if m0d['_io_disks']:
+                        ctrl_oid = ConfController.build(conf, encl_id)
+                        ctrl_ids.append((ctrl_oid, m0d))
+                        io_ctrls[ctrl_oid] = m0d
+                    else:
+                        ctrl_ids.append((None, m0d))
 
-        ports = node.get('network_ports')
-        if ports:
-            lnet_portals = get_lnet_portal_group(
-                               hax=ports['hax'],
-                               m0_server=tuple(ports['m0_server']),
-                               m0_client_s3=ports['m0_client_s3'],
-                               m0_client_other=ports['m0_client_other'])
-            libfab_portals = get_libfab_portal_group(
-                                 hax=ports['hax'],
-                                 m0_server=tuple(ports['m0_server']),
-                                 m0_client_s3=ports['m0_client_s3'],
-                                 m0_client_other=ports['m0_client_other'])
-        else:
-            lnet_portals = get_lnet_portal_group()
-            libfab_portals = get_libfab_portal_group()
+            ports = node.get('network_ports')
+            if ports:
+                lnet_portals = get_lnet_portal_group(
+                                   hax=ports['hax'],
+                                   m0_server=tuple(ports['m0_server']),
+                                   m0_client_s3=ports['m0_client_s3'],
+                                   m0_client_other=ports['m0_client_other'])
+                libfab_portals = get_libfab_portal_group(
+                                     hax=ports['hax'],
+                                     m0_server=tuple(ports['m0_server']),
+                                     m0_client_s3=ports['m0_client_s3'],
+                                     m0_client_other=ports['m0_client_other'])
+            else:
+                lnet_portals = get_lnet_portal_group()
+                libfab_portals = get_libfab_portal_group()
 
-        transport_type = node.get('transport_type', 'libfab')
-        if transport_type == 'lnet':
-            portalgroup = lnet_portals
-        else:
-            portalgroup = libfab_portals
+            transport_type = node.get('transport_type', 'libfab')
+            if transport_type == 'lnet':
+                portalgroup = lnet_portals
+            else:
+                portalgroup = libfab_portals
 
-        ConfProcess.build(conf, node_id, portalgroup, node, ProcT.hax)
+            ConfProcess.build(conf, node_id, portalgroup, node, ProcT.hax)
 
-        m0srv = node.get('m0_servers')
-        confd_p = False
-        if m0srv is not None:
-            for ctrl_id in ctrl_ids:
-                m0d = ctrl_id[1]
-                conf_ctrl_id: Optional[Oid] = ctrl_id[0]
-                if m0d['runs_confd']:
-                    confd_p = True
-                    ConfProcess.build(conf, node_id, portalgroup, node,
-                                      ProcT.m0_server, m0d, conf_ctrl_id,
-                                      proc_name='confd')
-                else:
-                    ConfProcess.build(conf, node_id, portalgroup, node,
-                                      ProcT.m0_server, m0d, conf_ctrl_id,
-                                      proc_name='ios')
+            m0srv = node.get('m0_servers')
+            confd_p = False
+            if m0srv is not None:
+                for ctrl_id in ctrl_ids:
+                    m0d = ctrl_id[1]
+                    conf_ctrl_id: Optional[Oid] = ctrl_id[0]
+                    if m0d['runs_confd']:
+                        confd_p = True
+                        ConfProcess.build(conf, node_id, portalgroup, node,
+                                          ProcT.m0_server, m0d, conf_ctrl_id,
+                                          proc_name='confd')
+                    else:
+                        ConfProcess.build(conf, node_id, portalgroup, node,
+                                          ProcT.m0_server, m0d, conf_ctrl_id,
+                                          proc_name='ios')
 
-        ipaddr = node['facts'][ipaddr_key(node['data_iface'])]
-        (cluster.consul_servers if confd_p else cluster.consul_clients).\
-            append(ConsulAgent(node_name=node['hostname'],
-                               # XXX use 'mgmt_iface' for consul?
-                               ipaddr=ipaddr))
+            ipaddr = node['facts'][ipaddr_key(node['data_iface'])]
+            (cluster.consul_servers if confd_p else cluster.consul_clients).\
+                append(ConsulAgent(node_name=node['hostname'],
+                                   # XXX use 'mgmt_iface' for consul?
+                                   ipaddr=ipaddr))
 
-        if 'm0_clients' in node and node['m0_clients'] is not None:
-            for client in node['m0_clients']:
-                for _ in range(client['instances']):
-                    proc_id = ConfProcess.build(conf, node_id, portalgroup,
-                                                node, ProcT.m0_client_other,
-                                                proc_name=client['name'])
-                    cluster.m0_clients[proc_id] = new_oid(ObjT.service)
-                    if client['name'] not in cluster.m0_client_types:
-                        cluster.m0_client_types.append(client['name'])
+            if 'm0_clients' in node and node['m0_clients'] is not None:
+                for client in node['m0_clients']:
+                    for _ in range(client['instances']):
+                        proc_id = ConfProcess.build(conf, node_id,
+                                                    portalgroup, node,
+                                                    ProcT.m0_client_other,
+                                                    proc_name=client['name'])
+                        cluster.m0_clients[proc_id] = new_oid(ObjT.service)
+                        if client['name'] not in cluster.m0_client_types:
+                            cluster.m0_client_types.append(client['name'])
 
     # Motr requires all the data devices together in-order to map a data object
     # to its corresponding device and further to its ioservice. Motr maintains
@@ -2802,15 +2809,17 @@ def build_cluster(cluster_desc: Dict[str, Any]) -> Cluster:
                 # We need to generate disk_refs only if it is not present
                 # in pool description
                 if not get_pool_diskrefs(pool):
-                    for node in cluster_desc['nodes']:
-                        if not node.get('m0_servers'):
-                            continue
-                        for m0d in node['m0_servers']:
-                            if m0d['runs_confd']:
+                    for node_group in cluster_desc['node_groups']:
+                        for node in node_group['nodes']:
+                            if not node.get('m0_servers'):
                                 continue
-                            for d in m0d['io_disks']['data']:
-                                disks.append(DiskRef(path=d,
-                                                     node=node['hostname']))
+                            for m0d in node['m0_servers']:
+                                if m0d['runs_confd']:
+                                    continue
+                                for d in m0d['io_disks']['data']:
+                                    disks.append(
+                                        DiskRef(path=d,
+                                                node=node['hostname']))
 
                 aux_pool_list(pool, disks, conf, cluster_desc)
             else:

@@ -1,45 +1,47 @@
 # Cluster Description File (CDF).
 # See `cfgen --help-schema` for the format description.
 
-nodes:
-  - hostname: localhost     # [user@]hostname
-    data_iface: eth1        # name of data network interface
-    data_iface_ip_addr: null
-    transport_type: libfab
-    m0_servers:
-      - runs_confd: true
-        io_disks:
-          data: []
-          meta_data: null
-      - runs_confd: null
-        io_disks:
-          data:
-            - path: /dev/loop0 
-            - path: /dev/loop1 
-            - path: /dev/loop2 
-            - path: /dev/loop3 
-            - path: /dev/loop4 
-            - path: /dev/loop5 
-            - path: /dev/loop6 
-            - path: /dev/loop7 
-            - path: /dev/loop8 
-            - path: /dev/loop9 
-          meta_data: null
-    m0_clients:
-      - name: m0_client_other  # name of the motr client
-        instances: 2   # Number of instances, this host will run
-    # network_ports:
-    #   hax: 42000
-    #   hax_http: 8004
-    #   m0_server:
-    #   - name: ios
-    #     port: 41000
-    #   - name: confd
-    #     port: 41000
-    #   m0_client_other:
-    #   - name: m0_client_other
-    #     port: 41500
-    #   m0_client_s3: 42500
+node_groups:
+  - name: localhost
+    nodes:
+    - hostname: localhost     # [user@]hostname
+      data_iface: eth1        # name of data network interface
+      data_iface_ip_addr: null
+      transport_type: libfab
+      m0_servers:
+        - runs_confd: true
+          io_disks:
+            data: []
+            meta_data: null
+        - runs_confd: null
+          io_disks:
+            data:
+              - path: /dev/loop0 
+              - path: /dev/loop1 
+              - path: /dev/loop2 
+              - path: /dev/loop3 
+              - path: /dev/loop4 
+              - path: /dev/loop5 
+              - path: /dev/loop6 
+              - path: /dev/loop7 
+              - path: /dev/loop8 
+              - path: /dev/loop9 
+            meta_data: null
+      m0_clients:
+        - name: m0_client_other  # name of the motr client
+          instances: 2   # Number of instances, this host will run
+      # network_ports:
+      #   hax: 42000
+      #   hax_http: 8004
+      #   m0_server:
+      #   - name: ios
+      #     port: 41000
+      #   - name: confd
+      #     port: 41000
+      #   m0_client_other:
+      #   - name: m0_client_other
+      #     port: 41500
+      #   m0_client_s3: 42500
 create_aux: false # optional; supported values: "false" (default), "true"
 pools:
   - name: the pool
