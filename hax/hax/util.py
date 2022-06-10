@@ -590,7 +590,7 @@ class ConsulUtil:
         watchers.The following services are considered [default]: ios, confd.
         """
         if not motr_services:
-            motr_services = set(['ios', 'confd'])
+            motr_services = set(['ios'])
         result = []
         for service_name in self.catalog.get_service_names():
             if service_name not in motr_services:
