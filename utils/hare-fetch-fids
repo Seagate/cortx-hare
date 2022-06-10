@@ -29,7 +29,7 @@ import logging
 import logging.handlers
 import simplejson
 import inject
-from socket import gethostname
+from socket import getfqdn
 from hax.types import ObjT
 from hax.common import di_configuration
 from hax.util import ConsulUtil, repeat_if_fails
@@ -79,7 +79,7 @@ class Node:
 @repeat_if_fails(max_retries=2)
 def get_log_path():
     cns_utils = ConsulUtil()
-    hostname = gethostname()
+    hostname = getfqdn()
     log_path_key = cns_utils.kv.kv_get(f'{hostname}/log_path')
 
     if log_path_key is None:
