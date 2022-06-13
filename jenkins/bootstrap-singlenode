@@ -29,6 +29,18 @@ mkdir -p /var/motr
 echo 'options lnet networks=tcp(eth1) config_on_load=1' \
      > /etc/modprobe.d/lnet.conf
 
+# Ensure that Motr processes aren't lingering and holding onto loop devices.
+# Loop device detatch is lazy as of kernel 3.7, so if there's a mounted
+# filesystem or open file descriptor for the device, losetup -d will run
+# successfully but not actually detatch the loop device (it will be
+# automatically detatched when the last reference is released). Stuck Motr
+# processes have been interfering with loop devices here, so ensure they're
+# cleaned up. Note that this assumes that there are no other tests or Motr
+# instances running on the same host, as it just kills all m0d and m0mkfs.
+
+pkill -9 m0d || true
+pkill -9 m0mkfs || true
+
 for i in {0..9}; do
     losetup -d /dev/loop$i || true
     sleep 1s
