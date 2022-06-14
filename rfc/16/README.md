@@ -70,32 +70,32 @@ Supported event types and their payload are specified in [19/EVERULES](../19/REA
 
 1. On the Consul leader node there MUST be configured a [watch](https://www.consul.io/docs/agent/watches.html#keyprefix) of "keyprefix" type that watches `eq/` key prefix.  Whenever the EQ is modified, the handler of this watch will execute the _RC_ and pass it full contents of the EQ in JSON format via stdin.
 
-1. There MUST NOT be several simultaneously running RC instances.  <!-- XXX This is guaranteed by Consul, isn't it? -->
+2. There MUST NOT be several simultaneously running RC instances.  <!-- XXX This is guaranteed by Consul, isn't it? -->
 
-1. The RC MUST process all the events in the EQ.
+3. The RC MUST process all the events in the EQ.
 
-1. To process an event, the RC finds the _rule_ associated with this event type and executes it.
+4. To process an event, the RC finds the _rule_ associated with this event type and runs this.
 
    1. Rules are executable files.
 
-   1. Rules MUST obtain event payload from the standard input.
+   2. Rules MUST obtain event payload from the standard input.
 
-   1. Rules SHOULD have _effects_.  E.g.: put an item into the BQ/EQ, add new entry to the system log, execute a shell command.
+   3. Rules SHOULD have _effects_.  E.g.: put an item into the BQ/EQ, add new entry to the system log, execute a shell command.
 
    Supported rules and their effects are specified in [19/EVERULES](../19/README.md).
 
-1. It is RECOMMENDED to define a special `_default` rule.  The RC SHALL apply the `_default` rule if there is no rule associated with the type of processed event.
+5. It is RECOMMENDED to define a unique `_default` rule.  The RC SHALL apply the `_default` rule if there is no rule associated with the type of processed event.
 
 <!-- XXX We may borrow some rule processing ideas from iptables/nftables.
   -->
 
-1. The RC MUST abort a rule that runs longer than predetermined \<timeout\>.
-1. If rule terminates with nonzero exit code, the RC SHALL log this error in the systemd log.
+6. The RC MUST abort a rule that runs longer than predetermined \<timeout\>.
+7. If rule terminates with nonzero exit code, the RC SHALL log this error in the systemd log.
 
 <!-- XXX How is RC to be configured?  Do we want to reconfigure it at runtime?
   -->
 
-1. The same set of rules MUST be installed in the same directory on every Consul server node.
+8. The same set of rules MUST be installed in the same directory on every Consul server node.
 
    E.g., a directory of rules that handle events of types "foo", "bar", and "baz" would look like this:
   ```sh
@@ -106,9 +106,9 @@ Supported event types and their payload are specified in [19/EVERULES](../19/REA
    \_ foo
   ```
 
-1. The RC and rules SHOULD take configuration parameters from environment variables and SHOULD NOT use command line options.  <!-- Rationale: https://12factor.net/config -->
+9. The RC and rules SHOULD take configuration parameters from environment variables and SHOULD NOT use command line options.  <!-- Rationale: https://12factor.net/config -->
 
-1. The RC MUST delete processed events from the EQ.
+10. The RC MUST delete processed events from the EQ.
 
 ### Broadcast Queue (BQ)
 
