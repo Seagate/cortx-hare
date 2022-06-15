@@ -162,11 +162,11 @@ When RC leader changes (e.g. due to HW issue) it may happen that previous RC did
 The problem can be alleviated by the approach as follows.
 
 1. RC Hax receives a message from MessageBus
-1. RC Hax double checks "am I still RC" (if yes, then proceed, otherwise just ignore the message and stop listening MessageBus)
-1. Process the message
+2. RC Hax double checks "am I still RC" (if yes, then proceed, otherwise ignore the message and stop listening MessageBus)
+3. Process the message
    - If processing means sending out messages to Motr world, then send everything needed and wait until Motr side confirms delivery.
-1. RC Hax double checks "am I still RC" (if yes, then proceed, otherwise just ignore the message and stop listening MessageBus)
-1. And only after that update "last confirmed" offset in Consul KV
+4. RC Hax double checks "am I still RC" (if yes, then proceed, otherwise ignore the message and stop listening MessageBus)
+5. And only after that update "last confirmed" offset in Consul KV
 
 **Potential problems**
 
