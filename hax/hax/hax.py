@@ -43,7 +43,7 @@ from hax.motr.planner import WorkPlanner
 from hax.motr.rconfc import RconfcStarter
 from hax.server import ServerRunner
 from hax.types import Fid, Profile, StoppableThread
-from hax.util import ConsulUtil, repeat_if_fails
+from hax.util import ConsulUtil, ProcessGroup, repeat_if_fails
 
 
 __all__ = ['main']
@@ -71,8 +71,10 @@ def _run_thread(thread: StoppableThread) -> StoppableThread:
 
 def _run_qconsumer_thread(planner: WorkPlanner, motr: Motr,
                           herald: DeliveryHerald, consul: ConsulUtil,
+                          process_groups: ProcessGroup,
                           idx: int) -> StoppableThread:
-    return _run_thread(ConsumerThread(planner, motr, herald, consul, idx))
+    return _run_thread(ConsumerThread(planner, motr, herald, consul,
+                                      process_groups, idx))
 
 
 # TODO this is work around and once the proper fix for CORTX-27707 is in
@@ -208,10 +210,11 @@ def main():
     # Reason: hax process will send entrypoint request and somebody needs
     # to reply it.
 
+    process_groups = ProcessGroup(32)
     # TODO make the number of threads configurable
     consumer_threads = [
         _run_qconsumer_thread(planner, motr, herald,
-                              util, i) for i in range(32)
+                              util, process_groups, i) for i in range(32)
     ]
 
     try:

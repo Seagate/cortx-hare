@@ -33,7 +33,7 @@ from hax.motr.ffi import HaxFFI
 from hax.types import (Fid, FidStruct, HaNote, HaNoteStruct, HAState, Profile,
                        ObjHealth, Uint128)
 from hax.util import (create_process_fid, create_profile_fid, create_drive_fid,
-                      dump_json)
+                      dump_json, ProcessGroup)
 
 from .testutils import (AssertionPlan, FakeFFI, Invocation, TraceMatcher,
                         tr_and, tr_method, tr_not)
@@ -45,6 +45,12 @@ def herald(mocker):
     mocker.patch.object(herald, 'wait_for_all')
     return herald
 
+@pytest.fixture
+def process_groups(mocker):
+    process_groups = ProcessGroup(32)
+    mocker.patch.object(process_groups, 'process_group_lock')
+    mocker.patch.object(process_groups, 'process_group_unlock')
+    return process_groups
 
 @pytest.fixture
 def planner(mocker) -> WorkPlanner:
@@ -240,8 +246,9 @@ def motr(mocker, ffi, planner, herald, consul_util) -> Motr:
 
 
 @pytest.fixture
-def consumer(planner, motr, herald, consul_util):
-    return ConsumerThread(planner, motr, herald, consul_util, 0)
+def consumer(planner, motr, herald, consul_util, process_groups):
+    return ConsumerThread(planner, motr, herald, consul_util,
+                          process_groups, 0)
 
 
 def run_in_consumer(mocker, msg: BaseMessage, planner: WorkPlanner,
@@ -257,7 +264,7 @@ def run_in_consumer(mocker, msg: BaseMessage, planner: WorkPlanner,
 
 @pytest.mark.skip(reason="probably invalid, disabled temporarily")
 def test_first_entrypoint_request_broadcasts_fail_first(
-        mocker, planner, motr, consumer, consul_util):
+        mocker, planner, motr, consumer, consul_util, process_groups):
     def new_kv(key: str, val: str):
         return {
             'Key': key,
@@ -339,7 +346,7 @@ def test_first_entrypoint_request_broadcasts_fail_first(
 
 @pytest.mark.skip(reason="revive me")
 def test_get_nvec_replies_something(
-        mocker, planner, motr, consumer, consul_util):
+        mocker, planner, motr, consumer, consul_util, process_groups):
     def new_kv(key: str, val: str):
         return {
             'Key': key,
@@ -468,7 +475,7 @@ def test_get_nvec_replies_something(
 
 
 @pytest.mark.skip(reason="Fix me")
-def test_broadcast_node_failure(mocker, motr, consul_util):
+def test_broadcast_node_failure(mocker, motr, consul_util, process_groups):
     def new_kv(key: str, val: str):
         return {
             'Key': key,
@@ -806,7 +813,8 @@ def create_stub_get(process_type: str) -> Callable[[str, bool], Any]:
 
 # @pytest.mark.skip(reason="disabled temporarily")
 def test_mkfs_process_stopped_no_disk_marked_offline(mocker, motr,
-                                                     consul_util):
+                                                     consul_util,
+                                                     process_groups):
     mocker.patch.object(
         consul_util.kv,
         'kv_get',
@@ -840,7 +848,8 @@ def test_mkfs_process_stopped_no_disk_marked_offline(mocker, motr,
         'DRIVE should not be broadcast when MKFS is stopped'
 
 
-def test_nonmkfs_process_stop_causes_drive_offline(mocker, motr, consul_util):
+def test_nonmkfs_process_stop_causes_drive_offline(mocker, motr, consul_util,
+                                                   process_groups):
     mocker.patch.object(consul_util.kv,
                         'kv_get',
                         side_effect=create_stub_get('M0_CONF_HA_PROCESS_M0D'))
@@ -874,7 +883,7 @@ def test_nonmkfs_process_stop_causes_drive_offline(mocker, motr, consul_util):
 
 
 def test_broadcast_io_service_failure(mocker, planner, motr, consumer,
-                                      consul_util):
+                                      consul_util, process_groups):
     def new_kv(key: str, val: str):
         return {
             'Key': key,
@@ -1003,6 +1012,8 @@ def test_broadcast_io_service_failure(mocker, planner, motr, consumer,
     mocker.patch.object(consul_util.kv, 'kv_get', side_effect=my_get)
     # TODO: Handle 'kv_put' by updating kv returned by 'kv_get'
     mocker.patch.object(consul_util.kv, 'kv_put', return_value=0)
+    mocker.patch.object(process_groups, 'process_group_lock', return_value=0)
+    mocker.patch.object(process_groups, 'process_group_unlock', return_value=0)
     mocker.patch.object(consul_util,
                         'get_hax_fid',
                         return_value=Fid(0x7200000000000001, 0x6))
@@ -1057,7 +1068,7 @@ def _generate_sub_disks() -> List[HaNoteStruct]:
 
 
 def test_broadcast_more_than_1024_objects(mocker, planner, motr, consumer,
-                                          consul_util):
+                                          consul_util, process_groups):
     def new_kv(key: str, val: str):
         return {
             'Key': key,
@@ -1186,6 +1197,8 @@ def test_broadcast_more_than_1024_objects(mocker, planner, motr, consumer,
     mocker.patch.object(consul_util.kv, 'kv_get', side_effect=my_get)
     # TODO: Handle 'kv_put' by updating kv returned by 'kv_get'
     mocker.patch.object(consul_util.kv, 'kv_put', return_value=0)
+    mocker.patch.object(process_groups, 'process_group_lock', return_value=0)
+    mocker.patch.object(process_groups, 'process_group_unlock', return_value=0)
     mocker.patch.object(consul_util,
                         'get_hax_fid',
                         return_value=Fid(0x7200000000000001, 0x6))

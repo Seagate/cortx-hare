@@ -329,6 +329,22 @@ class CatalogAdapter:
                 'Could not access Consul Catalog') from e
 
 
+class ProcessGroup:
+    def __init__(self, buckets_count: int):
+        self.buckets: int = buckets_count
+        self.process_locks = []
+        for _ in range(self.buckets):
+            self.process_locks.append(Lock())
+
+    def process_group_lock(self, proc_fid: Fid):
+        group = proc_fid.key % self.buckets
+        self.process_locks[group].acquire()
+
+    def process_group_unlock(self, proc_fid: Fid):
+        group = proc_fid.key % self.buckets
+        self.process_locks[group].release()
+
+
 class ConsulUtil:
     def __init__(self, raw_client: Optional[Consul] = None):
         self.cns: Consul = raw_client or Consul()

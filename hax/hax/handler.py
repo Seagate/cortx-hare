@@ -35,7 +35,7 @@ from hax.queue.publish import EQPublisher
 from hax.types import (ConfHaProcess, HAState, MessageId,
                        ObjT, ObjHealth, StoppableThread, m0HaProcessEvent,
                        m0HaProcessType)
-from hax.util import ConsulUtil, dump_json, repeat_if_fails
+from hax.util import ConsulUtil, ProcessGroup, dump_json, repeat_if_fails
 from hax.ha import get_producer
 
 
@@ -53,7 +53,8 @@ class ConsumerThread(StoppableThread):
     """
 
     def __init__(self, planner: WorkPlanner, motr: Motr,
-                 herald: DeliveryHerald, consul: ConsulUtil, idx: int):
+                 herald: DeliveryHerald, consul: ConsulUtil,
+                 process_groups: ProcessGroup, idx: int):
         super().__init__(target=self._do_work,
                          name=f'qconsumer-{idx}',
                          args=(planner, motr))
@@ -62,6 +63,7 @@ class ConsumerThread(StoppableThread):
         self.eq_publisher = EQPublisher()
         self.herald = herald
         self.idx = idx
+        self.process_groups = process_groups
 
     def stop(self) -> None:
         self.is_stopped = True
@@ -134,7 +136,9 @@ class ConsumerThread(StoppableThread):
             motr.broadcast_ha_states(
                 [HAState(fid=event.fid, status=svc_status)],
                 broadcast_hax_only=broadcast_hax_only)
+        self.process_groups.process_group_lock(event.fid)
         self.consul.update_process_status(event)
+        self.process_groups.process_group_unlock(event.fid)
 
         # If we are receiving M0_CONF_HA_PROCESS_STARTED for M0D processes
         # then we will check if all the M0D processes on the local node are
@@ -164,15 +168,19 @@ class ConsumerThread(StoppableThread):
             ObjHealth.OK: m0HaProcessEvent.M0_CONF_HA_PROCESS_DTM_RECOVERED,
             ObjHealth.RECOVERING: m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED
         }
+        process_group_fid: Any = None
         try:
             cns = self.consul
             am_i_rc = self.consul.am_i_rc()
             for state in ha_states:
                 if state.fid.container == ObjT.PROCESS.value:
+                    process_group_fid = state.fid
                     is_proc_local = self.consul.is_proc_local(state.fid)
+                    self.process_groups.process_group_lock(state.fid)
                     current_status = cns.get_process_current_status(
                         state.status, state.fid)
                     if current_status == ObjHealth.UNKNOWN:
+                        self.process_groups.process_group_unlock(state.fid)
                         continue
                     proc_status_remote = cns.get_process_status(state.fid)
                     proc_status: Any = None
@@ -182,6 +190,7 @@ class ConsumerThread(StoppableThread):
                     if proc_status_remote.proc_type in (
                             'Unknown',
                             m0HaProcessType.M0_CONF_HA_PROCESS_M0MKFS.name):
+                        self.process_groups.process_group_unlock(state.fid)
                         continue
                     proc_type = m0HaProcessType.str_to_Enum(
                          proc_status_remote.proc_type)
@@ -227,8 +236,9 @@ class ConsumerThread(StoppableThread):
                               current_status, proc_status_remote.proc_status)
                     if proc_status is not None:
                         LOG.debug('proc_status: %s', proc_status.name)
-                        if proc_status_remote.proc_status != proc_status.name:
-                            if (am_i_rc or is_proc_local):
+                        if am_i_rc or is_proc_local:
+                            if (proc_status_remote.proc_status !=
+                                    proc_status.name):
                                 # Probably process node failed, in such a
                                 # case, only RC must be allowed to update
                                 # the process's persistent state.
@@ -239,11 +249,10 @@ class ConsumerThread(StoppableThread):
                                                   chp_type=proc_type,
                                                   chp_pid=0,
                                                   fid=state.fid))
-                            # RC or not RC, i.e. even without persistent state
-                            # update, it is important that the notification to
-                            # local motr processes must still be sent.
-                            new_ha_states.append(
-                                HAState(fid=state.fid, status=current_status))
+                                new_ha_states.append(
+                                    HAState(fid=state.fid,
+                                            status=current_status))
+                        self.process_groups.process_group_unlock(state.fid)
                         if not is_proc_local:
                             proc_status_local = (
                                 cns.get_process_status_local(
@@ -272,6 +281,8 @@ class ConsumerThread(StoppableThread):
                 else:
                     new_ha_states.append(state)
         except Exception as e:
+            if process_group_fid is not None:
+                self.process_groups.process_group_unlock(process_group_fid)
             raise HAConsistencyException('failed to process ha states') from e
         return new_ha_states
 
