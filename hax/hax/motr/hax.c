@@ -758,7 +758,7 @@ M0_INTERNAL struct hax_context *init_motr_api(PyObject *obj,
 	m0_mutex_init(&hc->hc_mutex);
 	rc = m0_halon_interface_init(&hc->hc_hi, M0_VERSION_GIT_REV_ID,
 				     M0_VERSION_BUILD_CONFIGURE_OPTS,
-				     "log-entrypoint log-link log-msg", NULL);
+				     "disable-compatibility-check log-entrypoint log-link log-msg", NULL);
 	if (rc != 0) {
 		hx_links_tlist_fini(&hc->hc_links);
 		m0_mutex_fini(&hc->hc_mutex);
