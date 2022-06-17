@@ -23,8 +23,8 @@ DHALL_TO_YAML_EXE = '/opt/seagate/cortx/hare/bin/dhall-to-yaml'
 
 
 class procT(Enum):
-    """Motr service type
-    """
+
+    """Motr service type"""
     M0_CST_MDS = 1
     M0_CST_IOS = auto()
     M0_CST_CONFD = auto()
@@ -483,6 +483,8 @@ class CdfGenerator:
 
     def _get_node_clients(self, machine_id: str) -> Iterator[M0ClientDesc]:
         """
+        Get motr client nodes.
+
         For all the motr clients present in the cluster return only those
         clients that are present in the components list for the given
         node>{machine_id} according to the ConfStore.

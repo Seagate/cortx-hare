@@ -74,7 +74,9 @@ def get_python_env():
 
 
 def bytecount_stat(request):
-    """This function calls for hare-status script from hax-server in order to
+    """Calls hare-status to provide CSM with --bytecount data in json format
+
+    This function calls for hare-status script from hax-server in order to
     provide CSM with an endpoint to get --byecount data in json format.
     """
     exec = Executor()
@@ -85,7 +87,10 @@ def bytecount_stat(request):
 
 
 def hctl_stat(request):
-    """This function calls the hare-status script from the hax-server in order
+    """
+    Calls hare-status to provide CSM with hctl status --json data.
+
+    This function calls the hare-status script from the hax-server in order
     to provide CSM with an endpoint to get the hctl status --json data.
     """
     exec = Executor()
@@ -99,7 +104,10 @@ def hctl_stat(request):
 # request a parameter. The respective result is obtained by executing
 # corresponding `hctl-fetch-fids` script.
 def hctl_fetch_fids(request):
-    """This function calls the hare-fetch-fids script from the hax-server in
+    """
+    calls the hare-fetch-fids to provide info about services configured.
+
+    This function calls the hare-fetch-fids script from the hax-server in
     order to provide details about services configured by Hare e.g. Hax,
     ios, confd, rgw etc
     """
@@ -114,7 +122,10 @@ def hctl_fetch_fids(request):
 
 
 def to_ha_states(data: Any, consul_util: ConsulUtil) -> List[HAState]:
-    """Converts a dictionary, obtained from JSON data, into a list of
+    """
+    converts dictionary into list of HA states
+
+    Converts a dictionary, obtained from JSON data, into a list of
     HA states.
 
     Format of an HA state: HAState(fid= <service fid>, status= <state>),

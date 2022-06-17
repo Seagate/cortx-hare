@@ -38,6 +38,7 @@ status_map: Dict[str, ObjHealth] = {
 
 
 class NodeEventHandler(EventHandler):
+
     """
     Handles HA events with resource_type == 'node'.
 

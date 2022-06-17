@@ -22,6 +22,7 @@ from typing import Callable, Dict, List, Optional, Tuple, TypeVar
 
 
 class Program:
+
     """
     Holds the command (or chain of commands if pipe `|` is used)
     to be executed by Executor class.

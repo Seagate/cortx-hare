@@ -33,6 +33,7 @@ LOG = logging.getLogger('hax')
 
 
 class EventPollingThread(StoppableThread):
+
     """
     Thread which polls the HA events from Kafka by means of EventListener
     class.

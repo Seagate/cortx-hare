@@ -93,12 +93,13 @@ def _run_bc_updater_thread(motr: Motr,
 
 @repeat_if_fails()
 def _remove_stale_session(util: ConsulUtil) -> None:
-    '''Destroys a stale RC leader session if it exists or does nothing otherwise.
+    """
+    Destroys a stale RC leader session if it exists or does nothing otherwise.
 
     An RC leader session may survive 'hctl shutdown'. In such a case 'leader'
     key will contain a garbage value 'elect2805' but the session will be alive
     and thus RC leader will not be re-elected.
-    '''
+    """
     if not util.kv.kv_get_raw('leader'):
         # No leader key means that there can be no stale RC leader session for
         # sure. We're starting for the first time against a fresh Consul KV.

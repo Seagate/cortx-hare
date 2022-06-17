@@ -19,6 +19,7 @@ import inject
 
 
 class HaxGlobalState:
+
     """
     Global state of whole HaX application.
     """
@@ -26,11 +27,11 @@ class HaxGlobalState:
         self.stopping: bool = False
 
     def is_stopping(self) -> bool:
-        """Whether the application is stopping now"""
+        """Whether the application is stopping now."""
         return self.stopping
 
     def set_stopping(self):
-        """Switches the current state to 'stopping' state"""
+        """Switches the current state to 'stopping' state."""
         self.stopping = True
 
 

@@ -122,6 +122,7 @@ class WorkPlanner:
 
     def _create_initial_state(self) -> State:
         '''Default factory method that returns initial state.
+
            Invoked from WorkPlanner's __init__ method.
         '''
         return State(next_group_id=0,
@@ -133,6 +134,7 @@ class WorkPlanner:
 
     def _create_poison(self) -> BaseMessage:
         '''Creates poison pill - Die command. Used in a special 'shutting down'
+
            mode to stop worker threads gracefully.
         '''
 
@@ -230,7 +232,10 @@ class WorkPlanner:
         return True
 
     def _is_allowed(self, command: BaseMessage) -> bool:
-        ''' The command is allowed for execution if and only if the command has
+        '''
+        Returns True group_id equal to the currently active group
+
+        The command is allowed for execution if and only if the command has
         group_id equal to the currently active group (see
         State.current_group_id). The command group ids are assigned just once
         when the command is being added to the WorkPlanner via add_command()
@@ -245,6 +250,7 @@ class WorkPlanner:
 
     def _get_increased_group(self, current: int) -> int:
         ''' Returns the next valid group_id number by the given current value.
+
             Performs no side effects.
         '''
         new_value = current + 1
@@ -258,10 +264,13 @@ class WorkPlanner:
         return new_value
 
     def _inc_group(self):
-        ''' Increases the currently active group. The method is invoked by
-            WorkPlanner when all the commands from the current group have
-            already been processed.
-            Assumes that b_lock is acquired already.
+        '''Increases the currently active group.
+
+        The method is invoked by WorkPlanner when
+        all the commands from the current group have
+        already been processed.
+
+        Assumes that b_lock is acquired already.
         '''
         state = self.state
         cur_group_id = state.current_group_id
@@ -274,8 +283,10 @@ class WorkPlanner:
             state.next_group_commands = set()
 
     def notify_finished(self, command: BaseMessage) -> None:
-        ''' The method must be invoked by the worker thread when the command
-            is executed.
+        '''Method invoked by the worker thread when the command is executed.
+
+           The method must be invoked by the worker thread when the command
+           is executed.
         '''
 
         with self.b_lock:
@@ -298,9 +309,11 @@ class WorkPlanner:
             self.b_lock.notifyAll()
 
     def _should_increase_group(self, cmd: BaseMessage) -> bool:
-        ''' Predicate function. Returns True if and only if cmd command CANNOT
-            be added to group number next_group_id.
-            Assumes that b_lock is acquired already.
+        '''Predicate function.
+
+        Returns True if and only if cmd command CANNOT
+        be added to group number next_group_id.
+        Assumes that b_lock is acquired already.
         '''
         def has(cmd_type: Type[BaseMessage]) -> bool:
             ''' Checks if the group being currently formed (i.e. next_group)
@@ -338,6 +351,7 @@ class WorkPlanner:
     def _assign_group(self, cmd: BaseMessage) -> Tuple[BaseMessage, bool]:
         ''' Sets the correct group_id to the command. Side effect: updates
         self.state.
+
         Returns Tuple with the updated command and a boolean flag saying
         whether this command must be added out of order (is_asap).
 

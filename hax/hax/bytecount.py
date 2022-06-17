@@ -52,6 +52,7 @@ class ByteCountUpdater(StoppableThread):
                                        Dict[str, PverInfo]]:
         '''
         Storing a map of pver_fid and its state.
+
         Ex of pver state:
         PverInfo(fid=0x7600000000000001:0x3e, state=0,
         data_units=1, parity_units=0, pool_width=10, unit_size=0)
@@ -77,6 +78,8 @@ class ByteCountUpdater(StoppableThread):
             self,
             pver_state: Dict[str, PverInfo]) -> Dict[str, int]:
         """
+        Aggregate all the bytecount based on pver fid.
+
         Based on bytecount data saved in consul KV, aggregate all the
         bytecount based on pver fid. Discard the parity buffer count based
         on that pver configuration and return the map of pver fid : bytecount.

@@ -45,9 +45,8 @@ class Service(NamedTuple):
 
 
 class KVFile:
-    """
-    Helper class to fetch data from Hare-Motr configuration key values file.
-    """
+
+    """Helper to fetch data from Hare-Motr configuration key values file."""
 
     def __init__(self, kv_file: str, node: str) -> None:
         self.kv_file = kv_file

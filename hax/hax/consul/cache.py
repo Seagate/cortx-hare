@@ -67,6 +67,8 @@ kwd_cache = 'kv_cache'
 
 def supports_consul_cache(f: T) -> T:
     """
+    Create the instance of cache that nested functions can pick up.
+
     Decorates a method that either starts a new cache or silently reuses the
     one provided as kv_cache parameter.
     The function being decorated WILL NOT be cached. The only use case is to
