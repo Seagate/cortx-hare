@@ -29,12 +29,14 @@ logging.basicConfig(level=logging.INFO,
 
 
 class FailedToGenerateReport(BaseException):
+
     """Used to raise exception while report generation failed."""
 
     pass
 
 
 class DirectoryScanner:
+
     """
     Scans the directory according to the given pattern. It never return files
     which are not listed into 'include' keyword argument.
@@ -96,6 +98,7 @@ class DirectoryScanner:
 
 
 class Utility:
+
     """Here is the utility class which has static utility helper methods."""
 
     def run_cmd(self, command: str, delimiter: Optional[str] = None,
@@ -147,6 +150,7 @@ class Utility:
 
 
 class Strategy(ABC):
+    
     """Abstract base class for coverage tool."""
 
     @abstractmethod

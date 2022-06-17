@@ -10,6 +10,7 @@ LOG = logging.getLogger('hax')
 
 
 class RconfcStarter(StoppableThread):
+
     """
     A short-lived thread that is intended to start rconfc.
 

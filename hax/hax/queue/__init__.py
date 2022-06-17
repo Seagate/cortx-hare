@@ -17,6 +17,7 @@ LOG = logging.getLogger('hax')
 
 
 class BQProcessor:
+
     """
     Broadcast Queue Processor.
 

@@ -23,9 +23,7 @@ class Publisher:
 
     @repeat_if_fails(wait_seconds=0.1)
     def publish(self, message_type: str, payload: str) -> int:
-        """
-        Publishes the given message to the queue.
-        """
+        """Publishes the given message to the queue."""
         data = simplejson.loads(payload)
         message = Message(message_type=message_type, payload=data)
         data = simplejson.dumps(message)

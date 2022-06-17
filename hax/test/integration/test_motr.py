@@ -76,6 +76,8 @@ def logging_support(hax_state: HaxGlobalState):
 
 def ha_note_failed() -> TraceMatcher:
     '''
+    Checks if the argument is a pointer to HaNoteStruct
+
     Returns true if the second argument is a pointer to HaNoteStruct and that
     structure brings M0_NC_FAILED state.
 

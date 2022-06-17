@@ -29,6 +29,7 @@ LOG = logging.getLogger('hax')
 
 
 class StubEventThread(StoppableThread):
+
     """Stub implementation of EventPollingThread.
 
     The class is used as a Null Object pattern in cases when

@@ -43,6 +43,7 @@ class LinkedListIterator:
 
 
 class LinkedList(Iterable[A]):
+
     ''' The class is used as a replacement for set() in cases when the stored
     objects are not hashable and it is sufficient to compare them by 'identity'
     (the equality of memory pointer).

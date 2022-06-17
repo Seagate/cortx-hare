@@ -32,6 +32,7 @@ from helper.exec import CliException, Executor, Program, two_columns
 
 @dataclass
 class AppCtx:
+
     """
     A storage for application context.
     Conains the parameters to run the current application.
@@ -103,7 +104,8 @@ def parse_opts(ctx, cdf: str, conf_dir: str, transport: str, log_dir: str,
                consul_server: bool, uuid: str, log_file: str):
     """Generate Hare configuration according to the given CDF file.
 
-    CDF   Full path to the Cluster Description File (CDF)."""
+    CDF Full path to the Cluster Description File (CDF).
+    """
     ctx.ensure_object(dict)
     ctx.obj['result'] = AppCtx(cdf_path=cdf,
                                conf_dir=conf_dir,

@@ -24,6 +24,7 @@ from hax.ha.message_interface.message_interface import Event
 
 
 class EventHandler:
+
     """Base class (effectively - interface) for all HA event handlers"""
     @abstractmethod
     def handle(self, msg: Event) -> None:

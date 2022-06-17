@@ -32,9 +32,11 @@ LOG = logging.getLogger('hax')
 
 
 class CountDownLatch:
+
     """ Home-made implementation of CountDownLatch from Java world.
-        Unblocks a single thread when all N threads have invoked count_down()
-        from their sides.
+
+    Unblocks a single thread when all N threads have invoked count_down()
+    from their sides.
     """
     def __init__(self, value: int):
         self.lock = Condition()

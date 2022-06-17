@@ -30,6 +30,7 @@ LOG_FILE_SIZE = 1024 * 1024 * 1024
 
 
 class ConsulStarter(StoppableThread):
+
     """
     Starts consul agent and blocks until terminated.
     """
