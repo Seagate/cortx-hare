@@ -86,7 +86,6 @@ class Motr:
             return self.consul_util.get_rm_fid()
 
         rm_fid = _get_rm_fid()
-        # Cleanup old process states.
         result = self._ffi.start(self._ha_ctx, make_c_str(rpc_endpoint),
                                  process.to_c(), ha_service.to_c(),
                                  rm_fid.to_c())
