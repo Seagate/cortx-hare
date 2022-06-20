@@ -32,7 +32,7 @@ from hax.motr import Motr
 from hax.motr.delivery import DeliveryHerald
 from hax.motr.planner import WorkPlanner
 from hax.queue.publish import EQPublisher
-from hax.types import (ConfHaProcess, HAState, MessageId,
+from hax.types import (ConfHaProcess, HAState, HaLinkMessagePromise, MessageId,
                        ObjT, ObjHealth, StoppableThread, m0HaProcessEvent,
                        m0HaProcessType)
 from hax.util import ConsulUtil, ProcessGroup, dump_json, repeat_if_fails
@@ -298,6 +298,34 @@ class ConsumerThread(StoppableThread):
 
                     LOG.debug('Got %s message from planner', item)
                     if isinstance(item, FirstEntrypointRequest):
+                        # Check process's restart count, if its the first time
+                        # (restart_count = 0), do not notify failure for this
+                        # process, else report failure.
+                        # Update restart count.
+                        restart_count = self.consul.get_proc_restart_count(
+                                            item.process_fid)
+                        if restart_count > 1:
+                            LOG.debug('process restarted, broadcast FAILED')
+                            proc_status = (
+                                m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED)
+                            proc_type = m0HaProcessType.M0_CONF_HA_PROCESS_M0D
+                            self.consul.update_process_status(
+                                ConfHaProcess(chp_event=proc_status,
+                                              chp_type=proc_type,
+                                              chp_pid=0,
+                                              fid=item.process_fid))
+                            ids: List[MessageId] = motr.broadcast_ha_states(
+                                [
+                                    HAState(fid=item.process_fid,
+                                            status=ObjHealth.OFFLINE)
+                                ],
+                                notify_devices=False)
+                            LOG.debug('waiting for broadcast of %s for ep: %s',
+                                      ids, item.remote_rpc_endpoint)
+                            # Wait for failure delivery.
+                            self.herald.wait_for_all(HaLinkMessagePromise(ids))
+                        self.consul.set_proc_restart_count(item.process_fid,
+                                                           restart_count + 1)
                         motr.send_entrypoint_request_reply(
                             EntrypointRequest(
                                 reply_context=item.reply_context,

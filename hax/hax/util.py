@@ -1418,6 +1418,23 @@ class ConsulUtil:
                 return m0HaObjState.parse(state)
         return m0HaObjState.M0_NC_ONLINE
 
+    @repeat_if_fails()
+    def get_proc_restart_count(self, proc_fid: Fid) -> int:
+        local_node = self.get_local_nodename()
+        key = f'{local_node}/process_restarts/{proc_fid}'
+        restart_count_val = self.kv.kv_get(key, allow_null=True,
+                                           recurse=False)
+        if restart_count_val:
+            restart_count = json.loads(restart_count_val['Value'])
+            return int(restart_count)
+        return 0
+
+    @repeat_if_fails()
+    def set_proc_restart_count(self, proc_fid: Fid, count: int):
+        local_node = self.get_local_nodename()
+        key = f'{local_node}/process_restarts/{proc_fid}'
+        self.kv.kv_put(key, json.dumps(str(count)))
+
     @staticmethod
     def _to_canonical_service_data(service: Dict[str, Any]) -> ServiceData:
         node = service['Node']
@@ -2116,6 +2133,17 @@ class ConsulUtil:
         keys: List[KeyDelete] = [
             KeyDelete(name='processes/', recurse=True),
         ]
+        logging.info('Deleting Hare KV entries (%s)', keys)
+        if not self.kv.kv_delete_in_transaction(keys):
+            raise HAConsistencyException('KV deletion failed')
+
+    @repeat_if_fails()
+    def cleanup_process_restarts(self):
+        local_node = self.get_local_nodename()
+        keys: List[KeyDelete] = [
+            KeyDelete(name=f'{local_node}/process_restarts/', recurse=True),
+        ]
+
         logging.info('Deleting Hare KV entries (%s)', keys)
         if not self.kv.kv_delete_in_transaction(keys):
             raise HAConsistencyException('KV deletion failed')
