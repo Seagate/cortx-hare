@@ -19,6 +19,7 @@ recordclass==0.14
 
 #:runtime-requirements:
 idna==2.10
+charset-normalizer==2.0.12
 aiohttp==3.8.1
 click==8.0.1
 dataclasses==0.8
