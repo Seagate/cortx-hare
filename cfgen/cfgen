@@ -2016,8 +2016,11 @@ class ConfPool(ToDhall):
             m0conf[parent].mdpool = pool_id
         else:
             assert t is PoolT.sns
-            for v in gen_allowances(tolerance):
-                ConfPverF.build(m0conf, pool_id, base=pver, allowance=v)
+            generate_formulaic_pvers: bool = cluster_desc.get(
+                                           'generate_formulaic_pvers', False)
+            if generate_formulaic_pvers:
+                for v in gen_allowances(tolerance):
+                    ConfPverF.build(m0conf, pool_id, base=pver, allowance=v)
 
         return pool_id
 
