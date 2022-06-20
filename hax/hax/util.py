@@ -37,8 +37,8 @@ from urllib3.exceptions import HTTPError
 from hax.common import HaxGlobalState
 from hax.exception import HAConsistencyException, InterruptedException
 from hax.types import (ByteCountStats, ConfHaProcess, Fid, FsStatsWithTime,
-                       ObjT, ObjHealth, ObjTMaskMap, Profile, PverInfo,
-                       PverState, m0HaProcessEvent, m0HaProcessType,
+                       HAState, ObjT, ObjHealth, ObjTMaskMap, Profile,
+                       PverInfo, PverState, m0HaProcessEvent, m0HaProcessType,
                        KeyDelete, HaNoteStruct, m0HaObjState)
 
 from hax.consul.cache import (uses_consul_cache, invalidates_consul_cache,
@@ -200,6 +200,12 @@ def wait_for_event(event: Event, interval_sec) -> None:
         raise InterruptedException()
 
 
+def ha_state_to_json(state: HAState) -> str:
+    data = {'fid': str(state.fid),
+            'state': str(state.status.name)}
+    return dump_json(data)
+
+
 class KVAdapter:
     def __init__(self, cns: Optional[Consul] = None):
         self.cns = cns or Consul()
@@ -241,7 +247,7 @@ class KVAdapter:
             b64: bytes = b64encode(v.value.encode())
             b64_str = b64.decode()
 
-            if v.cas:
+            if v.cas is not None:
                 return {
                     'KV': {
                         'Key': v.key,

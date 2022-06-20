@@ -22,9 +22,10 @@ set -e -o pipefail
 export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
 
 log() {
-    # logger --tag "hare/${0##*/}" --stderr "$*"
     echo -n "$*"
 }
-log "Default RC rule handler called for event \
-type: ${HARE_RC_EVENT_TYPE} and payload ${HARE_RC_EVENT_PAYLOAD}. \
-No action."
+
+log "Process state update event is called for \
+payload ${HARE_RC_EVENT_PAYLOAD}."
+
+h0q bq PROC_STATE_UPDATE "$HARE_RC_EVENT_PAYLOAD"

@@ -3,9 +3,10 @@ import logging
 from queue import Queue
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from hax.message import (BaseMessage, BroadcastHAStates, SnsDiskAttach,
-                         SnsDiskDetach, SnsRebalancePause, SnsRebalanceResume,
-                         SnsRebalanceStart, SnsRebalanceStop, SnsRepairPause,
+from hax.message import (BaseMessage, BroadcastHAStates, ProcessStateUpdate,
+                         SnsDiskAttach, SnsDiskDetach, SnsRebalancePause,
+                         SnsRebalanceResume, SnsRebalanceStart,
+                         SnsRebalanceStop, SnsRepairPause,
                          SnsRepairResume, SnsRepairStart, SnsRepairStop)
 from hax.motr.delivery import DeliveryHerald
 from hax.motr.planner import WorkPlanner
@@ -23,6 +24,7 @@ class BQProcessor:
 
     This is the place where a real processing logic should be located.
     """
+
     def __init__(self, planner: WorkPlanner, delivery_herald: DeliveryHerald,
                  conf_obj_util: ConfObjUtil):
         self.planner = planner
@@ -56,7 +58,9 @@ class BQProcessor:
             'M0_HA_MSG_NVEC': self.handle_device_state_set,
             'SNS_OP': self.handle_sns_op,
             'STOB_IOQ_ERROR': self.handle_ioq_stob_error,
+            'PROC_STATE_UPDATE': self.handle_process_state_update
         }
+        LOG.debug('Payload: %s for handler type: %s', payload, msg_type)
         if msg_type not in handlers:
             LOG.warn('Unsupported message type given: %s. Message skipped.',
                      msg_type)
@@ -122,6 +126,23 @@ class BQProcessor:
                                 status=ObjHealth.FAILED)], reply_to=q))
         ids: List[MessageId] = q.get()
         self.herald.wait_for_any(HaLinkMessagePromise(ids))
+
+    def handle_process_state_update(self, payload: Dict[str, Any]) -> None:
+
+        def _get_ha_state() -> Optional[HAState]:
+            try:
+                fid = Fid.parse(payload['fid'])
+                state = getattr(ObjHealth, payload['state'])
+            except (KeyError, AttributeError) as error:
+                LOG.error('Invalid json payload, no key (%s) present', error)
+                return None
+            return HAState(fid, status=state)
+
+        hastate: Optional[HAState] = _get_ha_state()
+        LOG.debug('ProcessStateUpdate process fid: %s state: %s',
+                  payload['fid'], payload['state'])
+        self.planner.add_command(
+            ProcessStateUpdate(states=[hastate]))
 
     def to_ha_state(self, objinfo: Dict[str, str]) -> Optional[HAState]:
         hastate_to_objstate = {

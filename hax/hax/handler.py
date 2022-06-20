@@ -21,7 +21,7 @@ from typing import List, Any
 
 from hax.message import (BroadcastHAStates, Die, EntrypointRequest,
                          FirstEntrypointRequest, HaNvecGetEvent,
-                         HaNvecSetEvent, ProcessEvent,
+                         HaNvecSetEvent, ProcessEvent, ProcessStateUpdate,
                          SnsRebalancePause, SnsRebalanceResume,
                          SnsRebalanceStart, SnsRebalanceStatus,
                          SnsRebalanceStop, SnsRepairPause, SnsRepairResume,
@@ -32,10 +32,11 @@ from hax.motr import Motr
 from hax.motr.delivery import DeliveryHerald
 from hax.motr.planner import WorkPlanner
 from hax.queue.publish import EQPublisher
-from hax.types import (ConfHaProcess, HAState, HaLinkMessagePromise, MessageId,
-                       ObjT, ObjHealth, StoppableThread, m0HaProcessEvent,
-                       m0HaProcessType)
-from hax.util import ConsulUtil, ProcessGroup, dump_json, repeat_if_fails
+from hax.types import (ConfHaProcess, Fid, HAState, HaLinkMessagePromise,
+                       KeyDelete, MessageId, ObjT, ObjHealth, StoppableThread,
+                       m0HaProcessEvent, m0HaProcessType)
+from hax.util import (ConsulUtil, ProcessGroup, TxPutKV, dump_json,
+                      repeat_if_fails, ha_state_to_json)
 from hax.ha import get_producer
 
 
@@ -158,6 +159,40 @@ class ConsumerThread(StoppableThread):
             except Exception as e:
                 LOG.warning("Send event failed due to '%s'", e)
 
+    @staticmethod
+    def _get_process_cached_key(proc_state: HAState) -> TxPutKV:
+        key = f'cached/{proc_state.fid}/{proc_state.status}'
+        return TxPutKV(key=key,
+                       value='True',
+                       cas=0)
+
+    @staticmethod
+    def _delete_process_cached_key(proc_state: HAState,
+                                   cns: ConsulUtil) -> None:
+        key = f'cached/{proc_state.fid}/{proc_state.status}'
+        # Only RC will be able to delete this key.
+        # Deleting this key may fail when there isn't a node failure
+        # and process event wasn't cached.
+        keys: List[KeyDelete] = [
+                KeyDelete(name=key, recurse=False),
+        ]
+        # TODO how to avoid retries?
+        cns.kv.kv_delete_in_transaction(keys)
+
+    def cache_process_event(self, state: HAState) -> None:
+        # cache the process state updates in EQ
+        payload = ha_state_to_json(state)
+        checks = self._get_process_cached_key(state)
+        res = self.eq_publisher.publish_no_duplicate(
+            'process-state-update', payload, str(state.fid), [checks])
+        LOG.debug('Event: %s, Added to EQ: %s', payload, res)
+
+    def _is_node_failure(self, proc_fid: Fid) -> bool:
+        cns = self.consul
+        proc_node = cns.get_process_node(proc_fid)
+        status = cns.get_node_health_status(proc_node)
+        return True if status != 'passing' else False
+
     @repeat_if_fails(wait_seconds=1)
     def update_process_failure(self, planner: WorkPlanner,
                                ha_states: List[HAState]) -> List[HAState]:
@@ -193,7 +228,7 @@ class ConsumerThread(StoppableThread):
                         self.process_groups.process_group_unlock(state.fid)
                         continue
                     proc_type = m0HaProcessType.str_to_Enum(
-                         proc_status_remote.proc_type)
+                        proc_status_remote.proc_type)
                     # Following cases are handled here,
                     # 1. Delayed consul service failure notification:
                     # -  We re-confirm the current process state before
@@ -249,6 +284,7 @@ class ConsumerThread(StoppableThread):
                                                   chp_type=proc_type,
                                                   chp_pid=0,
                                                   fid=state.fid))
+                                self._delete_process_cached_key(state, cns)
                                 new_ha_states.append(
                                     HAState(fid=state.fid,
                                             status=current_status))
@@ -276,6 +312,19 @@ class ConsumerThread(StoppableThread):
                                 new_ha_states.append(
                                     HAState(fid=state.fid,
                                             status=current_status))
+
+                            # Cache the event in case of remote node failure
+                            # and if not already processed by RC node and
+                            # not updated in Consul KV.
+                            proc_status_kv = cns.get_process_status(state.fid)
+                            node_failure = self._is_node_failure(state.fid)
+                            LOG.debug('proc status in kv=%s,'
+                                      'reported status=%s, node_fail=%s',
+                                      proc_status_kv.proc_status,
+                                      proc_status.name, node_failure)
+                            if (proc_status_kv.proc_status !=
+                                    proc_status.name and node_failure):
+                                self.cache_process_event(state)
                         else:
                             continue
                 else:
@@ -295,7 +344,7 @@ class ConsumerThread(StoppableThread):
         # We don't want to send failure for hax and client
         # restarts, so skip them.
         restart_count = self.consul.get_proc_restart_count(
-                            req.process_fid)
+            req.process_fid)
         if (req.process_fid != self.consul.get_hax_fid() and
                 not self.consul.is_proc_client(req.process_fid)):
             if restart_count > 1:
@@ -308,12 +357,12 @@ class ConsumerThread(StoppableThread):
                                   chp_pid=0,
                                   fid=req.process_fid))
                 ids: List[MessageId] = motr.broadcast_ha_states(
-                                       [
-                                           HAState(fid=req.process_fid,
-                                                   status=ObjHealth.OFFLINE)
-                                       ],
-                                       notify_devices=False,
-                                       proc_skip_list=[req.process_fid])
+                    [
+                        HAState(fid=req.process_fid,
+                                status=ObjHealth.OFFLINE)
+                    ],
+                    notify_devices=False,
+                    proc_skip_list=[req.process_fid])
                 LOG.debug('waiting for broadcast of %s for ep: %s',
                           ids, req.remote_rpc_endpoint)
                 # Wait for failure delivery.
@@ -335,14 +384,14 @@ class ConsumerThread(StoppableThread):
                     if isinstance(item, FirstEntrypointRequest):
                         self._restart_notify(item, motr)
                         motr.send_entrypoint_request_reply(
-                             EntrypointRequest(
-                                 reply_context=item.reply_context,
-                                 req_id=item.req_id,
-                                 remote_rpc_endpoint=item.remote_rpc_endpoint,
-                                 process_fid=item.process_fid,
-                                 git_rev=item.git_rev,
-                                 pid=item.pid,
-                                 is_first_request=item.is_first_request))
+                            EntrypointRequest(
+                                reply_context=item.reply_context,
+                                req_id=item.req_id,
+                                remote_rpc_endpoint=item.remote_rpc_endpoint,
+                                process_fid=item.process_fid,
+                                git_rev=item.git_rev,
+                                pid=item.pid,
+                                is_first_request=item.is_first_request))
                     elif isinstance(item, EntrypointRequest):
                         # While replying any Exception is catched. In such a
                         # case, the motr process will receive EAGAIN and
@@ -384,6 +433,9 @@ class ConsumerThread(StoppableThread):
                                         ' is not available')
                         if item.reply_to:
                             item.reply_to.put(result)
+                    elif isinstance(item, ProcessStateUpdate):
+                        LOG.info('HA states cached: %s', item.states)
+                        self.update_process_failure(planner, item.states)
                     elif isinstance(item, StobIoqError):
                         LOG.info('Stob IOQ: %s', item.fid)
                         payload = dump_json(item)
