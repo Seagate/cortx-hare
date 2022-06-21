@@ -1115,6 +1115,18 @@ def add_systemd_argument(parser):
     return parser
 
 
+def add_changeset_argument(parser):
+    parser.add_argument('--changeset',
+                        help="""Changeset URL, which has new/deleted/changes
+                        keys for upgrade.
+                        Default is 'yaml:///etc/cortx/changeset.conf.'""",
+                        nargs=1,
+                        type=str,
+                        default="yaml:///etc/cortx/changeset.conf",
+                        action='store')
+    return parser
+
+
 def str2bool(v):
     if isinstance(v, bool):
         return v
@@ -1279,12 +1291,13 @@ def create_parser() -> argparse.ArgumentParser:
                        help_str='Performs the Hare rpm post-upgrade tasks',
                        handler_fn=noop))
 
-    add_service_argument(
-        add_subcommand(subparser,
-                       'upgrade',
-                       help_str='Performs the Hare rpm upgrade tasks',
-                       handler_fn=noop,
-                       config_required=False))
+    add_changeset_argument(
+        add_service_argument(
+            add_subcommand(subparser,
+                           'upgrade',
+                           help_str='Performs the Hare rpm upgrade tasks',
+                           handler_fn=noop,
+                           config_required=True)))
     return p
 
 
