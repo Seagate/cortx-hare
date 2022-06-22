@@ -286,6 +286,41 @@ class ConsumerThread(StoppableThread):
             raise HAConsistencyException('failed to process ha states') from e
         return new_ha_states
 
+    def _restart_notify(self, req: FirstEntrypointRequest,
+                        motr: Motr):
+        # Check process's restart count, if its the first time
+        # (restart_count = 0), do not notify failure for this
+        # process, else report failure.
+        # Update restart count.
+        # We don't want to send failure for hax and client
+        # restarts, so skip them.
+        restart_count = self.consul.get_proc_restart_count(
+                            req.process_fid)
+        if (req.process_fid != self.consul.get_hax_fid() and
+                not self.consul.is_proc_client(req.process_fid)):
+            if restart_count > 1:
+                LOG.debug('Process restarted, broadcasting OFFLINE')
+                proc_status = m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED
+                proc_type = m0HaProcessType.M0_CONF_HA_PROCESS_M0D
+                self.consul.update_process_status(
+                    ConfHaProcess(chp_event=proc_status,
+                                  chp_type=proc_type,
+                                  chp_pid=0,
+                                  fid=req.process_fid))
+                ids: List[MessageId] = motr.broadcast_ha_states(
+                                       [
+                                           HAState(fid=req.process_fid,
+                                                   status=ObjHealth.FAILED)
+                                       ],
+                                       notify_devices=False,
+                                       proc_skip_list=[req.process_fid])
+                LOG.debug('waiting for broadcast of %s for ep: %s',
+                          ids, req.remote_rpc_endpoint)
+                # Wait for failure delivery.
+                self.herald.wait_for_all(HaLinkMessagePromise(ids))
+        self.consul.set_proc_restart_count(req.process_fid,
+                                           restart_count + 1)
+
     def _do_work(self, planner: WorkPlanner, motr: Motr):
         LOG.info('Handler thread has started')
 
@@ -298,43 +333,16 @@ class ConsumerThread(StoppableThread):
 
                     LOG.debug('Got %s message from planner', item)
                     if isinstance(item, FirstEntrypointRequest):
-                        # Check process's restart count, if its the first time
-                        # (restart_count = 0), do not notify failure for this
-                        # process, else report failure.
-                        # Update restart count.
-                        restart_count = self.consul.get_proc_restart_count(
-                                            item.process_fid)
-                        if restart_count > 1:
-                            LOG.debug('process restarted, broadcast FAILED')
-                            proc_status = (
-                                m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED)
-                            proc_type = m0HaProcessType.M0_CONF_HA_PROCESS_M0D
-                            self.consul.update_process_status(
-                                ConfHaProcess(chp_event=proc_status,
-                                              chp_type=proc_type,
-                                              chp_pid=0,
-                                              fid=item.process_fid))
-                            ids: List[MessageId] = motr.broadcast_ha_states(
-                                [
-                                    HAState(fid=item.process_fid,
-                                            status=ObjHealth.OFFLINE)
-                                ],
-                                notify_devices=False)
-                            LOG.debug('waiting for broadcast of %s for ep: %s',
-                                      ids, item.remote_rpc_endpoint)
-                            # Wait for failure delivery.
-                            self.herald.wait_for_all(HaLinkMessagePromise(ids))
-                        self.consul.set_proc_restart_count(item.process_fid,
-                                                           restart_count + 1)
+                        self._restart_notify(item, motr)
                         motr.send_entrypoint_request_reply(
-                            EntrypointRequest(
-                                reply_context=item.reply_context,
-                                req_id=item.req_id,
-                                remote_rpc_endpoint=item.remote_rpc_endpoint,
-                                process_fid=item.process_fid,
-                                git_rev=item.git_rev,
-                                pid=item.pid,
-                                is_first_request=item.is_first_request))
+                             EntrypointRequest(
+                                 reply_context=item.reply_context,
+                                 req_id=item.req_id,
+                                 remote_rpc_endpoint=item.remote_rpc_endpoint,
+                                 process_fid=item.process_fid,
+                                 git_rev=item.git_rev,
+                                 pid=item.pid,
+                                 is_first_request=item.is_first_request))
                     elif isinstance(item, EntrypointRequest):
                         # While replying any Exception is catched. In such a
                         # case, the motr process will receive EAGAIN and

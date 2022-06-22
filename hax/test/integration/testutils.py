@@ -239,7 +239,8 @@ class FakeFFI(HaxFFI):
         ...
 
     @trace_call
-    def ha_broadcast(self, _ha_ctx, ha_notes, notes_len):
+    def ha_broadcast(self, _ha_ctx, ha_notes, notes_len, proc_skip_list,
+                     proc_skip_list_len):
         return [MessageId(101, 1), MessageId(101, 2)]
 
     @trace_call

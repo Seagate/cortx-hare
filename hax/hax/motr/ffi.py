@@ -91,6 +91,8 @@ class HaxFFI:
             c.c_void_p,  # unsigned long long ctx
             c.POINTER(HaNoteStruct),  # struct m0_ha_note *notes
             c.c_uint32,  # uint32_t nr_notes
+            c.POINTER(c.c_char_p),  # const char **proc_skip_list
+            c.c_uint32,  # uin32_t proc_skip_list_len
         ]
         lib.m0_ha_notify.restype = c.py_object
         self.ha_broadcast = lib.m0_ha_notify
