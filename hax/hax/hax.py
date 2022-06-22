@@ -43,7 +43,8 @@ from hax.motr.planner import WorkPlanner
 from hax.motr.rconfc import RconfcStarter
 from hax.server import ServerRunner
 from hax.types import Fid, Profile, StoppableThread
-from hax.util import ConsulUtil, ProcessGroup, repeat_if_fails
+from hax.util import ProcessGroup, repeat_if_fails
+from hax.configmanager import ConfigManager, ConsulConfigManager
 
 
 __all__ = ['main']
@@ -70,7 +71,7 @@ def _run_thread(thread: StoppableThread) -> StoppableThread:
 
 
 def _run_qconsumer_thread(planner: WorkPlanner, motr: Motr,
-                          herald: DeliveryHerald, consul: ConsulUtil,
+                          herald: DeliveryHerald, consul: ConfigManager,
                           process_groups: ProcessGroup,
                           idx: int) -> StoppableThread:
     return _run_thread(ConsumerThread(planner, motr, herald, consul,
@@ -80,19 +81,19 @@ def _run_qconsumer_thread(planner: WorkPlanner, motr: Motr,
 # TODO this is work around and once the proper fix for CORTX-27707 is in
 # place, this will be reverted
 def _run_stats_updater_thread(motr: Motr,
-                              consul_util: ConsulUtil) -> StoppableThread:
+                              consul_util: ConfigManager) -> StoppableThread:
     return _run_thread(FsStatsUpdater(motr, consul_util, interval_sec=600))
 
 
 # TODO this is work around and once the proper fix for CORTX-27707 is in
 # place, this will be reverted
 def _run_bc_updater_thread(motr: Motr,
-                           consul_util: ConsulUtil) -> StoppableThread:
+                           consul_util: ConfigManager) -> StoppableThread:
     return _run_thread(ByteCountUpdater(motr, consul_util, interval_sec=600))
 
 
 @repeat_if_fails()
-def _remove_stale_session(util: ConsulUtil) -> None:
+def _remove_stale_session(util: ConfigManager) -> None:
     """
     Destroys a stale RC leader session if it exists or does nothing otherwise.
 
@@ -127,7 +128,7 @@ def _remove_stale_session(util: ConsulUtil) -> None:
 
 @log_exception
 @repeat_if_fails()
-def _get_motr_fids(util: ConsulUtil) -> HL_Fids:
+def _get_motr_fids(util: ConfigManager) -> HL_Fids:
     try:
         hax_ep: str = util.get_hax_endpoint()
         hax_fid: Fid = util.get_hax_fid()
@@ -142,7 +143,7 @@ def _get_motr_fids(util: ConsulUtil) -> HL_Fids:
 
 
 def _run_rconfc_starter_thread(motr: Motr,
-                               consul_util: ConsulUtil) -> RconfcStarter:
+                               consul_util: ConfigManager) -> RconfcStarter:
     rconfc_starter = RconfcStarter(motr, consul_util)
     rconfc_starter.start()
     return rconfc_starter
@@ -185,7 +186,7 @@ def main():
     # process needs to shutdown).
     signal.signal(signal.SIGINT, handle_signal)
 
-    util: ConsulUtil = ConsulUtil()
+    util: ConfigManager = ConsulConfigManager()
     # Avoid removing session on hax start as this will happen
     # on every node, thus leader election will keep re-triggering
     # until the final hax node starts, this will delay further

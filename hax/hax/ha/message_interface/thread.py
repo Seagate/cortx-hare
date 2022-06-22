@@ -27,7 +27,8 @@ from hax.ha.message_interface.message_interface import (MessageBusInterface,
 from hax.ha.message_interface.message_interface import Event
 from hax.motr.planner import WorkPlanner
 from hax.types import StoppableThread
-from hax.util import ConsulUtil, InterruptedException, wait_for_event
+from hax.util import InterruptedException, wait_for_event
+from hax.configmanager import ConfigManager
 
 LOG = logging.getLogger('hax')
 
@@ -40,7 +41,7 @@ class EventPollingThread(StoppableThread):
     """
     def __init__(self,
                  planner: WorkPlanner,
-                 consul: ConsulUtil,
+                 consul: ConfigManager,
                  listener: Optional[MessageInterface] = None,
                  interval_sec: float = 1.0):
         """Constructor."""

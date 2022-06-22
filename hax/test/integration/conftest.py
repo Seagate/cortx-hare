@@ -2,12 +2,12 @@ import logging
 
 import pytest
 from hax.log import setup_logging
-from hax.util import ConsulUtil
+from hax.configmanager import ConsulConfigManager
 
 
 @pytest.fixture
 def consul_util(mocker):
-    consul = ConsulUtil()
+    consul = ConsulConfigManager()
     exc = RuntimeError('Not allowed')
     mock = mocker.patch.object
     mock(consul.kv, 'kv_get', side_effect=exc)

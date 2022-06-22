@@ -44,7 +44,8 @@ from hax.queue import BQProcessor
 from hax.queue.confobjutil import ConfObjUtil
 from hax.queue.offset import InboxFilter, OffsetStorage
 from hax.types import Fid, HAState, ObjHealth, StoppableThread
-from hax.util import ConsulUtil, create_process_fid, dump_json
+from hax.util import create_process_fid, dump_json
+from hax.configmanager import ConfigManager
 from helper.exec import Executor, Program
 from hax.util import repeat_if_fails
 from hax.ha.utils import HaUtils
@@ -121,7 +122,7 @@ def hctl_fetch_fids(request):
     return json_response(text=result)
 
 
-def to_ha_states(data: Any, consul_util: ConsulUtil) -> List[HAState]:
+def to_ha_states(data: Any, consul_util: ConfigManager) -> List[HAState]:
     """
     converts dictionary into list of HA states
 
@@ -149,7 +150,7 @@ def to_ha_states(data: Any, consul_util: ConsulUtil) -> List[HAState]:
     return ha_states
 
 
-def process_ha_states(planner: WorkPlanner, consul_util: ConsulUtil):
+def process_ha_states(planner: WorkPlanner, consul_util: ConfigManager):
     async def _process(request):
         data = await request.json()
 
@@ -295,7 +296,7 @@ def process_state_update(planner: WorkPlanner):
     return _process
 
 
-def event_subscription_handle(consul_util: ConsulUtil):
+def event_subscription_handle(consul_util: ConfigManager):
     async def _process(request):
         data = await request.json()
 
@@ -312,7 +313,7 @@ def event_subscription_handle(consul_util: ConsulUtil):
     return _process
 
 
-def event_unsubscription_handle(consul_util: ConsulUtil):
+def event_unsubscription_handle(consul_util: ConfigManager):
     async def _process(request):
         data = await request.json()
 
@@ -358,7 +359,7 @@ class ServerRunner:
         self,
         planner: WorkPlanner,
         herald: DeliveryHerald,
-        consul_util: ConsulUtil,
+        consul_util: ConfigManager,
         hax_state: HaxGlobalState
     ):
         self.consul_util = consul_util

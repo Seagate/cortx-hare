@@ -33,7 +33,8 @@ from typing import Any, Dict, List, NamedTuple, Optional
 from consul import Consul, ConsulException
 from hax.common import di_configuration
 from hax.exception import HAConsistencyException
-from hax.util import ConsulUtil, repeat_if_fails
+from hax.util import repeat_if_fails
+from hax.configmanager import ConfigManager, ConsulConfigManager
 from hax.types import Fid
 from requests.exceptions import RequestException
 from urllib3.exceptions import HTTPError
@@ -164,7 +165,7 @@ def node_name2fid(cns: Consul, node_name: str) -> Any:
     raise RuntimeError(f'Cannot find Consul KV entry for node {node_name!r}')
 
 
-def processes(cns: Consul, consul_util: ConsulUtil,
+def processes(cns: Consul, consul_util: ConfigManager,
               node_name: str) -> List[Process]:
     # Get 'm0conf/nodes/<node_id>/processes/<process_fidk>/...' entries
     # from the KV.  See 'Consul KV Schema' in [4/KV](rfc/4/README.md).
@@ -310,7 +311,7 @@ def get_bytecount_status(cns: Consul) -> Dict[str, Any]:
 
 
 @repeat_if_fails(max_retries=24)
-def get_cluster_status(cns: Consul, consul_util: ConsulUtil,
+def get_cluster_status(cns: Consul, consul_util: ConfigManager,
                        devices_requested: bool) -> Dict[str, Any]:
     result: Dict[str, Any] = {
         'bytecount': get_bytecount_status(cns).get('bytecount'),
@@ -349,7 +350,7 @@ def setup_logging():
 
 
 @repeat_if_fails(max_retries=24)
-def show_text_status(cns: Consul, consul_util: ConsulUtil,
+def show_text_status(cns: Consul, consul_util: ConfigManager,
                      devices_requested: bool) -> None:
     # In-memory buffer required because an intermittent Consul exception can
     # happen right in the middle of printing something. It is good to postpone
@@ -407,7 +408,7 @@ def main(argv=None):
         print('Cluster is not running', file=sys.stderr)
         return 1
 
-    cns_util: ConsulUtil = ConsulUtil()
+    cns_util: ConfigManager = ConsulConfigManager()
     if opts.json:
         status = get_cluster_status(cns, cns_util, opts.devices)
         print(simplejson.dumps(status, indent=2, for_json=True))

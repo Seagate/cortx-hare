@@ -32,7 +32,8 @@ import inject
 from socket import getfqdn
 from hax.types import ObjT
 from hax.common import di_configuration
-from hax.util import ConsulUtil, repeat_if_fails
+from hax.util import repeat_if_fails
+from hax.configmanager import ConsulConfigManager
 from hax.exception import HAConsistencyException
 
 from utils import get_node_name
@@ -78,7 +79,7 @@ class Node:
 
 @repeat_if_fails(max_retries=2)
 def get_log_path():
-    cns_utils = ConsulUtil()
+    cns_utils = ConsulConfigManager()
     hostname = getfqdn()
     log_path_key = cns_utils.kv.kv_get(f'{hostname}/log_path')
 
@@ -331,7 +332,7 @@ def read_file(path: str) -> List[Dict[str, str]]:
 
 @repeat_if_fails(max_retries=5)
 def read_kv() -> Optional[List[Dict[str, str]]]:
-    cns_utils = ConsulUtil()
+    cns_utils = ConsulConfigManager()
     data: List[Dict[str, str]] = []
     for key in ["m0conf", "m0_client_types"]:
         kv_data = cns_utils.kv.kv_get(key, recurse=True)

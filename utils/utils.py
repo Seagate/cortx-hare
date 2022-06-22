@@ -30,7 +30,8 @@ from consul import Consul, ConsulException
 from requests.exceptions import RequestException
 from urllib3.exceptions import HTTPError
 from hax.exception import HAConsistencyException
-from hax.util import ConsulUtil, consul_to_local_nodename
+from hax.util import consul_to_local_nodename
+from hax.configmanager import ConsulConfigManager
 
 Process = NamedTuple('Process', [('node', str), ('consul_name', str),
                                  ('systemd_name', str), ('fidk', int),
@@ -75,7 +76,7 @@ def processes_node(cns: Consul, node_name: str) -> Dict[str, List[Process]]:
     """Processes grouped by Consul service name."""
     try:
         processes: Dict[str, List[Process]] = {}
-        cns_util = ConsulUtil(raw_client=cns)
+        cns_util = ConsulConfigManager(raw_client=cns)
 
         # TODO Can we replace cns_util.get_local_nodename()
         # with get_node_name() function?
@@ -114,7 +115,7 @@ def processes_node(cns: Consul, node_name: str) -> Dict[str, List[Process]]:
 def processes_by_consul_svc_name(cns: Consul) -> Dict[str, List[Process]]:
     """Processes grouped by Consul service name."""
     try:
-        cns_util = ConsulUtil(raw_client=cns)
+        cns_util = ConsulConfigManager(raw_client=cns)
 
         processes: Dict[str, List[Process]] = {}
         for node in cns.catalog.nodes()[1]:

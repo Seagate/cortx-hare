@@ -29,7 +29,8 @@ from hax.log import TRACE
 from hax.motr import Motr
 from hax.types import (Fid, HaNoteStruct, HAState, MessageId,
                                ObjHealth, m0HaObjState)
-from hax.util import (FidWithType, PutKV, ConsulUtil)
+from hax.util import (FidWithType, PutKV)
+from hax.configmanager import ConsulConfigManager
 from hax.consul.cache import InvocationCache
 
 def _has_failed_note(notes, fid):
@@ -53,7 +54,7 @@ class TestFailure(unittest.TestCase):
         logging.getLogger('hax').setLevel(TRACE)
 
     def test_process_failure(self):
-        consul_util = ConsulUtil()
+        consul_util = ConsulConfigManager()
         consul_cache = InvocationCache()
         ffi = Mock(spec=['init_motr_api'])
         motr = Motr(ffi, None, None, consul_util)
@@ -120,7 +121,7 @@ class TestFailure(unittest.TestCase):
                 broadcast_hax_only=False,
                 kv_cache=consul_cache)
 
-        # ConsulUtil is responsible for the actual KV updates, just check
+        # ConfigManager is responsible for the actual KV updates, just check
         # here that the appropriate util function is called for each
         # component.
         consul_util.update_drive_state.assert_called_with(
@@ -150,7 +151,7 @@ class TestFailure(unittest.TestCase):
         self.assertTrue(_has_failed_note(broadcast_list, drive_fid))
 
     def test_drive_failure(self):
-        consul_util = ConsulUtil()
+        consul_util = ConsulConfigManager()
         consul_cache = InvocationCache()
         ffi = Mock(spec=['init_motr_api'])
         motr = Motr(ffi, None, None, consul_util)
@@ -190,7 +191,7 @@ class TestFailure(unittest.TestCase):
         # Send the mock event for drive failure.
         bqprocessor.handle_device_state_set(payload)
 
-        # ConsulUtil is responsible for the actual KV updates, just check
+        # ConfigManager is responsible for the actual KV updates, just check
         # here that the appropriate util function is called for drive state
         # update.
         consul_util.update_drive_state.assert_called_with(

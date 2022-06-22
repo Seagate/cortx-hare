@@ -4,7 +4,8 @@ from threading import Event
 from hax.exception import InterruptedException
 from hax.motr import Motr, log_exception
 from hax.types import StoppableThread
-from hax.util import ConsulUtil, wait_for_event
+from hax.util import wait_for_event
+from hax.configmanager import ConfigManager
 
 LOG = logging.getLogger('hax')
 
@@ -19,7 +20,7 @@ class RconfcStarter(StoppableThread):
     will not appear until confd's will receive entrypoint reply but that reply
     can happen when Motr is initialized in hax).
     """
-    def __init__(self, motr: Motr, consul_util: ConsulUtil):
+    def __init__(self, motr: Motr, consul_util: ConfigManager):
         super().__init__(target=self._execute,
                          name='rconfc-starter',
                          args=(motr, ))

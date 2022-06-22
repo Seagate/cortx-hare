@@ -21,7 +21,7 @@ import logging.handlers
 from typing import List
 from threading import Event
 from hax.types import StoppableThread
-from hax.util import ConsulUtil
+from hax.configmanager import ConfigManager
 from hare_mp.utils import (execute_no_communicate, func_log, func_enter,
                            func_leave, LogWriter, Utils)
 
@@ -34,7 +34,7 @@ class ConsulStarter(StoppableThread):
     """
     Starts consul agent and blocks until terminated.
     """
-    def __init__(self, utils: Utils, cns_utils: ConsulUtil, stop_event: Event,
+    def __init__(self, utils: Utils, cns_utils: ConfigManager, stop_event: Event,
                  log_dir: str, data_dir: str, config_dir: str, node_name: str,
                  node_id: str,
                  peers: List[str],
