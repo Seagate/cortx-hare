@@ -114,8 +114,17 @@ class TestCDF(unittest.TestCase):
             store.get_motr_clients = Mock(return_value=[])
             utils = Utils(store)
             kv = KVAdapter()
-            def my_get(key: str, recurse: bool = False):
-                if key == 'srvnode-1.data.private/drives/dev/sda':
+            def my_get(key: str, recurse: bool = False, allow_null: bool = False):
+                if key == 'conf/node>1114a50a6bf6f9c93ebd3c49d07d3fd4>node_group':
+                    return new_kv('conf/node>1114a50a6bf6f9c93ebd3c49d07d3fd4>node_group',
+                                  "ssc-vm-1623.colo.seagate.com".encode())
+                elif key == 'conf/node>9ec5de3a8b57493e8fc7bfae67ecd3b3>node_group':
+                    return new_kv('conf/node>9ec5de3a8b57493e8fc7bfae67ecd3b3>node_group',
+                                  "ssc-vm-1624.colo.seagate.com".encode())
+                elif key == 'conf/node>846fd26885f8423a8da0626538ed47bc>node_group':
+                    return new_kv('conf/node>846fd26885f8423a8da0626538ed47bc>node_group',
+                                  "ssc-vm-1625.colo.seagate.com".encode())
+                elif key == 'srvnode-1.data.private/drives/dev/sda':
                     return new_kv('srvnode-1.data.private/drives/dev/sda',
                                   json.dumps({"path": "/dev/sda",
                                               "size": "4096000",
@@ -149,7 +158,10 @@ class TestCDF(unittest.TestCase):
                     return new_kv('srvnode-1.data.private/facts',
                                   json.dumps({"processorcount": "16",
                                               "memorysize_mb": "4096.123"}))
-                raise RuntimeError(f'Unexpected call: key={key}, recurse={recurse}')
+                if allow_null:
+                    return None
+                else:
+                    raise RuntimeError(f'Unexpected call: key={key}, recurse={recurse}')
 
             kv.kv_get = my_get
             utils.kv = kv
@@ -238,8 +250,11 @@ class TestCDF(unittest.TestCase):
         store.get_motr_clients = Mock(return_value=[])
         utils = Utils(store)
         kv = KVAdapter()
-        def my_get(key: str, recurse: bool = False):
-            if key == 'srvnode-1.data.private/drives/dev/sdb':
+        def my_get(key: str, recurse: bool = False, allow_null: bool = False):
+            if key == 'conf/node>MACH_ID>node_group' :
+                return new_kv('conf/node>MACH_ID>node_group',
+                              "myhost".encode())
+            elif key == 'srvnode-1.data.private/drives/dev/sdb':
                 return new_kv('srvnode-1.data.private/drives/dev/sdb',
                               json.dumps({"path": "/dev/sdb",
                                           "size": "4096000",
@@ -253,7 +268,10 @@ class TestCDF(unittest.TestCase):
                 return new_kv('srvnode-1.data.private/facts',
                               json.dumps({"processorcount": "16",
                                           "memorysize_mb": "4096.123"}))
-            raise RuntimeError(f'Unexpected call: key={key}, recurse={recurse}')
+            if allow_null:
+                return None
+            else:
+                raise RuntimeError(f'Unexpected call: key={key}, recurse={recurse}')
 
         kv.kv_get = my_get
         utils.kv = kv
@@ -341,8 +359,11 @@ class TestCDF(unittest.TestCase):
         store.get_machine_ids_for_component = Mock(return_value=['MACH_ID'])
         utils = Utils(store)
         kv = KVAdapter()
-        def my_get(key: str, recurse: bool = False):
-            if key == 'srvnode-1.data.private/drives/dev/sdb':
+        def my_get(key: str, recurse: bool = False, allow_null: bool = False):
+            if key == 'conf/node>MACH_ID>node_group' :
+                return new_kv('conf/node>MACH_ID>node_group',
+                              "mynodename".encode())
+            elif key == 'srvnode-1.data.private/drives/dev/sdb':
                 return new_kv('srvnode-1.data.private/drives/dev/sdb',
                               json.dumps({"path": "/dev/sdb",
                                           "size": "4096000",
@@ -356,7 +377,10 @@ class TestCDF(unittest.TestCase):
                 return new_kv('srvnode-1.data.private/facts',
                               json.dumps({"processorcount": "16",
                                           "memorysize_mb": "4096.123"}))
-            raise RuntimeError(f'Unexpected call: key={key}, recurse={recurse}')
+            if allow_null:
+                return None
+            else:
+                raise RuntimeError(f'Unexpected call: key={key}, recurse={recurse}')
 
         kv.kv_get = my_get
         utils.kv = kv
@@ -603,8 +627,11 @@ class TestCDF(unittest.TestCase):
         cdf._get_m0d_per_cvg = Mock(return_value=1)
         utils = Utils(store)
         kv = KVAdapter()
-        def my_get(key: str, recurse: bool = False):
-            if key == 'srvnode-1.data.private/drives/dev/sdb':
+        def my_get(key: str, recurse: bool = False, allow_null: bool = False):
+            if key == 'conf/node>MACH_ID>node_group' :
+                return new_kv('conf/node>MACH_ID>node_group',
+                              "myhost".encode())
+            elif key == 'srvnode-1.data.private/drives/dev/sdb':
                 return new_kv('srvnode-1.data.private/drives/dev/sdb',
                               json.dumps({"path": "/dev/sdb",
                                           "size": "4096000",
@@ -618,7 +645,10 @@ class TestCDF(unittest.TestCase):
                 return new_kv('srvnode-1.data.private/facts',
                               json.dumps({"processorcount": "16",
                                           "memorysize_mb": "4096.123"}))
-            raise RuntimeError(f'Unexpected call: key={key}, recurse={recurse}')
+            if allow_null:
+                return None
+            else:
+                raise RuntimeError(f'Unexpected call: key={key}, recurse={recurse}')
 
 
         kv.kv_get = my_get
@@ -929,8 +959,11 @@ class TestCDF(unittest.TestCase):
         store.get_motr_clients = Mock(return_value=[])
         utils = Utils(store)
         kv = KVAdapter()
-        def my_get(key: str, recurse: bool = False):
-            if key == 'srvnode-1.data.private/drives/dev/sdb':
+        def my_get(key: str, recurse: bool = False, allow_null: bool = False):
+            if key == 'conf/node>MACH_ID>node_group' :
+                return new_kv('conf/node>MACH_ID>node_group',
+                              "mynodename".encode())
+            elif key == 'srvnode-1.data.private/drives/dev/sdb':
                 return new_kv('srvnode-1.data.private/drives/dev/sdb',
                               json.dumps({"path": "/dev/sdb",
                                           "size": "4096000",
@@ -944,7 +977,10 @@ class TestCDF(unittest.TestCase):
                 return new_kv('srvnode-1.data.private/facts',
                               json.dumps({"processorcount": "16",
                                           "memorysize_mb": "4096.123"}))
-            raise RuntimeError(f'Unexpected call: key={key}, recurse={recurse}')
+            if allow_null:
+                return None
+            else:
+                raise RuntimeError(f'Unexpected call: key={key}, recurse={recurse}')
 
         kv.kv_get = my_get
         utils.kv = kv
@@ -1063,8 +1099,14 @@ class TestCDF(unittest.TestCase):
                                                                  'MACH_2_ID'])
         utils = Utils(store)
         kv = KVAdapter()
-        def my_get(key: str, recurse: bool = False):
-            if key == 'srvnode-1.data.private/drives/dev/sdb':
+        def my_get(key: str, recurse: bool = False, allow_null: bool = False):
+            if key == 'conf/node>MACH_ID>node_group' :
+                return new_kv('conf/node>MACH_ID>node_group',
+                              "mynodename".encode())
+            elif key == 'conf/node>MACH_2_ID>node_group' :
+                return new_kv('conf/node>MACH_2_ID>node_group',
+                              "host-2".encode())
+            elif key == 'srvnode-1.data.private/drives/dev/sdb':
                 return new_kv('srvnode-1.data.private/drives/dev/sdb',
                               json.dumps({"path": "/dev/sdb",
                                           "size": "4096000",
@@ -1093,7 +1135,10 @@ class TestCDF(unittest.TestCase):
                               json.dumps({"processorcount": "16",
                                           "memorysize_mb": "4096.123"}))
 
-            raise RuntimeError(f'Unexpected call: key={key}, recurse={recurse}')
+            if allow_null:
+                return None
+            else:
+                raise RuntimeError(f'Unexpected call: key={key}, recurse={recurse}')
 
         kv.kv_get = my_get
         utils.kv = kv
@@ -1183,8 +1228,11 @@ class TestCDF(unittest.TestCase):
         cdf = CdfGenerator(provider=store)
         utils = Utils(store)
         kv = KVAdapter()
-        def my_get(key: str, recurse: bool = False):
-            if key == 'srvnode-1.data.private/drives/dev/sdb':
+        def my_get(key: str, recurse: bool = False, allow_null: bool = False):
+            if key == 'conf/node>MACH_ID>node_group':
+                return new_kv('conf/node>MACH_ID>node_group',
+                              "mynodename".encode())
+            elif key == 'srvnode-1.data.private/drives/dev/sdb':
                 return new_kv('srvnode-1.data.private/drives/dev/sdb',
                               json.dumps({"path": "/dev/sdb",
                                           "size": "4096000",
@@ -1198,7 +1246,10 @@ class TestCDF(unittest.TestCase):
                 return new_kv('srvnode-1.data.private/facts',
                               json.dumps({"processorcount": "16",
                                           "memorysize_mb": "4096.123"}))
-            raise RuntimeError(f'Unexpected call: key={key}, recurse={recurse}')
+            if allow_null:
+                return None
+            else:
+                raise RuntimeError(f'Unexpected call: key={key}, recurse={recurse}')
 
 
         kv.kv_get = my_get

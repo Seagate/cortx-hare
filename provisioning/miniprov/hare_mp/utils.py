@@ -349,6 +349,18 @@ class Utils:
         })
         self.kv.kv_put('ssl/hax', ssl_hax)
 
+    # Provisioner will be generating node_group from each data pod and place
+    # gconf copy into consul. Hence from consul for all data pods node_group
+    # value will be available.
+    @func_log(func_enter, func_leave)
+    @repeat_if_fails()
+    def get_node_group(self, machine_id: str, allow_null: bool = False):
+        key = f'conf/node>{machine_id}>node_group'
+        node_group = self.kv.kv_get(key, allow_null=allow_null)
+        if node_group:
+            return node_group['Value'].decode()
+        return None
+
 
 class LogWriter:
     def __init__(self, logger: logging.Logger, logging_handler):

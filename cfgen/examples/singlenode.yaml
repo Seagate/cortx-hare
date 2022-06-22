@@ -3,6 +3,7 @@
 
 nodes:
   - hostname: localhost     # [user@]hostname
+    node_group: localhost
     data_iface: eth1        # name of data network interface
     data_iface_ip_addr: null
     transport_type: libfab

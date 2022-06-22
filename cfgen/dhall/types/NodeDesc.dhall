@@ -19,6 +19,7 @@
 -}
 
 { hostname : Text
+, node_group: Optional Text 
 , machine_id : Optional Text
 , processorcount: Optional Natural
 , memorysize_mb: Optional Double
