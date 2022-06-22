@@ -19,7 +19,7 @@ import json
 import logging
 from typing import Optional
 from dataclasses import dataclass
-from hax.util import ConsulUtil
+from hax.configmanager import ConfigManager
 from cortx.utils.message_bus import MessageBus
 from cortx.utils.message_bus import (MessageConsumer, MessageProducer,
                                      MessageBusAdmin)
@@ -58,7 +58,7 @@ class MessageInterface():
 
 
 class MessageBusInterface(MessageInterface):
-    def __init__(self, util: ConsulUtil):
+    def __init__(self, util: ConfigManager):
         logging.debug('Inside  MessageBusInterface')
         self.initialize_bus(util)
 
@@ -70,7 +70,7 @@ class MessageBusInterface(MessageInterface):
                             message_type=message_type)
         return self.producer
 
-    def initialize_bus(self, util: ConsulUtil):
+    def initialize_bus(self, util: ConfigManager):
         """
         This creates a MessageBus internal global in-memory object which is
         indirectly part of the process address space. Thus

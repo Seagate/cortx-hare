@@ -21,7 +21,7 @@ import logging
 
 from hax.motr.planner import WorkPlanner
 from hax.types import StoppableThread
-from hax.util import ConsulUtil
+from hax.configmanager import ConfigManager
 
 __all__ = ['create_ha_thread']
 
@@ -45,7 +45,7 @@ class StubEventThread(StoppableThread):
 
 
 def create_ha_thread(planner: WorkPlanner,
-                     util: ConsulUtil) -> StoppableThread:
+                     util: ConfigManager) -> StoppableThread:
     """Creates the proper HA-aware thread, handling possible import errors."""
     try:
         LOG.info('Inside create_ha_thread')
@@ -56,7 +56,7 @@ def create_ha_thread(planner: WorkPlanner,
         return StubEventThread()
 
 
-def get_producer(util: ConsulUtil):
+def get_producer(util: ConfigManager):
     try:
         from hax.ha.ha import Ha
         LOG.info('Getting instance of Ha')

@@ -23,13 +23,14 @@ from threading import Event
 from hax.exception import HAConsistencyException, InterruptedException
 from hax.motr import Motr, log_exception
 from hax.types import FsStatsWithTime, StoppableThread
-from hax.util import ConsulUtil, wait_for_event
+from hax.util import wait_for_event
+from hax.configmanager import ConfigManager
 
 LOG = logging.getLogger('hax')
 
 
 class FsStatsUpdater(StoppableThread):
-    def __init__(self, motr: Motr, consul_util: ConsulUtil, interval_sec=5):
+    def __init__(self, motr: Motr, consul_util: ConfigManager, interval_sec=5):
         super().__init__(target=self._execute,
                          name='fs-stats-updater',
                          args=(motr, ))

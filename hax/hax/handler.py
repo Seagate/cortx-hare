@@ -36,6 +36,7 @@ from hax.types import (ConfHaProcess, HAState, HaLinkMessagePromise,
                        m0HaProcessEvent, m0HaProcessType)
 from hax.util import (ConsulUtil, ProcessGroup, dump_json, repeat_if_fails,
                       ha_process_events)
+from hax.configmanager import ConfigManager, ConsulConfigManager
 from hax.ha import get_producer
 
 
@@ -53,7 +54,7 @@ class ConsumerThread(StoppableThread):
     """
 
     def __init__(self, planner: WorkPlanner, motr: Motr,
-                 herald: DeliveryHerald, consul: ConsulUtil,
+                 herald: DeliveryHerald, consul: ConfigManager,
                  process_groups: ProcessGroup, idx: int):
         super().__init__(target=self._do_work,
                          name=f'qconsumer-{idx}',
@@ -133,7 +134,7 @@ class ConsumerThread(StoppableThread):
         if (event.chp_event ==
                 m0HaProcessEvent.M0_CONF_HA_PROCESS_DTM_RECOVERED):
             try:
-                util: ConsulUtil = ConsulUtil()
+                util: ConfigManager = ConsulConfigManager()
                 producer = get_producer(util)
                 if producer:
                     producer.check_and_send(parent_resource_type=ObjT.NODE,

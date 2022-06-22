@@ -24,7 +24,7 @@ from hax.ha.handler import EventHandler
 from hax.message import BroadcastHAStates
 from hax.motr.planner import WorkPlanner
 from hax.types import HAState, ObjHealth
-from hax.util import ConsulUtil
+from hax.configmanager import ConfigManager
 
 LOG = logging.getLogger('hax')
 
@@ -45,7 +45,7 @@ class NodeEventHandler(EventHandler):
     As a result of such HA event the corresponding BroadcastHAStates is
     offered to WorkPlanner.
     """
-    def __init__(self, consul: ConsulUtil, planner: WorkPlanner):
+    def __init__(self, consul: ConfigManager, planner: WorkPlanner):
         """Constructor."""
         self.cns = consul
         self.planner = planner

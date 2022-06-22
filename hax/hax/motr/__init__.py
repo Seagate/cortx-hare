@@ -36,7 +36,8 @@ from hax.types import (ByteCountStats, ConfHaProcess, Fid, FidStruct, FsStats,
                        MessageId, ObjT, FidTypeToObjT, Profile, PverInfo,
                        ReprebStatus, ObjHealth,
                        m0HaProcessEvent, m0HaProcessType)
-from hax.util import ConsulUtil, repeat_if_fails, FidWithType, PutKV
+from hax.util import repeat_if_fails, FidWithType, PutKV
+from hax.configmanager import ConfigManager
 
 LOG = logging.getLogger('hax')
 
@@ -58,7 +59,7 @@ class Motr:
                  ffi: HaxFFI,
                  planner: WorkPlanner,
                  herald: DeliveryHerald,
-                 consul_util: ConsulUtil,
+                 consul_util: ConfigManager,
                  node_uuid: str = ''):
         self._ffi = ffi or HaxFFI()
         # [KN] Note that node_uuid is currently ignored by the corresponding
@@ -516,7 +517,7 @@ class Motr:
     @supports_consul_cache
     def _generate_sub_services(self,
                                note: HaNoteStruct,
-                               cns: ConsulUtil,
+                               cns: ConfigManager,
                                update_kv: bool,
                                notify_devices=True,
                                kv_cache=None) -> List[HaNoteStruct]:
@@ -540,7 +541,7 @@ class Motr:
     def _generate_sub_disks(self,
                             note: HaNoteStruct,
                             services: List[FidWithType],
-                            cns: ConsulUtil,
+                            cns: ConfigManager,
                             update_kv: bool,
                             kv_cache=None) -> List[HaNoteStruct]:
         disk_list = []
