@@ -296,7 +296,8 @@ class Motr:
                             ha_states: List[HAState],
                             notify_devices=True,
                             kv_cache=None,
-                            broadcast_hax_only=False) -> List[MessageId]:
+                            broadcast_hax_only=False,
+                            proc_skip_list=None) -> List[MessageId]:
         LOG.debug('Broadcasting HA states %s over ha_link', ha_states)
 
         def _update_process_tree(proc_fid: Fid, state: ObjHealth) -> bool:
@@ -307,8 +308,20 @@ class Motr:
                     not self._is_mkfs(proc_fid) and
                     proc_fid != hax_fid)
 
+        def _proc_fids_to_eps(proc_skip_list: List[Fid]) -> List[str]:
+            proc_eps = []
+            for proc_fid in proc_skip_list:
+                proc_ep = self.consul_util.fid_to_endpoint(proc_fid)
+                if proc_ep:
+                    proc_eps.append(proc_ep)
+            return proc_eps
+
         hax_fid = self.consul_util.get_hax_fid()
         notes = []
+        proc_eps_skip: Any = []
+        if proc_skip_list is not None:
+            proc_eps_skip = _proc_fids_to_eps(proc_skip_list)
+
         for st in ha_states:
             if st.status == ObjHealth.UNKNOWN:
                 continue
@@ -385,12 +398,14 @@ class Motr:
                                                             kv_cache=kv_cache)
         if not notes:
             return []
-        message_ids = self._ha_broadcast(notes, broadcast_hax_only)
+        message_ids = self._ha_broadcast(notes, broadcast_hax_only,
+                                         proc_eps_skip)
 
         return message_ids
 
     def _ha_broadcast(self, notes: List[HaNoteStruct],
-                      broadcast_hax_only: bool) -> List[MessageId]:
+                      broadcast_hax_only: bool,
+                      proc_skip_list: List[str]) -> List[MessageId]:
         message_ids: List[MessageId] = []
         nr_notes_to_be_sent = len(notes)
         notes_sent = 0
@@ -406,9 +421,12 @@ class Motr:
                     notes_to_send_len,
                     make_c_str(hax_endpoint))
             else:
+                proc_skip_list_c = [make_c_str(ep) for ep in proc_skip_list]
                 message_ids = self._ffi.ha_broadcast(
                     self._ha_ctx, make_array(HaNoteStruct, notes_to_send),
-                    notes_to_send_len)
+                    notes_to_send_len,
+                    make_array(c.c_char_p, proc_skip_list_c),
+                    len(proc_skip_list))
             LOG.debug(
                 'Broadcast HA state complete, message_ids = %s',
                 message_ids)

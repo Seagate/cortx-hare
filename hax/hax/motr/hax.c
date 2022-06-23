@@ -883,11 +883,12 @@ void m0_ha_broadcast_test(unsigned long long ctx)
 {
 	struct m0_ha_note note = { .no_id = M0_FID_TINIT('s', 4, 0),
 				   .no_state = M0_NC_ONLINE };
-	m0_ha_notify(ctx, &note, 1);
+	m0_ha_notify(ctx, &note, 1, NULL, 0);
 }
 
 PyObject* m0_ha_notify(unsigned long long ctx, struct m0_ha_note *notes,
-		       uint32_t nr_notes)
+		       uint32_t nr_notes, const char **proc_skip_list,
+		       uint32_t proc_skip_list_len)
 {
 	struct hax_context *hc = (struct hax_context *)ctx;
 	struct m0_ha_nvec nvec = { .nv_nr = nr_notes, .nv_note = notes };
@@ -895,6 +896,8 @@ PyObject* m0_ha_notify(unsigned long long ctx, struct m0_ha_note *notes,
 	struct hax_link *hxl;
 	struct m0_ha_msg *msg;
 	uint64_t tag;
+        uint32_t i;
+        bool skip_process = false;
 
 	msg = _ha_nvec_msg_alloc(&nvec, 0, M0_HA_NVEC_SET);
 	hax_lock(hc);
@@ -907,6 +910,15 @@ PyObject* m0_ha_notify(unsigned long long ctx, struct m0_ha_note *notes,
 	m0_tl_for(hx_links, &hc->hc_links, hxl)
 	{
 		if (!hxl->hxl_is_active)
+			continue;
+		skip_process = false;
+                for (i = 0; i < proc_skip_list_len; ++i) {
+			if (m0_streq(hxl->hxl_ep_addr, proc_skip_list[i])) {
+				skip_process = true;
+				break;
+			}
+		}
+		if (skip_process)
 			continue;
 		Py_BEGIN_ALLOW_THREADS
 		m0_halon_interface_send(hi, hxl->hxl_link, msg, &tag);

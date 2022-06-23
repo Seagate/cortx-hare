@@ -92,7 +92,9 @@ void m0_ha_entrypoint_reply_send(unsigned long long epr,
 void m0_ha_failvec_reply_send(unsigned long long hm, struct m0_fid *pool_fid,
 			      uint32_t nr_notes);
 void m0_ha_nvec_reply_send(unsigned long long hm, struct m0_ha_note *notes, uint32_t nr_notes);
-PyObject *m0_ha_notify(unsigned long long ctx, struct m0_ha_note *notes, uint32_t nr_notes);
+PyObject* m0_ha_notify(unsigned long long ctx, struct m0_ha_note *notes,
+		       uint32_t nr_notes, const char **proc_skip_list,
+		       uint32_t nr_skip_processes);
 
 PyObject* m0_ha_notify_hax_only(unsigned long long ctx,
 				struct m0_ha_note *notes,

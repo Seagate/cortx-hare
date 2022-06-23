@@ -1815,10 +1815,10 @@ class ConsulUtil:
         svc_to_motr_status_map = {
             cur_consul_status('passing', 'M0_CONF_HA_PROCESS_STARTING'):
             local_remote_health_ret(ObjHealth.UNKNOWN,
-                                    ObjHealth.UNKNOWN),
+                                    ObjHealth.OFFLINE),
             cur_consul_status('passing', 'M0_CONF_HA_PROCESS_STOPPING'):
             local_remote_health_ret(ObjHealth.UNKNOWN,
-                                    ObjHealth.UNKNOWN),
+                                    ObjHealth.OFFLINE),
             cur_consul_status('passing', 'M0_CONF_HA_PROCESS_STARTED'):
             local_remote_health_ret(ObjHealth.RECOVERING,
                                     ObjHealth.RECOVERING),
@@ -1831,7 +1831,7 @@ class ConsulUtil:
             # goes offline Consul will report the same.
             cur_consul_status('passing', 'M0_CONF_HA_PROCESS_STOPPED'):
             local_remote_health_ret(ObjHealth.OK,
-                                    ObjHealth.OK),
+                                    ObjHealth.OFFLINE),
             cur_consul_status('passing', 'Unknown'):
             local_remote_health_ret(ObjHealth.UNKNOWN,
                                     ObjHealth.UNKNOWN),
