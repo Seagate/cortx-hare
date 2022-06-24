@@ -80,8 +80,8 @@ async def test_hello_works(hax_client):
 
 
 @pytest.mark.parametrize('status,health', [('passing', ObjHealth.OK),
-                                           ('warning', ObjHealth.FAILED),
-                                           ('critical', ObjHealth.FAILED)])
+                                           ('warning', ObjHealth.OFFLINE),
+                                           ('critical', ObjHealth.OFFLINE)])
 async def test_service_health_broadcast(hax_client, planner, status: str,
                                         health: ObjHealth):
     service_health = [{

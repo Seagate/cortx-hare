@@ -139,7 +139,7 @@ def to_ha_states(data: Any, consul_util: ConsulUtil) -> List[HAState]:
         svc_status = ObjHealth.OK
         for check in node['Checks']:
             if check.get('Status') != 'passing':
-                svc_status = ObjHealth.FAILED
+                svc_status = ObjHealth.OFFLINE
             svc_id = check.get('ServiceID')
             if svc_id:
                 ha_states.append(HAState(
