@@ -283,11 +283,11 @@ class WorkPlanner:
             state.next_group_commands = set()
 
     def notify_finished(self, command: BaseMessage) -> None:
-        '''Method invoked by the worker thread when the command is executed.
+        """Method invoked by the worker thread when the command is executed.
 
-           The method must be invoked by the worker thread when the command
-           is executed.
-        '''
+        The method must be invoked by the worker thread when the command
+        is executed.
+        """
 
         with self.b_lock:
             state = self.state
@@ -309,12 +309,12 @@ class WorkPlanner:
             self.b_lock.notifyAll()
 
     def _should_increase_group(self, cmd: BaseMessage) -> bool:
-        '''Predicate function.
+        """Predicate function.
 
         Returns True if and only if cmd command CANNOT
         be added to group number next_group_id.
         Assumes that b_lock is acquired already.
-        '''
+        """
         def has(cmd_type: Type[BaseMessage]) -> bool:
             ''' Checks if the group being currently formed (i.e. next_group)
                 contains a message of the given type.

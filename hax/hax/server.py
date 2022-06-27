@@ -74,7 +74,8 @@ def get_python_env():
 
 
 def bytecount_stat(request):
-    """Calls hare-status to provide CSM with --bytecount data in json format
+    """
+    Calls hare-status to provide CSM with --bytecount data in json format.
 
     This function calls for hare-status script from hax-server in order to
     provide CSM with an endpoint to get --byecount data in json format.
@@ -104,12 +105,11 @@ def hctl_stat(request):
 # request a parameter. The respective result is obtained by executing
 # corresponding `hctl-fetch-fids` script.
 def hctl_fetch_fids(request):
-    """
-    calls the hare-fetch-fids to provide info about services configured.
+    """calls the hare-fetch-fids to provide info about services configured.
 
     This function calls the hare-fetch-fids script from the hax-server in
     order to provide details about services configured by Hare e.g. Hax,
-    ios, confd, rgw etc
+    ios, confd, rgw etc.
     """
     exec = Executor()
     env = get_python_env()
