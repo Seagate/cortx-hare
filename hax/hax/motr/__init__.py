@@ -615,7 +615,7 @@ class Motr:
                                       new_state: ObjHealth,
                                       node: Optional[str] = None,
                                       kv_cache=None) -> List[HaNoteStruct]:
-        """Returns the list of HA notes with the state from given node
+        """Returns the list of HA notes with the state from given node.
 
         Returns the list of HA notes with the state derived
         from the given node. The node is not included into the resulting list.
