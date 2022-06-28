@@ -49,6 +49,7 @@ __all__ = ['ConsulUtil', 'create_process_fid', 'create_service_fid',
 
 LOG = logging.getLogger('hax')
 
+motr_processes_lock = Lock()
 motr_processes_status: dict = {}
 
 # XXX What is the difference between `ip_addr` and `address`?
@@ -77,6 +78,14 @@ MotrProcStatusLocalRemote = NamedTuple(
 )
 
 ObjStatus = NamedTuple("ObjStatus", [("resource_type", ObjT), ("status", str)])
+
+
+def dump_json(obj) -> str:
+    """
+    Interface wrapper to automatically apply correct parameters for json
+    serialization obj.
+    """
+    return simplejson.dumps(obj, for_json=True)
 
 
 def consul_to_local_nodename(consul_node: str) -> str:
@@ -122,6 +131,45 @@ def create_drive_fid(key: int) -> Fid:
 
 def create_profile_fid(key: int) -> Fid:
     return mk_fid(ObjT.PROFILE, key)
+
+
+def get_process_base_fid(proc_fid: Fid) -> Fid:
+    fid_mask: Fid = ObjTMaskMap[ObjT.PROCESS]
+    base_fid = Fid(proc_fid.container,
+                   (proc_fid.key & fid_mask.key))
+    return base_fid
+
+
+def get_process_keys(node_items: List[Any], fidk: int) -> List[Any]:
+    fid = mk_fid(ObjT.PROCESS, fidk)
+    return [
+        x['Key'] for x in node_items
+        if f'{fid}' == x['Key'].split('/')[-1]
+    ]
+
+def get_service_keys(node_items: List[Any], fidk: int) -> List[Any]:
+    fid = mk_fid(ObjT.SERVICE, fidk)
+    LOG.debug('fid: %s, fidk: %d', fid, fidk)
+    return [
+        x['Key'] for x in node_items
+        if f'{fid}' == x['Key'].split('/')[-1]
+    ]
+
+
+def get_motr_processes_status():
+    with motr_processes_lock:
+        LOG.debug('Current motr_processes_status: %s',
+                    motr_processes_status)
+        return motr_processes_status
+
+# bAdd indicate whether new entry should be added or status should be
+# updated only if fid is already present
+def set_motr_processes_status(fid, status, bAdd=False):
+    with motr_processes_lock:
+        if fid in motr_processes_status or bAdd:
+            motr_processes_status[fid] = status
+        LOG.debug('Updated motr_processes_status: %s',
+                    motr_processes_status)
 
 
 # See enum m0_conf_ha_process_event in Motr source code.
@@ -356,15 +404,6 @@ class ConsulUtil:
         self.cns: Consul = raw_client or Consul()
         self.kv = KVAdapter(cns=self.cns)
         self.catalog = CatalogAdapter(cns=self.cns)
-        self.lock = Lock()
-        self.object_state_getters = {
-            ObjT.SDEV.name: self.get_sdev_state,
-            ObjT.DRIVE.name: self.get_sdev_state,
-            ObjT.NODE.name: self.get_node_state,
-            ObjT.ENCLOSURE.name: self.get_encl_state,
-            ObjT.CONTROLLER.name: self.get_ctrl_state
-        }
-        self.all_node_items: Dict[Any, Any] = {}
 
     def get_consul_node(self, node: str) -> Optional[str]:
         LOG.debug('fetching consul node for node: %s', node)
@@ -816,7 +855,13 @@ class ConsulUtil:
                     'passing'):
                 obj_state = ObjHealth.OFFLINE.to_ha_note_status()
 
-        device_obj_types = self.object_state_getters
+        device_obj_types = {
+            ObjT.SDEV.name: self.get_sdev_state,
+            ObjT.DRIVE.name: self.get_sdev_state,
+            ObjT.NODE.name: self.get_node_state,
+            ObjT.ENCLOSURE.name: self.get_encl_state,
+            ObjT.CONTROLLER.name: self.get_ctrl_state
+        }
         if obj_t.name in (ObjT.PROCESS.name, ObjT.SERVICE.name):
             obj_state = self.get_proc_svc_conf_obj_status(obj_t,
                                                           fidk,
@@ -848,23 +893,6 @@ class ConsulUtil:
                  pfid == hax_fid)):
             return HaNoteStruct.M0_NC_ONLINE
         return proc_status.to_ha_note_status()
-
-    @staticmethod
-    def get_process_keys(node_items: List[Any], fidk: int) -> List[Any]:
-        fid = mk_fid(ObjT.PROCESS, fidk)
-        return [
-            x['Key'] for x in node_items
-            if f'{fid}' == x['Key'].split('/')[-1]
-        ]
-
-    @staticmethod
-    def get_service_keys(node_items: List[Any], fidk: int) -> List[Any]:
-        fid = mk_fid(ObjT.SERVICE, fidk)
-        LOG.debug('fid: %s, fidk: %d', fid, fidk)
-        return [
-            x['Key'] for x in node_items
-            if f'{fid}' == x['Key'].split('/')[-1]
-        ]
 
     @uses_consul_cache
     def is_node_alive(self, node: str, kv_cache=None) -> bool:
@@ -1546,8 +1574,8 @@ class ConsulUtil:
         LOG.debug('Setting process status in KV: %s:%s', key, data)
         self.kv.kv_put(key, data)
 
-        self.set_motr_processes_status(str(event.fid),
-                                       ha_process_events[event.chp_event])
+        set_motr_processes_status(str(event.fid),
+                                  ha_process_events[event.chp_event])
 
     @supports_consul_cache
     def update_drive_state(self,
@@ -1934,9 +1962,9 @@ class ConsulUtil:
             node_items = self.get_all_nodes_cached()
             LOG.log(TRACE, 'node items: %s', node_items)
             if ObjT.PROCESS.value == proc_base_fid.container:
-                keys = self.get_process_keys(node_items, fidk)
+                keys = get_process_keys(node_items, fidk)
             elif ObjT.SERVICE.value == proc_base_fid.container:
-                keys = self.get_service_keys(node_items, fidk)
+                keys = get_service_keys(node_items, fidk)
             LOG.debug('proc_fid: %s keys: %s', proc_base_fid, keys)
             if not keys:
                 raise HAConsistencyException('Failed to get process node')
@@ -2003,7 +2031,7 @@ class ConsulUtil:
     def get_service_process_fid(self, svc_fid: Fid, kv_cache=None) -> Fid:
         assert ObjT.SERVICE.value == svc_fid.container
         node_items = self.get_all_nodes_cached()
-        keys = self.get_service_keys(node_items, svc_fid.key)
+        keys = get_service_keys(node_items, svc_fid.key)
         if len(keys) != 1:
             raise RuntimeError(f'svc_fid:{svc_fid} len:{len(keys)}')
         process_fid: str = keys[0].split('/')[4]
@@ -2247,13 +2275,14 @@ class ConsulUtil:
                 continue
 
             p_fid = item['Key'].split('/')[4]
-            self.set_motr_processes_status(str(p_fid), ha_process_events[3],
-                                           True)
+            set_motr_processes_status(str(p_fid),
+                                      ha_process_events[3],
+                                      True)
 
     def get_local_node_status(self):
         total_processes = 0
         started_processes = 0
-        for item in self.get_motr_processes_status().values():
+        for item in get_motr_processes_status().values():
             total_processes += 1
             # Checking if status is M0_CONF_HA_PROCESS_STARTED
             if item == ha_process_events[1]:
