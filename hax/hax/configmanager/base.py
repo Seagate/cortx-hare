@@ -16,7 +16,12 @@
 # please email opensource@seagate.com or cortx-questions@seagate.com.
 #
 
-from .base import ConfigManager
-from .consul import ConsulConfigManager
+import logging
+from abc import ABC
 
-__all__ = ['ConfigManager', 'ConsulConfigManager']
+
+LOG = logging.getLogger('hax')
+
+
+class ConfigManager(ABC):
+    pass
