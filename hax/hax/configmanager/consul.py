@@ -21,7 +21,6 @@ import logging
 import os
 import re
 from typing import Any, Dict, List, Optional, Tuple
-from threading import Event
 from time import sleep
 from urllib3.exceptions import HTTPError
 
@@ -37,14 +36,13 @@ from hax.types import (ByteCountStats, ConfHaProcess, Fid, FsStatsWithTime,
                        KeyDelete, HaNoteStruct, m0HaObjState)
 from hax.util import (KVAdapter, CatalogAdapter, consul_to_local_nodename,
                       repeat_if_fails, mkServiceData, mk_fid, ServiceData,
-                      get_motr_processes_status, set_motr_processes_status,
-                      FidWithType, create_sdev_fid, create_service_fid,
+                      set_motr_processes_status,
+                      FidWithType, create_sdev_fid, get_service_keys,
                       create_process_fid, ObjStatus, PutKV,
                       ha_process_events, create_drive_fid,
                       MotrConsulProcInfo, get_process_base_fid,
                       ha_conf_obj_states, MotrConsulProcStatus,
-                      MotrProcStatusLocalRemote, get_process_keys,
-                      get_service_keys, wait_for_event)
+                      MotrProcStatusLocalRemote, get_process_keys)
 from hax.consul.cache import (uses_consul_cache, supports_consul_cache)
 
 from .base import ConfigManager
@@ -84,11 +82,6 @@ class ConsulConfigManager(ConfigManager):
             f'No {svc_name!r} Consul service found at node {hostname!r}')
 
     def get_local_nodename(self) -> str:
-        """
-        Returns the logical name of the current node. This is the name that
-        Consul is aware of. In other words, whenever Consul references a node,
-        it will use the names that this function can return.
-        """
         try:
             local_nodename = os.environ.get('HARE_HAX_NODE_NAME') or \
                 self.cns.agent.self()['Config']['NodeName']
@@ -105,17 +98,6 @@ class ConsulConfigManager(ConfigManager):
             raise HAConsistencyException('Force leaving agent') from e
 
     @uses_consul_cache
-    def _local_service_by_name(self,
-                               name: str,
-                               kv_cache=None) -> Optional[Dict[str, Any]]:
-        """
-        Returns the service data by its name assuming that it runs at the same
-        node to the current hax process.
-        """
-        local_nodename = self.get_local_nodename()
-        return self._service_by_name(local_nodename, name)
-
-    @uses_consul_cache
     def _service_data(self, kv_cache=None) -> ServiceData:
         my_fidk = self.get_hax_fid(kv_cache=kv_cache).key
         services = self.catalog.get_services('hax')
@@ -123,24 +105,6 @@ class ConsulConfigManager(ConfigManager):
             if int(svc['ServiceID']) == my_fidk:
                 return mkServiceData(svc)
         raise RuntimeError('Unreachable')
-
-    @uses_consul_cache
-    def get_hax_fid(self, kv_cache=None) -> Fid:
-        """
-        Returns the fid of the current hax process (in other words, returns
-        "my own" fid)
-        """
-        svc: Optional[Dict[str, Any]] = self._local_service_by_name('hax')
-        if not svc or svc is None:
-            raise HAConsistencyException('Error fetching hax svc')
-        return mk_fid(ObjT.PROCESS, int(svc['ServiceID']))
-
-    @uses_consul_cache
-    def get_ha_fid(self, kv_cache=None) -> Fid:
-        svc = self._local_service_by_name('hax')
-        if not svc or svc is None:
-            raise HAConsistencyException('Error fetching hax svc')
-        return mk_fid(ObjT.SERVICE, int(svc['ServiceID']) + 1)
 
     @repeat_if_fails()
     @uses_consul_cache
@@ -153,35 +117,6 @@ class ConsulConfigManager(ConfigManager):
         fidk = self.kv.kv_get(f'm0conf/nodes/{rm_node}/processes/{pfidk}/'
                               'services/rms', kv_cache=kv_cache)
         return mk_fid(ObjT.SERVICE, int(fidk['Value']))
-
-    @uses_consul_cache
-    def get_hax_endpoint(self, kv_cache=None) -> str:
-        hax_ep = self._service_data(kv_cache=kv_cache).address
-        if not hax_ep or hax_ep is None:
-            raise HAConsistencyException('Error fetching hax endpoint')
-        return hax_ep
-
-    @uses_consul_cache
-    @repeat_if_fails()
-    def get_hax_ip_address(self, kv_cache=None) -> str:
-        hax_ip = self._service_data(kv_cache=kv_cache).ip_addr
-        if not hax_ip or hax_ip is None:
-            raise HAConsistencyException('Error fetching hax ip address')
-        return str(hax_ip)
-
-    @uses_consul_cache
-    @repeat_if_fails()
-    def get_hax_hostname(self, kv_cache=None) -> str:
-        hax_hostname = self._service_data(kv_cache=kv_cache).node
-        if not hax_hostname or hax_hostname is None:
-            raise HAConsistencyException('Error fetching hax hostname')
-        return str(hax_hostname)
-
-    def get_hax_http_port(self) -> int:
-        service_data = self._local_service_by_name('hax')
-        if not service_data:
-            raise HAConsistencyException('Error fetching hax svc')
-        return int(service_data['ServiceMeta'].get('http_port', 8008))
 
     @uses_consul_cache
     @repeat_if_fails()
@@ -210,13 +145,6 @@ class ConsulConfigManager(ConfigManager):
 
     @repeat_if_fails()
     def get_leader_node(self) -> str:
-        """
-        Returns the node name of RC leader.
-        Note: in case when RC leader is not elected yet, the node name may be
-        just a randomly generated string (see hare-node-join script for
-        more details).
-        """
-
         leader = self.kv.kv_get('leader', allow_null=True)
         if leader is None:
             raise HAConsistencyException('No leader key exists yet')
@@ -227,20 +155,7 @@ class ConsulConfigManager(ConfigManager):
 
         return node.decode('utf-8')
 
-    @repeat_if_fails()
-    def get_leader_session(self) -> str:
-        """
-        Blocking version of `get_leader_session_no_wait()`.
-        The method either returns the RC leader session or blocks until the
-        session becomes available.
-        """
-        return str(self.get_leader_session_no_wait())
-
     def get_leader_session_no_wait(self) -> str:
-        """
-        Returns the RC leader session. HAConsistencyException is raised
-        immediately if there is no RC leader selected at the moment.
-        """
         try:
             leader = self.kv.kv_get('leader')
             return str(leader['Session'])
@@ -259,10 +174,6 @@ class ConsulConfigManager(ConfigManager):
         return True
 
     def destroy_session(self, session: str) -> None:
-        """
-        Destroys the given Consul Session by name.
-        The method doesn't raise any exception if the session doesn't exist.
-        """
         try:
             self.cns.session.destroy(session)
         except (ConsulException, HTTPError, RequestException) as e:
@@ -289,22 +200,11 @@ class ConsulConfigManager(ConfigManager):
             raise HAConsistencyException('Failed to communicate to'
                                          ' Consul Agent') from e
 
-    def get_svc_status(self, srv_fid: Fid, kv_cache=None) -> str:
-        try:
-            return self.get_process_status(srv_fid,
-                                           kv_cache=kv_cache).proc_status
-        except Exception:
-            return 'Unknown'
-
     @supports_consul_cache
     def get_m0d_statuses(self,
                          motr_services=None,
                          kv_cache=None
                          ) -> List[Tuple[ServiceData, ObjHealth]]:
-        """
-        Return the list of all Motr service statuses according to Consul
-        watchers.The following services are considered [default]: ios, confd.
-        """
         if not motr_services:
             motr_services = set(['ios'])
         result = []
@@ -328,21 +228,6 @@ class ConsulConfigManager(ConfigManager):
         for svc in services:
             services_dict[int(svc['ServiceID'])] = mkServiceData(svc)
         return [services_dict[key] for key in services_dict]
-
-    def get_confd_list(self) -> List[ServiceData]:
-        return self.get_service_data_by_name('confd')
-
-    def get_proc_fids_with_status(self,
-                                  proc_names: List[str]
-                                  ) -> List[Tuple[Fid, ObjHealth]]:
-        """
-        Fetches all the process fids and their statuses across the cluster
-        for a given process name.
-        """
-        statuses = self.get_m0d_statuses(proc_names)
-        LOG.debug('The following statuses received for %s: %s',
-                  proc_names, statuses)
-        return [(item.fid, status) for item, status in statuses]
 
     @uses_consul_cache
     def get_services_by_parent_process(self,
@@ -471,14 +356,6 @@ class ConsulConfigManager(ConfigManager):
         return to_ha_state_map[str(obj_state).lower()]
 
     @repeat_if_fails()
-    def is_process_confd(self, proc_fid: Fid, kv_cache=None) -> bool:
-        confds = self.get_confd_list()
-        for confd in confds:
-            if proc_fid == confd.fid:
-                return True
-        return False
-
-    @repeat_if_fails()
     @uses_consul_cache
     def get_conf_obj_status(self,
                             obj_t: ObjT,
@@ -523,31 +400,7 @@ class ConsulConfigManager(ConfigManager):
         return obj_state
 
     @uses_consul_cache
-    def get_proc_svc_conf_obj_status(self,
-                                     obj_t: ObjT,
-                                     fidk: int,
-                                     kv_cache=None) -> int:
-        if ObjT.SERVICE.name == obj_t.name:
-            svc_fid = create_service_fid(fidk)
-            pfid = self.get_service_process_fid(svc_fid, kv_cache=kv_cache)
-        else:
-            pfid = create_process_fid(fidk)
-        proc_node = self.get_process_node(pfid, kv_cache=kv_cache)
-        proc_status: ObjHealth = self.get_service_health(proc_node, pfid.key,
-                                                         kv_cache=kv_cache)
-        # Report ONLINE for hax and confd if they are already started.
-        hax_fid = self.get_hax_fid(kv_cache=kv_cache)
-        if (proc_status == ObjHealth.RECOVERING and
-                (self.is_process_confd(pfid) or
-                 pfid == hax_fid)):
-            return HaNoteStruct.M0_NC_ONLINE
-        return proc_status.to_ha_note_status()
-
-    @uses_consul_cache
     def is_node_alive(self, node: str, kv_cache=None) -> bool:
-        """
-        Checks via Consul Members API whether the given node is alive.
-        """
         try:
             # Returns data of the following kind:
             # [{
@@ -607,10 +460,6 @@ class ConsulConfigManager(ConfigManager):
 
     @uses_consul_cache
     def get_node_health_status(self, node: str, kv_cache=None) -> str:
-        """
-        Returns the node health status string returned by Consul.
-        Possible return values: passing, warning, critical
-        """
         try:
             node_data = self.get_node_health_details(node, kv_cache=kv_cache)
             # if not node_data or (not self.is_node_alive(node,
@@ -625,12 +474,6 @@ class ConsulConfigManager(ConfigManager):
     @repeat_if_fails()
     @uses_consul_cache
     def get_node_fid(self, node: str, kv_cache=None) -> Optional[Fid]:
-        """
-        Returns the fid of the given node.
-
-        Parameters:
-            node : hostname of the node.
-        """
         # Example,
         # m0conf/nodes/
         # 0x6e00000000000001:0x3:{"name": "ssc-vm-1623.colo.seagate.com",
@@ -654,10 +497,6 @@ class ConsulConfigManager(ConfigManager):
     def get_node_name_by_fid(self,
                              node_fid: Fid,
                              kv_cache=None) -> Optional[str]:
-        """
-        Returns the node name by its FID value or None if the given FID doesn't
-        correspond to any node.
-        """
         node_data = self.kv.kv_get(f'm0conf/nodes/{node_fid}',
                                    kv_cache=kv_cache)
         if node_data:
@@ -672,10 +511,6 @@ class ConsulConfigManager(ConfigManager):
                                    machineid: str,
                                    kv_cache=None,
                                    allow_null=False) -> Optional[str]:
-        """
-        Returns the node name by its machine id value or None if the given
-        machine id doesn't correspond to any node.
-        """
         mid_key = self.kv.kv_get(machineid, kv_cache=kv_cache,
                                  allow_null=allow_null)
         if mid_key:
@@ -688,10 +523,6 @@ class ConsulConfigManager(ConfigManager):
                                   nodename: str,
                                   kv_cache=None,
                                   allow_null=False):
-        """
-        Returns the machine id by its node-name value or None if the given
-        node-name doesn't correspond to any node.
-        """
         node_key = self.kv.kv_get(nodename, kv_cache=kv_cache,
                                   allow_null=allow_null)
         if node_key:
@@ -704,10 +535,6 @@ class ConsulConfigManager(ConfigManager):
     def get_node_ctrl_fids(self,
                            node: str,
                            kv_cache=None) -> Optional[List[Fid]]:
-        """
-        Parameters:
-            node : hostname of the node.
-        """
         # Example,
         # [
         #    "key": "m0conf/sites/0x5300000000000001:0x1/
@@ -731,13 +558,6 @@ class ConsulConfigManager(ConfigManager):
         return list_fids
 
     def get_node_hare_motr_s3_fids(self, node: str) -> List[Fid]:
-        """
-        Parameters:
-            node : hostname of the node
-        response:
-            returns list of fids for hax, ioservices, confd and s3services
-            configured and running on @node.
-        """
         services = ['hax', 'ios', 'confd', 's3service']
         node_data = self.get_node_health_details(node)
         fids: List[Fid] = []
@@ -796,45 +616,7 @@ class ConsulConfigManager(ConfigManager):
         return None
 
     @repeat_if_fails()
-    @uses_consul_cache
-    def get_ioservice_ctrl_fid(self,
-                               ioservice_fid: Fid,
-                               kv_cache=None) -> Optional[Fid]:
-        """
-        Returns the fid of the controller for the given IOservice.
-
-        Parameters:
-            ioservice_fid : Fid of IO service for which ctrl fid is required.
-
-        TODO: Instead of comparing devices, add a mapping from controller
-              to I/O service
-        """
-        if not ioservice_fid:
-            return None
-
-        sdev_fids = self.get_io_service_devices(ioservice_fid,
-                                                kv_cache=kv_cache)
-
-        if not sdev_fids:
-            return None
-
-        sdev_fid = sdev_fids[0]
-
-        ctrl_fid = self.get_device_controller(sdev_fid, kv_cache=kv_cache)
-
-        if ctrl_fid is None:
-            return None
-        else:
-            return Fid.parse(ctrl_fid)
-
-    @repeat_if_fails()
     def all_io_services_failed(self, node: str, kv_cache=None) -> bool:
-        """
-        Checks if all the IO services of given node are in failed state.
-
-        Parameters:
-            node : hostname of the node.
-        """
         node_fid = self.get_node_fid(node)
 
         # Example m0conf/nodes/0x6e00000000000001:0x3/processes/
@@ -919,12 +701,6 @@ class ConsulConfigManager(ConfigManager):
     @repeat_if_fails()
     @uses_consul_cache
     def get_node_encl_fid(self, node: str, kv_cache=None) -> Optional[Fid]:
-        """
-        Returns the fid of the enclosure for the given node.
-
-        Parameters:
-            node : hostname of the node.
-        """
         # Example,
         # {
         #    "key": "m0conf/sites/0x5300000000000001:0x1/
@@ -950,20 +726,6 @@ class ConsulConfigManager(ConfigManager):
                 encl_fid: str = match_result.group(1)
                 return Fid.parse(encl_fid)
         return None
-
-    def get_device_ha_state(self, status: ObjHealth) -> str:
-
-        device_ha_state_map = {
-            ObjHealth.UNKNOWN: m0HaObjState.M0_NC_TRANSIENT,
-            ObjHealth.RECOVERING: m0HaObjState.M0_NC_DTM_RECOVERING,
-            ObjHealth.OK: m0HaObjState.M0_NC_ONLINE,
-            ObjHealth.OFFLINE: m0HaObjState.M0_NC_TRANSIENT,
-            ObjHealth.FAILED: m0HaObjState.M0_NC_FAILED,
-            ObjHealth.REPAIR: m0HaObjState.M0_NC_REPAIR,
-            ObjHealth.REPAIRED: m0HaObjState.M0_NC_REPAIRED,
-            ObjHealth.REBALANCE: m0HaObjState.M0_NC_REBALANCE
-            }
-        return device_ha_state_map[status].name
 
     @repeat_if_fails()
     def set_node_state(self,
@@ -1149,13 +911,9 @@ class ConsulConfigManager(ConfigManager):
         self.kv.kv_put('stats/filesystem', data_str)
 
     def update_pver_bc(self, data: ByteCountStats) -> None:
-        """
-        Updates bytecount stats per pool versions for all pvers
-        under the ios service in consul kv.
-        Example: key= ioservices/0x7200000000000001:0xf/pvers/
-                      0x7600000000000001:0x8/users/1
-        value = {"bc":4096, "object_cnt":1}
-        """
+        # Example: key= ioservices/0x7200000000000001:0xf/pvers/
+        #              0x7600000000000001:0x8/users/1
+        # value = {"bc":4096, "object_cnt":1}
         ios_fid = data.proc_fid
         for pver in data.pvers:
             value = json.dumps({'bc': pver.byte_count,
@@ -1169,13 +927,10 @@ class ConsulConfigManager(ConfigManager):
     def update_bc_for_dg_category(self,
                                   pver_bc: Dict[str, int],
                                   pver_state: Dict[str, PverInfo]):
-        '''
-        This function will update bytecount for subsequent dg state/category
-        which will reflect on cluster status.
-        Bytecount data is stored in consul KV in key:value format
-        ioservices/0x7200000000000001:0x20/pvers/0x7600000000000001:0x6/users/1
-        value = {"bc": 4096, "object_cnt": 1}
-        '''
+        # Bytecount data is stored in consul KV in key:value format
+        # ioservices/0x7200000000000001:0x20/pvers/
+        #     0x7600000000000001:0x6/users/1
+        # value = {"bc": 4096, "object_cnt": 1}
         pver_state_map = {
             PverState.M0_CPS_HEALTHY: 'healthy',
             PverState.M0_CPS_DEGRADED: 'degraded',
@@ -1426,11 +1181,6 @@ class ConsulConfigManager(ConfigManager):
             return pfid
         return proc_base_fid
 
-    def is_proc_local(self, pfid: Fid) -> bool:
-        local_node = self.get_local_nodename()
-        proc_node = self.get_process_node(pfid)
-        return bool(proc_node == local_node)
-
     @repeat_if_fails()
     def update_process_status_local(self, event: ConfHaProcess) -> None:
         assert 0 <= event.chp_event < len(ha_process_events), \
@@ -1499,10 +1249,6 @@ class ConsulConfigManager(ConfigManager):
                            node: str,
                            svc_id: int,
                            kv_cache=None) -> ObjHealth:
-        """
-        Returns current status of a Consul service identified by the given
-        svc_id for a given node.
-        """
         # Maps consul service status and motr process status to the
         # corresponding ha status to be notified.
         # Respective values are for local and remote nodes.
@@ -1692,44 +1438,6 @@ class ConsulConfigManager(ConfigManager):
         return result
 
     @repeat_if_fails()
-    def ensure_ioservices_running(self) -> List[bool]:
-        statuses = self.get_m0d_statuses()
-        LOG.debug('The following statuses received: %s', statuses)
-        # started = ['M0_CONF_HA_PROCESS_STARTED' == v[1] for v in statuses]
-        started = [ObjHealth.OK == v[1] for v in statuses]
-        return started
-
-    @repeat_if_fails()
-    def ensure_motr_all_started(self, event: Event):
-        while True:
-            started = self.ensure_ioservices_running()
-            if all(started):
-                LOG.debug('According to Consul all confds have been started')
-                return
-            wait_for_event(event, 2)
-
-    def m0ds_stopping(self) -> bool:
-        # statuses = self.get_m0d_statuses()
-        statuses = self.get_m0d_statuses()
-        LOG.debug('The following statuses received: %s', statuses)
-        # stopping = [v[1] in ('M0_CONF_HA_PROCESS_STOPPING',
-        #                      'M0_CONF_HA_PROCESS_STOPPED') for v in statuses]
-        stopping = [v[1] in (ObjHealth.OFFLINE,
-                             ObjHealth.STOPPED) for v in statuses]
-        return all(stopping)
-
-    def get_process_current_status(self, status_reported: ObjHealth,
-                                   proc_fid: Fid) -> ObjHealth:
-        status_current = status_reported
-        # Reconfirm the process status only if the reported status is FAILED.
-        node = self.get_process_node(proc_fid)
-        status_current = self.get_service_health(node,
-                                                 proc_fid.key)
-        LOG.info('node: %s proc: %s current status: %s',
-                 node, proc_fid, status_current)
-        return status_current
-
-    @repeat_if_fails()
     def get_process_based_node_state(self, node_fid: Fid) -> str:
 
         proc_keys = self.kv.kv_get('processes', recurse=True)
@@ -1770,30 +1478,6 @@ class ConsulConfigManager(ConfigManager):
         elif started_processes == 0:
             fin_state = 'offline'
         return fin_state
-
-    def svcHealthToM0Status(self, svc_health: ObjHealth):
-        svcHealthToM0status: dict = {
-            ObjHealth.OK: m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED,
-            ObjHealth.FAILED: m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED,
-            ObjHealth.UNKNOWN: m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED,
-            ObjHealth.STOPPED: m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED
-        }
-        return svcHealthToM0status[svc_health]
-
-    def service_health_to_m0dstatus_update(self, proc_fid: Fid,
-                                           svc_health: ObjHealth):
-        ev = ConfHaProcess(chp_event=self.svcHealthToM0Status(svc_health),
-                           chp_type=int(
-                                m0HaProcessType.M0_CONF_HA_PROCESS_M0D),
-                           chp_pid=0,
-                           fid=proc_fid)
-        self.update_process_status(ev)
-
-    def is_confd_failed(self, proc_fid: Fid) -> bool:
-        status = self.get_process_status(proc_fid).proc_status
-        return status in ('M0_CONF_HA_PROCESS_STOPPING',
-                          'M0_CONF_HA_PROCESS_STOPPED',
-                          'M0_CONF_HA_PROCESS_STARTING')
 
     @repeat_if_fails()
     def set_process_state(self,
@@ -1855,13 +1539,6 @@ class ConsulConfigManager(ConfigManager):
             return None
         return config_path['Value'].decode("utf-8")
 
-    def am_i_rc(self):
-        # The call is already marked with @repeat_if_fails
-        leader = self.get_leader_node()
-        # The call doesn't communicate via Consul REST API
-        this_node = self.get_local_nodename()
-        return leader == this_node
-
     @repeat_if_fails()
     def init_motr_processes_status(self):
         local_node = self.get_local_nodename()
@@ -1885,22 +1562,6 @@ class ConsulConfigManager(ConfigManager):
             set_motr_processes_status(str(p_fid),
                                       ha_process_events[3],
                                       True)
-
-    def get_local_node_status(self):
-        total_processes = 0
-        started_processes = 0
-        for item in get_motr_processes_status().values():
-            total_processes += 1
-            # Checking if status is M0_CONF_HA_PROCESS_STARTED
-            if item == ha_process_events[1]:
-                started_processes += 1
-
-        if total_processes == started_processes:
-            return 'online'
-        elif started_processes == 0:
-            return 'offline'
-        else:
-            return 'degraded'
 
     @repeat_if_fails()
     def process_dynamic_fidk_lock(self) -> bool:
