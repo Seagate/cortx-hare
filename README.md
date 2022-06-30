@@ -106,6 +106,7 @@ and health-checking mechanisms.
 * Build and install Hare.
 
   ```sh
+  cd cortx-hare
   make
   sudo make install
   ```
