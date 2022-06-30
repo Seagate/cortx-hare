@@ -37,7 +37,7 @@ from hax.types import (ByteCountStats, ConfHaProcess, Fid, FidStruct, FsStats,
                        ReprebStatus, ObjHealth,
                        m0HaProcessEvent, m0HaProcessType)
 from hax.util import repeat_if_fails, FidWithType, PutKV
-from hax.configmanager import ConfigManager
+from hax.configmanager import ConfigManager, ConsulConfigManager
 
 LOG = logging.getLogger('hax')
 
@@ -59,7 +59,7 @@ class Motr:
                  ffi: HaxFFI,
                  planner: WorkPlanner,
                  herald: DeliveryHerald,
-                 consul_util: ConfigManager,
+                 consul_util: ConsulConfigManager,
                  node_uuid: str = ''):
         self._ffi = ffi or HaxFFI()
         # [KN] Note that node_uuid is currently ignored by the corresponding

@@ -88,12 +88,13 @@ def _run_stats_updater_thread(motr: Motr,
 # TODO this is work around and once the proper fix for CORTX-27707 is in
 # place, this will be reverted
 def _run_bc_updater_thread(motr: Motr,
-                           consul_util: ConfigManager) -> StoppableThread:
+                           consul_util: ConsulConfigManager
+                           ) -> StoppableThread:
     return _run_thread(ByteCountUpdater(motr, consul_util, interval_sec=600))
 
 
 @repeat_if_fails()
-def _remove_stale_session(util: ConfigManager) -> None:
+def _remove_stale_session(util: ConsulConfigManager) -> None:
     """
     Destroys a stale RC leader session if it exists or does nothing otherwise.
 
@@ -186,7 +187,7 @@ def main():
     # process needs to shutdown).
     signal.signal(signal.SIGINT, handle_signal)
 
-    util: ConfigManager = ConsulConfigManager()
+    util: ConsulConfigManager = ConsulConfigManager()
     # Avoid removing session on hax start as this will happen
     # on every node, thus leader election will keep re-triggering
     # until the final hax node starts, this will delay further

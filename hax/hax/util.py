@@ -156,7 +156,7 @@ def get_service_keys(node_items: List[Any], fidk: int) -> List[Any]:
 def get_motr_processes_status():
     with motr_processes_lock:
         LOG.debug('Current motr_processes_status: %s',
-                    motr_processes_status)
+                  motr_processes_status)
         return motr_processes_status
 
 
@@ -167,7 +167,7 @@ def set_motr_processes_status(fid, status, bAdd=False):
         if fid in motr_processes_status or bAdd:
             motr_processes_status[fid] = status
         LOG.debug('Updated motr_processes_status: %s',
-                    motr_processes_status)
+                  motr_processes_status)
 
 
 # See enum m0_conf_ha_process_event in Motr source code.

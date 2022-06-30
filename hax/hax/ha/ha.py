@@ -71,6 +71,8 @@ class Ha():
 
             node_name = cns.get_process_node(ha_state.fid)
             node_fid = cns.get_node_fid(node_name)
+            # silence mypy
+            assert node_fid is not None
             state = cns.get_process_based_node_state(node_fid)
             LOG.debug('received node state=%s node=%s', state, node_name)
             # since the node event is not always for local node

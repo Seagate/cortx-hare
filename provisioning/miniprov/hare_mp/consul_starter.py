@@ -34,8 +34,9 @@ class ConsulStarter(StoppableThread):
     """
     Starts consul agent and blocks until terminated.
     """
-    def __init__(self, utils: Utils, cns_utils: ConfigManager, stop_event: Event,
-                 log_dir: str, data_dir: str, config_dir: str, node_name: str,
+    def __init__(self, utils: Utils, cns_utils: ConfigManager,
+                 stop_event: Event, log_dir: str, data_dir: str,
+                 config_dir: str, node_name: str,
                  node_id: str,
                  peers: List[str],
                  bind_addr: str = '0.0.0.0',  # nosec
