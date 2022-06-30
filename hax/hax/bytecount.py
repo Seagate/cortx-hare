@@ -28,13 +28,14 @@ from hax.motr import Motr, log_exception
 from hax.types import (ByteCountStats, Fid, ObjHealth, PverInfo,
                        StoppableThread)
 from hax.util import wait_for_event
-from hax.configmanager import ConfigManager
+from hax.configmanager import ConsulConfigManager
 
 LOG = logging.getLogger('hax')
 
 
 class ByteCountUpdater(StoppableThread):
-    def __init__(self, motr: Motr, consul_util: ConfigManager, interval_sec=5):
+    def __init__(self, motr: Motr, consul_util: ConsulConfigManager,
+                 interval_sec=5):
         super().__init__(target=self._execute,
                          name='byte-count-updater',
                          args=(motr, ))

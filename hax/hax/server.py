@@ -45,7 +45,7 @@ from hax.queue.confobjutil import ConfObjUtil
 from hax.queue.offset import InboxFilter, OffsetStorage
 from hax.types import Fid, HAState, ObjHealth, StoppableThread
 from hax.util import create_process_fid, dump_json
-from hax.configmanager import ConfigManager
+from hax.configmanager import ConfigManager, ConsulConfigManager
 from helper.exec import Executor, Program
 from hax.util import repeat_if_fails
 from hax.ha.utils import HaUtils
@@ -296,7 +296,7 @@ def process_state_update(planner: WorkPlanner):
     return _process
 
 
-def event_subscription_handle(consul_util: ConfigManager):
+def event_subscription_handle(consul_util: ConsulConfigManager):
     async def _process(request):
         data = await request.json()
 
@@ -313,7 +313,7 @@ def event_subscription_handle(consul_util: ConfigManager):
     return _process
 
 
-def event_unsubscription_handle(consul_util: ConfigManager):
+def event_unsubscription_handle(consul_util: ConsulConfigManager):
     async def _process(request):
         data = await request.json()
 
@@ -359,7 +359,7 @@ class ServerRunner:
         self,
         planner: WorkPlanner,
         herald: DeliveryHerald,
-        consul_util: ConfigManager,
+        consul_util: ConsulConfigManager,
         hax_state: HaxGlobalState
     ):
         self.consul_util = consul_util
