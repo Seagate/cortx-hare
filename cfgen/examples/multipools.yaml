@@ -8,6 +8,7 @@ nodes:
       - runs_confd: true
         io_disks:
           data: []
+          log: []
       - io_disks:
           meta_data: /dev/vg_metadata_srvnode-1/lv_raw_metadata
           data:
@@ -18,6 +19,8 @@ nodes:
             - path: /dev/disk/by-id/dm-name-mpathd
             - path: /dev/disk/by-id/dm-name-mpathe
             - path: /dev/disk/by-id/dm-name-mpathf
+          log:
+            - path: /dev/disk/by-id/dm-name-mpathff
     m0_clients:
       - name: m0_client_other  # name of the motr client
         instances: 2   # Number of instances, this host will run
@@ -42,6 +45,7 @@ nodes:
       - runs_confd: true
         io_disks:
           data: []
+          log: []
       - io_disks:
           meta_data: /dev/vg_metadata_srvnode-2/lv_raw_metadata
           data:
@@ -52,6 +56,8 @@ nodes:
             - path: /dev/disk/by-id/dm-name-mpathj
             - path: /dev/disk/by-id/dm-name-mpathk
             - path: /dev/disk/by-id/dm-name-mpathl
+          log:
+            - path: /dev/disk/by-id/dm-name-mpathm
     m0_clients:
       - name: m0_client_other  # name of the motr client
         instances: 2   # Number of instances, this host will run

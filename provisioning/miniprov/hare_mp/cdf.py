@@ -521,10 +521,13 @@ class CdfGenerator:
             servers = DList([
                 M0ServerDesc(
                     io_disks=DisksDesc(
-                        data=self.utils.get_drives_info_for(cvg, machine_id),
+                        data=self.utils.get_data_drives_info_for(cvg,
+                                                                 machine_id),
                         meta_data=Maybe(
                             self._get_metadata_device(
-                                machine_id, cvg), 'Text')),
+                                machine_id, cvg), 'Text'),
+                        log=self.utils.get_log_drives_info_for(cvg,
+                                                               machine_id)),
                     runs_confd=Maybe(False, 'Bool'))
                 # node>{machine_id}>cvg
                 for cvg in range(len(store.get(
@@ -538,6 +541,7 @@ class CdfGenerator:
             servers.value.append(M0ServerDesc(
                 io_disks=DisksDesc(
                     data=DList([], 'List Disk'),
+                    log=DList([], 'List Disk'),
                     meta_data=Maybe(None, 'Text')),
                 runs_confd=Maybe(True, 'Bool')))
 

@@ -7,6 +7,7 @@ nodes:
       - runs_confd: true
         io_disks:
           data: []
+          log: []
       - io_disks:
           data:
             - path: /dev/vdb
@@ -14,6 +15,7 @@ nodes:
             - path: /dev/vdd
             - path: /dev/vde
             - path: /dev/vdf
+          log:
             - path: /dev/vdg
     m0_clients:
       - name: m0_client_other  # name of the motr client
@@ -26,6 +28,7 @@ nodes:
       - runs_confd: true
         io_disks:
           data: []
+          log: []
       - io_disks:
           data:
             - path: /dev/vdb
@@ -33,6 +36,7 @@ nodes:
             - path: /dev/vdd
             - path: /dev/vde
             - path: /dev/vdf
+          log:
             - path: /dev/vdg
     m0_clients:
       - name: m0_client_other  # name of the motr client
@@ -45,13 +49,11 @@ pools:
       - { path: /dev/vdd, node: ssu1 }
       - { path: /dev/vde, node: ssu1 }
       - { path: /dev/vdf, node: ssu1 }
-      - { path: /dev/vdg, node: ssu1 }
       - { path: /dev/vdb, node: ssu2 }
       - { path: /dev/vdc, node: ssu2 }
       - { path: /dev/vdd, node: ssu2 }
       - { path: /dev/vde, node: ssu2 }
       - { path: /dev/vdf, node: ssu2 }
-      - { path: /dev/vdg, node: ssu2 }
     #type: sns  # optional; supported values: "sns" (default), "dix", "md"
     data_units: 1
     parity_units: 0
