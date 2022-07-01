@@ -1262,6 +1262,7 @@ class ConsulUtil:
 
         device_ha_state_map = {
             ObjHealth.UNKNOWN: m0HaObjState.M0_NC_TRANSIENT,
+            ObjHealth.RECOVERING: m0HaObjState.M0_NC_DTM_RECOVERING,
             ObjHealth.OK: m0HaObjState.M0_NC_ONLINE,
             ObjHealth.OFFLINE: m0HaObjState.M0_NC_TRANSIENT,
             ObjHealth.FAILED: m0HaObjState.M0_NC_FAILED,
@@ -1532,6 +1533,8 @@ class ConsulUtil:
                            kv_cache=None) -> None:
         device_state_map = {
             ObjHealth.OK: 'online',
+            ObjHealth.UNKNOWN: 'offline',
+            ObjHealth.RECOVERING: 'dtm_recovering',
             ObjHealth.FAILED: 'failed',
             ObjHealth.OFFLINE: 'offline',
             ObjHealth.REPAIR: 'repairing',
@@ -1583,6 +1586,7 @@ class ConsulUtil:
             'unknown': HaNoteStruct.M0_NC_ONLINE,
             'm0_nc_unknown': HaNoteStruct.M0_NC_ONLINE,
             'online': HaNoteStruct.M0_NC_ONLINE,
+            'dtm_recovering': HaNoteStruct.M0_NC_DTM_RECOVERING,
             'offline': HaNoteStruct.M0_NC_TRANSIENT,
             'failed': HaNoteStruct.M0_NC_FAILED,
             'repairing': HaNoteStruct.M0_NC_REPAIR,
@@ -2061,8 +2065,9 @@ class ConsulUtil:
             if p_fid not in all_procs:
                 continue
             # Checking if status is M0_CONF_HA_PROCESS_STARTED
-            if all_procs[p_fid] == \
-                    m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED.name:
+            if all_procs[p_fid] in (
+                    m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED.name,
+                    m0HaProcessEvent.M0_CONF_HA_PROCESS_DTM_RECOVERED.name):
                 started_processes += 1
         LOG.debug('total procs=%s, started procs=%s', total_processes,
                   started_processes)

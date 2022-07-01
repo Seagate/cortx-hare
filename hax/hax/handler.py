@@ -310,7 +310,7 @@ class ConsumerThread(StoppableThread):
                 ids: List[MessageId] = motr.broadcast_ha_states(
                                        [
                                            HAState(fid=req.process_fid,
-                                                   status=ObjHealth.FAILED)
+                                                   status=ObjHealth.OFFLINE)
                                        ],
                                        notify_devices=False,
                                        proc_skip_list=[req.process_fid])
