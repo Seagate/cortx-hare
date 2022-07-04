@@ -302,7 +302,7 @@ class Motr:
 
         def _update_process_tree(proc_fid: Fid, state: ObjHealth) -> bool:
             return (st.status in (ObjHealth.FAILED, ObjHealth.OK,
-                                  ObjHealth.OFFLINE) and
+                                  ObjHealth.OFFLINE, ObjHealth.RECOVERING) and
                     not self.consul_util.is_proc_client(st.fid) and
                     not broadcast_hax_only and
                     not self._is_mkfs(proc_fid) and
@@ -561,8 +561,14 @@ class Motr:
         new_state = note.no_state
         proc_fid = Fid.from_struct(note.no_id)
 
-        state = (ObjHealth.OK if new_state ==
-                 HaNoteStruct.M0_NC_ONLINE else ObjHealth.OFFLINE)
+        # Hax still sends M0_NC_FAILED notifications for processes
+        # on receiving process stop event to disconnect halinks.
+        # But we don't want to mark corresponding disks as FAILED,
+        # instead they should be marked OFFLINE.
+        if new_state == HaNoteStruct.M0_NC_FAILED:
+            state = ObjHealth.OFFLINE
+        else:
+            state = ObjHealth.from_ha_note_state(new_state)
         is_mkfs = self._is_mkfs(proc_fid)
 
         mkfs_down = is_mkfs and state != ObjHealth.OK
