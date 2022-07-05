@@ -539,9 +539,6 @@ def init(args):
     try:
         url = args.config[0]
 
-        if not is_mkfs_required(url):
-            return
-
         conf = ConfStoreProvider(url)
         utils = Utils(conf)
         cns_utils = ConsulUtil()
@@ -551,13 +548,15 @@ def init(args):
         # Starting consul and hax
         consul_starter = _start_consul(utils, stop_event,
                                        config_dir, log_dir, url)
-        hax_starter = _start_hax(utils, stop_event, config_dir, log_dir)
         hostname = utils.get_local_hostname()
-        # Cleanup old mkfs state
-        cleanup_mkfs_state(utils, cns_utils)
-        start_mkfs_parallel(hostname, config_dir)
-        # Update mkfs state
-        set_mkfs_done_for(hostname, cns_utils)
+        if is_mkfs_required(url):
+            hax_starter = _start_hax(utils, stop_event, config_dir, log_dir)
+            # Cleanup old mkfs state
+            cleanup_mkfs_state(utils, cns_utils)
+            start_mkfs_parallel(hostname, config_dir)
+            # Update mkfs state
+            set_mkfs_done_for(hostname, cns_utils)
+
         data_nodes = conf.get_hostnames_for_service(
             Const.SERVICE_MOTR_IO.value)
 
@@ -567,7 +566,8 @@ def init(args):
                                             data_nodes):
             sleep(5)
         # Stopping hax and consul
-        stop_hax_blocking(hax_starter)
+        if is_mkfs_required(url):
+            stop_hax_blocking(hax_starter)
         stop_consul_blocking(consul_starter)
     except Exception as error:
         if hax_starter:
