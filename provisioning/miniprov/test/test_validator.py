@@ -30,7 +30,7 @@ URL = "json:///tmp/test-conf-store.json"
 conf_store_data = {
   "provisioner": {
     "cluster_info": {
-      "pillar_dir": "/opt/seagate/cortx/provisioner/pillar/groups/all/",
+      "pillar_dir": "$HOME/seagate/cortx/provisioner/pillar/groups/all/",
       "num_of_nodes": 1
     },
     "cluster": {

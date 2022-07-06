@@ -164,7 +164,7 @@ def is_mkfs_required(url: str) -> bool:
 @func_log(func_enter, func_leave)
 def logrotate_generic(url: str):
     try:
-        with open('/opt/seagate/cortx/hare/conf/logrotate/hare',
+        with open('$HOME/seagate/cortx/hare/conf/logrotate/hare',
                   'r') as f:
             content = f.read()
 
@@ -190,7 +190,7 @@ def logrotate(url: str):
         logging.info('Server type (%s)', server_type)
 
         if server_type != 'unknown':
-            with open(f'/opt/seagate/cortx/hare/conf/logrotate/{server_type}',
+            with open(f'$HOME/seagate/cortx/hare/conf/logrotate/{server_type}',
                       'r') as f:
                 content = f.read()
 
@@ -209,7 +209,7 @@ def logrotate(url: str):
 def unsupported_feature(url: str):
     try:
         features_unavailable = []
-        path = '/opt/seagate/cortx/hare/conf/setup_info.json'
+        path = '$HOME/seagate/cortx/hare/conf/setup_info.json'
         with open(path) as hare_features_info:
             hare_unavailable_features = json.load(hare_features_info)
 
@@ -886,7 +886,7 @@ def generate_config(url: str, path_to_cdf: str) -> None:
     conf_dir = get_config_dir(url)
     path = os.getenv('PATH')
     if path:
-        path += os.pathsep + '/opt/seagate/cortx/hare/bin/'
+        path += os.pathsep + '$HOME/seagate/cortx/hare/bin/'
     python_path = os.pathsep.join(sys.path)
     transport_type = utils.get_transport_type()
     cmd = ['configure', '-c', conf_dir, path_to_cdf,

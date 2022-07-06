@@ -1,30 +1,30 @@
 hare:
   post_install:
-    cmd: /opt/seagate/cortx/hare/bin/hare_setup post_install
+    cmd: $HOME/seagate/cortx/hare/bin/hare_setup post_install
     args: --config $URL --report-unavailable-features --configure-logrotate
   init:
-    cmd: /opt/seagate/cortx/hare/bin/hare_setup init
+    cmd: $HOME/seagate/cortx/hare/bin/hare_setup init
     args: --config $URL
   config:
-    cmd: /opt/seagate/cortx/hare/bin/hare_setup config
+    cmd: $HOME/seagate/cortx/hare/bin/hare_setup config
     args: --config $URL
   test:
-    cmd: /opt/seagate/cortx/hare/bin/hare_setup test
+    cmd: $HOME/seagate/cortx/hare/bin/hare_setup test
     args: --config $URL --plan $TYPE
   reset:
-    cmd: /opt/seagate/cortx/hare/bin/hare_setup reset
+    cmd: $HOME/seagate/cortx/hare/bin/hare_setup reset
     args: --config $URL
   cleanup:
-    cmd: /opt/seagate/cortx/hare/bin/hare_setup cleanup
+    cmd: $HOME/seagate/cortx/hare/bin/hare_setup cleanup
     args: --config $URL --pre-factory
   prepare:
-    cmd: /opt/seagate/cortx/hare/bin/hare_setup prepare
+    cmd: $HOME/seagate/cortx/hare/bin/hare_setup prepare
     args: --config $URL
   pre-upgrade:
-    cmd: /opt/seagate/cortx/hare/bin/hare_setup pre-upgrade
+    cmd: $HOME/seagate/cortx/hare/bin/hare_setup pre-upgrade
     args: --config $URL
   post-upgrade:
-    cmd: /opt/seagate/cortx/hare/bin/hare_setup post-upgrade
+    cmd: $HOME/seagate/cortx/hare/bin/hare_setup post-upgrade
     args: --config $URL
 support_bundle:
-  - /opt/seagate/cortx/hare/bin/hare_setup support_bundle
+  - $HOME/seagate/cortx/hare/bin/hare_setup support_bundle

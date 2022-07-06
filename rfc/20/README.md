@@ -35,7 +35,7 @@ Hare component must implement Mini-Provisioner API (see the [specification docum
 
 ## Vocabulary
 
-1. Mini-Provisioner API - a part of CORTX V2 Provisioner Framework. CORTX Provisioner defines Mini-Provisioner API interfaces to support phase-wise installation for each of the components which is specified using standard template: `/opt/seagate/cortx/<component>/conf/setup.yaml`
+1. Mini-Provisioner API - a part of CORTX V2 Provisioner Framework. CORTX Provisioner defines Mini-Provisioner API interfaces to support phase-wise installation for each of the components which is specified using standard template: `$HOME/seagate/cortx/<component>/conf/setup.yaml`
 2. ConfStore - a [lens-like thing](https://medium.com/@russmatney/haskell-lens-operator-onboarding-a235481e8fac) (yes, almost in the sense of Haskell) to work with various file formats and potentially databases as if it is a Key-Value storage. The idea is that different components may require similar knowledge about the cluster configuration or produce some knowledge that can be used later by another components during their self-deployment. So it is natural that at the level of Provisioner Framework we have a shared "database" to store and exchange the facts. But instead of the "database" we're given with an optics to it.
 
 ## General setup.yaml structure
@@ -70,7 +70,7 @@ Hare component must implement Mini-Provisioner API (see the [specification docum
         cmd: <script path> 
         target: <URL>           		# Custom end-point for restoring config (Consul) 
       support_bundle:   
-        - /opt/seagate/cortx/provisioner/cli/provisioner-bundler   
+        - $HOME/seagate/cortx/provisioner/cli/provisioner-bundler   
 ```
 
 ### Notes
@@ -115,7 +115,7 @@ TBD
 
 #### post_install
 ```
-/opt/seagate/cortx/hare/bin/hare_setup post_install --config 'json:///tmp/exampleV2.json'
+$HOME/seagate/cortx/hare/bin/hare_setup post_install --config 'json:///tmp/exampleV2.json'
 ```
 Verifies that
 1. Motr, Hare, Consul rpms are installed.
@@ -125,7 +125,7 @@ Exit codes: 0 if no issues found, 1 otherwise.
 
 #### config
 ```
-/opt/seagate/cortx/hare/bin/hare_setup config --config 'json:///tmp/exampleV2.json' --file '$HOME/seagate/var/lib/hare/cluster.yaml'
+$HOME/seagate/cortx/hare/bin/hare_setup config --config 'json:///tmp/exampleV2.json' --file '$HOME/seagate/var/lib/hare/cluster.yaml'
 ```
 1. Generates CDF file according to the configuration provided by <str> (URL) parameter.
 2. Applies configuration to Consul.
@@ -150,7 +150,7 @@ Exit codes: 0 if no issues found, 1 otherwise.
 
 #### init
 ```
-/opt/seagate/cortx/hare/bin/hare_setup init --config 'json:///tmp/exampleV2.json'
+$HOME/seagate/cortx/hare/bin/hare_setup init --config 'json:///tmp/exampleV2.json'
 ```
 1. Invokes 'hctl bootstrap --mkfs'(If cluster is not already running)
 
@@ -160,7 +160,7 @@ Exit codes: 0 if no issues found (so Hare cluster running), 1 otherwise.
 
 #### test
 ```
-/opt/seagate/cortx/hare/bin/hare_setup test --config 'json:///tmp/exampleV2.json'
+$HOME/seagate/cortx/hare/bin/hare_setup test --config 'json:///tmp/exampleV2.json'
 ```
 Run functional tests against a running singlenode cluster (TBD).
 Runs 'hctl status --json' and compares output with info extracted from CDF used during bootstrap to check if all the services are running correctly.
@@ -168,10 +168,10 @@ Runs 'hctl status --json' and compares output with info extracted from CDF used 
 ### support bundle
 
 ```
-[root@ssc-vm-1623:root] /opt/seagate/cortx/hare/bin/hare_setup support_bundle
+[root@ssc-vm-1623:root] $HOME/seagate/cortx/hare/bin/hare_setup support_bundle
 [root@ssc-vm-1623:root] ls /tmp/hare
 hare_ssc-vm-1623.tar.gz
-[root@ssc-vm-1623:root] /opt/seagate/cortx/hare/bin/hare_setup support_bundle SB12345 /root
+[root@ssc-vm-1623:root] $HOME/seagate/cortx/hare/bin/hare_setup support_bundle SB12345 /root
 [root@ssc-vm-1623:root] ls hare
 hare_SB12345.tar.gz
 ```

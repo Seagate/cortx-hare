@@ -157,7 +157,7 @@ ensure that
 1 | passwordless `sudo` works for \<user\> | all machines
 2 | \<user\> can `ssh` from \<origin\> to other machines | \<origin\>
 3 | `cortx-hare` and `cortx-s3server` RPMs are installed | all machines
-4 | `/opt/seagate/cortx/hare/bin` is in \<user\>'s PATH | all machines
+4 | `$HOME/seagate/cortx/hare/bin` is in \<user\>'s PATH | all machines
 5 | \<user\> is a member of `hare` group | all machines
 6 | CDF exists and corresponds to the actual cluster configuration | \<origin\>
 
@@ -169,13 +169,13 @@ _cluster description file_ (CDF).
 See `cfgen --help-schema` for the description of CDF format.
 
 You can make a copy of
-`/opt/seagate/cortx/hare/share/cfgen/examples/singlenode.yaml`
+`$HOME/seagate/cortx/hare/share/cfgen/examples/singlenode.yaml`
 (single-node setup) or
-`/opt/seagate/cortx/hare/share/cfgen/examples/ldr1-cluster.yaml`
+`$HOME/seagate/cortx/hare/share/cfgen/examples/ldr1-cluster.yaml`
 (dual-node setup) and edit it as necessary.
 
 ```sh
-cp /opt/seagate/cortx/hare/share/cfgen/examples/singlenode.yaml ~/CDF.yaml
+cp $HOME/seagate/cortx/hare/share/cfgen/examples/singlenode.yaml ~/CDF.yaml
 vi ~/CDF.yaml
 ```
 
@@ -239,7 +239,7 @@ You will probably need to modify `host`, `data_iface`, and `io_disks` values.
   -->
 
   ```sh
-  /opt/seagate/cortx/hare/libexec/m0crate-io-conf >/tmp/m0crate-io.yaml
+  $HOME/seagate/cortx/hare/libexec/m0crate-io-conf >/tmp/m0crate-io.yaml
   dd if=/dev/urandom of=/tmp/128M bs=1M count=128
   sudo m0crate -S /tmp/m0crate-io.yaml
   ```

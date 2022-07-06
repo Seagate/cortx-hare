@@ -237,7 +237,7 @@ class Utils:
         os.makedirs(dest_s3, exist_ok=True)
         os.makedirs(dest_motr, exist_ok=True)
 
-        cmd = ['/opt/seagate/cortx/hare/libexec/node-name',
+        cmd = ['$HOME/seagate/cortx/hare/libexec/node-name',
                '--conf-dir', conf_dir_path]
         node_name = execute(cmd)
 

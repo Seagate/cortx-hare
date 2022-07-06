@@ -29,8 +29,8 @@ SRC_DIR="$(dirname $(readlink -f $0))"
 M0_SRC_DIR=${M0_SRC_DIR:-${SRC_DIR%/*}/cortx-motr}
 
 # Quick fix for EOS-10650
-CORTX_HA_BIN=/opt/seagate/cortx/ha/bin/
-CORTX_HA_PY_INCLUDES=/opt/seagate/cortx/ha/lib64/python3.6/site-packages:/opt/seagate/cortx/ha/lib/python3.6/site-packages
+CORTX_HA_BIN=$HOME/seagate/cortx/ha/bin/
+CORTX_HA_PY_INCLUDES=$HOME/seagate/cortx/ha/lib64/python3.6/site-packages:$HOME/seagate/cortx/ha/lib/python3.6/site-packages
 
 die() {
     local LightRed="$(tput bold ; tput setaf 1)"
@@ -45,14 +45,14 @@ die() {
     exit 1
 }
 
-if [[ $SRC_DIR =~ bin/?$ ]]; then
-    HARE_BASE_DIR=$SRC_DIR/..
-else
-    # TODO: '/opt/seagate/cortx/hare' prefix can be different, e.g. '/usr'
-    HARE_BASE_DIR=/opt/seagate/cortx/hare
+#if [[ $SRC_DIR =~ bin/?$ ]]; then
+#    HARE_BASE_DIR=$SRC_DIR/..
+#else
+    # TODO: '$HOME/seagate/cortx/hare' prefix can be different, e.g. '/usr'
+    HARE_BASE_DIR=$HOME/seagate/cortx/hare
     [[ -d $HARE_BASE_DIR && -e $HARE_BASE_DIR/bin/hctl ]] ||
         die 'Hare is not installed, please run `make devinstall`.'
-fi
+#fi
 
 if [[ -d $SRC_DIR/.py3venv ]]; then
     source "$SRC_DIR/.py3venv/bin/activate"

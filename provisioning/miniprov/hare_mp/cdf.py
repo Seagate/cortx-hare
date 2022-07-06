@@ -15,9 +15,9 @@ from hare_mp.types import (ClusterDesc, DiskRef, DList, Maybe, NodeDesc,
                            FdmiFilterDesc, NetworkPorts)
 from hare_mp.utils import func_log, func_enter, func_leave, Utils
 
-DHALL_PATH = '/opt/seagate/cortx/hare/share/cfgen/dhall'
-DHALL_EXE = '/opt/seagate/cortx/hare/bin/dhall'
-DHALL_TO_YAML_EXE = '/opt/seagate/cortx/hare/bin/dhall-to-yaml'
+DHALL_PATH = '$HOME/seagate/cortx/hare/share/cfgen/dhall'
+DHALL_EXE = '$HOME/seagate/cortx/hare/bin/dhall'
+DHALL_TO_YAML_EXE = '$HOME/seagate/cortx/hare/bin/dhall-to-yaml'
 
 
 @dataclass

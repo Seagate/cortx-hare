@@ -307,7 +307,7 @@ class Generator:
         port = self.get_service_port(ep)
 
         checks: Dict[str, Any] = {}
-        checks['args'] = ['/opt/seagate/cortx/hare/libexec/check-service']
+        checks['args'] = ['$HOME/seagate/cortx/hare/libexec/check-service']
         checks['interval'] = '1s'
         checks['status'] = 'warning'
         # get svc checks args as per svc name

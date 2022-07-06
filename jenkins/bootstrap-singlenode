@@ -36,4 +36,4 @@ done
 
 # XXX-FIXME: to discuss
 hctl bootstrap --mkfs \
-     /opt/seagate/cortx/hare/share/cfgen/examples/singlenode.yaml
+     $HOME/seagate/cortx/hare/share/cfgen/examples/singlenode.yaml

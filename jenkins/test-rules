@@ -28,7 +28,7 @@ die() {
     exit 1
 }
 
-cd /opt/seagate/cortx/hare
+cd $HOME/seagate/cortx/hare
 
 hctl bootstrap --mkfs share/cfgen/examples/singlenode.yaml
 hctl status

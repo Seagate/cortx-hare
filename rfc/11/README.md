@@ -74,7 +74,7 @@ $ hctl bootstrap --mkfs /tmp/ldr1-cluster.yaml
 OR (specifying transport type)
 
 ```
-$ hctl bootstrap --mkfs --xprt libfab /opt/seagate/cortx/hare/share/cfgen/examples/singlenode.yaml
+$ hctl bootstrap --mkfs --xprt libfab $HOME/seagate/cortx/hare/share/cfgen/examples/singlenode.yaml
 2021-12-29 10:38:57: Generating cluster configuration... OK
 2021-12-29 10:38:58: Stopping Consul on this node... OK
 2021-12-29 10:39:10: Stopping Consul on other nodes... OK

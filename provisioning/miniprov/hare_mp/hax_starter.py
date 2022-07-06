@@ -62,8 +62,8 @@ class HaxStarter(StoppableThread):
                                                       delay=False)
             LOG.addHandler(fh)
             path = os.getenv('PATH', '')
-            path += os.pathsep + '/opt/seagate/cortx/hare/bin'
-            path += os.pathsep + '/opt/seagate/cortx/hare/libexec'
+            path += os.pathsep + '$HOME/seagate/cortx/hare/bin'
+            path += os.pathsep + '$HOME/seagate/cortx/hare/libexec'
             python_path = os.pathsep.join(sys.path)
             cmd = ['hax']
             restart = True

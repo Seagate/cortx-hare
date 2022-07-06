@@ -58,8 +58,8 @@ def get_python_env():
     env = {
         'PATH':
         ':'.join([
-            '/opt/seagate/cortx/hare/bin',
-            '/opt/seagate/cortx/hare/libexec', path
+            '$HOME/seagate/cortx/hare/bin',
+            '$HOME/seagate/cortx/hare/libexec', path
         ]),
         'PYTHONPATH':
         py_path
@@ -73,7 +73,7 @@ def bytecount_stat(request):
     """
     exec = Executor()
     env = get_python_env()
-    result = exec.run(Program(["/opt/seagate/cortx/hare/libexec/hare-status",
+    result = exec.run(Program(["$HOME/seagate/cortx/hare/libexec/hare-status",
                       "--bytecount"]), env=env)
     return json_response(text=result)
 
@@ -84,7 +84,7 @@ def hctl_stat(request):
     """
     exec = Executor()
     env = get_python_env()
-    result = exec.run(Program(["/opt/seagate/cortx/hare/libexec/hare-status",
+    result = exec.run(Program(["$HOME/seagate/cortx/hare/libexec/hare-status",
                       "--json"]), env=env)
     return json_response(text=result)
 

@@ -158,7 +158,7 @@ pipeline {
                     def remote = getTestMachine(VM_FQDN)
                     def commandResult = sshCommand remote: remote, command: """
                         cd $REPO_NAME
-                        export PATH=/opt/seagate/cortx/hare/bin:\$PATH
+                        export PATH=$HOME/seagate/cortx/hare/bin:\$PATH
                         make check
                         make test
                         """
@@ -175,7 +175,7 @@ pipeline {
                 script {
                     def remote = getTestMachine(VM_FQDN)
                     def commandResult = sshCommand remote: remote, command: """
-                        PATH=/opt/seagate/cortx/hare/bin/:\$PATH
+                        PATH=$HOME/seagate/cortx/hare/bin/:\$PATH
                         hctl shutdown
                         """
                     echo "Result: " + commandResult

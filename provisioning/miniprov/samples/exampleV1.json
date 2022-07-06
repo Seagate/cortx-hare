@@ -13,7 +13,7 @@
   },
   "commons": {
     "health-map": {
-      "path": "/opt/seagate/cortx_configs/healthmap/",
+      "path": "$HOME/seagate/cortx_configs/healthmap/",
       "file": "healthmap-schema.json"
     },
     "version": {
@@ -209,10 +209,10 @@
   },
   "provisioner": {
     "common_config": {
-      "confstore_url": "json:///opt/seagate/cortx_configs/provisioner_cluster.json"
+      "confstore_url": "json://$HOME/seagate/cortx_configs/provisioner_cluster.json"
     },
     "cluster_info": {
-      "pillar_dir": "/opt/seagate/cortx/provisioner/pillar/groups/all/",
+      "pillar_dir": "$HOME/seagate/cortx/provisioner/pillar/groups/all/",
       "num_of_nodes": 1
     },
     "cluster": {
@@ -229,7 +229,7 @@
     "type": "bundle",
     "target_build": "http://cortx-storage.colo.seagate.com/releases/cortx/github/integration-custom-ci/release/centos-7.8.2003/custom-build-500/",
     "update": {
-      "base_dir": "/opt/seagate/cortx/updates",
+      "base_dir": "$HOME/seagate/cortx/updates",
       "repos": {}
     }
   },

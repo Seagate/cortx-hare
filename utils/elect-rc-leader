@@ -75,7 +75,7 @@ get_node_name() {
     # script.
     # In non-hctl context, the scripts should use absolute path instead
     # when accessing scripts under hare/libexec/.
-    /opt/seagate/cortx/hare/libexec/node-name --conf-dir $conf_dir
+    $HOME/seagate/cortx/hare/libexec/node-name --conf-dir $conf_dir
 }
 
 cleanup() {

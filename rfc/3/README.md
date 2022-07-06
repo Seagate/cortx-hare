@@ -89,7 +89,7 @@ optional arguments:
   -h, --help           show this help message and exit
   --help-schema        show the schema of cluster description file (CDF)
   -D dir, --dhall dir  directory with auxiliary Dhall expressions (defaults to
-                       '/opt/seagate/cortx/hare/share/cfgen/dhall')
+                       '$HOME/seagate/cortx/hare/share/cfgen/dhall')
   -o output-dir        output directory (defaults to '.')
   --mock               Generate pseudo-random "facts". The hosts specified in
                        the cluster description file will not be visited and

@@ -21,7 +21,7 @@ set -eu -o pipefail
 # set -x
 export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
 
-PATH=$PATH:/opt/seagate/cortx/hare/bin
+PATH=$PATH:$HOME/seagate/cortx/hare/bin
 
 PROG=${0##*/}
 

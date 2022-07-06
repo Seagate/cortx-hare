@@ -110,6 +110,7 @@ def repeat_on_cmd_timeout(max_retries=-1):
 
 
 def parse_opts(argv):
+    dhall_dir = os.getenv('HOME', "") + '/seagate/cortx/hare/share/cfgen/dhall'
     p = argparse.ArgumentParser(description='Generate configuration files'
                                 ' required to start Motr cluster.',
                                 usage='%(prog)s [OPTION]... CDF')
@@ -119,7 +120,7 @@ def parse_opts(argv):
     p.add_argument('--help-schema', nargs=0,
                    help='show the schema of cluster description file (CDF)',
                    action=ShowSchema)
-    default_dhall_dir = '/opt/seagate/cortx/hare/share/cfgen/dhall'
+    default_dhall_dir = dhall_dir
     p.add_argument('-D', '--dhall', metavar='dir',
                    help='directory with auxiliary Dhall expressions'
                    f' (defaults to {default_dhall_dir!r})',

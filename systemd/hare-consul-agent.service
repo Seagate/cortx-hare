@@ -6,7 +6,7 @@ ConditionFileNotEmpty=%h/seagate/var/lib/hare/consul-env
 
 [Service]
 EnvironmentFile=%h/seagate/var/lib/hare/consul-env
-ExecStart=/opt/seagate/cortx/hare/libexec/consul/hare-consul
+ExecStart=%h/seagate/cortx/hare/libexec/consul/hare-consul
 ExecReload=/usr/bin/consul reload
 KillMode=process
 Restart=on-failure
