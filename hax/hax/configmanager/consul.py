@@ -366,9 +366,10 @@ class ConsulConfigManager(ConfigManager):
         if obj_t.name in (ObjT.PROCESS.name, ObjT.SERVICE.name):
             # 'node/<node_name>/process/<process_fidk>/service/type'
             node_items = self.get_all_nodes(kv_cache=kv_cache)
-            # TODO [KN] This code is too cryptic. To be refactored.
-            keys = getattr(self, 'get_{}_keys'.format(obj_t.name.lower()))(
-                node_items, fidk)
+            if obj_t.name == ObjT.PROCESS.name:
+                keys = get_process_keys(node_items, fidk)
+            elif obj_t.name == ObjT.SERVICE.name:
+                keys = get_service_keys(node_items, fidk)
             if len(keys) != 1:
                 raise RuntimeError(f'XXX fidk:{fidk} len:{len(keys)}')
             key = keys[0].split('/')
