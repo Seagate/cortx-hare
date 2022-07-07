@@ -79,10 +79,16 @@ class MessageBusInterface(MessageInterface):
         configpath = util.get_configpath(allow_null=True)
         if configpath:
             Conf.load('cortx_conf', configpath, skip_reload=True)
-
-            message_server_endpoints = Conf.get(
-                            'cortx_conf',
-                            'cortx>external>kafka>endpoints')
+            # cortx>external>kafka>num_endpoints
+            num_kafka = int(Conf.get(
+                'cortx_conf',
+                'cortx>external>kafka>num_endpoints'))
+            message_server_endpoints = []
+            # cortx>external>kafka>endpoints[0]
+            for i in range(num_kafka):
+                message_server_endpoints.append(Conf.get(
+                    'cortx_conf',
+                    f'cortx>external>kafka>endpoints[{i}]'))
             MessageBus.init(message_server_endpoints)
         else:
             logging.warning('initialize_bus skipped as configpath not found')

@@ -113,7 +113,6 @@ class TestCDF(unittest.TestCase):
 
             store.get_machine_id = Mock(return_value='1114a50a6bf6f9c93ebd3c49d07d3fd4')
             store.get_machine_ids_for_service = Mock(return_value=['1114a50a6bf6f9c93ebd3c49d07d3fd4'])
-            store.get_motr_clients = Mock(return_value=[])
             utils = Utils(store)
             kv = KVAdapter()
             def my_get(key: str, recurse: bool = False, allow_null: bool = False):
@@ -249,7 +248,6 @@ class TestCDF(unittest.TestCase):
         store._raw_get = Mock(side_effect=ret_values)
         store.get_machine_id = Mock(return_value='MACH_ID')
         store.get_machine_ids_for_service = Mock(return_value=['MACH_ID'])
-        store.get_motr_clients = Mock(return_value=[])
         utils = Utils(store)
         kv = KVAdapter()
         def my_get(key: str, recurse: bool = False, allow_null: bool = False):
@@ -358,9 +356,6 @@ class TestCDF(unittest.TestCase):
         store._raw_get = Mock(side_effect=ret_values)
         store.get_machine_id = Mock(return_value='MACH_ID')
         store.get_machine_ids_for_service = Mock(return_value=['MACH_ID'])
-        store.get_motr_clients = Mock(return_value=
-                                      [{'name': 'other',
-                                        'num_instances' : 2}])
         store.get_machine_ids_for_component = Mock(return_value=['MACH_ID'])
         utils = Utils(store)
         kv = KVAdapter()
@@ -641,7 +636,6 @@ class TestCDF(unittest.TestCase):
         store._raw_get = Mock(side_effect=ret_values)
         store.get_machine_id = Mock(return_value='MACH_ID')
         store.get_machine_ids_for_service = Mock(return_value=['MACH_ID'])
-        store.get_motr_clients = Mock(return_value=[])
         cdf = CdfGenerator(provider=store)
         cdf._get_m0d_per_cvg = Mock(return_value=1)
         utils = Utils(store)
@@ -975,7 +969,6 @@ class TestCDF(unittest.TestCase):
         store._raw_get = Mock(side_effect=ret_values)
         store.get_machine_id = Mock(return_value='MACH_ID')
         store.get_machine_ids_for_service = Mock(return_value=['MACH_ID'])
-        store.get_motr_clients = Mock(return_value=[])
         utils = Utils(store)
         kv = KVAdapter()
         def my_get(key: str, recurse: bool = False, allow_null: bool = False):
@@ -1111,9 +1104,6 @@ class TestCDF(unittest.TestCase):
         store.get_machine_id = Mock(return_value='MACH_ID')
         store.get_machine_ids_for_service = Mock(return_value=['MACH_ID',
                                                                'MACH_2_ID'])
-        store.get_motr_clients = Mock(return_value=
-                                [{'name': 'other',
-                                'num_instances' : 2}])
         store.get_machine_ids_for_component = Mock(return_value=['MACH_ID',
                                                                  'MACH_2_ID'])
         utils = Utils(store)
@@ -1243,7 +1233,6 @@ class TestCDF(unittest.TestCase):
         store._raw_get = Mock(side_effect=ret_values)
         store.get_machine_id = Mock(return_value='MACH_ID')
         store.get_machine_ids_for_service = Mock(return_value=['MACH_ID'])
-        store.get_motr_clients = Mock(return_value=[])
         cdf = CdfGenerator(provider=store)
         utils = Utils(store)
         kv = KVAdapter()
