@@ -132,6 +132,15 @@ class Utils:
         return data_devices
 
     @func_log(func_enter, func_leave)
+    def get_log_devices(self, machine_id: str, cvg: int) -> DList[Text]:
+        log_devices = DList(
+            [Text(device) for device in self.provider.get(
+                f'node>{machine_id}>'
+                f'cvg[{cvg}]>devices>log',
+                allow_null=True) or []], 'List Text')
+        return log_devices
+
+    @func_log(func_enter, func_leave)
     def _get_drive_info_form_os(self, path: str) -> Disk:
         drive_size = 0
         with open(path, 'rb') as f:
@@ -235,6 +244,10 @@ class Utils:
                 data_devs = self.get_data_devices(machine_id, cvg)
                 for dev_path in data_devs.value:
                     self._save_drive_info(dev_path.s)
+                log_devs = self.get_log_devices(machine_id, cvg)
+                if log_devs:
+                    for dev_path in log_devs.value:
+                        self._save_drive_info(dev_path.s)
 
     @func_log(func_enter, func_leave)
     @repeat_if_fails()
@@ -257,8 +270,16 @@ class Utils:
                      blksize=Maybe(drive_info['blksize'], 'Natural')))
 
     @func_log(func_enter, func_leave)
-    def get_drives_info_for(self, cvg: int, machine_id: str) -> DList[Disk]:
+    def get_data_drives_info_for(self, cvg: int,
+                                 machine_id: str) -> DList[Disk]:
         data_devs = self.get_data_devices(machine_id, cvg)
+        return DList([self.get_drive_info_from_consul(dev_path, machine_id)
+                      for dev_path in data_devs.value], 'List Disk')
+
+    @func_log(func_enter, func_leave)
+    def get_log_drives_info_for(self, cvg: int,
+                                machine_id: str) -> DList[Disk]:
+        data_devs = self.get_log_devices(machine_id, cvg)
         return DList([self.get_drive_info_from_consul(dev_path, machine_id)
                       for dev_path in data_devs.value], 'List Disk')
 

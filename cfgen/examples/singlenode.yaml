@@ -11,6 +11,7 @@ nodes:
       - runs_confd: true
         io_disks:
           data: []
+          log: []
           meta_data: null
       - runs_confd: null
         io_disks:
@@ -24,7 +25,8 @@ nodes:
             - path: /dev/loop6 
             - path: /dev/loop7 
             - path: /dev/loop8 
-            - path: /dev/loop9 
+          log:
+            - path: /dev/loop9
           meta_data: null
     m0_clients:
       - name: m0_client_other  # name of the motr client
@@ -55,7 +57,6 @@ pools:
       - { path: /dev/loop6, node: localhost }
       - { path: /dev/loop7, node: localhost }
       - { path: /dev/loop8, node: localhost }
-      - { path: /dev/loop9, node: localhost }
     data_units: 1
     parity_units: 0
     spare_units: 0

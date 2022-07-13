@@ -14,6 +14,7 @@ let Disk =
 let IODisks =
       { meta_data : Optional Text
       , data : List Disk
+      , log : List Disk
       }
 
 let M0ServerDesc =
