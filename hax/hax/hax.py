@@ -155,7 +155,6 @@ def main():
     LOG.info(f'Setting up ha_link interface with the options as follows: '
              f'hax fid = {cfg.hax_fid}, hax endpoint = {cfg.hax_ep}, '
              f'HA fid = {cfg.ha_fid}')
-
     ffi = HaxFFI()
     herald = DeliveryHerald()
     motr = Motr(planner=planner, ffi=ffi, herald=herald, consul_util=util)

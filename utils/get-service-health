@@ -22,7 +22,7 @@ set -eu -o pipefail
 PROG=${0##*/}
 
 get_node_name() {
-    /opt/seagate/cortx/hare/libexec/node-name
+    $HOME/seagate/cortx/hare/libexec/node-name
 }
 
 usage() {

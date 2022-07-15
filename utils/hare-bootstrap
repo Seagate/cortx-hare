@@ -293,7 +293,7 @@ EOF
     fi
 
     say 'Generating cluster configuration...'
-    PATH="$(dirname $(readlink -f $0)):$PATH" cfgen -o $conf_dir $cdf
+    PATH="$(dirname $(readlink -f $0)):$HOME/seagate/motr/usr/bin::$HOME/seagate/motr/usr/sbin:$PATH" cfgen -o $conf_dir $cdf
     dhall text < $conf_dir/confd.dhall | m0confgen > $conf_dir/confd.xc
 
     while read node _; do

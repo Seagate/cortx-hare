@@ -86,7 +86,7 @@ declare -A status=(
 )
 
 get_node_name() {
-    /opt/seagate/cortx/hare/libexec/node-name --conf-dir $conf_dir
+    $HOME/seagate/cortx/hare/libexec/node-name --conf-dir $conf_dir
 }
 
 # Convert fid to decimal service id (used in Consul):
@@ -121,7 +121,7 @@ if [[ $service =~ m0d ]]; then
     fi
 fi
 
-/opt/seagate/cortx/hare/bin/m0ping $host $port
+$HOME/seagate/cortx/hare/bin/m0ping $host $port
 rc=$?
 # Curl return codes that suggests that the service is active,
 # 0 -> OK, all fine. Proceed as usual.

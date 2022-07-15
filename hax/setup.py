@@ -93,24 +93,11 @@ def get_motr_dir():
 
 
 def get_motr_libs_dir():
-    try:
-        # Motr devel rpm takes precedence over M0_SRC_DIR
-        if pkgconfig.exists('motr'):
-            return pkgconfig.variables('motr')['libdir']
-    except EnvironmentError:
-        # fall back to M0_SRC_DIR handling if `pkg-config` is not available in
-        # the system
-        pass
-
-    libs_dir = get_motr_dir() + '/motr/.libs'
-    libmotr = libs_dir + '/libmotr.so'
-    assert P.isfile(libmotr), f'{libmotr}: No such file'
-    return libs_dir
+    return os.getenv('HOME') + '/seagate/motr/usr/lib64'
 
 
 def get_galois_include_dir():
-    motr_dir = get_motr_dir()
-    return f'{motr_dir}/extra-libs/galois/include/'
+    return os.getenv('HOME') + '/cortx-motr/extra-libs/galois/include/'
 
 
 def get_motr_cflags():

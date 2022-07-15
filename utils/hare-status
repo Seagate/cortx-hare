@@ -23,6 +23,7 @@ import json
 import argparse
 import inject
 import io
+import os
 import logging
 import re
 import simplejson
@@ -266,7 +267,8 @@ def get_node_processes(cns: Consul, node_name: str) -> Any:
 
 
 def cluster_online() -> bool:
-    cmd = ['pgrep', '--full', '/opt/seagate/cortx/hare/bin/hax']
+    cmdpath = os.getenv('HOME', '') + '/seagate/cortx/hare/bin/hax'
+    cmd = ['pgrep', '--full', cmdpath]
     process = Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE, encoding='utf8')
     out, err = process.communicate()
     exit_code = process.returncode

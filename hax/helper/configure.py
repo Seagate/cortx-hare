@@ -158,8 +158,8 @@ class ConfGenerator:
         env = {
             'PATH':
             ':'.join([
-                '/opt/seagate/cortx/hare/bin',
-                '/opt/seagate/cortx/hare/libexec', path
+                os.getenv('HOME') + '/seagate/cortx/hare/bin',
+                os.getenv('HOME') + '/seagate/cortx/hare/libexec', path
             ]),
             'PYTHONPATH':
             py_path

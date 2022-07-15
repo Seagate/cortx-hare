@@ -17,6 +17,7 @@
 #
 
 import logging
+import logging.handlers
 import sys
 from threading import Event
 import os
@@ -61,9 +62,10 @@ class HaxStarter(StoppableThread):
                                                       encoding=None,
                                                       delay=False)
             LOG.addHandler(fh)
+            HOME = os.getenv('HOME', '')
             path = os.getenv('PATH', '')
-            path += os.pathsep + '/opt/seagate/cortx/hare/bin'
-            path += os.pathsep + '/opt/seagate/cortx/hare/libexec'
+            path += os.pathsep + HOME + '/seagate/cortx/hare/bin'
+            path += os.pathsep + HOME + '/seagate/cortx/hare/libexec'
             python_path = os.pathsep.join(sys.path)
             cmd = ['hax']
             restart = True

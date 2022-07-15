@@ -51,7 +51,7 @@ esac
 
 fid=$1
 get_node_name() {
-    /opt/seagate/cortx/hare/libexec/node-name
+    $HOME/seagate/cortx/hare/libexec/node-name
 }
 
 consul kv get processes/$fid 2> /dev/null | jq -r '.state'

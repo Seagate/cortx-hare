@@ -305,9 +305,10 @@ class Generator:
             raise RuntimeError('Cannot get service endpoint.')
         addr = self.get_service_addr(ep)
         port = self.get_service_port(ep)
+        HOME = os.getenv('HOME', '')
 
         checks: Dict[str, Any] = {}
-        checks['args'] = ['/opt/seagate/cortx/hare/libexec/check-service']
+        checks['args'] = [HOME + '/seagate/cortx/hare/libexec/check-service']
         checks['interval'] = '1s'
         checks['status'] = 'warning'
         # get svc checks args as per svc name
