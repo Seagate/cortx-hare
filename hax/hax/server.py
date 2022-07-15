@@ -51,6 +51,7 @@ async def hello_reply(request):
 
 def get_python_env():
     path = os.environ['PATH']
+    HOME = os.getenv('HOME', '')
     py_path = ':'.join(sys.path)
     if 'PYTHONPATH' in os.environ:
         env_var = os.environ['PYTHONPATH']
@@ -58,8 +59,8 @@ def get_python_env():
     env = {
         'PATH':
         ':'.join([
-            '/opt/seagate/cortx/hare/bin',
-            '/opt/seagate/cortx/hare/libexec', path
+            HOME + '/seagate/cortx/hare/bin',
+            HOME + '/seagate/cortx/hare/libexec', path
         ]),
         'PYTHONPATH':
         py_path
@@ -72,8 +73,10 @@ def bytecount_stat(request):
     provide CSM with an endpoint to get --byecount data in json format.
     """
     exec = Executor()
+    HOME = os.getenv('HOME', '')
+    prog = HOME + "/seagate/cortx/hare/libexec/hare-status"
     env = get_python_env()
-    result = exec.run(Program(["/opt/seagate/cortx/hare/libexec/hare-status",
+    result = exec.run(Program([prog,
                       "--bytecount"]), env=env)
     return json_response(text=result)
 
@@ -83,8 +86,10 @@ def hctl_stat(request):
     to provide CSM with an endpoint to get the hctl status --json data.
     """
     exec = Executor()
+    HOME = os.getenv('HOME', '')
+    prog = HOME + "/seagate/cortx/hare/libexec/hare-status"
     env = get_python_env()
-    result = exec.run(Program(["/opt/seagate/cortx/hare/libexec/hare-status",
+    result = exec.run(Program([prog,
                       "--json"]), env=env)
     return json_response(text=result)
 

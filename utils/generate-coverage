@@ -21,7 +21,7 @@
 
 set -eu -o pipefail
 
-HARE_BASE_DIR=/opt/seagate/cortx/hare
+HARE_BASE_DIR=$HOME/seagate/cortx/hare
 PYTHONPATH="$HARE_BASE_DIR/lib/python3.6/site-packages"
 PYTHONPATH="$HARE_BASE_DIR/lib64/python3.6/site-packages:$PYTHONPATH"
 export PYTHONPATH

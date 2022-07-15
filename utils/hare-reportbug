@@ -145,8 +145,8 @@ sysconfig_dir=$HOME/seagate/etc/sysconfig
 
 extra_files=(
     $sysconfig_dir/motr
-    /opt/seagate/cortx-prvsnr/pillar/components/cluster.sls
-    /opt/seagate/cortx/s3/conf/s3config.yaml
+    $HOME/seagate/cortx-prvsnr/pillar/components/cluster.sls
+    $HOME/seagate/cortx/s3/conf/s3config.yaml
 )
 for f in ${extra_files[@]}; do
     if [[ -f $f ]]; then

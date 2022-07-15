@@ -244,10 +244,6 @@ install: install-dirs install-cfgen install-hax install-miniprov install-systemd
 	@$(call _log,linking h0q -> $(DESTDIR)/usr/bin)
 	@ln -sf /$(PREFIX)/bin/h0q $(DESTDIR)/usr/bin
 	@$(call _log,copying m0trace-prune -> $(ETC_CRON_DIR))
-	@$(call _log,copying preboot-motr-setup -> $(DESTDIR)/$(PREFIX)/bin)
-	@install utils/preboot-motr-setup $(DESTDIR)/$(PREFIX)/bin
-	@$(call _log,linking preboot-motr-setup -> $(DESTDIR)/usr/bin)
-	@ln -sf /$(PREFIX)/bin/preboot-motr-setup $(DESTDIR)/usr/bin
 	@install utils/m0trace-prune $(ETC_CRON_DIR)
 	@for f in provisioning/miniprov/hare_mp/templates/hare.* \
 		  provisioning/setup.yaml \

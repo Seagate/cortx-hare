@@ -111,7 +111,7 @@ else
 fi
 
 get_node_name() {
-    /opt/seagate/cortx/hare/libexec/node-name --conf-dir=$conf_dir
+    $HOME/seagate/cortx/hare/libexec/node-name --conf-dir=$conf_dir
 }
 
 get_service_ids() {
@@ -274,7 +274,7 @@ append_hax_svc() {
           },
       \"checks\": [
           {
-            \"args\": [ \"/opt/seagate/cortx/hare/libexec/check-service\",
+            \"args\": [ \"$HOME/seagate/cortx/hare/libexec/check-service\",
                         \"--hax\", \"--port\", \"$port\",
                         \"--host\", \"$host\",
                         \"--conf-dir\", \"$conf_dir\" ],
@@ -303,7 +303,7 @@ append_confd_svc() {
           },
       \"checks\": [
           {
-            \"args\": [ \"/opt/seagate/cortx/hare/libexec/check-service\",
+            \"args\": [ \"$HOME/seagate/cortx/hare/libexec/check-service\",
                         \"--fid\", \"$fid\", \"--port\", \"$port\",
                         \"--host\", \"$host\",
                         \"--conf-dir\", \"$conf_dir\" ],
@@ -341,7 +341,7 @@ append_ios_svc() {
           },
       \"checks\": [
           {
-            \"args\": [ \"/opt/seagate/cortx/hare/libexec/check-service\",
+            \"args\": [ \"$HOME/seagate/cortx/hare/libexec/check-service\",
                         \"--fid\", \"$fid\", \"--port\", \"$port\",
                         \"--host\", \"$host\",
                         \"--conf-dir\", \"$conf_dir\" ],
@@ -386,7 +386,7 @@ append_s3_svc() {
           },
       \"checks\": [
           {
-            \"args\": [ \"/opt/seagate/cortx/hare/libexec/check-service\",
+            \"args\": [ \"$HOME/seagate/cortx/hare/libexec/check-service\",
                         \"--svc\", \"$s3svc\", \"--port\", \"$port\",
                         \"--host\", \"$host\",
                         \"--conf-dir\", \"$conf_dir\" ],
@@ -429,16 +429,21 @@ tmpfile=$(mktemp $HOME/seagate/tmp/${CONF_FILE##*/}.XXXXXX)
 trap "rm -f $tmpfile" EXIT # delete automatically on exit
 jq ".services = [$SVCS_CONF]" <$CONF_FILE >$tmpfile
 
+HOMED="\/home\/"
+HOMED+=$USER
+ELECT=$HOMED"/seagate/cortx/hare/libexec/elect-rc-leader"
+
 if [[ $CONFD_IDs ]]; then
     jq '.watches += [{"type": "key",
                       "key": "leader",
-                      "args": [ "/opt/seagate/cortx/hare/libexec/elect-rc-leader",
+                      "args": [ "ELECT-LEADER",
                                 "--conf-dir",
                                 "TMP_CONF_DIR",
                                 "--log-dir",
                                 "TMP_LOG_DIR" ]}]' $tmpfile > $tmpfile.tmp && mv -f $tmpfile.tmp $tmpfile
 fi
 
+sed -i "s|ELECT-LEADER|$ELECT|" $tmpfile
 sed -i "s|TMP_CONF_DIR|$conf_dir|" $tmpfile
 sed -i "s|TMP_LOG_DIR|$log_dir|" $tmpfile
 

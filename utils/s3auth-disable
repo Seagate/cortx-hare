@@ -19,7 +19,7 @@
 
 set -eu -o pipefail
 
-S3_PREFIX='/opt/seagate/cortx/s3'
+S3_PREFIX='$HOME/seagate/cortx/s3'
 S3_CONFIG=$S3_PREFIX/conf/s3config.yaml
 S3_START_SCRIPT=$S3_PREFIX/s3startsystem.sh
 

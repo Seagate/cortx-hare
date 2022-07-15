@@ -23,8 +23,8 @@ export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
 
 PROG=${BASH_SOURCE[0]##*/}
 
-# XXX '/opt/seagate/cortx/hare' prefix can be different
-HARE_DIR=/opt/seagate/cortx/hare
+# XXX '$HOME/seagate/cortx/hare' prefix can be different
+HARE_DIR=$HOME/seagate/cortx/hare
 
 ENV_TEMPLATE=$HARE_DIR/share/consul/consul-env.in
 
@@ -78,7 +78,7 @@ ENV_FILE=$conf_dir/consul-env
 }
 
 get_node_name() {
-    /opt/seagate/cortx/hare/libexec/node-name --conf-dir=$conf_dir
+    $HOME/seagate/cortx/hare/libexec/node-name --conf-dir=$conf_dir
 }
 
 sed -r -e "s/^(NODE=).*/\1$(get_node_name)/" \
