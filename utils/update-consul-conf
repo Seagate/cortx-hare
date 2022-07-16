@@ -347,6 +347,7 @@ append_hax_svc() {
                         \"--host\", \"$host\",
                         \"--conf-dir\", \"$conf_dir\" ],
             \"interval\": \"1s\",
+            \"timeout\": \"30s\",
             \"status\": \"warning\"
           }
         ]
@@ -376,6 +377,7 @@ append_confd_svc() {
                         \"--host\", \"$host\",
                         \"--conf-dir\", \"$conf_dir\" ],
             \"interval\": \"1s\",
+            \"timeout\": \"30s\",
             \"status\": \"warning\"
           }
         ]
@@ -414,6 +416,7 @@ append_ios_svc() {
                         \"--host\", \"$host\",
                         \"--conf-dir\", \"$conf_dir\" ],
             \"interval\": \"1s\",
+            \"timeout\": \"30s\",
             \"status\": \"warning\"
           }
         ]
@@ -460,6 +463,7 @@ append_motr_client_svc() {
                         \"--host\", \"$host\",
                         \"--conf-dir\", \"$conf_dir\" ],
             \"interval\": \"1s\",
+            \"timeout\": \"30s\",
             \"status\": \"warning\"
           }
         ]
@@ -510,84 +514,6 @@ if [[ $CONFD_IDs ]]; then
                                 "--log-dir",
                                 "TMP_LOG_DIR" ]}]' $tmpfile > $tmpfile.tmp && mv -f $tmpfile.tmp $tmpfile
 fi
-
-append_hax_svc_watch() {
-    local id=$1
-    local fid=$(id2fid $id)
-    local key="processes/$fid"
-
-    jq --arg k "$key" '.watches += [{"type": "key",
-                          "key": $k,
-                          "handler_type": "http",
-                          "http_handler_config": {
-                          "path": "HAX_HTTP_PROTOCOL://localhost:HAX_HTTP_PORT/watcher/processes",
-                          "method": "POST",
-                          "tls_skip_verify": true,
-                          "timeout": "10s"}}]' $tmpfile > $tmpfile.tmp && mv -f $tmpfile.tmp $tmpfile
-}
-
-append_confd_svc_watch() {
-    local id=$1
-    local fid=$(id2fid $id)
-    local key="processes/$fid"
-
-    jq --arg k "$key" '.watches += [{"type": "key",
-                          "key": $k,
-                          "handler_type": "http",
-                          "http_handler_config": {
-                          "path": "HAX_HTTP_PROTOCOL://localhost:HAX_HTTP_PORT/watcher/processes",
-                          "method": "POST",
-                          "tls_skip_verify": true,
-                          "timeout": "10s"}}]' $tmpfile > $tmpfile.tmp && mv -f $tmpfile.tmp $tmpfile
-}
-
-append_ios_svc_watch() {
-    local id=$1
-    local fid=$(id2fid $id)
-    local key="processes/$fid"
-
-    jq --arg k "$key" '.watches += [{"type": "key",
-                          "key": $k,
-                          "handler_type": "http",
-                          "http_handler_config": {
-                          "path": "HAX_HTTP_PROTOCOL://localhost:HAX_HTTP_PORT/watcher/processes",
-                          "method": "POST",
-                          "tls_skip_verify": true,
-                          "timeout": "10s"}}]' $tmpfile > $tmpfile.tmp && mv -f $tmpfile.tmp $tmpfile
-}
-
-append_motr_client_watch() {
-    local id=$1
-    local fid=$(id2fid $id)
-    local key="processes/$fid"
-
-    jq --arg k "$key" '.watches += [{"type": "key",
-                          "key": $k,
-                          "handler_type": "http",
-                          "http_handler_config": {
-                          "path": "HAX_HTTP_PROTOCOL://localhost:HAX_HTTP_PORT/watcher/processes",
-                          "method": "POST",
-                          "tls_skip_verify": true,
-                          "timeout": "10s"}}]' $tmpfile > $tmpfile.tmp && mv -f $tmpfile.tmp $tmpfile
-}
-
-for id in $HAX_ID_ALL; do
-    append_hax_svc_watch $id
-done
-
-for id in $CONFD_IDs_ALL; do
-    append_confd_svc_watch $id
-done
-
-for id in $IOS_IDs_ALL; do
-    append_ios_svc_watch $id
-done
-
-for id in $MOTR_CLIENT_IDS_ALL; do
-    proc=$(echo $id| cut -d':' -f 1)
-    client_id=$(echo $id| cut -d':' -f 2)
-    append_motr_client_watch $client_id
-done
 
 sed -i "s|TMP_CONF_DIR|$conf_dir|" $tmpfile
 sed -i "s|TMP_LOG_DIR|$log_dir|" $tmpfile

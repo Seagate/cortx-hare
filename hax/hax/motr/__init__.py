@@ -301,10 +301,7 @@ class Motr:
         LOG.debug('Broadcasting HA states %s over ha_link', ha_states)
 
         def _update_process_tree(proc_fid: Fid, state: ObjHealth) -> bool:
-            return (st.status in (ObjHealth.FAILED, ObjHealth.OK,
-                                  ObjHealth.OFFLINE, ObjHealth.RECOVERING) and
-                    not self.consul_util.is_proc_client(st.fid) and
-                    not broadcast_hax_only and
+            return (not broadcast_hax_only and
                     not self._is_mkfs(proc_fid) and
                     proc_fid != hax_fid)
 
@@ -369,22 +366,8 @@ class Motr:
                 # not in failed state then we will mark node as OK
                 # If both the above conditions are not true then we will just
                 # mark controller status
-                is_node_failed = self.is_node_failed(note, kv_cache=kv_cache)
-                if (st.status in (ObjHealth.FAILED, ObjHealth.OFFLINE) and
-                        is_node_failed):
-                    notes += self.notify_node_status_by_process(
-                        note, kv_cache=kv_cache)
-                elif (st.status == ObjHealth.OK
-                        and not is_node_failed):
-                    notes += self.notify_node_status_by_process(
-                        note, kv_cache=kv_cache)
-                else:
-                    ctrl_note = self.get_ctrl_status(note, kv_cache=kv_cache)
-                    if ctrl_note is not None:
-                        (a_note, updates) = ctrl_note
-                        notes.append(a_note)
-                        self._write_updates(updates, kv_cache)
-
+                notes += self.notify_node_status_by_process(
+                            note, kv_cache=kv_cache)
             if st.fid.container == ObjT.DRIVE.value:
                 self.consul_util.update_drive_state([st.fid],
                                                     st.status,
@@ -568,7 +551,7 @@ class Motr:
         if new_state == HaNoteStruct.M0_NC_FAILED:
             state = ObjHealth.OFFLINE
         else:
-            state = ObjHealth.from_ha_note_state(new_state)
+            state = cns.ha_note_to_objhealth(new_state)
         is_mkfs = self._is_mkfs(proc_fid)
 
         mkfs_down = is_mkfs and state != ObjHealth.OK
@@ -615,6 +598,22 @@ class Motr:
             HaNoteStruct(no_id=node_fid.to_c(), no_state=state_int)
         ]
 
+    def get_update_encl_state(self, node_fid: Fid, new_state: ObjHealth,
+                              node: Optional[str] = None,
+                              kv_cache=None) -> List[HaNoteStruct]:
+
+        node = node or self.consul_util.get_node_name_by_fid(node_fid,
+                                                             kv_cache=kv_cache)
+        encl_fid = self.consul_util.get_node_encl_fid(node, kv_cache=kv_cache)
+        self.consul_util.set_encl_state(encl_fid, new_state, kv_cache=kv_cache)
+        notes = []
+        if encl_fid:
+            notes = [
+                HaNoteStruct(no_id=encl_fid.to_c(),
+                             no_state=new_state.to_ha_note_status())
+            ]
+        return notes
+
     @uses_consul_cache
     def add_enclosing_devices_by_node(self,
                                       node_fid: Fid,
@@ -642,7 +641,7 @@ class Motr:
         # Update the states of all the controllers as failed, in case of
         # node failure event.
         #
-        if new_state == ObjHealth.FAILED and ctrl_fids:
+        if new_state in [ObjHealth.FAILED, ObjHealth.OFFLINE] and ctrl_fids:
             updates: List[PutKV] = []
             for x in ctrl_fids:
                 updates += self.consul_util.get_ctrl_state_updates(
@@ -662,11 +661,12 @@ class Motr:
                 notes.append(HaNoteStruct(no_id=x.to_c(), no_state=ctrl_state))
         return notes
 
+    @uses_consul_cache
     def notify_node_status_by_process(self,
                                       proc_note: HaNoteStruct,
                                       kv_cache=None) -> List[HaNoteStruct]:
         # proc_note.no_state is of int type
-        new_state = ObjHealth.from_ha_note_state(proc_note.no_state)
+        new_state = self.consul_util.ha_note_to_objhealth(proc_note.no_state)
         proc_fid = Fid.from_struct(proc_note.no_id)
         assert ObjT.PROCESS.value == proc_fid.container
         LOG.debug('Notifying node status for process_fid=%s state=%s',
@@ -674,28 +674,34 @@ class Motr:
 
         node = self.consul_util.get_process_node(proc_fid, kv_cache=kv_cache)
 
+        notes = []
         updates: List[PutKV] = []
-        if new_state == ObjHealth.OK:
-            # Node can have multiple controllers. Node can be online, with
-            # a single controller running online.
-            # If we receive process 'OK', only the process state is
-            # updated. So, we need to update the corresponding
-            # controller state.
-            ctrl_fid = self.consul_util.get_ioservice_ctrl_fid(
-                proc_fid, kv_cache=kv_cache)
-            if ctrl_fid:
-                updates = self.consul_util.get_ctrl_state_updates(
-                    ctrl_fid, new_state, kv_cache=kv_cache)
+        # Node can have multiple controllers. Node can be online, with
+        # a single controller running online.
+        # If we receive process 'OK', only the process state is
+        # updated. So, we need to update the corresponding
+        # controller state.
+        ctrl_fid = self.consul_util.get_ioservice_ctrl_fid(
+                    proc_fid, kv_cache=kv_cache)
+        if ctrl_fid:
+            updates = self.consul_util.get_ctrl_state_updates(
+                        ctrl_fid, new_state, kv_cache=kv_cache)
+            notes.append(HaNoteStruct(no_id=ctrl_fid.to_c(),
+                         no_state=proc_note.no_state))
 
         node_fid = self.consul_util.get_node_fid(node, kv_cache=kv_cache)
         # FIXME make these two functions to return List[PutKV] so that the
         # write operations can be delayed to reuse the cache as long as
         # possible
-        notes = self.add_node_state_by_fid(node_fid, new_state)
-        notes += self.add_enclosing_devices_by_node(node_fid,
-                                                    new_state,
-                                                    node=node,
-                                                    kv_cache=kv_cache)
+        if new_state in [ObjHealth.OFFLINE, ObjHealth.FAILED]:
+            if self.is_node_failed(proc_note, kv_cache=kv_cache):
+                notes.extend(self.add_node_state_by_fid(node_fid, new_state))
+                notes.extend(self.get_update_encl_state(node_fid, new_state,
+                                                        kv_cache=kv_cache))
+        else:
+            notes.extend(self.add_node_state_by_fid(node_fid, new_state))
+            notes.extend(self.get_update_encl_state(node_fid, new_state,
+                                                    kv_cache=kv_cache))
         self._write_updates(updates, kv_cache)
         return notes
 
@@ -717,7 +723,7 @@ class Motr:
             # Update controller state in consul kv.
             updates = self.consul_util.get_ctrl_state_updates(
                 ctrl_fid,
-                ObjHealth.from_ha_note_state(new_state),
+                self.consul_util.ha_note_to_objhealth(new_state),
                 kv_cache=kv_cache)
             return (HaNoteStruct(no_id=ctrl_fid.to_c(),
                                  no_state=new_state), updates)

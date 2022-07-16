@@ -18,24 +18,24 @@
 
 import logging
 from typing import List, Any
-
 from hax.message import (BroadcastHAStates, Die, EntrypointRequest,
                          FirstEntrypointRequest, HaNvecGetEvent,
-                         HaNvecSetEvent, ProcessEvent,
+                         HaNvecSetEvent, ProcessEvent, ProcessHaEvent,
                          SnsRebalancePause, SnsRebalanceResume,
                          SnsRebalanceStart, SnsRebalanceStatus,
                          SnsRebalanceStop, SnsRepairPause, SnsRepairResume,
                          SnsRepairStart, SnsRepairStatus, SnsRepairStop,
                          StobIoqError)
-from hax.exception import HAConsistencyException
+from hax.exception import HAConsistencyException, NotDelivered
 from hax.motr import Motr
 from hax.motr.delivery import DeliveryHerald
 from hax.motr.planner import WorkPlanner
-from hax.queue.publish import EQPublisher
-from hax.types import (ConfHaProcess, HAState, HaLinkMessagePromise, MessageId,
-                       ObjT, ObjHealth, StoppableThread, m0HaProcessEvent,
-                       m0HaProcessType)
-from hax.util import ConsulUtil, ProcessGroup, dump_json, repeat_if_fails
+from hax.queue.publish import EQPublisher, BQPublisher
+from hax.types import (ConfHaProcess, HAState, HaLinkMessagePromise,
+                       MessageId, ObjT, ObjHealth, StoppableThread,
+                       m0HaProcessEvent, m0HaProcessType)
+from hax.util import (ConsulUtil, ProcessGroup, dump_json, repeat_if_fails,
+                      ha_process_events)
 from hax.ha import get_producer
 
 
@@ -61,12 +61,26 @@ class ConsumerThread(StoppableThread):
         self.is_stopped = False
         self.consul = consul
         self.eq_publisher = EQPublisher()
+        self.bq_publisher = BQPublisher()
         self.herald = herald
         self.idx = idx
         self.process_groups = process_groups
 
     def stop(self) -> None:
         self.is_stopped = True
+
+    def broadcast_process_state(self, event: ConfHaProcess):
+        if event.fid == self.consul.get_hax_fid():
+            event_type = m0HaProcessType.M0_CONF_HA_PROCESS_HA.name
+        else:
+            event_type = m0HaProcessType(event.chp_type).name
+        data = {'fid': str(event.fid),
+                'state': ha_process_events[event.chp_event],
+                'type': event_type}
+        payload = dump_json(data)
+        res = self.bq_publisher.publish('PROCESS-STATE-UPDATE', payload)
+        LOG.debug('PROCESS-STATE-UPDATE event JSON: %s res: %d',
+                  payload, res)
 
     @repeat_if_fails(wait_seconds=1)
     def _update_process_status(self, p: WorkPlanner, motr: Motr,
@@ -77,43 +91,13 @@ class ConsumerThread(StoppableThread):
         #
         # This thread will become blocked until that
         # intermittent error gets resolved.
-        motr_to_svc_status = {
-            (m0HaProcessType.M0_CONF_HA_PROCESS_M0MKFS,
-                m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED): (
-                    ObjHealth.OK),
-            (m0HaProcessType.M0_CONF_HA_PROCESS_M0MKFS,
-                m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED): (
-                    ObjHealth.FAILED),
-            (m0HaProcessType.M0_CONF_HA_PROCESS_M0D,
-                m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED): (
-                    ObjHealth.RECOVERING),
-            (m0HaProcessType.M0_CONF_HA_PROCESS_M0D,
-                m0HaProcessEvent.M0_CONF_HA_PROCESS_DTM_RECOVERED): (
-                    ObjHealth.OK),
-            (m0HaProcessType.M0_CONF_HA_PROCESS_M0D,
-                m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED): (
-                    ObjHealth.FAILED),
-            (m0HaProcessType.M0_CONF_HA_PROCESS_OTHER,
-                m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED): (
-                    ObjHealth.RECOVERING),
-            (m0HaProcessType.M0_CONF_HA_PROCESS_OTHER,
-                m0HaProcessEvent.M0_CONF_HA_PROCESS_DTM_RECOVERED): (
-                    ObjHealth.OK),
-            (m0HaProcessType.M0_CONF_HA_PROCESS_OTHER,
-                m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED): (
-                    ObjHealth.FAILED)}
-        LOG.debug('chp_type=%d chp_event=%d',
-                  event.chp_type, event.chp_event)
         if event.chp_event in (
                 m0HaProcessEvent.M0_CONF_HA_PROCESS_DTM_RECOVERED,
                 m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED,
                 m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED):
 
-            svc_status = motr_to_svc_status[(event.chp_type,
-                                             event.chp_event)]
-            # Confd does not report M0_CONF_HA_PROCESS_DTM_RECOVERED as of yet,
-            # thus, we check if the reporting process is a confd and report it
-            # ONLINE immediately if it reported M0_CONF_HA_PROCESS_STARTED.
+            svc_status = self.consul.processEventToObjHealth(event.chp_type,
+                                                             event.chp_event)
             if (event.chp_event ==
                     m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED and
                     (event.chp_type ==
@@ -123,14 +107,8 @@ class ConsumerThread(StoppableThread):
                 svc_status = ObjHealth.OK
             broadcast_hax_only = False
             if ((event.chp_type ==
-                 m0HaProcessType.M0_CONF_HA_PROCESS_M0MKFS) or
-               (event.fid == self.consul.get_hax_fid())):
-                # Motr-mkfs processes do not require updates on their peer
-                # mkfs processes. Motr-mkfs is an independent and typically a
-                # one-time operation. So avoid broadcasting a motr-mkfs state
-                # to the peer motr-mkfs processes but hax still needs to be
-                # notified in-order to disconnect the hax-motr halink when
-                # motr-mkfs process stops.
+                    m0HaProcessType.M0_CONF_HA_PROCESS_M0MKFS) or
+                    (event.fid == self.consul.get_hax_fid())):
                 broadcast_hax_only = True
 
             motr.broadcast_ha_states(
@@ -138,13 +116,17 @@ class ConsumerThread(StoppableThread):
                 broadcast_hax_only=broadcast_hax_only)
         self.process_groups.process_group_lock(event.fid)
         self.consul.update_process_status(event)
+        # No need to broadcast to all the nodes for mkfs operations.
+        if event.chp_type != m0HaProcessType.M0_CONF_HA_PROCESS_M0MKFS:
+            self.broadcast_process_state(event)
         self.process_groups.process_group_unlock(event.fid)
 
         # If we are receiving M0_CONF_HA_PROCESS_STARTED for M0D processes
         # then we will check if all the M0D processes on the local node are
         # started. If yes then we are going to send node online event to
         # MessageBus
-        if event.chp_event == m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED:
+        if (event.chp_event ==
+                m0HaProcessEvent.M0_CONF_HA_PROCESS_DTM_RECOVERED):
             try:
                 util: ConsulUtil = ConsulUtil()
                 producer = get_producer(util)
@@ -159,7 +141,7 @@ class ConsumerThread(StoppableThread):
                 LOG.warning("Send event failed due to '%s'", e)
 
     @repeat_if_fails(wait_seconds=1)
-    def update_process_failure(self, planner: WorkPlanner,
+    def update_process_failure(self, planner: WorkPlanner, motr: Motr,
                                ha_states: List[HAState]) -> List[HAState]:
         new_ha_states: List[HAState] = []
         proc_Health_to_status = {
@@ -169,17 +151,26 @@ class ConsumerThread(StoppableThread):
             ObjHealth.RECOVERING: m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED
         }
         process_group_fid: Any = None
+        LOG.debug('bootstrap done')
         try:
             cns = self.consul
-            am_i_rc = self.consul.am_i_rc()
+            self_fid = cns.get_hax_fid()
+            am_i_rc = cns.am_i_rc()
             for state in ha_states:
                 if state.fid.container == ObjT.PROCESS.value:
+                    # No need to broadcast again for self, it is already
+                    # handled as part of process startup.
+                    if state.fid == self_fid:
+                        continue
                     process_group_fid = state.fid
-                    is_proc_local = self.consul.is_proc_local(state.fid)
                     self.process_groups.process_group_lock(state.fid)
                     current_status = cns.get_process_current_status(
-                        state.status, state.fid)
-                    if current_status == ObjHealth.UNKNOWN:
+                                            state.status, state.fid)
+                    # Process only failure events from Consul as happy
+                    # path broadcast is covered as part of the process
+                    # startup.
+                    if current_status not in (ObjHealth.OFFLINE,
+                                              ObjHealth.FAILED):
                         self.process_groups.process_group_unlock(state.fid)
                         continue
                     proc_status_remote = cns.get_process_status(state.fid)
@@ -234,50 +225,54 @@ class ConsumerThread(StoppableThread):
                     proc_status = proc_Health_to_status.get(current_status)
                     LOG.debug('current_status: %s proc_status_remote: %s',
                               current_status, proc_status_remote.proc_status)
-                    if proc_status is not None:
-                        LOG.debug('proc_status: %s', proc_status.name)
-                        if am_i_rc or is_proc_local:
-                            if (proc_status_remote.proc_status !=
-                                    proc_status.name):
-                                # Probably process node failed, in such a
-                                # case, only RC must be allowed to update
-                                # the process's persistent state.
-                                # Or, if the node's alive then allow the node
-                                # to update the local process's state.
-                                cns.update_process_status(
-                                    ConfHaProcess(chp_event=proc_status,
-                                                  chp_type=proc_type,
-                                                  chp_pid=0,
-                                                  fid=state.fid))
-                                new_ha_states.append(
-                                    HAState(fid=state.fid,
-                                            status=current_status))
+                    if proc_status is None:
                         self.process_groups.process_group_unlock(state.fid)
-                        if not is_proc_local:
-                            proc_status_local = (
-                                cns.get_process_status_local(
-                                    state.fid))
-                            # Consul monitors a process every 1 second and
-                            # this notification is sent to every node. Thus
-                            # to avoid notifying about a process multiple
-                            # times about the same status every node
-                            # maintains a local copy of the remote process
-                            # status, which is checked everytime a consul
-                            # notification is received and accordingly
-                            # the status is notified locally to all the local
-                            # motr processes.
-                            if (proc_status_local.proc_status !=
-                                    proc_status.name):
-                                cns.update_process_status_local(
-                                    ConfHaProcess(chp_event=proc_status,
-                                                  chp_type=proc_type,
-                                                  chp_pid=0,
-                                                  fid=state.fid))
-                                new_ha_states.append(
-                                    HAState(fid=state.fid,
-                                            status=current_status))
-                        else:
+                        continue
+                    # If processes local hax is alive then let it process the
+                    # event.
+                    is_proc_local = cns.is_proc_local(state.fid)
+                    if is_proc_local:
+                        if (proc_status_remote.proc_status !=
+                                proc_status.name):
+                            proc_event = ConfHaProcess(chp_event=proc_status,
+                                                       chp_type=proc_type,
+                                                       chp_pid=0,
+                                                       fid=state.fid)
+                            cns.update_process_status(proc_event)
+                            new_ha_states.append(
+                                HAState(fid=state.fid,
+                                        status=current_status))
+                            # Let everyone in cluster know.
+                            self.broadcast_process_state(proc_event)
+                    elif am_i_rc:
+                        # Check if process node is online
+                        proc_node_status: ObjHealth = (
+                            cns.get_proc_node_health(state.fid))
+                        LOG.debug('Process node status: %s', proc_node_status)
+                        # If process node is online, we assume corresponding
+                        # hax is also online. Let the local hax process it.
+                        if proc_node_status == ObjHealth.OK:
+                            self.process_groups.process_group_unlock(state.fid)
                             continue
+                        # Probably process node failed, in such a
+                        # case, only RC must be allowed to update
+                        # the process's persistent state.
+                        # Or, if the node's alive then allow the node
+                        # to update the local process's state.
+                        if (proc_status_remote.proc_status !=
+                                proc_status.name):
+                            proc_event = ConfHaProcess(chp_event=proc_status,
+                                                       chp_type=proc_type,
+                                                       chp_pid=0,
+                                                       fid=state.fid)
+                            cns.update_process_status(proc_event)
+                            new_ha_states.append(
+                                HAState(fid=state.fid,
+                                        status=current_status))
+                            self.broadcast_process_state(proc_event)
+                    else:
+                        LOG.debug('Skipping event for fid: %s', state.fid)
+                    self.process_groups.process_group_unlock(state.fid)
                 else:
                     new_ha_states.append(state)
         except Exception as e:
@@ -299,25 +294,30 @@ class ConsumerThread(StoppableThread):
         if (req.process_fid != self.consul.get_hax_fid() and
                 not self.consul.is_proc_client(req.process_fid)):
             if restart_count > 1:
-                LOG.debug('Process restarted, broadcasting OFFLINE')
+                LOG.debug('Process restarted, broadcasting FAILED')
                 proc_status = m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED
                 proc_type = m0HaProcessType.M0_CONF_HA_PROCESS_M0D
-                self.consul.update_process_status(
-                    ConfHaProcess(chp_event=proc_status,
-                                  chp_type=proc_type,
-                                  chp_pid=0,
-                                  fid=req.process_fid))
+                proc_event = ConfHaProcess(chp_event=proc_status,
+                                           chp_type=proc_type,
+                                           chp_pid=0,
+                                           fid=req.process_fid)
+                self.consul.update_process_status(proc_event)
+                self.broadcast_process_state(proc_event)
                 ids: List[MessageId] = motr.broadcast_ha_states(
                                        [
                                            HAState(fid=req.process_fid,
-                                                   status=ObjHealth.OFFLINE)
+                                                   status=(
+                                                       ObjHealth.FAILED))
                                        ],
-                                       notify_devices=False,
+                                       notify_devices=True,
                                        proc_skip_list=[req.process_fid])
                 LOG.debug('waiting for broadcast of %s for ep: %s',
                           ids, req.remote_rpc_endpoint)
                 # Wait for failure delivery.
-                self.herald.wait_for_all(HaLinkMessagePromise(ids))
+                try:
+                    self.herald.wait_for_all(HaLinkMessagePromise(ids))
+                except NotDelivered:
+                    pass
         self.consul.set_proc_restart_count(req.process_fid,
                                            restart_count + 1)
 
@@ -350,6 +350,20 @@ class ConsumerThread(StoppableThread):
                         motr.send_entrypoint_request_reply(item)
                     elif isinstance(item, ProcessEvent):
                         self._update_process_status(planner, motr, item.evt)
+                    elif isinstance(item, ProcessHaEvent):
+                        # All the events corresponding to a particular
+                        # process must be processed in order.
+                        # Avoid Duplicate processing of local process's
+                        # HA events.
+                        if not self.consul.is_proc_local(item.fid):
+                            motr.broadcast_ha_states(item.states)
+                            status = self.consul.objHealthToProcessEvent(
+                                        item.states[0].status)
+                            self.consul.update_process_status_local(
+                                ConfHaProcess(chp_event=status,
+                                              chp_type=item.proc_type,
+                                              chp_pid=0,
+                                              fid=item.fid))
                     elif isinstance(item, HaNvecGetEvent):
                         fn = motr.ha_nvec_get_reply
                         # If a consul-related exception appears, it will
@@ -373,7 +387,7 @@ class ConsumerThread(StoppableThread):
                         # Check the current status of the object and
                         # broadcast accordingly.
                         ha_states = self.update_process_failure(
-                            planner, item.states)
+                            planner, motr, item.states)
                         result: List[MessageId] = motr.broadcast_ha_states(
                             ha_states)
                         ha = get_producer(self.consul)

@@ -319,13 +319,13 @@ class HaLinkMessagePromise:
 class ObjHealth(Enum):
     FAILED = (0, HaNoteStruct.M0_NC_FAILED)
     OK = (1, HaNoteStruct.M0_NC_ONLINE)
-    UNKNOWN = (2, HaNoteStruct.M0_NC_TRANSIENT)
-    OFFLINE = (3, HaNoteStruct.M0_NC_TRANSIENT)
-    STOPPED = (4, HaNoteStruct.M0_NC_TRANSIENT)
-    RECOVERING = (5, HaNoteStruct.M0_NC_DTM_RECOVERING)
-    REPAIR = (6, HaNoteStruct.M0_NC_REPAIR)
-    REPAIRED = (7, HaNoteStruct.M0_NC_REPAIRED)
-    REBALANCE = (8, HaNoteStruct.M0_NC_REBALANCE)
+    OFFLINE = (2, HaNoteStruct.M0_NC_TRANSIENT)
+    STOPPED = (3, HaNoteStruct.M0_NC_TRANSIENT)
+    RECOVERING = (4, HaNoteStruct.M0_NC_DTM_RECOVERING)
+    REPAIR = (5, HaNoteStruct.M0_NC_REPAIR)
+    REPAIRED = (6, HaNoteStruct.M0_NC_REPAIRED)
+    REBALANCE = (7, HaNoteStruct.M0_NC_REBALANCE)
+    UNKNOWN = (8, HaNoteStruct.M0_NC_TRANSIENT)
 
     def __repr__(self):
         """Return human-readable constant name (useful in log output)."""
@@ -338,8 +338,8 @@ class ObjHealth(Enum):
         ObjHealth.
         """
         for i in list(ObjHealth):
-            (_, note) = i.value
-            if note == state:
+            # (_, note) = i.value
+            if i.value[1] == state:
                 return i
         return ObjHealth.UNKNOWN
 
@@ -385,8 +385,8 @@ class m0HaProcessEvent(IntEnum):
             m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED: ObjHealth.RECOVERING,
             m0HaProcessEvent.M0_CONF_HA_PROCESS_DTM_RECOVERED:
                 ObjHealth.OK,
-            m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPING: ObjHealth.FAILED,
-            m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED: ObjHealth.FAILED}
+            m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPING: ObjHealth.OFFLINE,
+            m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED: ObjHealth.OFFLINE}
         return m0ProcessEvToSvcHealth[self]
 
 
@@ -416,7 +416,7 @@ class m0HaProcessType(IntEnum):
 
 
 class m0HaObjState(IntEnum):
-    M0_NC_UNKNOWN = HaNoteStruct.M0_NC_TRANSIENT
+    M0_NC_UNKNOWN = HaNoteStruct.M0_NC_UNKNOWN
     M0_NC_ONLINE = HaNoteStruct.M0_NC_ONLINE
     M0_NC_FAILED = HaNoteStruct.M0_NC_FAILED
     M0_NC_TRANSIENT = HaNoteStruct.M0_NC_TRANSIENT

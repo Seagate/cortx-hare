@@ -178,9 +178,6 @@ M0_INTERNAL void m0_ha_entrypoint_reply_send(
  */
 PyObject *m0_ha_filesystem_stats_fetch(unsigned long long ctx)
 {
-	PyGILState_STATE gstate;
-	gstate = PyGILState_Ensure();
-
 	struct hax_context *hc = (struct hax_context *)ctx;
 	struct m0_halon_interface *hi = hc->hc_hi;
 	struct m0_spiel *spiel = m0_halon_interface_spiel(hi);
@@ -188,6 +185,8 @@ PyObject *m0_ha_filesystem_stats_fetch(unsigned long long ctx)
 	struct m0_fs_stats stats;
 	int rc;
 
+	PyGILState_STATE gstate;
+	gstate = PyGILState_Ensure();
 	Py_BEGIN_ALLOW_THREADS rc =
 	    m0_spiel_filesystem_stats_fetch(spiel, &stats);
 	Py_END_ALLOW_THREADS if (rc != 0)
@@ -213,15 +212,15 @@ PyObject *m0_ha_filesystem_stats_fetch(unsigned long long ctx)
 PyObject *m0_ha_proc_counters_fetch(unsigned long long ctx,
 	struct m0_fid *proc_fid)
 {
-	PyGILState_STATE gstate;
-	gstate = PyGILState_Ensure();
-
 	struct hax_context *hc = (struct hax_context *)ctx;
 	struct m0_halon_interface *hi = hc->hc_hi;
 	struct m0_spiel *spiel = m0_halon_interface_spiel(hi);
 
 	struct m0_proc_counter *count_stats=NULL;
 	int rc;
+
+	PyGILState_STATE gstate;
+	gstate = PyGILState_Ensure();
 	/* init count_stats */
 	Py_BEGIN_ALLOW_THREADS rc = 
 	    m0_spiel_count_stats_init(&count_stats);
@@ -279,9 +278,6 @@ PyObject *m0_ha_proc_counters_fetch(unsigned long long ctx,
 PyObject *m0_ha_pver_status(unsigned long long ctx,
 	struct m0_fid *pver_fid)
 {
-	PyGILState_STATE gstate;
-	gstate = PyGILState_Ensure();
-
 	struct hax_context *hc = (struct hax_context *)ctx;
 	struct m0_halon_interface *hi = hc->hc_hi;
 	struct m0_spiel *spiel = m0_halon_interface_spiel(hi);
@@ -289,6 +285,9 @@ PyObject *m0_ha_pver_status(unsigned long long ctx,
 	struct m0_conf_pver_info pver_info;
 
 	int rc;
+
+	PyGILState_STATE gstate;
+	gstate = PyGILState_Ensure();
 	/* call the motr api */
 	Py_BEGIN_ALLOW_THREADS rc =
 	    m0_spiel_conf_pver_status(spiel, pver_fid, &pver_info);
@@ -900,13 +899,14 @@ PyObject* m0_ha_notify(unsigned long long ctx, struct m0_ha_note *notes,
         bool skip_process = false;
 
 	msg = _ha_nvec_msg_alloc(&nvec, 0, M0_HA_NVEC_SET);
-	hax_lock(hc);
 
+	hax_lock(hc);
 	PyGILState_STATE gstate;
 	gstate = PyGILState_Ensure();
 
 	PyObject* hax_mod = getModule("hax.types");
 	PyObject* broadcast_tags = PyList_New(0);
+
 	m0_tl_for(hx_links, &hc->hc_links, hxl)
 	{
 		if (!hxl->hxl_is_active)
@@ -949,8 +949,8 @@ PyObject* m0_ha_notify_hax_only(unsigned long long ctx,
 	uint64_t tag;
 
 	msg = _ha_nvec_msg_alloc(&nvec, 0, M0_HA_NVEC_SET);
-	hax_lock(hc);
 
+	hax_lock(hc);
 	PyGILState_STATE gstate;
 	gstate = PyGILState_Ensure();
 
@@ -1021,7 +1021,6 @@ PyObject* m0_hax_stop(unsigned long long ctx, const struct m0_fid *process_fid,
 			PyList_Append(broadcast_tags, instance);
 		}
 	} m0_tl_endfor;
-
 	Py_DECREF(hax_mod);
 	PyGILState_Release(gstate);
 	hax_unlock(hc);
