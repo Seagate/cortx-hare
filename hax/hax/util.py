@@ -1623,8 +1623,8 @@ class ConsulUtil:
                 continue
             val = json.loads(sdev['Value'])
             LOG.debug('Sdev=%s state=%s', str(sdev_fid), val['state'])
-            if str(val['state']).lower() not in ['failed', 'repairing',
-                                                 'repaired', 'rebalancing']:
+            if str(val['state']).lower() in ['unknown', 'm0_nc_unknown',
+                                             'dtm_recovering']:
                 return HaNoteStruct.M0_NC_ONLINE
             else:
                 return drive_to_ha_state_map[str(val['state']).lower()]
