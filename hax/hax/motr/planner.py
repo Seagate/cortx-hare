@@ -25,7 +25,7 @@ from typing import Callable, Deque, Dict, Optional, Set, Tuple, Type
 from hax.log import TRACE
 from hax.message import (AnyEntrypointRequest, BaseMessage, BroadcastHAStates,
                          Die, HaNvecGetEvent, HaNvecSetEvent, ProcessEvent,
-                         SnsOperation)
+                         ProcessHaEvent, SnsOperation)
 from hax.motr.util import LinkedList
 from hax.types import Fid
 
@@ -324,6 +324,8 @@ class WorkPlanner:
         if not self.state.next_group_commands:
             # current group is empty -> join it freely
             return False
+        if isinstance(cmd, ProcessEvent):
+            return False
         if isinstance(cmd, HaNvecGetEvent):
             # HaNvecGetEvent can be done in parallel to any other commands.
             # No need to form the new group for it.
@@ -339,6 +341,8 @@ class WorkPlanner:
             # e.g. BroadcastHAStates, then the wait needs to explicit.
             # For example, see FirstEntrypoint request code in hax/handler.py.
             return False
+        if isinstance(cmd, ProcessHaEvent):
+            return True
         if isinstance(cmd, BroadcastHAStates):
             return True
 

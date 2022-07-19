@@ -24,7 +24,7 @@ def main():
     try:
         hostname = sys.argv[1]
         port = sys.argv[2]
-        if tcpping(host=hostname, port=port, timeout=1):
+        if tcpping(host=hostname, port=port, timeout=10):
             sys.exit(0)
     except Exception:
         sys.exit(1)
