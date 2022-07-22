@@ -96,6 +96,10 @@ def get_motr_libs_dir():
     return os.getenv('HOME') + '/seagate/motr/usr/lib64'
 
 
+def get_isal_libs_dir():
+    return os.getenv('HOME') + '/intel/usr/lib64'
+
+
 def get_galois_include_dir():
     return os.getenv('HOME') + '/cortx-motr/extra-libs/galois/include/'
 
@@ -164,9 +168,9 @@ setup(
             include_dirs=[get_motr_dir(),
                           get_galois_include_dir()],
             define_macros=[('M0_INTERNAL', ''), ('M0_EXTERN', 'extern')],
-            library_dirs=[get_motr_libs_dir()],
-            runtime_library_dirs=[get_motr_libs_dir()],
-            libraries=['motr'],
+            library_dirs=[get_motr_libs_dir(), get_isal_libs_dir()],
+            runtime_library_dirs=[get_motr_libs_dir(), get_isal_libs_dir()],
+            libraries=['motr', 'isal'],
             extra_compile_args=[x for x in get_motr_cflags() + ['-fPIC']])
     ],
 )
