@@ -715,6 +715,7 @@ class ConsulUtil:
     @repeat_if_fails()
     def is_proc_client(self, process_fid: Fid) -> bool:
         node_items = self.get_all_nodes_cached()
+        client_types = self.get_m0_client_types()
         fidk = str(process_fid.key)
 
         # This is the RegExp to match the keys in Consul KV that describe
@@ -736,7 +737,7 @@ class ConsulUtil:
             if not match_result:
                 continue
             srv_type = match_result.group(1)
-            if 'm0_client' in srv_type:
+            if srv_type in client_types:
                 return True
         return False
 
@@ -2330,6 +2331,14 @@ class ConsulUtil:
         base_fid = Fid(proc_fid.container,
                        (proc_fid.key & fid_mask.key))
         return base_fid
+
+    @repeat_if_fails()
+    def get_m0_client_types(self) -> List[str]:
+        m0_client_types = self.kv.kv_get('m0_client_types')
+        client_types = []
+        for client_type in json.loads(m0_client_types['Value']):
+            client_types.append(client_type)
+        return client_types
 
 
 def dump_json(obj) -> str:
