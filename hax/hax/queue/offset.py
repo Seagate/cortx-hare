@@ -21,6 +21,12 @@ class OffsetStorage:
                  node_name: str,
                  key_prefix: str = '',
                  kv: Optional[KVAdapter] = None):
+        """Constructor arguments.
+
+        :param node_name: consumer node
+        :param key_prefix: KV store's key prefix
+        :param kv: KV adapter to KV store
+        """
         self.node_name = node_name
         self.kv = kv or KVAdapter()
         self.key_prefix = key_prefix
@@ -48,6 +54,11 @@ class InboxFilter:
     reported by Consul) and then removes the messages that are already read.
     """
     def __init__(self, offset_mgr: OffsetStorage):
+        """Constructor arguments.
+
+        :param offset_mgr: Instance of Offset Storage
+        with last read message epoch
+        """
         self.offset_mgr = offset_mgr
 
     def prepare(
