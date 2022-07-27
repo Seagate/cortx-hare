@@ -93,9 +93,9 @@ class ConfStoreProvider(ValueProvider):
         Const.SERVICE_S3_SERVER.value etc
         """
         types = {
-            'io'    : 'motr',
+            'io': 'motr',
             'rgw_s3': 'rgw',
-            'agent' : 'csm'
+            'agent': 'csm'
         }
         node_info = str(types.get(service_type))
         return self.get_machine_ids_for_attribute('name', node_info)
