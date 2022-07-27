@@ -17,7 +17,7 @@
 #
 
 from cortx.utils.conf_store import Conf
-from typing import List, Dict, Any
+from typing import List, Any
 from cortx.utils.cortx import Const
 from hare_mp.types import MissingKeyError
 
@@ -60,9 +60,6 @@ class ValueProvider:
                    search_val: str) -> List[str]:
         raise NotImplementedError()
 
-    def get_motr_clients(self) -> List[Dict[str, Any]]:
-        raise NotImplementedError()
-
 
 class ConfStoreProvider(ValueProvider):
     def __init__(self, url: str, index='hare'):
@@ -95,7 +92,13 @@ class ConfStoreProvider(ValueProvider):
         service_type will be like Const.SERVICE_MOTR_IO.value,
         Const.SERVICE_S3_SERVER.value etc
         """
-        return self.get_machine_ids_for_attribute('services', service_type)
+        types = {
+            'io': 'motr',
+            'rgw_s3': 'rgw',
+            'agent': 'csm'
+        }
+        node_info = str(types.get(service_type))
+        return self.get_machine_ids_for_attribute('name', node_info)
 
     def get_hostnames_for_service(self, service_type: str) -> List[str]:
         """
@@ -125,13 +128,20 @@ class ConfStoreProvider(ValueProvider):
         attribute type can be like service, node, etc.
         """
         nodes: List[str] = []
-        machines: Dict[str, Any] = self.get('node')
+        machines = []
+        num_storage_sets = int(self.get('cluster>num_storage_set'))
+        for i in range(num_storage_sets):
+            num_nodes = int(self.get(f'cluster>storage_set[{i}]>num_nodes'))
+            for j in range(num_nodes):
+                machines.append(self.get(
+                    f'cluster>storage_set[{i}]>nodes[{j}]'))
+
         # example ouput for search_val()
         # attr_type = services
         # ['node>32bdeac034fe4155af4ca66951d410e9>components[1]>services[0]']
         values = self.search_val('node', attr_type, name)
 
-        for machine_id in machines.keys():
+        for machine_id in machines:
             result = [val for val in values if machine_id in val]
             if result:
                 nodes.append(machine_id)
@@ -151,10 +161,11 @@ class ConfStoreProvider(ValueProvider):
         storage_set_id = self.get((f'node>{machine_id}>'
                                    f'storage_set'))
 
-        for storage_set in self.get('cluster>storage_set'):
-            if storage_set['name'] == storage_set_id:
-                return i
-            i += 1
+        for j in range(int(self.get('cluster>num_storage_set'))):
+            for storage_set in self.get(f'cluster>storage_set[{j}]'):
+                if storage_set['name'] == storage_set_id:
+                    return i
+                i += 1
 
         raise RuntimeError('No storage set found. Is ConfStore data valid?')
 
@@ -167,25 +178,6 @@ class ConfStoreProvider(ValueProvider):
         Searches a given key value under the given parent key.
         """
         return self.conf.search(self.index, parent_key, search_key, search_val)
-
-    def get_motr_clients(self) -> List[Dict[str, Any]]:
-        """
-        Returns a list of all motr clients with their name and instances.
-        Example
-        clients:
-        -   name: rgw
-            num_instances: 1
-        -   name: other
-            num_instances: 2
-        """
-        clients = self.get('cortx>motr>clients', allow_null=True)
-        if clients is None:
-            return []
-        for client in clients:
-            instances = int(str(client.get('num_instances')))
-            if instances == 0:
-                clients.remove(client)
-        return clients
 
 
 def get_machine_id() -> str:
