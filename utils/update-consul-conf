@@ -136,6 +136,16 @@ get_ios_meta_data_from_kv_file() {
     eval $cmd || true
 }
 
+get_ios_log_from_kv_file() {
+    local process_fidk=$1
+    local key="m0conf/nodes/$(get_node_name)/processes/$process_fidk/log"
+
+    local cmd="jq -r '.[] | select(.key==\"$key\") |
+                  .value' $kv_file | jq -r '.[]'"
+
+    eval $cmd || true
+}
+
 get_service_ids_from_kv_file() {
     local filter=$1
     local key="m0conf/nodes/$(get_node_name)/processes/*"
@@ -400,6 +410,8 @@ append_ios_svc() {
     local port=$(get_service_port $ep)
     local host=$(get_service_host $addr)
     local meta_data=$(get_ios_meta_data_from_kv_file $id)
+    local log=$(get_ios_log_from_kv_file $id)
+
     SVCS_CONF+="${SVCS_CONF:+,}{
       \"id\": \"$id\",
       \"name\": \"ios\",

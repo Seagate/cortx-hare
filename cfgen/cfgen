@@ -1217,13 +1217,14 @@ class ConfProcess(ToDhall):
     def __init__(self, nr_cpu: int, memsize_MB: int,
                  endpoint,
                  services: List[Oid], meta_data: str = None,
-                 proc_name: str = None):
+                 log: List[str] = [], proc_name: str = None):
         _assert(nr_cpu > 0, 'nr_cpu must be positive')
         self.nr_cpu = nr_cpu
         _assert(memsize_MB > 0, 'memsize_MB must be positive')
         self.memsize_MB = memsize_MB
         self.endpoint = endpoint
         self.meta_data = meta_data
+        self.log = log
         self.proc_name = proc_name
         _assert(all(x.type is ObjT.service for x in services),
                 'All services must be of ObjT.service type')
@@ -1294,13 +1295,16 @@ class ConfProcess(ToDhall):
                               portalgroup=portal)
         proc_id = new_oid(ObjT.process)
         meta_data = None
+        log = []
         if proc_desc is not None and proc_t is ProcT.m0_server:
             meta_data = proc_desc['io_disks'].get('meta_data')
+            log = proc_desc['io_disks'].get('log')
 
         m0conf[proc_id] = cls(nr_cpu=facts['processorcount'],
                               memsize_MB=facts['_memsize_MB'],
                               endpoint=ep,
                               meta_data=meta_data,
+                              log=log,
                               services=[],
                               proc_name=proc_name)
         m0conf[parent].processes.append(proc_id)
@@ -2453,7 +2457,8 @@ def generate_consul_kv(cluster: Cluster, dhall_dir: str) -> str:
 
     ConsulService = NamedTuple('ConsulService', [
         ('node_name', str), ('proc_id', Oid), ('ep', Any),
-        ('svc_id', Oid), ('stype', str), ('meta_data', Optional[str])])
+        ('svc_id', Oid), ('stype', str), ('meta_data', Optional[str]),
+        ('log', Optional[List[str]])])
 
     def processes() -> Iterator[ConsulService]:
         for node_id, node in m0conf.items():
@@ -2469,7 +2474,8 @@ def generate_consul_kv(cluster: Cluster, dhall_dir: str) -> str:
                                         ep=proc.endpoint,
                                         svc_id=svc_id,
                                         stype=stype,
-                                        meta_data=proc.meta_data)
+                                        meta_data=proc.meta_data,
+                                        log=proc.log)
                 # Add Motr clients to consul kv
                 if proc_id in cluster.m0_clients:
                     yield ConsulService(node_name=node.name,
@@ -2477,7 +2483,8 @@ def generate_consul_kv(cluster: Cluster, dhall_dir: str) -> str:
                                         ep=proc.endpoint,
                                         svc_id=cluster.m0_clients[proc_id],
                                         stype=m0conf[proc_id].proc_name,
-                                        meta_data=None)
+                                        meta_data=None,
+                                        log=[])
 
     def sns_pools() -> List[Oid]:
         for root_id, root in m0conf.items():
@@ -2525,6 +2532,9 @@ def generate_consul_kv(cluster: Cluster, dhall_dir: str) -> str:
         *[(f'm0conf/nodes/{x.node_name}/processes/{x.proc_id.fidk}/'
            f'meta_data', x.meta_data)
           for x in processes() if x.stype == 'ios' and x.meta_data],
+        *[(f'm0conf/nodes/{x.node_name}/processes/{x.proc_id.fidk}/'
+           f'log', x.log)
+          for x in processes() if x.stype == 'ios' and x.log],
         *[(f'm0conf/nodes/{x.node_name}/processes/{x.proc_id.fidk}/endpoint',
            str(x.ep))
           for x in processes()],
