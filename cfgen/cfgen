@@ -189,6 +189,8 @@ nodes:
           meta_data: <str>  # device path for meta-data;
                             # optional, Motr will use "/var/motr/m0d-<FID>/"
                             # by default
+          log: [ <str> ]    # e.g. [ "/dev/loop0", "/dev/loop1", "/dev/loop2" ]
+                            # Empty list means no log device.
           data: [ <str> ]   # e.g. [ "/dev/loop0", "/dev/loop1", "/dev/loop2" ]
                             # Empty list means no IO service.
     m0_clients:
@@ -437,6 +439,9 @@ def enrich_cluster_desc(desc: Dict[str, Any], mock_p: bool) -> None:
             if 'meta_data' in m0d['io_disks']:
                 if m0d['io_disks']['meta_data'] is None:
                     del m0d['io_disks']['meta_data']
+            if 'log' in m0d['io_disks']:
+                if m0d['io_disks']['log'] is None:
+                    del m0d['io_disks']['log']
             m0d['_io_disks'] = get_disks_from_cdf(node['hostname'], mock_p,
                                                   m0d['io_disks']['data'])
 
@@ -514,8 +519,15 @@ Make sure the value of data_iface in the CDF is correct.""")
             if 'meta_data' in d:
                 _assert(d['meta_data'], f"Node {name}: 'io_disks.meta_data'"
                         'must not be an empty string')
-                _assert(d['meta_data'] not in d['data'], f"Node {name}: "
-                        'Meta-data disk must not belong io_disks.data')
+                _assert(d['meta_data'] not in d['data'] or d['log'],
+                        f"Node {name}: Meta-data disk must not belong "
+                        'in io_disks.data or io_disks.log')
+            if 'log' in d:
+                _assert('' not in d['log'], f"Node {name}: Empty strings "
+                        "in 'io_disks.log' are not allowed")
+                _assert(d['log'] not in d['data'] or d['meta_data'],
+                        f"Node {name}: Log disk must not belong "
+                        'in io_disks.data or io_disks.meta_data')
 
         disks: List[Disk] = []
         for m0d in node['m0_servers']:
