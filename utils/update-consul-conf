@@ -141,7 +141,7 @@ get_ios_log_from_kv_file() {
     local key="m0conf/nodes/$(get_node_name)/processes/$process_fidk/log"
 
     local cmd="jq -r '.[] | select(.key==\"$key\") |
-                  .value' $kv_file | jq -r '.[]'"
+                  .value' $kv_file"
 
     eval $cmd || true
 }
@@ -410,7 +410,8 @@ append_ios_svc() {
     local port=$(get_service_port $ep)
     local host=$(get_service_host $addr)
     local meta_data=$(get_ios_meta_data_from_kv_file $id)
-    local log=$(get_ios_log_from_kv_file $id)
+    local log_path=$(get_ios_log_from_kv_file $id | jq -r .path)
+    local log_size=$(get_ios_log_from_kv_file $id | jq -r .size)
 
     SVCS_CONF+="${SVCS_CONF:+,}{
       \"id\": \"$id\",
@@ -446,6 +447,16 @@ EOF
     cat <<EOF | sudo tee -a /tmp/m0d-$fid > /dev/null
 MOTR_NODE_UUID='$UUID'
 EOF
+    if [[ $log_path ]]; then
+        cat <<EOF | sudo tee -a /tmp/m0d-$fid > /dev/null
+MOTR_LOG_PATH='$log_path'
+EOF
+    fi
+    if [[ $log_size ]]; then
+        cat <<EOF | sudo tee -a /tmp/m0d-$fid > /dev/null
+MOTR_LOG_SIZE='$log_size'
+EOF
+    fi
     install_motr_conf /tmp/m0d-$fid
 }
 

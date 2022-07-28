@@ -448,6 +448,13 @@ def enrich_cluster_desc(desc: Dict[str, Any], mock_p: bool) -> None:
             if not m0d['_io_disks']:
                 m0d['_io_disks'] = get_disks_ssh(node['hostname'], mock_p,
                                                  m0d['io_disks']['data'])
+            
+            m0d['_log_disks'] = get_disks_from_cdf(node['hostname'], mock_p,
+                                                  m0d['io_disks']['log'])
+
+            if not m0d['_log_disks']:
+                m0d['_log_disks'] = get_disks_ssh(node['hostname'], mock_p,
+                                                 m0d['io_disks']['log'])
 
     if 'profiles' not in desc:
         sns_pools = [pool['name'] for pool in desc['pools']
@@ -1217,7 +1224,7 @@ class ConfProcess(ToDhall):
     def __init__(self, nr_cpu: int, memsize_MB: int,
                  endpoint,
                  services: List[Oid], meta_data: str = None,
-                 log: List[str] = [], proc_name: str = None):
+                 log: List[Disk] = [], proc_name: str = None):
         _assert(nr_cpu > 0, 'nr_cpu must be positive')
         self.nr_cpu = nr_cpu
         _assert(memsize_MB > 0, 'memsize_MB must be positive')
@@ -1298,7 +1305,7 @@ class ConfProcess(ToDhall):
         log = []
         if proc_desc is not None and proc_t is ProcT.m0_server:
             meta_data = proc_desc['io_disks'].get('meta_data')
-            log = proc_desc['io_disks'].get('log')
+            log = proc_desc['_log_disks']
 
         m0conf[proc_id] = cls(nr_cpu=facts['processorcount'],
                               memsize_MB=facts['_memsize_MB'],
@@ -2458,7 +2465,7 @@ def generate_consul_kv(cluster: Cluster, dhall_dir: str) -> str:
     ConsulService = NamedTuple('ConsulService', [
         ('node_name', str), ('proc_id', Oid), ('ep', Any),
         ('svc_id', Oid), ('stype', str), ('meta_data', Optional[str]),
-        ('log', Optional[List[str]])])
+        ('log', Optional[List[Disk]])])
 
     def processes() -> Iterator[ConsulService]:
         for node_id, node in m0conf.items():
@@ -2533,7 +2540,11 @@ def generate_consul_kv(cluster: Cluster, dhall_dir: str) -> str:
            f'meta_data', x.meta_data)
           for x in processes() if x.stype == 'ios' and x.meta_data],
         *[(f'm0conf/nodes/{x.node_name}/processes/{x.proc_id.fidk}/'
-           f'log', x.log)
+           f'log', 
+           json.dumps({
+               'path': x.log[0].path,
+	       'size': x.log[0].size
+           }))
           for x in processes() if x.stype == 'ios' and x.log],
         *[(f'm0conf/nodes/{x.node_name}/processes/{x.proc_id.fidk}/endpoint',
            str(x.ep))
