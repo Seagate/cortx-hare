@@ -448,13 +448,13 @@ def enrich_cluster_desc(desc: Dict[str, Any], mock_p: bool) -> None:
             if not m0d['_io_disks']:
                 m0d['_io_disks'] = get_disks_ssh(node['hostname'], mock_p,
                                                  m0d['io_disks']['data'])
-            
+
             m0d['_log_disks'] = get_disks_from_cdf(node['hostname'], mock_p,
-                                                  m0d['io_disks']['log'])
+                                                   m0d['io_disks']['log'])
 
             if not m0d['_log_disks']:
                 m0d['_log_disks'] = get_disks_ssh(node['hostname'], mock_p,
-                                                 m0d['io_disks']['log'])
+                                                  m0d['io_disks']['log'])
 
     if 'profiles' not in desc:
         sns_pools = [pool['name'] for pool in desc['pools']
@@ -2540,10 +2540,10 @@ def generate_consul_kv(cluster: Cluster, dhall_dir: str) -> str:
            f'meta_data', x.meta_data)
           for x in processes() if x.stype == 'ios' and x.meta_data],
         *[(f'm0conf/nodes/{x.node_name}/processes/{x.proc_id.fidk}/'
-           f'log', 
+           f'log',
            json.dumps({
                'path': x.log[0].path,
-	       'size': x.log[0].size
+               'size': x.log[0].size
            }))
           for x in processes() if x.stype == 'ios' and x.log],
         *[(f'm0conf/nodes/{x.node_name}/processes/{x.proc_id.fidk}/endpoint',
