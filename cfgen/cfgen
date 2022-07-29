@@ -516,6 +516,7 @@ Make sure the value of data_iface in the CDF is correct.""")
                 f'Node {name}: Too many confd services: {nr_confds} >= 2')
         total_nr_confds += nr_confds
 
+        disks_list = []
         for m0d in node['m0_servers']:
             d = m0d['io_disks']
             _assert(m0d['runs_confd'] or d['data'],
@@ -523,18 +524,20 @@ Make sure the value of data_iface in the CDF is correct.""")
                     "'io_disks.data' must be set")
             _assert('' not in d['data'], f"Node {name}: Empty strings "
                     "in 'io_disks.data' are not allowed")
+            for x in d['data']:
+                disks_list.append(x['path'])
             if 'meta_data' in d:
                 _assert(d['meta_data'], f"Node {name}: 'io_disks.meta_data'"
                         'must not be an empty string')
-                _assert(d['meta_data'] not in d['data'] or d['log'],
-                        f"Node {name}: Meta-data disk must not belong "
-                        'in io_disks.data or io_disks.log')
+                disks_list.append(d['meta_data'])
             if 'log' in d:
                 _assert('' not in d['log'], f"Node {name}: Empty strings "
                         "in 'io_disks.log' are not allowed")
-                _assert(d['log'] not in d['data'] or d['meta_data'],
-                        f"Node {name}: Log disk must not belong "
-                        'in io_disks.data or io_disks.meta_data')
+                for x in d['log']:
+                    disks_list.append(x['path'])
+
+        _assert(all_unique(disks_list),
+                f'Node {name}: Disk repeated in log / meta_data / data!')
 
         disks: List[Disk] = []
         for m0d in node['m0_servers']:
