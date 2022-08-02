@@ -92,8 +92,13 @@ class ConfStoreProvider(ValueProvider):
         service_type will be like Const.SERVICE_MOTR_IO.value,
         Const.SERVICE_S3_SERVER.value etc
         """
+        if service_type == 'io':
+            return self.get_machine_ids_for_attribute('num_cvg')
+        # presently, For service_type: motr_client, both client and data pods
+        # are returned by the conf store search query. But data pods are
+        # filtered out while creating node in _create_node().
         types = {
-            'io': 'motr',
+            'motr_client': 'motr',
             'rgw_s3': 'rgw',
             'agent': 'csm'
         }
@@ -121,7 +126,7 @@ class ConfStoreProvider(ValueProvider):
         return self.get_machine_ids_for_attribute('name', comp_type)
 
     def get_machine_ids_for_attribute(self, attr_type: str,
-                                      name: str) -> List[str]:
+                                      name: str = None) -> List[str]:
         """
         Return a list of pod's machine_id for the machines consisting
         the attribute name under the given attribute type.
@@ -173,7 +178,7 @@ class ConfStoreProvider(ValueProvider):
         return self.get_machine_ids_for_service(Const.SERVICE_MOTR_IO.value)
 
     def search_val(self, parent_key: str, search_key: str,
-                   search_val: str) -> List[str]:
+                   search_val: str = None) -> List[str]:
         """
         Searches a given key value under the given parent key.
         """
