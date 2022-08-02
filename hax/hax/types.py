@@ -193,7 +193,7 @@ class Fid:
         return f'0x{self.container:x}:0x{self.key:x}'
 
     def __eq__(self, other):
-        return type(other) is Fid and \
+        return isinstance(other, Fid) and \
             other.container == self.container and other.key == self.key
 
     def for_json(self):

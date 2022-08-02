@@ -18,11 +18,10 @@
 
 # flake8: noqa
 import logging
-import pytest
 import time
 import unittest
+from queue import Queue
 from threading import Condition, Thread
-from time import sleep
 from typing import Any, List
 from unittest.mock import Mock
 
@@ -201,16 +200,13 @@ class TestWorkPlanner(unittest.TestCase):
                 Mock(side_effect=ret_values))
         tracker = GroupTracker()
         thread_count = 12
-        for i in range(10):
+        for _ in range(10):
             planner.add_command(nvec_get())
 
-        for j in range(thread_count):
+        for _ in range(thread_count):
             planner.add_command(Die())
 
-        exc = None
-
-        def fn(planner: WorkPlanner):
-            nonlocal exc
+        def fn(planner: WorkPlanner, exc: Queue):
             try:
                 while True:
                     LOG.log(TRACE, "Requesting for a work")
@@ -230,18 +226,20 @@ class TestWorkPlanner(unittest.TestCase):
 
             except Exception as e:
                 LOG.exception('*** ERROR ***')
-                exc = e
+                exc.put(e)
 
+        excq = Queue(maxsize=thread_count)
         workers = [
-            Thread(target=fn, args=(planner, )) for t in range(thread_count)
+            Thread(target=fn, args=(planner, excq)) for t in range(thread_count)
         ]
         for t in workers:
             t.start()
 
         for t in workers:
             t.join()
-        if exc:
-            raise exc
+        # raises the first collected exception
+        if excq.qsize() != 0:
+            raise excq.get()
         groups_processed = tracker.get_tracks()
         self.assertEqual([0, 0, 0, 0, 0, 0, 0, 0, 0, 0], groups_processed)
 
@@ -249,21 +247,6 @@ class TestWorkPlanner(unittest.TestCase):
     def test_entrypoint_request_processed_asap(self):
         planner = WorkPlanner()
         group_idx = 0
-
-        def ret_values(cmd: BaseMessage) -> bool:
-            nonlocal group_idx
-            # We don't care about the group distribution logic
-            # in this test. Instead, we concentrate how different group
-            # numbers are processed by the workers and the order
-            # in which they are allowed to process the messages.
-            #
-            # _assign_group is invoked under a lock acquired, so this
-            # increment is thread-safe.
-            values = [0, 1, 0, 1, 0, 1, 0, 1, 0, 1]
-            ret = bool(values[group_idx])
-            group_idx += 1
-            return ret
-
         tracker = TimeTracker()
         thread_count = 4
         planner.add_command(broadcast())
@@ -312,22 +295,20 @@ class TestWorkPlanner(unittest.TestCase):
         if exc:
             raise exc
         tracks = tracker.get_tracks()
-        (cmd, ts) = tracks[0]
+        cmd = tracks[0][0]
         self.assertTrue(isinstance(cmd, EntrypointRequest))
 
     def test_workers_not_blocked_by_future_work(self):
         planner = WorkPlanner()
-        group_idx = 0
-
         tracker = TimeTracker()
         thread_count = 2
         # We add way more commands than we have workers now
-        for i in range(8):
+        for _ in range(8):
             planner.add_command(broadcast())
 
         planner.add_command(entrypoint())
 
-        for j in range(thread_count):
+        for _ in range(thread_count):
             planner.add_command(Die())
 
         exc = None
@@ -375,7 +356,7 @@ class TestWorkPlanner(unittest.TestCase):
             raise exc
         tracks = tracker.get_tracks()
 
-        idx, (cmd, ts) = self.find(tracks,
+        _, (_, ts) = self.find(tracks,
                              lambda a: isinstance(a[0], EntrypointRequest),
                              'EntrypointRequest not processed')
         self.assertTrue(ts - t0 < 3)

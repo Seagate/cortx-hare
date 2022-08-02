@@ -101,12 +101,12 @@ class WorkPlanner:
         self.b_lock = Condition()
 
     def is_empty(self) -> bool:
-        '''Checks whether the backlog is empty. Blocking call.'''
+        """Checks whether the backlog is empty. Blocking call."""
         with self.b_lock:
             return not self.backlog
 
     def add_command(self, command: BaseMessage) -> None:
-        '''Adds the given command to the execution plan. Blocking call.'''
+        """Adds the given command to the execution plan. Blocking call."""
         LOG.log(TRACE, '[WP]Before add_command: %s', command)
         with self.b_lock:
             cmd, is_asap = self._assign_group(command)
@@ -121,10 +121,10 @@ class WorkPlanner:
             self.b_lock.notifyAll()
 
     def _create_initial_state(self) -> State:
-        '''Default factory method that returns initial state.
+        """Default factory method that returns initial state.
 
-           Invoked from WorkPlanner's __init__ method.
-        '''
+        Invoked from WorkPlanner's __init__ method.
+        """
         return State(next_group_id=0,
                      active_commands=LinkedList(),
                      active_meta={},
@@ -133,9 +133,10 @@ class WorkPlanner:
                      is_shutdown=False)
 
     def _create_poison(self) -> BaseMessage:
-        '''Creates poison pill - Die command. Used in a special 'shutting down'
+        '''Creates poison pill - Die command.
 
-           mode to stop worker threads gracefully.
+        Used in a special 'shutting down' mode to stop worker
+        threads gracefully.
         '''
 
         cmd = Die()
@@ -190,7 +191,6 @@ class WorkPlanner:
     def shutdown(self):
         '''Put the WorkPlanner to 'shutting down' mode. After this function is
         invoked WorkPlanner will issue Die commands only.'''
-
         with self.b_lock:
             LOG.debug('WorkPlanner is shutting down')
             self.state.is_shutdown = True
@@ -219,7 +219,7 @@ class WorkPlanner:
         if not meta:
             return True
 
-        for k, v in self.state.active_meta.items():
+        for v in self.state.active_meta.values():
             # TODO in the future `==` will have to be replaced with something
             # more command-specific.
             # E.g. two ProcessEvents conflict if their metas contain the same
@@ -233,7 +233,7 @@ class WorkPlanner:
 
     def _is_allowed(self, command: BaseMessage) -> bool:
         '''
-        Returns True group_id equal to the currently active group
+        Returns True group_id equal to the currently active group.
 
         The command is allowed for execution if and only if the command has
         group_id equal to the currently active group (see
@@ -251,7 +251,7 @@ class WorkPlanner:
     def _get_increased_group(self, current: int) -> int:
         ''' Returns the next valid group_id number by the given current value.
 
-            Performs no side effects.
+        Performs no side effects.
         '''
         new_value = current + 1
         # In Python, every int uses an arbitrary-precision maths. In other
@@ -288,7 +288,6 @@ class WorkPlanner:
         The method must be invoked by the worker thread when the command
         is executed.
         """
-
         with self.b_lock:
             state = self.state
             self._remove_active_cmd(command)
@@ -316,9 +315,10 @@ class WorkPlanner:
         Assumes that b_lock is acquired already.
         """
         def has(cmd_type: Type[BaseMessage]) -> bool:
-            ''' Checks if the group being currently formed (i.e. next_group)
-                contains a message of the given type.
-            '''
+            """
+            Checks if the group being currently formed (i.e. next_group)
+            contains a message of the given type.
+            """
             return cmd_type in self.state.next_group_commands
 
         if not self.state.next_group_commands:
@@ -353,8 +353,9 @@ class WorkPlanner:
         return False
 
     def _assign_group(self, cmd: BaseMessage) -> Tuple[BaseMessage, bool]:
-        ''' Sets the correct group_id to the command. Side effect: updates
-        self.state.
+        '''Sets the correct group_id to the command.
+
+        Side effect: updates self.state.
 
         Returns Tuple with the updated command and a boolean flag saying
         whether this command must be added out of order (is_asap).
@@ -384,10 +385,12 @@ class WorkPlanner:
             self.state.next_group_id = self._get_increased_group(
                 self.state.next_group_id)
 
-        if (isinstance(cmd, AnyEntrypointRequest)
-                or isinstance(cmd, HaNvecGetEvent)
-                or isinstance(cmd, HaNvecSetEvent)
-                or isinstance(cmd, ProcessEvent)):
+        if (
+            isinstance(cmd, AnyEntrypointRequest)
+            or isinstance(cmd, HaNvecGetEvent)
+            or isinstance(cmd, HaNvecSetEvent)
+            or isinstance(cmd, ProcessEvent)
+        ):
             # Entrypoint and Die will always be added to the CURRENT group
             # (the one being currently active), so they can be executed at
             # first priority.

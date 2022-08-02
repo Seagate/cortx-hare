@@ -115,9 +115,7 @@ class ByteCountUpdater(StoppableThread):
         return bc_without_parity
 
     def _get_parity_buffers(self, bc: int, state: PverInfo) -> int:
-        """
-        Calculate the parity buffer count based on pool configuration.
-        """
+        """Calculate the parity buffer count based on pool configuration."""
         tot_units = state.data_units + state.parity_units
         bytes_per_unit = ceil(bc / tot_units)
         return bytes_per_unit * state.parity_units

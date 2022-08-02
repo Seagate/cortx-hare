@@ -22,6 +22,7 @@ import re
 import threading
 import argparse
 import subprocess
+import shlex
 from queue import Queue
 from socket import gethostname
 from typing import Dict, List, NamedTuple
@@ -179,7 +180,7 @@ def ssh_prefix(hostname: str) -> str:
 def consul_is_active_at(hostname: str) -> bool:
     cmd = ssh_prefix(hostname) + \
         'sudo systemctl is-active --quiet hare-consul-agent'
-    return subprocess.call(cmd, shell=True) == 0
+    return subprocess.call(shlex.split(cmd), shell=False) == 0  # nosec B603
 
 
 def pcs_consul_is_active_at(hostname: str) -> bool:

@@ -35,11 +35,11 @@ def trace_call(fn):
     '''
     Decorator that 'logs' the historical sequence of all the methods of the
     given class.
-
     The implementation assumes that
     1. the decorator will decorate methods of a class (not static functions).
     2. the class has field `traces: List[Invocation]`
     '''
+
     def wrapper(self, *args, **kwargs):
         ts = time.time()
         args_copy = [i for i in args]
@@ -78,7 +78,9 @@ class AssertionPlan:
             tr_method('entrypoint_reply')).run(traces),
             'ha_broadcast must be invoked before entrypoint_reply'
     '''
+
     def __init__(self, first: TraceMatcher):
+        '''Constructor with initial Assertion State.'''
         self.steps: List[Tuple[StateTransformer,
                                TracePredicate]] = [(self._id(),
                                                     self._exec(first))]
@@ -114,7 +116,8 @@ class AssertionPlan:
 
     def count(self, traces: List[Invocation]) -> int:
         """
-        Counts how many traces in the list correspond to the given criteria.
+        Counts how many traces in the list correspond to
+        the given criteria.
         """
         def _eval(state: AssertionState, steps: List[Tuple[StateTransformer,
                                                            TracePredicate]],
@@ -219,23 +222,24 @@ class FakeFFI(HaxFFI):
         self.traces: List[Invocation] = []
 
     @trace_call
-    def init_motr_api(self, ptr, some_str):
+    def init_motr_api(self, ptr, some_str):  # pylint: disable=E0202
         return 1
 
     @trace_call
-    def start(self, ctx, endpoint, process_fid, ha_fid, rm_fid):
+    def start(self, ctx, endpoint,  # pylint: disable=E0202
+              process_fid, ha_fid, rm_fid):
         ...
 
     @trace_call
-    def start_rconfc(self):
+    def start_rconfc(self):  # pylint: disable=E0202
         ...
 
     @trace_call
-    def motr_stop(self, ha_ctx):
+    def motr_stop(self, ha_ctx):  # pylint: disable=E0202
         ...
 
     @trace_call
-    def stop_rconfc(self, ha_ctx):
+    def stop_rconfc(self, ha_ctx):  # pylint: disable=E0202
         ...
 
     @trace_call

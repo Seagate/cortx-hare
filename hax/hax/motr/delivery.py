@@ -55,6 +55,12 @@ class DeliveryHerald:
         # if we are here then the delivery was confirmed
     """
     def __init__(self, unsorted_ttl_msec: int = MAX_UNSORTED_TTL):
+        """Inits DeliveryHerald.
+
+        Args:
+            unsorted_ttl_msec (int): time-to-live threshold for
+                unsorted_deliveries.
+        """
         self.recently_delivered: Dict[HaLinkMessagePromise,
                                       List[MessageId]] = {}
         self.waiting_clients: Dict[HaLinkMessagePromise, Condition] = {}

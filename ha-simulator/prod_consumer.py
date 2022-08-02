@@ -30,6 +30,7 @@ class myEvent:
         print(f'Created event={self}.')
 
     def __str__(self):
+        """String representation of Event."""
         return str(f'Event: resource type={self.resource_type}, '
                    f'pod name={self.node_id}, '
                    f'type={self.event_type}')
