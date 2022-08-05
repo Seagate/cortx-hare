@@ -189,6 +189,8 @@ nodes:
           meta_data: <str>  # device path for meta-data;
                             # optional, Motr will use "/var/motr/m0d-<FID>/"
                             # by default
+          log: [ <str> ]    # e.g. [ "/dev/loop0", "/dev/loop1", "/dev/loop2" ]
+                            # Empty list means no log device.
           data: [ <str> ]   # e.g. [ "/dev/loop0", "/dev/loop1", "/dev/loop2" ]
                             # Empty list means no IO service.
     m0_clients:
@@ -437,12 +439,22 @@ def enrich_cluster_desc(desc: Dict[str, Any], mock_p: bool) -> None:
             if 'meta_data' in m0d['io_disks']:
                 if m0d['io_disks']['meta_data'] is None:
                     del m0d['io_disks']['meta_data']
+            if 'log' in m0d['io_disks']:
+                if m0d['io_disks']['log'] is None:
+                    del m0d['io_disks']['log']
             m0d['_io_disks'] = get_disks_from_cdf(node['hostname'], mock_p,
                                                   m0d['io_disks']['data'])
 
             if not m0d['_io_disks']:
                 m0d['_io_disks'] = get_disks_ssh(node['hostname'], mock_p,
                                                  m0d['io_disks']['data'])
+
+            m0d['_log_disks'] = get_disks_from_cdf(node['hostname'], mock_p,
+                                                   m0d['io_disks']['log'])
+
+            if not m0d['_log_disks']:
+                m0d['_log_disks'] = get_disks_ssh(node['hostname'], mock_p,
+                                                  m0d['io_disks']['log'])
 
     if 'profiles' not in desc:
         sns_pools = [pool['name'] for pool in desc['pools']
@@ -504,6 +516,7 @@ Make sure the value of data_iface in the CDF is correct.""")
                 f'Node {name}: Too many confd services: {nr_confds} >= 2')
         total_nr_confds += nr_confds
 
+        disks_list = []
         for m0d in node['m0_servers']:
             d = m0d['io_disks']
             _assert(m0d['runs_confd'] or d['data'],
@@ -511,11 +524,20 @@ Make sure the value of data_iface in the CDF is correct.""")
                     "'io_disks.data' must be set")
             _assert('' not in d['data'], f"Node {name}: Empty strings "
                     "in 'io_disks.data' are not allowed")
+            for x in d['data']:
+                disks_list.append(x['path'])
             if 'meta_data' in d:
                 _assert(d['meta_data'], f"Node {name}: 'io_disks.meta_data'"
                         'must not be an empty string')
-                _assert(d['meta_data'] not in d['data'], f"Node {name}: "
-                        'Meta-data disk must not belong io_disks.data')
+                disks_list.append(d['meta_data'])
+            if 'log' in d:
+                _assert('' not in d['log'], f"Node {name}: Empty strings "
+                        "in 'io_disks.log' are not allowed")
+                for x in d['log']:
+                    disks_list.append(x['path'])
+
+        _assert(all_unique(disks_list),
+                f'Node {name}: Disk repeated in log / meta_data / data!')
 
         disks: List[Disk] = []
         for m0d in node['m0_servers']:
@@ -1205,13 +1227,14 @@ class ConfProcess(ToDhall):
     def __init__(self, nr_cpu: int, memsize_MB: int,
                  endpoint,
                  services: List[Oid], meta_data: str = None,
-                 proc_name: str = None):
+                 log: List[Disk] = [], proc_name: str = None):
         _assert(nr_cpu > 0, 'nr_cpu must be positive')
         self.nr_cpu = nr_cpu
         _assert(memsize_MB > 0, 'memsize_MB must be positive')
         self.memsize_MB = memsize_MB
         self.endpoint = endpoint
         self.meta_data = meta_data
+        self.log = log
         self.proc_name = proc_name
         _assert(all(x.type is ObjT.service for x in services),
                 'All services must be of ObjT.service type')
@@ -1282,13 +1305,16 @@ class ConfProcess(ToDhall):
                               portalgroup=portal)
         proc_id = new_oid(ObjT.process)
         meta_data = None
+        log = []
         if proc_desc is not None and proc_t is ProcT.m0_server:
             meta_data = proc_desc['io_disks'].get('meta_data')
+            log = proc_desc['_log_disks']
 
         m0conf[proc_id] = cls(nr_cpu=facts['processorcount'],
                               memsize_MB=facts['_memsize_MB'],
                               endpoint=ep,
                               meta_data=meta_data,
+                              log=log,
                               services=[],
                               proc_name=proc_name)
         m0conf[parent].processes.append(proc_id)
@@ -2441,7 +2467,8 @@ def generate_consul_kv(cluster: Cluster, dhall_dir: str) -> str:
 
     ConsulService = NamedTuple('ConsulService', [
         ('node_name', str), ('proc_id', Oid), ('ep', Any),
-        ('svc_id', Oid), ('stype', str), ('meta_data', Optional[str])])
+        ('svc_id', Oid), ('stype', str), ('meta_data', Optional[str]),
+        ('log', Optional[List[Disk]])])
 
     def processes() -> Iterator[ConsulService]:
         for node_id, node in m0conf.items():
@@ -2457,7 +2484,8 @@ def generate_consul_kv(cluster: Cluster, dhall_dir: str) -> str:
                                         ep=proc.endpoint,
                                         svc_id=svc_id,
                                         stype=stype,
-                                        meta_data=proc.meta_data)
+                                        meta_data=proc.meta_data,
+                                        log=proc.log)
                 # Add Motr clients to consul kv
                 if proc_id in cluster.m0_clients:
                     yield ConsulService(node_name=node.name,
@@ -2465,7 +2493,8 @@ def generate_consul_kv(cluster: Cluster, dhall_dir: str) -> str:
                                         ep=proc.endpoint,
                                         svc_id=cluster.m0_clients[proc_id],
                                         stype=m0conf[proc_id].proc_name,
-                                        meta_data=None)
+                                        meta_data=None,
+                                        log=[])
 
     def sns_pools() -> List[Oid]:
         for root_id, root in m0conf.items():
@@ -2513,6 +2542,13 @@ def generate_consul_kv(cluster: Cluster, dhall_dir: str) -> str:
         *[(f'm0conf/nodes/{x.node_name}/processes/{x.proc_id.fidk}/'
            f'meta_data', x.meta_data)
           for x in processes() if x.stype == 'ios' and x.meta_data],
+        *[(f'm0conf/nodes/{x.node_name}/processes/{x.proc_id.fidk}/'
+           f'log',
+           json.dumps({
+               'path': x.log[0].path,
+               'size': x.log[0].size
+           }))
+          for x in processes() if x.stype == 'ios' and x.log],
         *[(f'm0conf/nodes/{x.node_name}/processes/{x.proc_id.fidk}/endpoint',
            str(x.ep))
           for x in processes()],

@@ -27,6 +27,7 @@
 #define __HAX_H__
 
 #include "lib/mutex.h"
+#include "net/ip.h" /* M0_NET_IP_STRLEN_MAX */
 #include <Python.h>
 
 struct m0_halon_interface;
@@ -46,7 +47,7 @@ struct hax_context {
 };
 
 enum {
-	EP_ADDR_BUF_SIZE = 64
+	EP_ADDR_BUF_SIZE = M0_NET_IP_STRLEN_MAX
 };
 
 struct hax_link {

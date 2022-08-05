@@ -101,6 +101,7 @@ class Disk(DhallTuple):
 class DisksDesc(DhallTuple):
     meta_data: Maybe[Text]
     data: DList[Disk]
+    log: DList[Disk]
 
 
 @dataclass(repr=False)

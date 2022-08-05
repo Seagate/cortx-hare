@@ -18,9 +18,6 @@
 # build number
 %define h_build_num  %(test -n "$build_number" && echo "$build_number" || echo 1)
 
-# motr version
-%define h_motr_version %(rpm -q --whatprovides cortx-motr | xargs rpm -q --queryformat '%%{VERSION}-%%{RELEASE}')
-
 # parallel build jobs
 %define h_build_jobs_opt  %(test -n "$build_jobs" && echo "-j$build_jobs" || echo '')
 
@@ -56,7 +53,7 @@ Requires: puppet-agent >= 6.13.0
 Requires: facter >= 3.14.2
 %endif
 Requires: jq
-Requires: cortx-motr = %{h_motr_version}
+Requires: cortx-motr
 Requires: cortx-py-utils
 %if %{rhel} < 8
 Requires: python36

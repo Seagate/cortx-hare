@@ -96,14 +96,10 @@ class CdfGenerator:
             'hare_mp', resource_path)
         return raw_content.decode('utf-8')
 
-    # node>{machine-id}>cluster_id
+    # cluster>id
     def _get_cluster_id(self) -> str:
         conf = self.provider
-
-        # We will read 'cluster_id' of 1st 'machine_id' present in 'node'
-        server_node = conf.get('node')
-        machine_id = list(server_node.keys())[0]
-        cluster_id = server_node[machine_id]['cluster_id']
+        cluster_id = conf.get('cluster>id')
         return cluster_id
 
     def _create_node_descriptions(self) -> List[NodeDesc]:
@@ -113,11 +109,16 @@ class CdfGenerator:
         machines = conf.get_machine_ids_for_service(
             Const.SERVICE_MOTR_IO.value)
         # Get all the pods which runs the client components
+        # cortx>motr>num_clients
+        # cortx>motr>clients[N]>name
         client_machines = []
-        for client in conf.get_motr_clients():
-            name = str(client.get('name'))
-            client_machines.extend(conf.get_machine_ids_for_service(name))
-            client_machines.extend(conf.get_machine_ids_for_component(name))
+        num_clients = int(conf.get('cortx>motr>num_clients'))
+        for i in range(num_clients):
+            if int(conf.get(f'cortx>motr>clients[{i}]>num_instances')) > 0:
+                name = conf.get(f'cortx>motr>clients[{i}]>name')
+                client_machines.extend(conf.get_machine_ids_for_service(name))
+                client_machines.extend(
+                    conf.get_machine_ids_for_component(name))
 
         # Avoid adding duplicate machine ids if client and data node
         # are the same. We do not use list(set()) mechanism as it
@@ -148,15 +149,7 @@ class CdfGenerator:
                      f'durability>{pool_type}>{prop_name}'))
 
     def _get_layout(self, pool: PoolHandle) -> Optional[Layout]:
-        conf = self.provider
         (cluster_id, pool_type, storage_ndx) = pool.tuple()
-        # cluster>storage_set[N]>durability>{type}
-        type_value = conf.get(
-            f'cluster>storage_set[{storage_ndx}]'
-            f'>durability>{pool_type}',
-            allow_null=True)
-        if not type_value:
-            return None
 
         def prop(name: str) -> int:
             return self._get_pool_property(pool, name)
@@ -175,9 +168,12 @@ class CdfGenerator:
         if pool_type == 'dix':
             prop_name = 'metadata'
         for i in range(cvg_num):
-            # node>{machine-id}>cvg[N]>devices>name
-            all_cvg_devices += conf.get(
-                f'node>{node}>cvg[{i}]>devices>{prop_name}')
+            prop_num = int(conf.get(
+                f'node>{node}>cvg[{i}]>devices>num_{prop_name}'))
+            for j in range(prop_num):
+                # node>{machine-id}>cvg[N]>devices>data/metadata[N]
+                all_cvg_devices.append(conf.get(
+                    f'node>{node}>cvg[{i}]>devices>{prop_name}[{j}]'))
         return all_cvg_devices
 
     def _validate_pool(self, pool: PoolHandle) -> None:
@@ -312,44 +308,51 @@ class CdfGenerator:
         m0client_ports = []
         for srv in NetworkPorts.__annotations__.keys():
             if srv == 'hax':
-                url = conf.get('cortx>hare>hax>endpoints', allow_null=True)
+                num_ep = int(conf.get('cortx>hare>hax>num_endpoints'))
                 _hax = None
                 _hax_http = None
-                for u in url or ():
-                    _parsed_url = urlparse(u)
+                for i in range(num_ep):
+                    url = conf.get(f'cortx>hare>hax>endpoints[{i}]')
+                    _parsed_url = urlparse(url)
                     if _parsed_url.scheme in ('http', 'https'):
                         _hax_http = _parsed_url.port
                     else:
                         if _parsed_url.hostname == hostname:
                             _hax = round(_parsed_url.port / 100) * 100
             elif srv == 'm0_client_other':
-                for client in self.provider.get_motr_clients():
-                    url = client.get('endpoints')
-                    if url:
-                        for u in url or ():
-                            _parsed_url = urlparse(u)
+                num_clients = int(conf.get('cortx>motr>num_clients'))
+                for i in range(num_clients):
+                    # Note: every client will not have endpoints
+                    num_endpoints = conf.get(
+                        f'cortx>motr>clients[{i}]>num_endpoints',
+                        allow_null=True)
+                    if num_endpoints:
+                        for j in range(int(num_endpoints)):
+                            url = conf.get(
+                                f'cortx>motr>clients[{i}]>endpoints[{j}]')
+                            _parsed_url = urlparse(url)
                             if _parsed_url.hostname == hostname:
                                 port = round(_parsed_url.port / 100) * 100
-                                client_name = str(client.get('name'))
+                                client_name = conf.get(
+                                    f'cortx>motr>clients[{i}]>name')
                                 m0client_ports.append(
                                     ClientPort(name=Text(client_name),
                                                port=int(port)))
             elif srv == 'm0_server':
                 for server in m0serverT:
-                    url = conf.get(f'cortx>motr>{server}>endpoints',
-                                   allow_null=True)
+                    num_ep = int(conf.get(
+                        f'cortx>motr>{server}>num_endpoints'))
                     port = 0
-                    for u in url or ():
-                        _parsed_url = urlparse(u)
+                    for i in range(num_ep):
+                        url = conf.get(f'cortx>motr>{server}>endpoints[{i}]')
+                        _parsed_url = urlparse(url)
                         if _parsed_url.hostname == hostname:
                             port = round(_parsed_url.port / 100) * 100
                     m0server_ports.append(
                         ServerPort(name=Text(server),
                                    port=int(port)))
             else:
-                url = conf.get('cortx>motr>client>endpoints', allow_null=True)
-                _client_s3 = url if url is None else \
-                    round(urlparse(url[0]).port / 100) * 100
+                _client_s3 = None
 
         return NetworkPorts(
             hax=Maybe(_hax, 'Natural'),
@@ -425,12 +428,7 @@ class CdfGenerator:
         return ifaces[0]
 
     def _get_iface_type(self, machine_id: str) -> Optional[Protocol]:
-        endpoints = self.provider.get(
-            'cortx>hare>hax>endpoints',
-            allow_null=True)
-
-        if endpoints is None:
-            return None
+        num_ep = int(self.provider.get('cortx>hare>hax>num_endpoints'))
 
         hostname = self.utils.get_hostname(machine_id)
 
@@ -439,8 +437,9 @@ class CdfGenerator:
         # e.g. endpoints:
         #      - tcp://data1-node1:22001  # For motr and Hax communication
         #      - tcp://data1-node2:22001  # For motr and Hax communication
-        for e in endpoints:
-            key = e.split(':')
+        for i in range(num_ep):
+            endpoint = self.provider.get(f'cortx>hare>hax>endpoints[{i}]')
+            key = endpoint.split(':')
 
             if key[0] in ('http', 'https'):
                 continue
@@ -453,14 +452,17 @@ class CdfGenerator:
             return None
         return Protocol[proto]
 
-    # node>{machine -id}>cvg[N]>devices>data
+    # node>{machine -id}>cvg[N]>devices>num_data
+    # node>{machine -id}>cvg[N]>devices>data[N]
     def _get_data_devices(self, machine_id: str, cvg: int) -> DList[Text]:
         store = self.provider
-        data_devices = DList(
-            [Text(device) for device in store.get(
-                f'node>{machine_id}>'
-                f'cvg[{cvg}]>devices>data')], 'List Text')
-        return data_devices
+        data_devices = []
+        num_data = int(store.get(
+            f'node>{machine_id}>cvg[{cvg}]>devices>num_data'))
+        for i in range(num_data):
+            data_devices.append(Text(store.get(
+                f'node>{machine_id}>cvg[{cvg}]>devices>data[{i}]')))
+        return DList(data_devices, 'List Text')
 
     # conf-store returns a list of devices, thus, the function
     # must return a single metadata device path instead of a string of
@@ -470,7 +472,7 @@ class CdfGenerator:
                              cvg: int) -> Text:
         store = self.provider
         metadata_device = Text(store.get(
-            f'node>{machine_id}>cvg[{cvg}]>devices>metadata')[0])
+            f'node>{machine_id}>cvg[{cvg}]>devices>metadata[0]'))
         return metadata_device
 
     # This function is kept as place holder with length returning 1,
@@ -489,15 +491,18 @@ class CdfGenerator:
         clients that are present in the components list for the given
         node>{machine_id} according to the ConfStore.
 
-        cortx>motr>clients=[rgw, other]
-        node>{machine_id}>components=[motr, other]
+        cortx>motr>clients=[rgw_s3, other]
+        node>{machine_id}>components=[rgw, other]
 
         return 'other' only.
         """
-        for client in self.provider.get_motr_clients():
-            name = str(client.get('name'))
-            no_instances = int(str(client.get('num_instances')))
-            if no_instances:
+        conf = self.provider
+        num_clients = int(conf.get('cortx>motr>num_clients'))
+        for i in range(num_clients):
+            no_instances = int(conf.get(
+                f'cortx>motr>clients[{i}]>num_instances'))
+            if no_instances > 0:
+                name = str(conf.get(f'cortx>motr>clients[{i}]>name'))
                 if self.utils.is_component_or_service(machine_id, name):
                     yield M0ClientDesc(
                         name=Text(name),
@@ -521,14 +526,18 @@ class CdfGenerator:
             servers = DList([
                 M0ServerDesc(
                     io_disks=DisksDesc(
-                        data=self.utils.get_drives_info_for(cvg, machine_id),
+                        data=self.utils.get_data_drives_info_for(cvg,
+                                                                 machine_id),
                         meta_data=Maybe(
                             self._get_metadata_device(
-                                machine_id, cvg), 'Text')),
+                                machine_id, cvg), 'Text'),
+                        log=self.utils.get_log_drives_info_for(cvg,
+                                                               machine_id)),
                     runs_confd=Maybe(False, 'Bool'))
+                # node>{machine_id}>num_cvg
                 # node>{machine_id}>cvg
-                for cvg in range(len(store.get(
-                    f'node>{machine_id}>cvg')))
+                for cvg in range(int(store.get(
+                    f'node>{machine_id}>num_cvg')))
                 for m0d in range(self._get_m0d_per_cvg(machine_id, cvg))
             ], 'List M0ServerDesc')
 
@@ -538,6 +547,7 @@ class CdfGenerator:
             servers.value.append(M0ServerDesc(
                 io_disks=DisksDesc(
                     data=DList([], 'List Disk'),
+                    log=DList([], 'List Disk'),
                     meta_data=Maybe(None, 'Text')),
                 runs_confd=Maybe(True, 'Bool')))
 

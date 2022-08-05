@@ -53,9 +53,10 @@ class TestTypes(unittest.TestCase):
     def test_disks_empty(self):
         val = M0ServerDesc(runs_confd=Maybe(True, 'Bool'),
                            io_disks=DisksDesc(meta_data=Maybe(None, 'Text'),
+                                              log=DList([], 'List Text'),
                                               data=DList([], 'List Text')))
         self.assertEqual(
-            '{ runs_confd = Some (True), io_disks = { meta_data = None (Text), data = [] : List Text } }',
+            '{ runs_confd = Some (True), io_disks = { meta_data = None (Text), data = [] : List Text, log = [] : List Text } }',
             str(val))
 
     def test_pooldesc_empty(self):
@@ -77,9 +78,10 @@ class TestTypes(unittest.TestCase):
             runs_confd=Maybe(True, 'Bool'),
             io_disks=DisksDesc(
                 meta_data=Maybe(None, 'Text'),
-                data=DList([Text('/disk1'), Text('/disk2')], 'test')))
+                data=DList([Text('/disk1'), Text('/disk2')], 'test'),
+                log=DList([Text('/disk3')], 'test')))
         self.assertEqual(
-            '{ runs_confd = Some (True), io_disks = { meta_data = None (Text), data = ["/disk1", "/disk2"] } }',
+            '{ runs_confd = Some (True), io_disks = { meta_data = None (Text), data = ["/disk1", "/disk2"], log = ["/disk3"] } }',
             str(val))
 
 
@@ -111,7 +113,6 @@ class TestCDF(unittest.TestCase):
 
             store.get_machine_id = Mock(return_value='1114a50a6bf6f9c93ebd3c49d07d3fd4')
             store.get_machine_ids_for_service = Mock(return_value=['1114a50a6bf6f9c93ebd3c49d07d3fd4'])
-            store.get_motr_clients = Mock(return_value=[])
             utils = Utils(store)
             kv = KVAdapter()
             def my_get(key: str, recurse: bool = False, allow_null: bool = False):
@@ -247,7 +248,6 @@ class TestCDF(unittest.TestCase):
         store._raw_get = Mock(side_effect=ret_values)
         store.get_machine_id = Mock(return_value='MACH_ID')
         store.get_machine_ids_for_service = Mock(return_value=['MACH_ID'])
-        store.get_motr_clients = Mock(return_value=[])
         utils = Utils(store)
         kv = KVAdapter()
         def my_get(key: str, recurse: bool = False, allow_null: bool = False):
@@ -327,14 +327,17 @@ class TestCDF(unittest.TestCase):
                 'node': {'MACH_ID': {'cluster_id': 'CLUSTER_ID'}},
                 'node>MACH_ID>cluster_id': 'CLUSTER_ID',
                 'node>MACH_ID>components':
-                [{'name':'hare'}, {'name': 'motr'}, {'name': 's3'},
+                [{'name':'hare'}, {'name': 'motr', 'services': ['io']}, {'name': 's3'},
                  {'name': 'other'}],
                 'node>MACH_ID>num_cvg': 2,
                 'node>MACH_ID>cvg':
-                [{'devices': {'data': ['/dev/sdb', '/dev/sdc'], 'metadata': ['/dev/meta', '/dev/meta1']}}],
+                [{'devices': {'data': ['/dev/sdb'], 'log': ['/dev/sdd'], 'metadata': ['/dev/meta']}},
+                 {'devices': {'data': ['/dev/sdc'], 'log': ['/dev/sde'], 'metadata': ['/dev/meta1']}}],
                 'node>MACH_ID>cvg[0]>devices>data': ['/dev/sdb'],
+                'node>MACH_ID>cvg[0]>devices>log': ['/dev/sdd'],
                 'node>MACH_ID>cvg[0]>devices>metadata': ['/dev/meta'],
                 'node>MACH_ID>cvg[1]>devices>data': ['/dev/sdc'],
+                'node>MACH_ID>cvg[1]>devices>log': ['/dev/sde'],
                 'node>MACH_ID>cvg[1]>devices>metadata': ['/dev/meta1'],
                 'node>MACH_ID>hostname':                'myhost',
                 'node>MACH_ID>name': 'mynodename',
@@ -353,9 +356,6 @@ class TestCDF(unittest.TestCase):
         store._raw_get = Mock(side_effect=ret_values)
         store.get_machine_id = Mock(return_value='MACH_ID')
         store.get_machine_ids_for_service = Mock(return_value=['MACH_ID'])
-        store.get_motr_clients = Mock(return_value=
-                                      [{'name': 'other',
-                                        'num_instances' : 2}])
         store.get_machine_ids_for_component = Mock(return_value=['MACH_ID'])
         utils = Utils(store)
         kv = KVAdapter()
@@ -370,7 +370,17 @@ class TestCDF(unittest.TestCase):
                                           "blksize": "4096"}))
             elif key == 'srvnode-1.data.private/drives/dev/sdc':
                 return new_kv('srvnode-1.data.private/drives/dev/sdc',
-                              json.dumps({"path": "/dev/sdb",
+                              json.dumps({"path": "/dev/sdc",
+                                          "size": "4096000",
+                                          "blksize": "4096"}))
+            elif key == 'srvnode-1.data.private/drives/dev/sdd':
+                return new_kv('srvnode-1.data.private/drives/dev/sdd',
+                              json.dumps({"path": "/dev/sdd",
+                                          "size": "4096000",
+                                          "blksize": "4096"}))
+            elif key == 'srvnode-1.data.private/drives/dev/sde':
+                return new_kv('srvnode-1.data.private/drives/dev/sde',
+                              json.dumps({"path": "/dev/sde",
                                           "size": "4096000",
                                           "blksize": "4096"}))
             elif key == 'srvnode-1.data.private/facts':
@@ -413,7 +423,11 @@ class TestCDF(unittest.TestCase):
         self.assertEqual(1, len(clients))
         self.assertEqual(Text('other'), clients[0].name)
         self.assertEqual(2, clients[0].instances)
-
+        servers = ret[0].m0_servers.value.value
+        self.assertEqual(Text('/dev/sdb'), servers[0].io_disks.data[0].path.value)
+        self.assertEqual(Text('/dev/sdc'), servers[1].io_disks.data[0].path.value)
+        self.assertEqual(Text('/dev/sdd'), servers[0].io_disks.log[0].path.value)
+        self.assertEqual(Text('/dev/sde'), servers[1].io_disks.log[0].path.value)
 
         cdf = CdfGenerator(provider=store)
         cdf.utils = utils
@@ -622,7 +636,6 @@ class TestCDF(unittest.TestCase):
         store._raw_get = Mock(side_effect=ret_values)
         store.get_machine_id = Mock(return_value='MACH_ID')
         store.get_machine_ids_for_service = Mock(return_value=['MACH_ID'])
-        store.get_motr_clients = Mock(return_value=[])
         cdf = CdfGenerator(provider=store)
         cdf._get_m0d_per_cvg = Mock(return_value=1)
         utils = Utils(store)
@@ -956,7 +969,6 @@ class TestCDF(unittest.TestCase):
         store._raw_get = Mock(side_effect=ret_values)
         store.get_machine_id = Mock(return_value='MACH_ID')
         store.get_machine_ids_for_service = Mock(return_value=['MACH_ID'])
-        store.get_motr_clients = Mock(return_value=[])
         utils = Utils(store)
         kv = KVAdapter()
         def my_get(key: str, recurse: bool = False, allow_null: bool = False):
@@ -1092,9 +1104,6 @@ class TestCDF(unittest.TestCase):
         store.get_machine_id = Mock(return_value='MACH_ID')
         store.get_machine_ids_for_service = Mock(return_value=['MACH_ID',
                                                                'MACH_2_ID'])
-        store.get_motr_clients = Mock(return_value=
-                                [{'name': 'other',
-                                'num_instances' : 2}])
         store.get_machine_ids_for_component = Mock(return_value=['MACH_ID',
                                                                  'MACH_2_ID'])
         utils = Utils(store)
@@ -1224,7 +1233,6 @@ class TestCDF(unittest.TestCase):
         store._raw_get = Mock(side_effect=ret_values)
         store.get_machine_id = Mock(return_value='MACH_ID')
         store.get_machine_ids_for_service = Mock(return_value=['MACH_ID'])
-        store.get_motr_clients = Mock(return_value=[])
         cdf = CdfGenerator(provider=store)
         utils = Utils(store)
         kv = KVAdapter()

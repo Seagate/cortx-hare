@@ -235,6 +235,7 @@ def main():
 
         server = ServerRunner(planner,
                               herald,
+                              motr=motr,
                               consul_util=util,
                               hax_state=state)
         server.run(threads_to_wait=[*consumer_threads,

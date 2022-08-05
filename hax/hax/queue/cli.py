@@ -54,7 +54,7 @@ def main():
         raw_ctx = parse_opts(args=sys.argv[1:],
                              standalone_mode=False,
                              obj={})
-        if type(raw_ctx) is not dict:
+        if not isinstance(raw_ctx, dict):
             exit(1)
         app_context = raw_ctx['result']
         pub = app_context.publisher

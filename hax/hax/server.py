@@ -39,6 +39,7 @@ from hax.message import (BaseMessage, BroadcastHAStates, SnsDiskAttach,
 from hax.common import HaxGlobalState
 from hax.motr.delivery import DeliveryHerald
 from hax.exception import HAConsistencyException
+from hax.motr import Motr
 from hax.motr.planner import WorkPlanner
 from hax.queue import BQProcessor
 from hax.queue.confobjutil import ConfObjUtil
@@ -358,11 +359,13 @@ class ServerRunner:
         self,
         planner: WorkPlanner,
         herald: DeliveryHerald,
+        motr: Motr,
         consul_util: ConsulUtil,
         hax_state: HaxGlobalState
     ):
         self.consul_util = consul_util
         self.herald = herald
+        self.motr = motr
         self.planner = planner
         self.hax_state = hax_state
 
@@ -393,6 +396,7 @@ class ServerRunner:
             conf_obj = ConfObjUtil(self.consul_util)
             planner = self.planner
             herald = self.herald
+            motr = self.motr
             consul_util = self.consul_util
 
             app = self._create_server()
@@ -405,7 +409,8 @@ class ServerRunner:
                 web.post(
                     '/watcher/bq',
                     process_bq_update(inbox_filter,
-                                      BQProcessor(planner, herald, conf_obj))),
+                                      BQProcessor(planner, herald, motr,
+                                                  conf_obj))),
                 web.post(
                     '/watcher/processes',
                     process_state_update(planner)),

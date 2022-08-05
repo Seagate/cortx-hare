@@ -32,6 +32,16 @@ from hax.types import (Fid, HaNoteStruct, HAState, MessageId,
 from hax.util import (FidWithType, PutKV, ConsulUtil)
 from hax.consul.cache import InvocationCache
 
+
+def _has_offline_note(notes, fid):
+    for n in notes:
+        if (n.no_state == ObjHealth.OFFLINE.to_ha_note_status()
+                and n.no_id.f_container == fid.container
+                and n.no_id.f_key == fid.key):
+            return True
+    return False
+
+
 def _has_failed_note(notes, fid):
     for n in notes:
         if (n.no_state == ObjHealth.FAILED.to_ha_note_status()
@@ -83,6 +93,7 @@ class TestFailure(unittest.TestCase):
 
         # Set mock return values for the necessary Consul calls
         motr._is_mkfs = Mock(return_value=False)
+        motr.is_node_failed = Mock(return_value=True)
         consul_util.get_hax_fid = Mock(return_value=hax_fid)
         consul_util.is_proc_client = Mock(return_value=False)
         consul_util.get_services_by_parent_process = Mock(return_value=[service_fid_typed])
@@ -92,14 +103,15 @@ class TestFailure(unittest.TestCase):
         consul_util.get_node_fid = Mock(return_value=node_fid)
         consul_util.get_node_encl_fid = Mock(return_value=encl_fid)
         consul_util.get_node_ctrl_fids = Mock(return_value=[ctrl_fid])
+        consul_util.get_ioservice_ctrl_fid = Mock(return_value=ctrl_fid)
 
         # These failure indications are here to trigger specific code paths for
         # node failure. Additional tests can cover different scenarios (e.g.
         # drive failure but node still up), which will set differernt results
         # for these calls.
         consul_util.all_io_services_failed = Mock(return_value=True)
-        consul_util.get_sdev_state = Mock(return_value=HaNoteStruct.M0_NC_FAILED)
-        consul_util.get_ctrl_state = Mock(return_value=m0HaObjState.M0_NC_FAILED)
+        consul_util.get_sdev_state = Mock(return_value=HaNoteStruct.M0_NC_TRANSIENT)
+        consul_util.get_ctrl_state = Mock(return_value=m0HaObjState.M0_NC_TRANSIENT)
         consul_util.get_ctrl_state_updates = Mock(return_value=[PutKV(
             key=ctrl_path, value=ctrl_state)])
 
@@ -115,7 +127,7 @@ class TestFailure(unittest.TestCase):
         motr.broadcast_ha_states(
                 [HAState(
                     fid=process_fid,
-                    status=ObjHealth.FAILED)],
+                    status=ObjHealth.OFFLINE)],
                 notify_devices=True,
                 broadcast_hax_only=False,
                 kv_cache=consul_cache)
@@ -129,12 +141,12 @@ class TestFailure(unittest.TestCase):
                 device_event=False)
         consul_util.set_process_state.assert_called_with(
                 process_fid,
-                ObjHealth.FAILED)
+                ObjHealth.OFFLINE)
         consul_util.set_node_state.assert_called_with(
                 node_fid,
-                ObjHealth.FAILED)
+                ObjHealth.OFFLINE)
         consul_util.set_encl_state.assert_called_with(
-                encl_fid, ObjHealth.FAILED, kv_cache=consul_cache)
+                encl_fid, ObjHealth.OFFLINE, kv_cache=consul_cache)
         # This KV update is batched, so the check looks different.
         motr._write_updates.assert_any_call(
                 [PutKV(key=ctrl_path, value=ctrl_state)],
@@ -142,12 +154,12 @@ class TestFailure(unittest.TestCase):
 
         # Check hax broadcast. We should see states updated to FAILED.
         broadcast_list = motr._ha_broadcast.call_args[0][0]
-        self.assertTrue(_has_failed_note(broadcast_list, node_fid))
-        self.assertTrue(_has_failed_note(broadcast_list, encl_fid))
-        self.assertTrue(_has_failed_note(broadcast_list, ctrl_fid))
-        self.assertTrue(_has_failed_note(broadcast_list, process_fid))
-        self.assertTrue(_has_failed_note(broadcast_list, service_fid))
-        self.assertTrue(_has_failed_note(broadcast_list, drive_fid))
+        self.assertTrue(_has_offline_note(broadcast_list, node_fid))
+        self.assertTrue(_has_offline_note(broadcast_list, encl_fid))
+        self.assertTrue(_has_offline_note(broadcast_list, ctrl_fid))
+        self.assertTrue(_has_offline_note(broadcast_list, process_fid))
+        self.assertTrue(_has_offline_note(broadcast_list, service_fid))
+        self.assertTrue(_has_offline_note(broadcast_list, drive_fid))
 
     def test_drive_failure(self):
         consul_util = ConsulUtil()
@@ -158,7 +170,7 @@ class TestFailure(unittest.TestCase):
         herald = DeliveryHerald()
         herald.wait_for_any = Mock()
 
-        bqprocessor = BQProcessor(planner, herald, consul_util)
+        bqprocessor = BQProcessor(planner, herald, motr, consul_util)
         
         svc_name = 'hax'
         drive_fid = Fid(0x6b00000000000001, 0x11)

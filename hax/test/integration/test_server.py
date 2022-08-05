@@ -23,9 +23,10 @@ from typing import List
 import inject
 import pytest
 import simplejson
+from unittest.mock import Mock
 from hax.common import HaxGlobalState
 from hax.message import BroadcastHAStates, StobId, StobIoqError
-from hax.motr import WorkPlanner
+from hax.motr import WorkPlanner, Motr
 from hax.motr.delivery import DeliveryHerald
 from hax.server import ServerRunner
 from hax.types import Fid, HAState, MessageId, ObjHealth
@@ -67,7 +68,9 @@ async def logging_support(hax_state: HaxGlobalState):
 async def hax_client(mocker, aiohttp_client, herald, planner, consul_util,
                      loop):
     state = inject.instance(HaxGlobalState)
-    srv = ServerRunner(planner, herald, consul_util, state)
+    ffi = Mock(spec=['init_motr_api'])
+    motr = Motr(ffi, None, None, consul_util)
+    srv = ServerRunner(planner, herald, motr, consul_util, state)
     srv._configure()
     return await aiohttp_client(srv.app)
 

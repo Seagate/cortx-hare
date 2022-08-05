@@ -43,6 +43,11 @@ in
                            , path : Optional Text
                            , size : Optional Natural
                            }
+                , log = [] : List
+                           { blksize: Optional Natural
+                           , path: Optional Text
+                           , size: Optional Natural
+                           }
                 }
             }
           , { runs_confd = None Bool
@@ -85,7 +90,9 @@ in
                       , path = Some "/dev/loop8"
                       , size = None Natural
                       }
-                    , { blksize = None Natural
+                    ]
+                , log =
+                    [ { blksize = None Natural
                       , path = Some "/dev/loop9"
                       , size = None Natural
                       }
@@ -117,7 +124,6 @@ in
           , { node = Some "localhost", path = "/dev/loop6" }
           , { node = Some "localhost", path = "/dev/loop7" }
           , { node = Some "localhost", path = "/dev/loop8" }
-          , { node = Some "localhost", path = "/dev/loop9" }
           ]
       , data_units = 1
       , parity_units = 0

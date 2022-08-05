@@ -34,7 +34,7 @@ ADMIN_ID = "hare_admin"
 @dataclass
 class Event:
     version: str
-    event_type: str
+    resource_status: str
     event_id: str
     resource_type: str
     cluster_id: str
@@ -79,10 +79,16 @@ class MessageBusInterface(MessageInterface):
         configpath = util.get_configpath(allow_null=True)
         if configpath:
             Conf.load('cortx_conf', configpath, skip_reload=True)
-
-            message_server_endpoints = Conf.get(
-                            'cortx_conf',
-                            'cortx>external>kafka>endpoints')
+            # cortx>external>kafka>num_endpoints
+            num_kafka = int(Conf.get(
+                'cortx_conf',
+                'cortx>external>kafka>num_endpoints'))
+            message_server_endpoints = []
+            # cortx>external>kafka>endpoints[0]
+            for i in range(num_kafka):
+                message_server_endpoints.append(Conf.get(
+                    'cortx_conf',
+                    f'cortx>external>kafka>endpoints[{i}]'))
             MessageBus.init(message_server_endpoints)
         else:
             logging.warning('initialize_bus skipped as configpath not found')
@@ -159,7 +165,7 @@ class MessageBusInterface(MessageInterface):
         payload = data['payload']
         header = data['header']
         return Event(version=header['version'],
-                     event_type='NOT_DEFINED',
+                     resource_status=payload['resource_status'],
                      event_id=header['event_id'],
                      resource_type=payload['resource_type'],
                      cluster_id=payload['cluster_id'],

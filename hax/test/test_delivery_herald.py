@@ -39,6 +39,7 @@ class CountDownLatch:
     from their sides.
     """
     def __init__(self, value: int):
+        """CountDownLatch with countdown value."""
         self.lock = Condition()
         self.value = value
 

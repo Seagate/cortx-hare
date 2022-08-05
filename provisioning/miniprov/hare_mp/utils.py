@@ -125,11 +125,23 @@ class Utils:
 
     @func_log(func_enter, func_leave)
     def get_data_devices(self, machine_id: str, cvg: int) -> DList[Text]:
-        data_devices = DList(
+        data_devices = []
+        num_data = int(self.provider.get(
+            f'node>{machine_id}>cvg[{cvg}]>devices>num_data'))
+        for i in range(num_data):
+            data_devices.append(Text(self.provider.get(
+                f'node>{machine_id}>'
+                f'cvg[{cvg}]>devices>data[{i}]')))
+        return DList(data_devices, 'List Text')
+
+    @func_log(func_enter, func_leave)
+    def get_log_devices(self, machine_id: str, cvg: int) -> DList[Text]:
+        log_devices = DList(
             [Text(device) for device in self.provider.get(
                 f'node>{machine_id}>'
-                f'cvg[{cvg}]>devices>data')], 'List Text')
-        return data_devices
+                f'cvg[{cvg}]>devices>log',
+                allow_null=True) or []], 'List Text')
+        return log_devices
 
     @func_log(func_enter, func_leave)
     def _get_drive_info_form_os(self, path: str) -> Disk:
@@ -177,11 +189,12 @@ class Utils:
         list for the given node>{machine_id} according to the
         ConfStore (ValueProvider).
         """
-        comp_names = self.provider.get(f'node>{machine_id}>'
-                                       f'components')
+        num_comp = int(self.provider.get(f'node>{machine_id}>num_components'))
         found = False
-        for component in comp_names:
-            if(component.get('name') == name):
+        for i in range(num_comp):
+            comp_name = self.provider.get(
+                f'node>{machine_id}>components[{i}]>name')
+            if(comp_name == name):
                 found = True
                 break
         return found
@@ -214,13 +227,16 @@ class Utils:
         list for the given node>{machine_id} according to the
         ConfStore (ValueProvider).
         """
-        comp_names = self.provider.get(f'node>{machine_id}>'
-                                       f'components')
         found: bool = False
-        for component in comp_names:
-            svc_names = component.get('services')
-            if svc_names:
-                for service in svc_names:
+        num_comp = int(self.provider.get(f'node>{machine_id}>num_components'))
+        for i in range(num_comp):
+            num_svc = self.provider.get(
+                f'node>{machine_id}>components[{i}]>num_services',
+                allow_null=True)
+            if num_svc:
+                for j in range(int(num_svc)):
+                    service = self.provider.get(
+                        f'node>{machine_id}>components[{i}]>services[{j}]')
                     if(service == svc_name):
                         found = True
                         break
@@ -230,11 +246,15 @@ class Utils:
     def save_drives_info(self):
         machine_id = self.provider.get_machine_id()
         if(self.is_motr_io_present(machine_id)):
-            cvgs_key: str = f'node>{machine_id}>cvg'
-            for cvg in range(len(self.provider.get(cvgs_key))):
+            num_cvg = int(self.provider.get(f'node>{machine_id}>num_cvg'))
+            for cvg in range(num_cvg):
                 data_devs = self.get_data_devices(machine_id, cvg)
                 for dev_path in data_devs.value:
                     self._save_drive_info(dev_path.s)
+                log_devs = self.get_log_devices(machine_id, cvg)
+                if log_devs:
+                    for dev_path in log_devs.value:
+                        self._save_drive_info(dev_path.s)
 
     @func_log(func_enter, func_leave)
     @repeat_if_fails()
@@ -257,8 +277,16 @@ class Utils:
                      blksize=Maybe(drive_info['blksize'], 'Natural')))
 
     @func_log(func_enter, func_leave)
-    def get_drives_info_for(self, cvg: int, machine_id: str) -> DList[Disk]:
+    def get_data_drives_info_for(self, cvg: int,
+                                 machine_id: str) -> DList[Disk]:
         data_devs = self.get_data_devices(machine_id, cvg)
+        return DList([self.get_drive_info_from_consul(dev_path, machine_id)
+                      for dev_path in data_devs.value], 'List Disk')
+
+    @func_log(func_enter, func_leave)
+    def get_log_drives_info_for(self, cvg: int,
+                                machine_id: str) -> DList[Disk]:
+        data_devs = self.get_log_devices(machine_id, cvg)
         return DList([self.get_drive_info_from_consul(dev_path, machine_id)
                       for dev_path in data_devs.value], 'List Disk')
 
@@ -334,10 +362,11 @@ class Utils:
     @func_log(func_enter, func_leave)
     @repeat_if_fails()
     def save_ssl_config(self):
-        url = self.provider.get('cortx>hare>hax>endpoints', allow_null=True)
         http_protocol = 'http'
-        for u in url or ():
-            scheme = urlparse(u).scheme
+        num_ep = int(self.provider.get('cortx>hare>hax>num_endpoints'))
+        for i in range(num_ep):
+            url = self.provider.get(f'cortx>hare>hax>endpoints[{i}]')
+            scheme = urlparse(url).scheme
             if scheme in ('http', 'https'):
                 http_protocol = scheme
                 break

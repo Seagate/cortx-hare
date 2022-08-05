@@ -44,10 +44,11 @@ class LinkedListIterator:
 
 class LinkedList(Iterable[A]):
 
-    ''' The class is used as a replacement for set() in cases when the stored
+    """
+    The class is used as a replacement for set() in cases when the stored
     objects are not hashable and it is sufficient to compare them by 'identity'
     (the equality of memory pointer).
-    '''
+    """
     head: Optional[Elem[A]]
 
     def __init__(self):
@@ -74,7 +75,7 @@ class LinkedList(Iterable[A]):
         return False
 
     def __contains__(self, value: A) -> bool:
-        # This supports 'in' operator
+        """This supports 'in' operator."""
         q = self.head
         while q:
             if q.data is value:

@@ -249,13 +249,14 @@ def _start_consul(utils: Utils,
 
     provider = ConfStoreProvider(url)
     node_id = uuid.uuid4()
-    consul_endpoints = provider.get('cortx>external>consul>endpoints')
+    num_ep = int(provider.get('cortx>external>consul>num_endpoints'))
     cns_utils: ConsulUtil = ConsulUtil()
     hostname = utils.get_local_hostname()
 
     # remove tcp://
     peers = []
-    for endpoint in consul_endpoints:
+    for i in range(num_ep):
+        endpoint = provider.get(f'cortx>external>consul>endpoints[{i}]')
         key = endpoint.split('/')
         # Considering tcp endpoints only. Ignoring all other endpoints.
         if key[0] != 'tcp:':
