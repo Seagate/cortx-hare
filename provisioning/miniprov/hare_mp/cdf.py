@@ -303,7 +303,7 @@ class CdfGenerator:
 
     def _create_ports_descriptions(self, hostname: str) -> NetworkPorts:
         conf = self.provider
-        m0serverT = ['ios', 'confd']
+        m0serverT = ['confd', 'ios']
         m0server_ports = []
         m0client_ports = []
         for srv in NetworkPorts.__annotations__.keys():
@@ -318,7 +318,7 @@ class CdfGenerator:
                         _hax_http = _parsed_url.port
                     else:
                         if _parsed_url.hostname == hostname:
-                            _hax = round(_parsed_url.port / 100) * 100
+                            _hax = _parsed_url.port
             elif srv == 'm0_client_other':
                 num_clients = int(conf.get('cortx>motr>num_clients'))
                 for i in range(num_clients):
@@ -332,7 +332,7 @@ class CdfGenerator:
                                 f'cortx>motr>clients[{i}]>endpoints[{j}]')
                             _parsed_url = urlparse(url)
                             if _parsed_url.hostname == hostname:
-                                port = round(_parsed_url.port / 100) * 100
+                                port = _parsed_url.port
                                 client_name = conf.get(
                                     f'cortx>motr>clients[{i}]>name')
                                 m0client_ports.append(
@@ -347,7 +347,7 @@ class CdfGenerator:
                         url = conf.get(f'cortx>motr>{server}>endpoints[{i}]')
                         _parsed_url = urlparse(url)
                         if _parsed_url.hostname == hostname:
-                            port = round(_parsed_url.port / 100) * 100
+                            port = _parsed_url.port
                     m0server_ports.append(
                         ServerPort(name=Text(server),
                                    port=int(port)))
