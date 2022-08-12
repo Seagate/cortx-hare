@@ -50,7 +50,7 @@ def setup_logging(log_level: int = logging.DEBUG):
         '%(asctime)s [%(levelname)s] {%(threadName)s} %(message)s')
     console = logging.StreamHandler(sys.stdout)
     console.setFormatter(formatter)
-
+    console.setLevel(logging.INFO)
     logging.getLogger('').addHandler(console)
     logging.getLogger('consul').setLevel(logging.WARN)
 

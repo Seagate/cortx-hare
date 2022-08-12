@@ -62,13 +62,19 @@ FidWithType = NamedTuple('FidWithType', [('fid', Fid), ('service_type', str)])
 MotrConsulProcInfo = NamedTuple('MotrConsulProcInfo', [('proc_status', str),
                                                        ('proc_type', str)])
 
-MotrConsulProcStatus = NamedTuple('MotrConsulProcStatus', [(
-                                        'consul_svc_status', str),
-                                        ('consul_motr_proc_status', str)])
+MotrConsulProcStatus = NamedTuple(
+    "MotrConsulProcStatus", [
+        ("consul_svc_status", str),
+        ("consul_motr_proc_status", str),
+    ],
+)
 
-MotrProcStatusLocalRemote = NamedTuple('MotrProcStatusLocalRemote', [(
-                                'motr_proc_status_local', ObjHealth),
-                                ('motr_proc_status_remote', ObjHealth)])
+MotrProcStatusLocalRemote = NamedTuple(
+    'MotrProcStatusLocalRemote', [
+        ('motr_proc_status_local', ObjHealth),
+        ('motr_proc_status_remote', ObjHealth),
+    ],
+)
 
 ObjStatus = NamedTuple("ObjStatus", [("resource_type", ObjT), ("status", str)])
 
@@ -1295,7 +1301,7 @@ class ConsulUtil:
             ObjHealth.REPAIR: m0HaObjState.M0_NC_REPAIR,
             ObjHealth.REPAIRED: m0HaObjState.M0_NC_REPAIRED,
             ObjHealth.REBALANCE: m0HaObjState.M0_NC_REBALANCE
-            }
+        }
         return device_ha_state_map[status].name
 
     def ha_note_to_objhealth(self, state: int) -> ObjHealth:
@@ -1540,8 +1546,8 @@ class ConsulUtil:
         LOG.debug('Setting process status in KV: %s:%s', key, data)
         self.kv.kv_put(key, data)
 
-        self.set_motr_processes_status(str(event.fid), ha_process_events[
-                                                  event.chp_event])
+        self.set_motr_processes_status(str(event.fid),
+                                       ha_process_events[event.chp_event])
 
     @supports_consul_cache
     def update_drive_state(self,
@@ -1896,9 +1902,10 @@ class ConsulUtil:
                         return ObjHealth.OFFLINE
                     cns_status = self.get_process_status(pfid,
                                                          kv_cache=kv_cache)
-                    svc_health = svc_to_motr_status_map[MotrConsulProcStatus(
-                                         item['Status'],
-                                         cns_status.proc_status)]
+                    svc_health = svc_to_motr_status_map[
+                        MotrConsulProcStatus(
+                            item['Status'],
+                            cns_status.proc_status)]
                     LOG.debug('consul.status %s svc_health: %s',
                               cns_status, svc_health)
                     local_node = self.get_local_nodename()
@@ -2137,11 +2144,11 @@ class ConsulUtil:
 
     def service_health_to_m0dstatus_update(self, proc_fid: Fid,
                                            svc_health: ObjHealth):
-        ev = ConfHaProcess(chp_event=self.objHealthToProcessEvent(svc_health),
-                           chp_type=int(
-                                m0HaProcessType.M0_CONF_HA_PROCESS_M0D),
-                           chp_pid=0,
-                           fid=proc_fid)
+        ev = ConfHaProcess(
+            chp_event=self.objHealthToProcessEvent(svc_health),
+            chp_type=int(m0HaProcessType.M0_CONF_HA_PROCESS_M0D),
+            chp_pid=0,
+            fid=proc_fid)
         self.update_process_status(ev)
 
     def is_confd_failed(self, proc_fid: Fid) -> bool:

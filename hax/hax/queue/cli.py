@@ -1,9 +1,10 @@
 import logging
 import sys
-from typing import NamedTuple
-
 import click
 import inject
+from typing import NamedTuple
+from logging import StreamHandler
+from typing import List
 
 from hax.common import di_configuration
 from hax.queue.publish import BQPublisher, EQPublisher, Publisher
@@ -13,7 +14,11 @@ AppCtx = NamedTuple('AppCtx', [('payload', str), ('type', str),
 
 
 def _setup_logging():
+    streamh: logging.Handler = StreamHandler(stream=sys.stdout)
+    streamh.setLevel(logging.INFO)
+    handlers: List[logging.Handler] = [streamh]
     logging.basicConfig(level=logging.DEBUG,
+                        handlers=handlers,
                         format='%(asctime)s [%(levelname)s] %(message)s')
 
 
