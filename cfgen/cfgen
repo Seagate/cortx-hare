@@ -22,7 +22,7 @@ from enum import Enum, auto
 from functools import lru_cache, wraps
 from typing import (Any, Callable, Dict, Iterable, Iterator, List, NamedTuple,
                     Optional, Set, Type, Tuple)
-from math import floor, ceil
+from math import floor, ceil, log as lg
 from hax.log import create_logger_directory
 from hax.types import ObjTMaskMap, QW_F, Fid
 from hax.types import ObjT as HaxObjT
@@ -463,6 +463,8 @@ def enrich_cluster_desc(desc: Dict[str, Any], mock_p: bool) -> None:
             if not m0d['_log_disks']:
                 m0d['_log_disks'] = get_disks_ssh(node['hostname'], mock_p,
                                                   m0d['io_disks']['log'])
+            if not mock_p:
+                set_log_disks_size(m0d['_log_disks'], host)
 
     if 'profiles' not in desc:
         sns_pools = [pool['name'] for pool in desc['pools']
@@ -825,6 +827,36 @@ def get_disks_from_cdf(hostname: str, mock_p: bool,
 def fabricate_disks(hostname: str, paths: List[str]) -> List[Disk]:
     assert paths
     return [Disk(path=x, size=0, blksize=4096) for x in paths]
+
+
+def set_log_disks_size(log_disks: List[Disk], host: str) -> None:
+    """
+    Update the log disk size provided by the user/lsblk based on the
+    motr constraints.
+    """
+    def powOf2(num: int) -> int:
+        power = int(lg(num, 2))
+        return int(pow(2, power))
+
+    KB = int(1024)
+    MB = int(KB ** 2)
+    GB = int(KB ** 3)
+    # [TODO] Hardcoded constraints based on motr requirements.
+    # Once CORTX-33998 will be completed, these constraints will be
+    # received from motr APIs.
+    upper_bound = 4*GB
+    lower_bound = 128*MB
+
+    # Rounding of log device size to the nearest(lower) power of 2.
+    for i, disk in enumerate(log_disks):
+        size = powOf2(disk.size)
+        if size < lower_bound:
+            raise RuntimeError(
+                f"Node {host}: Log device size in 'io_disks.log' is below "
+                f"{lower_bound}.")
+        if size > upper_bound:
+            size = upper_bound
+        log_disks[i] = disk._replace(size=size)
 
 
 ObjT = Enum('ObjT', 'root fdmi_flt_grp fdmi_filter'
