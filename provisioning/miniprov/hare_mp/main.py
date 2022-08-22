@@ -569,6 +569,9 @@ def init(args):
         # Stopping hax and consul
         if is_mkfs_required(url):
             stop_hax_blocking(hax_starter)
+        else:
+            while not all(cns_utils.ensure_ioservices_running()):
+                sleep(5)
         stop_consul_blocking(consul_starter)
     except Exception as error:
         if hax_starter:
