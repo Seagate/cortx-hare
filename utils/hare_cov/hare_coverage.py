@@ -18,11 +18,13 @@
 
 from abc import ABC, abstractmethod
 from subprocess import Popen, PIPE
+from sys import stdout
 from typing import Optional, Callable, List, Dict, Type
 from os import walk, sep, path, getcwd
 import logging
 
-handlers = [logging.FileHandler('coverage.log'), logging.StreamHandler()]
+handlers = [logging.FileHandler('coverage.log'),
+            logging.StreamHandler(stream=stdout)]
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s [%(levelname)s] %(message)s',
                     handlers=handlers)
@@ -150,7 +152,7 @@ class Utility:
 
 
 class Strategy(ABC):
-    
+
     """Abstract base class for coverage tool."""
 
     @abstractmethod
@@ -251,13 +253,13 @@ class PythonCoverage(Strategy):
         for index, (src, tst) in enumerate(self.src_tst_map.items()):
             if index == 0:
                 command_line = f"pytest --cov={self.abs_path}{src} " \
-                                    f"--cov-report={self.cov_report_type}:" \
-                                    f"{self.report} {self.abs_path}{tst}"
+                               f"--cov-report={self.cov_report_type}:" \
+                               f"{self.report} {self.abs_path}{tst}"
             else:
                 command_line = f"pytest --cov={self.abs_path}{src} " \
-                                    f"--cov-report={self.cov_report_type}:" \
-                                    f"{self.report} --cov-append " \
-                                    f"{self.abs_path}{tst}"
+                               f"--cov-report={self.cov_report_type}:" \
+                               f"{self.report} --cov-append " \
+                               f"{self.abs_path}{tst}"
             self.utils.run_cmd(command_line)
 
     def check_report(self) -> None:

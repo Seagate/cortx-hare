@@ -4,19 +4,22 @@ import abc
 import argparse
 import ast
 import sys
-from enum import Enum, auto
-from functools import lru_cache, wraps
+import yaml
+import logging
 import itertools
 import json
 import os
-from pprint import pprint
-from logging import StreamHandler
-from logging.handlers import RotatingFileHandler
 import psutil
 import random
 import re
 import socket
 import subprocess
+from pprint import pprint
+from logging import StreamHandler
+from logging.handlers import RotatingFileHandler
+from dataclasses import dataclass
+from enum import Enum, auto
+from functools import lru_cache, wraps
 from typing import (Any, Callable, Dict, Iterable, Iterator, List, NamedTuple,
                     Optional, Set, Type, Tuple)
 from math import floor, ceil
@@ -24,10 +27,9 @@ from hax.log import create_logger_directory
 from hax.types import ObjTMaskMap, QW_F, Fid
 from hax.types import ObjT as HaxObjT
 from helper.exec import CliException, Executor, Program
-import yaml
-import logging
 
-from dataclasses import dataclass
+
+LOG = logging.getLogger('cfgen')
 
 
 # This class will hold info for disks mentioned in CDF file
@@ -41,10 +43,13 @@ class DiskRef():
 
 __version__ = '0.14'
 
-faultToleranceInfo = NamedTuple('faultToleranceInfo', [
-                            ('max_drives_per_node', int),
-                            ('max_drives_per_ctrl', int),
-                            ('min_drives_per_node', int)])
+faultToleranceInfo = NamedTuple(
+    'faultToleranceInfo', [
+        ('max_drives_per_node', int),
+        ('max_drives_per_ctrl', int),
+        ('min_drives_per_node', int),
+    ],
+)
 
 
 # Global variable aux_pools is used for storing aux pools list
@@ -94,11 +99,11 @@ def repeat_on_cmd_timeout(max_retries=-1):
                 except subprocess.TimeoutExpired as e:
                     attempt_count += 1
                     if max_retries >= 0 and attempt_count > max_retries:
-                        logging.warn(
+                        LOG.warn(
                             '\nFunction %s: Too many errors happened in a row'
                             ' (max_retries = %d)', f.__name__, max_retries)
                         raise e
-                    logging.warn(
+                    LOG.warn(
                         f'\nGot {e.timeout} sec timeout '
                         f'for function {f.__name__} '
                         f'(attempt {attempt_count}). The attempt will '
@@ -264,10 +269,13 @@ def setup_logging(opts: Any) -> None:
     verbosity = logging.INFO
     if opts.verbose:
         verbosity = logging.DEBUG
-
-    logging.basicConfig(level=verbosity,
-                        handlers=handlers,
-                        format='%(asctime)s [%(levelname)s] %(message)s')
+    log_format = "%(asctime)s %(name)s %(process)d [%(levelname)s] " \
+                 "%(message)s"
+    formatter = logging.Formatter(fmt=log_format)
+    LOG.setLevel(verbosity)
+    for handler in handlers:
+        handler.setFormatter(formatter)
+        LOG.addHandler(handler)
 
 
 def main(argv=None):
@@ -302,8 +310,8 @@ def main(argv=None):
             with open(os.path.join(opts.output_dir, path), 'w') as f:
                 f.write(generate(*args))
     except Exception as e:
-        logging.error('Exiting with FAILURE status. Reason: %s', e)
-        logging.debug('Stacktrace can be seen below', exc_info=True)
+        LOG.error('Exiting with FAILURE status. Reason: %s', e)
+        LOG.debug('Stacktrace can be seen below', exc_info=True)
         sys.exit(1)
 
 
@@ -341,7 +349,7 @@ def version(s: str) -> Version:
 
 def check_dhall_versions() -> None:
     # See https://github.com/dhall-lang/dhall-haskell/releases
-    logging.debug('Checking dhall versions')
+    LOG.info('Checking dhall versions')
     versions = {'dhall': version('1.26.1'), 'yaml-to-dhall': version('1.4.1')}
 
     for exe, ver in versions.items():
@@ -362,7 +370,7 @@ def _assert(expr: bool,
 
 
 def validate_cdf_schema(cdf: str, cdf_path: str, schema_path: str) -> None:
-    logging.debug('Validating the provided CDF file structure')
+    LOG.info('Validating the provided CDF file structure')
     _assert(os.path.isabs(schema_path),
             f'Dhall schema is not found at path {schema_path}')
 
@@ -389,7 +397,7 @@ def get_network_ports(node) -> Optional[Dict[str, Any]]:
 
 
 def enrich_cluster_desc(desc: Dict[str, Any], mock_p: bool) -> None:
-    logging.debug('Enriching cluster description')
+    LOG.info('Enriching cluster description')
     for node in desc['nodes']:
         # The fact names used here correspond to version 2.4.1 of `facter`.
         # See https://puppet.com/docs/puppet/6.6/core_facts.html#legacy-facts
@@ -398,7 +406,7 @@ def enrich_cluster_desc(desc: Dict[str, Any], mock_p: bool) -> None:
         if all(key in node.keys()
                for key in ('processorcount', 'memorysize_mb')):
 
-            logging.debug(
+            LOG.info(
                 'Cluster description already has facts for '
                 '[hostname=%s]. facter tool will not be used', host)
             node['facts'] = {
@@ -413,7 +421,7 @@ def enrich_cluster_desc(desc: Dict[str, Any], mock_p: bool) -> None:
             node['facts']['_memsize_MB'] = int(
                 float(node['facts']['memorysize_mb']))
 
-        logging.debug('Node [hostname=%s] facts=%s', host, node['facts'])
+        LOG.debug('Node [hostname=%s] facts=%s', host, node['facts'])
 
         portalgroup = PortalGroup
         network_ports = get_network_ports(node)
@@ -469,11 +477,11 @@ def validate_cluster_desc(desc: Dict[str, Any]) -> None:
         validate_profiles_desc(desc['profiles'], desc['pools'])
     if 'fdmi_filters' in desc and desc['fdmi_filters'] is not None:
         validate_fdmi_filters_desc(desc['fdmi_filters'], desc['nodes'])
-    logging.debug('Validations passed')
+    LOG.info('Validations passed')
 
 
 def validate_nodes_desc(nodes_desc: List[Dict[str, Any]]) -> None:
-    logging.debug('Validating node descriptions')
+    LOG.info('Validating node descriptions')
     Node = NamedTuple('Node', [('name', str), ('ipaddr', str)])
     nodes = [Node(name=x['hostname'],
                   ipaddr=x['facts'][ipaddr_key(x['data_iface'])])
@@ -561,7 +569,7 @@ Make sure the value of data_iface in the CDF is correct.""")
 
 
 def validate_pools_desc(pools_desc: List[Dict[str, Any]]) -> None:
-    logging.debug('Validating pool descriptions')
+    LOG.info('Validating pool descriptions')
     pool_names = [x['name'] for x in pools_desc]
     _assert(
         all_unique(pool_names),
@@ -631,7 +639,7 @@ def validate_pools_desc(pools_desc: List[Dict[str, Any]]) -> None:
 
 def validate_profiles_desc(profiles_desc: List[Dict[str, Any]],
                            pools_desc: List[Dict[str, Any]]) -> None:
-    logging.debug('Validating profile descriptions')
+    LOG.info('Validating profile descriptions')
     _assert(bool(profiles_desc),
             'List of profiles must not be empty (it can be omitted though)')
     _assert(
@@ -662,7 +670,7 @@ def validate_profiles_desc(profiles_desc: List[Dict[str, Any]],
 def validate_fdmi_filters_desc(fdmi_filters_desc: List[Dict[str, Any]],
                                nodes_desc: List[Dict[str, Any]]) \
         -> None:
-    logging.debug('Validating FDMI filters')
+    LOG.info('Validating FDMI filters')
     _assert(
         all_unique(x['name'] for x in fdmi_filters_desc),
         'FDMI filter names are not unique:\n' +
@@ -739,7 +747,7 @@ def validate_facter(hostname: str) -> None:
 
 def get_facts(hostname: str, mock_p: bool, *args: str) -> Dict[str, Any]:
     if mock_p:
-        logging.debug('Node facts will be fabricated because of --mock flag')
+        LOG.info('Node facts will be fabricated because of --mock flag')
         return fabricate_facts(hostname, *args)
     validate_facter(hostname)
     result: Dict[str, Any] = json.loads(
@@ -2373,7 +2381,7 @@ Cluster = NamedTuple('Cluster', [('m0conf', Dict[Oid, Any]),
 
 
 def generate_consul_agents(cluster: Cluster) -> str:
-    logging.debug('Generating consul configuration')
+    LOG.info('Generating consul configuration')
     assert cluster.consul_servers
     return json.dumps(
         {'servers': [x._asdict() for x in cluster.consul_servers],
@@ -2459,7 +2467,7 @@ def consul_kv_fidk() -> Dict[str, int]:
 
 
 def generate_consul_kv(cluster: Cluster, dhall_dir: str) -> str:
-    logging.debug('Generating consul KV structure')
+    LOG.info('Generating consul KV structure')
     assert all(k.type is ObjT.process and v.type is ObjT.service
                for k, v in cluster.m0_clients.items())
 
@@ -2558,7 +2566,7 @@ def generate_consul_kv(cluster: Cluster, dhall_dir: str) -> str:
 
 
 def generate_confd(m0conf: Dict[Oid, ToDhall], dhall_dir: str) -> str:
-    logging.debug('Generating confd.dhall')
+    LOG.info('Generating confd.dhall')
     _assert(os.path.isabs(dhall_dir),
             f"Dhall directory doesn't exist: {dhall_dir}")
 

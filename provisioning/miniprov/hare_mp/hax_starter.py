@@ -62,6 +62,8 @@ class HaxStarter(StoppableThread):
                                                       encoding=None,
                                                       delay=False)
             LOG.addHandler(fh)
+            console = logging.StreamHandler(stream=sys.stdout)
+            LOG.addHandler(console)
             path = os.getenv('PATH', '')
             path += os.pathsep + '/opt/seagate/cortx/hare/bin'
             path += os.pathsep + '/opt/seagate/cortx/hare/libexec'
@@ -88,6 +90,6 @@ class HaxStarter(StoppableThread):
         except Exception:
             LOG.exception('Aborting due to an error')
         finally:
-            LOG.debug('Stopping Hax')
+            LOG.info('Stopping Hax')
             self.stop_event.set()
             self.utils.stop_hare()
