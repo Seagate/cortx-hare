@@ -104,7 +104,12 @@ class ConsumerThread(StoppableThread):
                      m0HaProcessType.M0_CONF_HA_PROCESS_M0D) and
                     self.consul.is_process_confd(event.fid) or
                     event.fid == self.consul.get_hax_fid()):
+                # Explicitly broadcasting process status to ONLINE and
+                # setting to M0_CONF_HA_PROCESS_DTM_RECOVERED in Consul
+                # KV process state machine.
                 svc_status = ObjHealth.OK
+                event.chp_event = (
+                    m0HaProcessEvent.M0_CONF_HA_PROCESS_DTM_RECOVERED)
             broadcast_hax_only = False
             if ((event.chp_type ==
                     m0HaProcessType.M0_CONF_HA_PROCESS_M0MKFS) or
@@ -356,9 +361,15 @@ class ConsumerThread(StoppableThread):
                         # Avoid Duplicate processing of local process's
                         # HA events.
                         if not self.consul.is_proc_local(item.fid):
-                            motr.broadcast_ha_states(item.states)
+                            # No need to update Consul KV corresponding to
+                            # the process tree. That is done by RC or the
+                            # process's local hax. This is just a motr
+                            # broadcast.
+                            motr.broadcast_ha_states(item.states,
+                                                     update_kv=False)
                             status = self.consul.objHealthToProcessEvent(
                                         item.states[0].status)
+                            # Account for received process status.
                             self.consul.update_process_status_local(
                                 ConfHaProcess(chp_event=status,
                                               chp_type=item.proc_type,

@@ -18,13 +18,20 @@
 import argparse
 import logging
 import sys
-
+from logging import StreamHandler
 from helper.generate_sysconf import Generator
 
 
 def _setup_logging():
+    console: logging.Handler = StreamHandler(stream=sys.stdout)
+    log_format = "%(asctime)s %(name)s [%(process)d]: %(levelname)s " \
+                 "%(message)s"
+    formatter = logging.Formatter(fmt=log_format)
+    console.setFormatter(formatter)
+    console.setLevel(logging.INFO)
     logging.basicConfig(level=logging.DEBUG,
-                        format='%(asctime)s [%(levelname)s] %(message)s')
+                        format=formatter,
+                        handlers=[console])
 
 
 def parse_opts(argv):
