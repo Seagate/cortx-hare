@@ -77,7 +77,7 @@ class Motr:
 
     def start(self, rpc_endpoint: str, process: Fid, ha_service: Fid,
               profile: Profile):
-        LOG.debug('Starting m0_halon_interface')
+        LOG.info('Starting m0_halon_interface')
         self._process_fid = process
         self._profile = profile
 
@@ -97,13 +97,13 @@ class Motr:
                                'Please check Motr logs for more details.')
 
     def start_rconfc(self) -> int:
-        LOG.debug('Starting rconfc')
+        LOG.info('Starting rconfc')
         profile_fid: Fid = self._profile.fid
         result: int = self._ffi.start_rconfc(self._ha_ctx, profile_fid.to_c())
         if result:
             raise RuntimeError('Cannot start rconfc.'
                                ' Please check Motr logs for more details.')
-        LOG.debug('rconfc started')
+        LOG.info('rconfc started')
         return result
 
     def stop(self):
@@ -118,10 +118,10 @@ class Motr:
         LOG.info('Finalizing motr')
         self._ffi.motr_fini(self._ha_ctx)
         self._ha_ctx = 0
-        LOG.debug('Motr API context is down. Bye!')
+        LOG.info('Motr API context is down. Bye!')
 
     def stop_rconfc(self) -> int:
-        LOG.debug('Stopping rconfc')
+        LOG.info('Stopping rconfc')
         result: int = self._ffi.stop_rconfc(self._ha_ctx)
         if result:
             LOG.error(
@@ -129,7 +129,7 @@ class Motr:
                 'returned non-zero code (%s)', result)
             raise RuntimeError('Cannot stop rconfc.'
                                'Please check Motr logs for more details.')
-        LOG.debug('confc has been stopped successfuly')
+        LOG.info('confc has been stopped successfuly')
         return result
 
     def is_spiel_ready(self):
@@ -139,10 +139,10 @@ class Motr:
     def _entrypoint_request_cb(self, reply_context: Any, req_id: Any,
                                remote_rpc_endpoint: str, process_fid: Fid,
                                git_rev: str, pid: int, is_first_request: bool):
-        LOG.debug('Received entrypoint request from remote endpoint'
-                  " '{}', process fid = {}".format(remote_rpc_endpoint,
-                                                   str(process_fid)) +
-                  ' The request will be processed in another thread.')
+        LOG.info('Received entrypoint request from remote endpoint'
+                 " '{}', process fid = {}".format(remote_rpc_endpoint,
+                                                  str(process_fid)) +
+                 ' The request will be processed in another thread.')
         try:
             if is_first_request:
                 # This is the first start of this process or the process has
@@ -169,7 +169,7 @@ class Motr:
         except Exception:
             LOG.exception('Failed to notify failure for %s', process_fid)
 
-        LOG.debug('enqueue entrypoint request for %s', remote_rpc_endpoint)
+        LOG.info('enqueue entrypoint request for %s', remote_rpc_endpoint)
         # XXX Verify:
         # If rconfc from motr land sends an entrypoint request when
         # the hax consumer thread is already stopping, will posting the
@@ -191,9 +191,9 @@ class Motr:
         process_fid = message.process_fid
         e_rc = EAGAIN
 
-        LOG.debug('Processing entrypoint request from remote endpoint'
-                  " '{}', process fid {}".format(remote_rpc_endpoint,
-                                                 str(process_fid)))
+        LOG.info('Processing entrypoint request from remote endpoint'
+                 " '{}', process fid {}".format(remote_rpc_endpoint,
+                                                str(process_fid)))
         sess = principal_rm = confds = None
         try:
             util = self.consul_util
@@ -276,20 +276,20 @@ class Motr:
                                        make_array(FidStruct, []),
                                        make_array(c.c_char_p, []), 0,
                                        Fid(0, 0).to_c(), None)
-            LOG.debug('Reply sent')
+            LOG.info('Reply sent')
             return
 
         confd_fids = [x.fid.to_c() for x in confds]
         confd_eps = [make_c_str(x.address) for x in confds]
 
-        LOG.debug('Passing the entrypoint reply to hax.c layer')
+        LOG.info('Passing the entrypoint reply to hax.c layer')
         self._ffi.entrypoint_reply(reply_context, req_id.to_c(), 0,
                                    len(confds),
                                    make_array(FidStruct, confd_fids),
                                    make_array(c.c_char_p,
                                               confd_eps), rc_quorum,
                                    rm_fid.to_c(), make_c_str(rm_eps))
-        LOG.debug('Entrypoint request has been replied to')
+        LOG.info('Entrypoint request has been replied to')
 
     @supports_consul_cache
     def broadcast_ha_states(self,
@@ -299,7 +299,7 @@ class Motr:
                             kv_cache=None,
                             broadcast_hax_only=False,
                             proc_skip_list=None) -> List[MessageId]:
-        LOG.debug('Broadcasting HA states %s over ha_link', ha_states)
+        LOG.info('Broadcasting HA states %s over ha_link', ha_states)
 
         def _update_process_tree(proc_fid: Fid, state: ObjHealth) -> bool:
             return (not broadcast_hax_only and
@@ -352,7 +352,7 @@ class Motr:
                     and _update_process_tree(st.fid, st.status)):
 
                 if st.fid.container == ObjT.PROCESS.value and update_kv:
-                    LOG.debug('ha_broadcast:set_process_state')
+                    LOG.info('ha_broadcast:set_process_state')
                     self.consul_util.set_process_state(st.fid, st.status)
 
                 notes += self._generate_sub_services(note,
@@ -395,7 +395,7 @@ class Motr:
         message_ids: List[MessageId] = []
         nr_notes_to_be_sent = len(notes)
         notes_sent = 0
-        LOG.debug('Broadcasting %d notes', nr_notes_to_be_sent)
+        LOG.info('Broadcasting %d notes', nr_notes_to_be_sent)
         while notes:
             notes_to_send = notes[0:MAX_MOTR_NVEC_UPDATE_SZ]
             notes_to_send_len = len(notes_to_send)
@@ -413,7 +413,7 @@ class Motr:
                     notes_to_send_len,
                     make_array(c.c_char_p, proc_skip_list_c),
                     len(proc_skip_list))
-            LOG.debug(
+            LOG.info(
                 'Broadcast HA state complete, message_ids = %s',
                 message_ids)
             notes = notes[MAX_MOTR_NVEC_UPDATE_SZ:]
@@ -461,19 +461,19 @@ class Motr:
 
     @log_exception
     def ha_nvec_get(self, hax_msg: int, nvec: List[HaNote]) -> None:
-        LOG.debug('Got ha nvec get of length %s from Motr land', len(nvec))
+        LOG.info('Got ha nvec get of length %s from Motr land', len(nvec))
         self.planner.add_command(HaNvecGetEvent(hax_msg, nvec))
 
     @log_exception
     def ha_nvec_set(self, hax_msg: int, nvec: List[HaNote]) -> None:
-        LOG.debug('Got ha nvec set of length %s from Motr land', len(nvec))
+        LOG.info('Got ha nvec set of length %s from Motr land', len(nvec))
         self.planner.add_command(HaNvecSetEvent(hax_msg, nvec))
 
     @log_exception
     @supports_consul_cache
     def ha_nvec_get_reply(self, event: HaNvecGetEvent, kv_cache=None) -> None:
-        LOG.debug('Preparing the reply for HaNvecGetEvent (nvec size = %s)',
-                  len(event.nvec))
+        LOG.info('Preparing the reply for HaNvecGetEvent (nvec size = %s)',
+                 len(event.nvec))
         self.consul_util.get_all_nodes()
         notes: List[HaNoteStruct] = []
         for n in event.nvec:
@@ -482,14 +482,14 @@ class Motr:
                 FidTypeToObjT[fid.container], fid.key, kv_cache=kv_cache)
             notes.append(n.note)
 
-        LOG.debug('Replying ha nvec of length ' + str(len(event.nvec)))
+        LOG.info('Replying ha nvec of length ' + str(len(event.nvec)))
         self._ffi.ha_nvec_reply(event.hax_msg, make_array(HaNoteStruct, notes),
                                 len(notes))
 
     @log_exception
     def ha_nvec_set_process(self, event: HaNvecSetEvent) -> None:
-        LOG.debug('Processing HaNvecSetEvent (nvec size = %s)',
-                  len(event.nvec))
+        LOG.info('Processing HaNvecSetEvent (nvec size = %s)',
+                 len(event.nvec))
         self.consul_util.get_all_nodes()
         ha_states: List[HAState] = []
         bcast_ss: List[HAState] = []
@@ -513,7 +513,7 @@ class Motr:
                                        HaNoteStruct.M0_NC_REPAIRED)
                 bcast_ss.append(HAState(fid, obj_health))
 
-        LOG.debug('got ha_states %s', ha_states)
+        LOG.info('got ha_states %s', ha_states)
         if bcast_ss:
             self.broadcast_ha_states(bcast_ss)
 
@@ -789,94 +789,94 @@ class Motr:
         return status
 
     def get_repair_status(self, pool_fid: Fid) -> List[ReprebStatus]:
-        LOG.debug('Fetching repair status for pool %s', pool_fid)
+        LOG.info('Fetching repair status for pool %s', pool_fid)
         status: List[ReprebStatus] = self._ffi.repair_status(
             self._ha_ctx, pool_fid.to_c())
         if status is None:
             raise RepairRebalanceException('Repair status unavailable')
-        LOG.debug('Repair status for pool %s: %s', pool_fid, status)
+        LOG.info('Repair status for pool %s: %s', pool_fid, status)
         return status
 
     def get_rebalance_status(self, pool_fid: Fid) -> List[ReprebStatus]:
-        LOG.debug('Fetching rebalance status for pool %s', pool_fid)
+        LOG.info('Fetching rebalance status for pool %s', pool_fid)
         status: List[ReprebStatus] = self._ffi.rebalance_status(
             self._ha_ctx, pool_fid.to_c())
         if status is None:
             raise RepairRebalanceException('rebalance status unavailable')
-        LOG.debug('rebalance status for pool %s: %s', pool_fid, status)
+        LOG.info('rebalance status for pool %s: %s', pool_fid, status)
         return status
 
     def start_repair(self, pool_fid: Fid):
-        LOG.debug('Initiating repair for pool %s', pool_fid)
+        LOG.info('Initiating repair for pool %s', pool_fid)
         result: int = self._ffi.start_repair(self._ha_ctx, pool_fid.to_c())
         if result:
             raise RepairRebalanceException(
                 'Failed to send SPIEL request "sns_repair_start", please' +
                 ' check Motr logs for more details.')
-        LOG.debug('Repairing started for pool %s', pool_fid)
+        LOG.info('Repairing started for pool %s', pool_fid)
 
     def start_rebalance(self, pool_fid: Fid):
-        LOG.debug('Initiating rebalance for pool %s', pool_fid)
+        LOG.info('Initiating rebalance for pool %s', pool_fid)
         result: int = self._ffi.start_rebalance(self._ha_ctx, pool_fid.to_c())
         if result:
             raise RepairRebalanceException(
                 'Failed to send SPIEL request "sns_rebalance_start",' +
                 'please check Motr logs for more details.')
-        LOG.debug('Rebalancing started for pool %s', pool_fid)
+        LOG.info('Rebalancing started for pool %s', pool_fid)
 
     def stop_repair(self, pool_fid: Fid):
-        LOG.debug('Stopping repair for pool %s', pool_fid)
+        LOG.info('Stopping repair for pool %s', pool_fid)
         result: int = self._ffi.stop_repair(self._ha_ctx, pool_fid.to_c())
         if result:
             raise RepairRebalanceException(
                 'Failed to send SPIEL request "sns_repair_stop", please' +
                 ' check Motr logs for more details.')
-        LOG.debug('Repairing stoped for pool %s', pool_fid)
+        LOG.info('Repairing stoped for pool %s', pool_fid)
 
     def stop_rebalance(self, pool_fid: Fid):
-        LOG.debug('Stopping rebalance for pool %s', pool_fid)
+        LOG.info('Stopping rebalance for pool %s', pool_fid)
         result: int = self._ffi.stop_rebalance(self._ha_ctx, pool_fid.to_c())
         if result:
             raise RepairRebalanceException(
                 'Failed to send SPIEL request "sns_rebalance_stop",' +
                 'please check Motr logs for more details.')
-        LOG.debug('Rebalancing stoped for pool %s', pool_fid)
+        LOG.info('Rebalancing stoped for pool %s', pool_fid)
 
     def pause_repair(self, pool_fid: Fid):
-        LOG.debug('Pausing repair for pool %s', pool_fid)
+        LOG.info('Pausing repair for pool %s', pool_fid)
         result: int = self._ffi.pause_repair(self._ha_ctx, pool_fid.to_c())
         if result:
             raise RepairRebalanceException(
                 'Failed to send SPIEL request "sns_repair_pause", please' +
                 ' check Motr logs for more details.')
-        LOG.debug('Repairing paused for pool %s', pool_fid)
+        LOG.info('Repairing paused for pool %s', pool_fid)
 
     def pause_rebalance(self, pool_fid: Fid):
-        LOG.debug('Pausing rebalance for pool %s', pool_fid)
+        LOG.info('Pausing rebalance for pool %s', pool_fid)
         result: int = self._ffi.pause_rebalance(self._ha_ctx, pool_fid.to_c())
         if result:
             raise RepairRebalanceException(
                 'Failed to send SPIEL request "sns_rebalance_pause",' +
                 'please check Motr logs for more details.')
-        LOG.debug('Rebalancing paused for pool %s', pool_fid)
+        LOG.info('Rebalancing paused for pool %s', pool_fid)
 
     def resume_repair(self, pool_fid: Fid):
-        LOG.debug('Resuming repair for pool %s', pool_fid)
+        LOG.info('Resuming repair for pool %s', pool_fid)
         result: int = self._ffi.resume_repair(self._ha_ctx, pool_fid.to_c())
         if result:
             raise RepairRebalanceException(
                 'Failed to send SPIEL request "sns_repair_resume",'
                 'please check Motr logs for more details.')
-        LOG.debug('Repairing resumed for pool %s', pool_fid)
+        LOG.info('Repairing resumed for pool %s', pool_fid)
 
     def resume_rebalance(self, pool_fid: Fid):
-        LOG.debug('Resuming rebalance for pool %s', pool_fid)
+        LOG.info('Resuming rebalance for pool %s', pool_fid)
         result: int = self._ffi.resume_rebalance(self._ha_ctx, pool_fid.to_c())
         if result:
             raise RepairRebalanceException(
                 'Failed to send SPIEL request "sns_rebalance_resume",' +
                 'please check Motr logs for more details.')
-        LOG.debug('Rebalancing resumed for pool %s', pool_fid)
+        LOG.info('Rebalancing resumed for pool %s', pool_fid)
 
     def _write_updates(self, updates: List[PutKV], kv_cache=None) -> None:
         for op in updates:

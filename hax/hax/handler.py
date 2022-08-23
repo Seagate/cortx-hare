@@ -253,7 +253,7 @@ class ConsumerThread(StoppableThread):
                         # Check if process node is online
                         proc_node_status: ObjHealth = (
                             cns.get_proc_node_health(state.fid))
-                        LOG.debug('Process node status: %s', proc_node_status)
+                        LOG.info('Process node status: %s', proc_node_status)
                         # If process node is online, we assume corresponding
                         # hax is also online. Let the local hax process it.
                         if proc_node_status == ObjHealth.OK:

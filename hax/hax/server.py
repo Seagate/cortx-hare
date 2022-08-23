@@ -146,7 +146,7 @@ def to_ha_states(data: Any, consul_util: ConsulUtil) -> List[HAState]:
                 ha_states.append(HAState(
                     fid=create_process_fid(int(svc_id)),
                     status=svc_status))
-    LOG.debug('Reporting ha states: %s', ha_states)
+    LOG.info('Reporting ha states: %s', ha_states)
     return ha_states
 
 
@@ -159,7 +159,7 @@ def process_ha_states(planner: WorkPlanner, consul_util: ConsulUtil):
         def fn():
             # import pudb.remote
             # pudb.remote.set_trace(term_size=(80, 40), port=9998)
-            LOG.debug('Service health from Consul: %s', data)
+            LOG.info('Service health from Consul: %s', data)
             planner.add_command(
                 BroadcastHAStates(states=to_ha_states(data, consul_util),
                                   reply_to=None))
@@ -197,7 +197,7 @@ def process_sns_operation(planner: WorkPlanner):
             'disk-detach': create_handler(SnsDiskDetach),
         }
 
-        LOG.debug(f'process_sns_operation: {op_name}')
+        LOG.info(f'process_sns_operation: {op_name}')
         if op_name not in msg_factory:
             raise HTTPNotFound()
         data = await request.json()
@@ -271,7 +271,7 @@ def process_state_update(planner: WorkPlanner):
             LOG.debug('process status: %s', data)
             proc_status_val = base64.b64decode(data['Value']).decode("utf-8")
             proc_status = json.loads(proc_status_val)
-            LOG.debug('process status %s', proc_status)
+            LOG.info('process status %s', proc_status)
             proc_fid = Fid.parse(data['Key'].split('/')[1])
             proc_state = proc_status['state']
             proc_type = proc_status['type']

@@ -113,16 +113,16 @@ def _remove_stale_session(util: ConsulUtil) -> None:
     if util.is_leader_value_present_for_session():
         node = util.get_leader_node()
         if re.match(r'^elect[\d]+$', node):
-            LOG.debug(
+            LOG.info(
                 'Stale leader session found: RC leader session %s is '
                 'found while the leader node seems to be '
                 'stub: %s', sess, node)
             util.destroy_session(sess)
-            LOG.debug('Stale session %s destroyed '
-                      'to enable RC re-election', sess)
+            LOG.info('Stale session %s destroyed '
+                     'to enable RC re-election', sess)
     else:
         util.destroy_session(sess)
-        LOG.debug('Stale session %s destroyed to enable RC re-election', sess)
+        LOG.info('Stale session %s destroyed to enable RC re-election', sess)
 
 
 @log_exception

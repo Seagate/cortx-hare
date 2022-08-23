@@ -652,8 +652,8 @@ class ConsulUtil:
         for a given process name.
         """
         statuses = self.get_m0d_statuses(proc_names)
-        LOG.debug('The following statuses received for %s: %s',
-                  proc_names, statuses)
+        LOG.info('The following statuses received for %s: %s',
+                 proc_names, statuses)
         return [(item.fid, status) for item, status in statuses]
 
     @uses_consul_cache
@@ -2161,8 +2161,8 @@ class ConsulUtil:
     def set_process_state(self,
                           process_fid: Fid,
                           state: ObjHealth) -> None:
-        LOG.debug('Setting process=%s in KV with state=%s',
-                  process_fid, state)
+        LOG.info('Setting process=%s in KV with state=%s',
+                 process_fid, state)
         process_state_map = {
             ObjHealth.OK: 'online',
             ObjHealth.FAILED: 'failed',
@@ -2185,7 +2185,7 @@ class ConsulUtil:
                 continue
             value = json.loads(item['Value'])
             value['state'] = process_state_map[state]
-            LOG.debug('set_process_state: %s', json.dumps(value))
+            LOG.info('set_process_state: %s', json.dumps(value))
             self.kv.kv_put(item['Key'], json.dumps(value))
 
     @repeat_if_fails()
@@ -2267,8 +2267,8 @@ class ConsulUtil:
 
     def get_motr_processes_status(self):
         with self.lock:
-            LOG.debug('Current motr_processes_status: %s',
-                      motr_processes_status)
+            LOG.info('Current motr_processes_status: %s',
+                     motr_processes_status)
             return motr_processes_status
 
     # bAdd indicate whether new entry should be added or status should be
@@ -2277,8 +2277,8 @@ class ConsulUtil:
         with self.lock:
             if fid in motr_processes_status or bAdd:
                 motr_processes_status[fid] = status
-            LOG.debug('Updated motr_processes_status: %s',
-                      motr_processes_status)
+            LOG.info('Updated motr_processes_status: %s',
+                     motr_processes_status)
 
     @repeat_if_fails()
     def process_dynamic_fidk_lock(self) -> bool:
