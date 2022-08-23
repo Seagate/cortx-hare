@@ -1001,15 +1001,15 @@ class m0ProcT(Enum):
 
 
 class PortalGroup(Enum):
-    hax = 22000
+    hax = 22001
     m0_server = [{'name': 'confd', 'port': m0ProcT.confd},
                  {'name': 'ios', 'port': m0ProcT.ios}]
-    m0_client_s3 = 22500
-    m0_client_other = [{'name': 'default', 'port': 22500}]
+    m0_client_s3 = 22501
+    m0_client_other = [{'name': 'default', 'port': 22501}]
 
 
 class Portals:
-    def __init__(self, hax=22000,
+    def __init__(self, hax=22001,
                  m0_server=[{'name': 'confd', 'port': m0ProcT.confd},
                             {'name': 'ios', 'port': m0ProcT.ios}],
                  m0_client_s3=22500,
@@ -1033,27 +1033,27 @@ def get_lnet_portal_group(
         m0_client_s3=3,
         m0_client_other=[]
         ) -> Portals:
-    protal_group = Portals(hax=hax, m0_server=m0_server,
+    portal_group = Portals(hax=hax, m0_server=m0_server,
                            m0_client_s3=m0_client_s3,
                            m0_client_other=m0_client_other)
-    protal_group.m0_client_other.append({'name': 'default',
+    portal_group.m0_client_other.append({'name': 'default',
                                          'port': 4})
-    return protal_group
+    return portal_group
 
 
 def get_libfab_portal_group(
-        hax=22000,
+        hax=22001,
         m0_server=[{'name': 'confd', 'port': m0ProcT.confd},
                    {'name': 'ios', 'port': m0ProcT.ios}],
-        m0_client_s3=22500,
+        m0_client_s3=22501,
         m0_client_other=[]
         ) -> Portals:
-    protal_group = Portals(hax=hax, m0_server=m0_server,
+    portal_group = Portals(hax=hax, m0_server=m0_server,
                            m0_client_s3=m0_client_s3,
                            m0_client_other=m0_client_other)
-    protal_group.m0_client_other.append({'name': 'default',
-                                         'port': 22500})
-    return protal_group
+    portal_group.m0_client_other.append({'name': 'default',
+                                         'port': 22501})
+    return portal_group
 
 
 class Endpoint:
@@ -1116,7 +1116,7 @@ class LibfabricEndpoint(Endpoint):
         assert portal > 0
         self.portal = 0
         self.portal = self.ep_map.setdefault((ipaddr, portal),
-                                             (portal + 1))
+                                             (portal))
         self.ep_map[(ipaddr, portal)] += 1
 
     def __repr__(self):
