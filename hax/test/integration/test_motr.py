@@ -808,6 +808,13 @@ def create_stub_get(process_type: str) -> Callable[[str, bool], Any]:
                     "name": "localhost",
                     "state": "M0_NC_UNKNOWN"
                 }))
+        elif key == '0x7300000000000001:0x10':
+            return new_kv('0x7300000000000001:0x10',
+                          json.dumps('0x7300000000000001:0x10'))
+        elif key == '0x7300000000000001:0x11':
+            return new_kv('0x7300000000000001:0x11',
+                          json.dumps('0x7300000000000001:0x11'))
+
         raise RuntimeError(f'Unexpected call: key={key}, recurse={recurse}')
 
     return my_get
