@@ -15,7 +15,7 @@
 # For any questions about this software or licensing,
 # please email opensource@seagate.com or cortx-questions@seagate.com.
 #
-
+import sys
 import logging
 import logging.handlers
 from typing import List
@@ -74,6 +74,8 @@ class ConsulStarter(StoppableThread):
                                                       encoding=None,
                                                       delay=False)
             LOG.addHandler(fh)
+            console = logging.StreamHandler(stream=sys.stdout)
+            LOG.addHandler(console)
             cmd = ['consul', 'agent', f'-bind={self.bind_addr}',
                    f'-advertise={self.bind_addr}',
                    f'-client=127.0.0.1 {self.bind_addr}',
@@ -102,6 +104,6 @@ class ConsulStarter(StoppableThread):
         except Exception:
             LOG.exception('Aborting due to an error')
         finally:
-            LOG.debug('Stopping Consul')
+            LOG.info('Stopping Consul')
             self.stop_event.set()
             self.utils.stop_hare()

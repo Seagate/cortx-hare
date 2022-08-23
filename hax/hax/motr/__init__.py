@@ -295,6 +295,7 @@ class Motr:
     def broadcast_ha_states(self,
                             ha_states: List[HAState],
                             notify_devices=True,
+                            update_kv=True,
                             kv_cache=None,
                             broadcast_hax_only=False,
                             proc_skip_list=None) -> List[MessageId]:
@@ -350,12 +351,13 @@ class Motr:
             if (st.fid.container == ObjT.PROCESS.value
                     and _update_process_tree(st.fid, st.status)):
 
-                if st.fid.container == ObjT.PROCESS.value:
+                if st.fid.container == ObjT.PROCESS.value and update_kv:
                     LOG.debug('ha_broadcast:set_process_state')
                     self.consul_util.set_process_state(st.fid, st.status)
 
                 notes += self._generate_sub_services(note,
                                                      self.consul_util,
+                                                     update_kv,
                                                      notify_devices,
                                                      kv_cache=kv_cache)
                 # Check if we need to mark node as failed,
@@ -367,18 +369,19 @@ class Motr:
                 # If both the above conditions are not true then we will just
                 # mark controller status
                 notes += self.notify_node_status_by_process(
-                            note, kv_cache=kv_cache)
-            if st.fid.container == ObjT.DRIVE.value:
+                            note, update_kv, kv_cache=kv_cache)
+            if st.fid.container == ObjT.DRIVE.value and update_kv:
                 self.consul_util.update_drive_state([st.fid],
                                                     st.status,
                                                     kv_cache=kv_cache)
             elif st.fid.container == ObjT.NODE.value:
-                self.consul_util.set_node_state(st.fid,
-                                                st.status,
-                                                kv_cache=kv_cache)
-                notes += self.add_enclosing_devices_by_node(st.fid,
-                                                            st.status,
-                                                            kv_cache=kv_cache)
+                if update_kv:
+                    self.consul_util.set_node_state(st.fid,
+                                                    st.status,
+                                                    kv_cache=kv_cache)
+                notes += self.add_enclosing_devices_by_node(
+                             st.fid, st.status, update_kv,
+                             kv_cache=kv_cache)
         if not notes:
             return []
         message_ids = self._ha_broadcast(notes, broadcast_hax_only,
@@ -518,6 +521,7 @@ class Motr:
     def _generate_sub_services(self,
                                note: HaNoteStruct,
                                cns: ConsulUtil,
+                               update_kv: bool,
                                notify_devices=True,
                                kv_cache=None) -> List[HaNoteStruct]:
         new_state = note.no_state
@@ -531,7 +535,8 @@ class Motr:
             for x in service_list
         ]
         if notify_devices:
-            service_notes += self._generate_sub_disks(note, service_list, cns)
+            service_notes += self._generate_sub_disks(note, service_list,
+                                                      cns, update_kv)
         return service_notes
 
     @supports_consul_cache
@@ -539,6 +544,7 @@ class Motr:
                             note: HaNoteStruct,
                             services: List[FidWithType],
                             cns: ConsulUtil,
+                            update_kv: bool,
                             kv_cache=None) -> List[HaNoteStruct]:
         disk_list = []
         new_state = note.no_state
@@ -563,7 +569,7 @@ class Motr:
             # XXX: Need to check the current state of the device, transition
             # to ONLINE only in case of an explicit request or iff the prior
             # state of the device is UNKNOWN/OFFLINE.
-            if not mkfs_down:
+            if not mkfs_down and update_kv:
                 # We don't mark the devices as failed if the process is MKFS
                 # and if its effective status is STOPPED (see EOS-24124).
                 cns.update_drive_state(disk_list, state, device_event=False)
@@ -599,13 +605,16 @@ class Motr:
         ]
 
     def get_update_encl_state(self, node_fid: Fid, new_state: ObjHealth,
+                              update_kv: bool,
                               node: Optional[str] = None,
                               kv_cache=None) -> List[HaNoteStruct]:
 
         node = node or self.consul_util.get_node_name_by_fid(node_fid,
                                                              kv_cache=kv_cache)
         encl_fid = self.consul_util.get_node_encl_fid(node, kv_cache=kv_cache)
-        self.consul_util.set_encl_state(encl_fid, new_state, kv_cache=kv_cache)
+        if update_kv:
+            self.consul_util.set_encl_state(encl_fid, new_state,
+                                            kv_cache=kv_cache)
         notes = []
         if encl_fid:
             notes = [
@@ -618,6 +627,7 @@ class Motr:
     def add_enclosing_devices_by_node(self,
                                       node_fid: Fid,
                                       new_state: ObjHealth,
+                                      update_kv: bool,
                                       node: Optional[str] = None,
                                       kv_cache=None) -> List[HaNoteStruct]:
         """Returns the list of HA notes with the state from given node.
@@ -636,7 +646,9 @@ class Motr:
 
         state_int = new_state.to_ha_note_status()
         # Update the enclosure state based on the event.
-        self.consul_util.set_encl_state(encl_fid, new_state, kv_cache=kv_cache)
+        if update_kv:
+            self.consul_util.set_encl_state(encl_fid, new_state,
+                                            kv_cache=kv_cache)
 
         # Update the states of all the controllers as failed, in case of
         # node failure event.
@@ -646,8 +658,8 @@ class Motr:
             for x in ctrl_fids:
                 updates += self.consul_util.get_ctrl_state_updates(
                     x, new_state, kv_cache=kv_cache)
-
-            self._write_updates(updates, kv_cache)
+            if update_kv:
+                self._write_updates(updates, kv_cache)
 
         notes = []
         if encl_fid:
@@ -664,6 +676,7 @@ class Motr:
     @uses_consul_cache
     def notify_node_status_by_process(self,
                                       proc_note: HaNoteStruct,
+                                      update_kv: bool,
                                       kv_cache=None) -> List[HaNoteStruct]:
         # proc_note.no_state is of int type
         new_state = self.consul_util.ha_note_to_objhealth(proc_note.no_state)
@@ -697,12 +710,15 @@ class Motr:
             if self.is_node_failed(proc_note, kv_cache=kv_cache):
                 notes.extend(self.add_node_state_by_fid(node_fid, new_state))
                 notes.extend(self.get_update_encl_state(node_fid, new_state,
+                                                        update_kv,
                                                         kv_cache=kv_cache))
         else:
             notes.extend(self.add_node_state_by_fid(node_fid, new_state))
             notes.extend(self.get_update_encl_state(node_fid, new_state,
+                                                    update_kv,
                                                     kv_cache=kv_cache))
-        self._write_updates(updates, kv_cache)
+        if update_kv:
+            self._write_updates(updates, kv_cache)
         return notes
 
     @supports_consul_cache

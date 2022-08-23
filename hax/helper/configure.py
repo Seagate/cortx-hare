@@ -61,10 +61,11 @@ def _setup_logging(opts: AppCtx):
                                 backupCount=5,
                                 encoding=None,
                                 delay=False))
-
+    log_format = "%(asctime)s %(name)s %(process)d [%(levelname)s] " \
+                 "%(message)s"
     logging.basicConfig(level=logging.INFO,
                         handlers=handlers,
-                        format='%(asctime)s [%(levelname)s] %(message)s')
+                        format=log_format)
 
 
 @click.command()
@@ -136,9 +137,8 @@ class ConfGenerator:
         env = self._get_pythonic_env()
         executor.run(p([
             'cfgen', '-o', self.conf_dir, '-v', '-l', self.log_dir,
-            '--log-file', self.log_file, self.cdf_path
-        ]),
-                     env=env)
+            '--log-file', self.log_file, self.cdf_path]),
+            env=env)
         xcode = executor.run(p(['cat', f'{conf_dir}/confd.dhall'])
                              | p(['dhall', 'text'])
                              | p(['m0confgen']),
