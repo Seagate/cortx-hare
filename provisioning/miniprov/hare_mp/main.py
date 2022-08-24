@@ -1027,6 +1027,7 @@ def config(args):
         stop_event = Event()
         conf_dir = get_config_dir(url)
         log_dir = get_log_dir(url)
+        cns_utils = ConsulUtil()
         consul_starter = _start_consul(utils, stop_event,
                                        conf_dir, log_dir, url)
         if args.file:
@@ -1036,7 +1037,12 @@ def config(args):
         save(filename, generate_cdf(url))
         update_hax_unit('/usr/lib/systemd/system/hare-hax.service')
         generate_config(url, filename)
-        stop_consul_blocking(consul_starter)
+        if is_mkfs_required(url):
+            stop_consul_blocking(consul_starter)
+        else:
+            while not all(cns_utils.ensure_ioservices_running()):
+                sleep(5)
+            stop_consul_blocking(consul_starter)
     except Exception as error:
         if consul_starter:
             stop_consul_blocking(consul_starter)
