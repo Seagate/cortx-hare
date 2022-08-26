@@ -28,6 +28,12 @@ class Program:
     to be executed by Executor class.
     """
     def __init__(self, cmd: List[str], stdin: Optional['Program'] = None):
+        """Holds a command or chain of commands.
+
+        Args:
+            cmd: a single command.
+            stdin: input to the command.
+        """
         self.cmd = cmd
         self.stdin = stdin
 
@@ -38,6 +44,7 @@ class Program:
         return other
 
     def __repr__(self):
+        """Machine readable repr of the command"""
         return f'Program({self.cmd}, stdin={self.stdin})'
 
 

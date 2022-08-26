@@ -106,7 +106,8 @@ def hctl_stat(request):
 # request a parameter. The respective result is obtained by executing
 # corresponding `hctl-fetch-fids` script.
 def hctl_fetch_fids(request):
-    """calls the hare-fetch-fids to provide info about services configured.
+    """
+    calls the hare-fetch-fids to provide info about services configured.
 
     This function calls the hare-fetch-fids script from the hax-server in
     order to provide details about services configured by Hare e.g. Hax,
@@ -124,7 +125,7 @@ def hctl_fetch_fids(request):
 
 def to_ha_states(data: Any, consul_util: ConsulUtil) -> List[HAState]:
     """
-    converts dictionary into list of HA states
+    converts dictionary into list of HA states.
 
     Converts a dictionary, obtained from JSON data, into a list of
     HA states.

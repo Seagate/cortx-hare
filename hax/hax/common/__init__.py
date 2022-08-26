@@ -15,15 +15,15 @@
 # For any questions about this software or licensing,
 # please email opensource@seagate.com or cortx-questions@seagate.com.
 #
+"""Hax commons package symbols."""
 import inject
 
 
 class HaxGlobalState:
 
-    """
-    Global state of whole HaX application.
-    """
+    """Global state of whole Hax application."""
     def __init__(self):
+        """Initialize current state to non-stopping state."""
         self.stopping: bool = False
 
     def is_stopping(self) -> bool:
@@ -36,7 +36,5 @@ class HaxGlobalState:
 
 
 def di_configuration(binder: inject.Binder):
-    """
-    Configures Dependency Injection (DI) engine.
-    """
+    """Configures Dependency Injection (DI) engine."""
     binder.bind(HaxGlobalState, HaxGlobalState())

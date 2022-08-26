@@ -1,3 +1,4 @@
+"""Broadcast Queue Consumer implementation."""
 import json
 import logging
 from queue import Queue
@@ -27,6 +28,15 @@ class BQProcessor:
     """
     def __init__(self, planner: WorkPlanner, delivery_herald: DeliveryHerald,
                  motr: Motr, conf_obj_util: ConfObjUtil):
+        """Initialize pre requisites for Broadcast Queue Processor.
+
+        Args:
+            planner: work planner for Motr-aware threads (see ConsumerThread).
+            delivery_herald: Thread synchronizing block that ensures
+                delivery is confirmed.
+            motr: hax side foreign fucntion interface wrapper.
+            conf_obj_util: references KV(consul) adapter.
+        """
         self.planner = planner
         self.confobjutil = conf_obj_util
         self.herald = delivery_herald

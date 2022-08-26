@@ -30,11 +30,15 @@ LOG_FILE_SIZE = 1024 * 1024 * 1024
 
 
 class HaxStarter(StoppableThread):
-    """
-    Starts consul agent and blocks until terminated.
-    """
+
+    """Starts consul agent and blocks until terminated."""
     def __init__(self, utils: Utils, stop_event: Event, home_dir: str,
                  log_dir: str):
+        """Starts hax and hence consul agent.
+
+        Arguments:
+        process -- forms the hax command
+        """
         super().__init__(target=self._execute,
                          name='hax-starter')
         self.utils = utils

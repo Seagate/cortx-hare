@@ -22,6 +22,7 @@ from hax.ha.message_interface.message_interface import MessageBusInterface
 
 class MessageType():
     def __init__(self):
+        """Message base class with abstract send method."""
         logging.debug('Inside MessageType')
 
     def send(self, event, util: ConsulUtil):
