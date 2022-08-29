@@ -25,7 +25,7 @@ nodes:
       - name: m0_client_other  # name of the motr client
         instances: 2   # Number of instances, this host will run
     # network_ports:
-    #   hax: 22000
+    #   hax: 22001
     #   hax_http: 8008
     #   m0_server:
     #   - name: ios
@@ -34,8 +34,8 @@ nodes:
     #     port: 21000
     #   m0_client_other:
     #   - name: m0_client_other
-    #     port: 21500
-    #   m0_client_s3: 22500
+    #     port: 21501
+    #   m0_client_s3: 22501
   - hostname: srvnode-2
     node_group: srvnode-2
     data_iface: enp175s0f1_c2
@@ -62,7 +62,7 @@ nodes:
       - name: m0_client_other  # name of the motr client
         instances: 2   # Number of instances, this host will run
     # network_ports:
-    #   hax: 22000
+    #   hax: 22001
     #   hax_http: 8008
     #   m0_server:
     #   - name: ios
@@ -71,8 +71,8 @@ nodes:
     #     port: 21000
     #   m0_client_other:
     #   - name: m0_client_other
-    #     port: 21500
-    #   m0_client_s3: 22500
+    #     port: 21501
+    #   m0_client_s3: 22501
 pools:
   - name: tier1-nvme
     disk_refs:

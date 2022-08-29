@@ -71,7 +71,7 @@ class ByteCountUpdater(StoppableThread):
                     pver_info: PverInfo = motr.get_pver_status(
                         Fid.parse(p_ver))
                     pver_items[p_ver] = pver_info
-            LOG.debug('Received pool version and status: %s', pver_items)
+            LOG.info('Received pool version and status: %s', pver_items)
         return pver_items
 
     def _calculate_bc_per_pver(
@@ -105,13 +105,13 @@ class ByteCountUpdater(StoppableThread):
                 else:
                     pver_bc[pver_fid] = byte_count
 
-        LOG.debug('Bytecount with parity buffer: %s', pver_bc)
+        LOG.info('Bytecount with parity buffer: %s', pver_bc)
 
         bc_without_parity: Dict[str, int] = {}
         for pver, bc in pver_bc.items():
             bc_without_parity[pver] = \
                 bc - self._get_parity_buffers(bc, pver_state[pver])
-        LOG.debug('Bytecount without parity buffer: %s', bc_without_parity)
+        LOG.info('Bytecount without parity buffer: %s', bc_without_parity)
         return bc_without_parity
 
     def _get_parity_buffers(self, bc: int, state: PverInfo) -> int:
@@ -140,7 +140,7 @@ class ByteCountUpdater(StoppableThread):
                         if status == ObjHealth.OK:
                             byte_count: ByteCountStats = \
                                 motr.get_proc_bytecount(ios)
-                            LOG.debug('Received bytecount: %s', byte_count)
+                            LOG.info('Received bytecount: %s', byte_count)
                             if not byte_count:
                                 continue
                             self.consul.update_pver_bc(byte_count)

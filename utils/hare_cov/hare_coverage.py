@@ -112,7 +112,7 @@ class Utility:
         :param max_split: maximum number split
         :return: tuple(stdout, stderr)
         """
-        logging.debug(f"Executing Command : {command!a}")
+        logging.info(f"Executing Command : {command!a}")
         process: Popen[bytes] = Popen(
             command.split(sep=delimiter, maxsplit=max_split),
             stdout=PIPE,
