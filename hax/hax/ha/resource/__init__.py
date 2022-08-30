@@ -16,4 +16,4 @@
 # please email opensource@seagate.com or cortx-questions@seagate.com.
 #
 
-# empty
+"""Modue provides Resource Type interface to send resource status events."""

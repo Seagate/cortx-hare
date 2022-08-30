@@ -38,7 +38,7 @@ class ConsulStarter(StoppableThread):
                  log_dir: str, data_dir: str, config_dir: str, node_name: str,
                  node_id: str,
                  peers: List[str],
-                 bind_addr: str = '0.0.0.0',
+                 bind_addr: str = '0.0.0.0',  # nosec
                  client_addr: str = '0.0.0.0'):
         super().__init__(target=self._execute,
                          name='consul-starter')

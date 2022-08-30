@@ -22,6 +22,7 @@ import sys
 import unittest
 from threading import Condition, Thread
 from time import sleep, time
+from queue import Queue
 
 from hax.exception import NotDelivered
 from hax.log import TRACE
@@ -73,17 +74,17 @@ class TestDeliveryHeraldAny(unittest.TestCase):
 
     def test_it_works(self):
         herald = DeliveryHerald()
-        notified_ok = True
+        notified_ok = Queue(maxsize=1)
 
-        def fn():
+        def fn(notified_ok: Queue):
             try:
                 sleep(1.5)
                 herald.notify_delivered(MessageId(halink_ctx=100, tag=1))
             except:
                 logging.exception('*** ERROR ***')
-                notified_ok = False
+                notified_ok.put(False)
 
-        t = Thread(target=fn)
+        t = Thread(target=fn, args=(notified_ok,))
         t.start()
 
         m = MessageId
@@ -91,22 +92,22 @@ class TestDeliveryHeraldAny(unittest.TestCase):
             [m(100, 1), m(100, 3), m(100, 4)]),
                             timeout_sec=10)
         t.join()
-        self.assertTrue(notified_ok,
+        self.assertTrue(not notified_ok.qsize(),
                         'Unexpected exception appeared in notifier thread')
 
     def test_exception_raised_by_timeout(self):
         herald = DeliveryHerald()
-        notified_ok = True
+        notified_ok = Queue(maxsize=1)
 
-        def fn():
+        def fn(notified_ok: Queue):
             try:
                 sleep(1.5)
                 herald.notify_delivered(MessageId(halink_ctx=43, tag=3))
             except:
                 logging.exception('*** ERROR ***')
-                notified_ok = False
+                notified_ok.put(False)
 
-        t = Thread(target=fn)
+        t = Thread(target=fn, args=(notified_ok,))
         t.start()
 
         m = MessageId
@@ -117,23 +118,23 @@ class TestDeliveryHeraldAny(unittest.TestCase):
                                     timeout_sec=5)
         finally:
             t.join()
-        self.assertTrue(notified_ok,
+        self.assertTrue(notified_ok.qsize() == 0,
                         'Unexpected exception appeared in notifier thread')
 
     def test_works_under_load(self):
         herald = DeliveryHerald()
-        notified_ok = True
+        notified_ok = Queue(maxsize=32)
 
-        def fn(msg: MessageId):
+        def fn(msg: MessageId, notified_ok: Queue):
             try:
                 sleep(1.5)
                 herald.notify_delivered(msg)
             except:
                 logging.exception('*** ERROR ***')
-                notified_ok = False
+                notified_ok.put(False)
 
         threads = [
-            Thread(target=fn, args=(MessageId(100, i), ))
+            Thread(target=fn, args=(MessageId(100, i), notified_ok))
             for i in range(1, 32)
         ]
         for t in threads:
@@ -149,16 +150,16 @@ class TestDeliveryHeraldAny(unittest.TestCase):
         finally:
             for t in threads:
                 t.join()
-        self.assertTrue(notified_ok,
+        self.assertTrue(notified_ok.qsize() == 0,
                         'Unexpected exception appeared in notifier thread')
 
     def test_if_delivered_earlier_than_awaited_wait_works(self):
         herald = DeliveryHerald()
-        notified_ok = True
         thread_count = 1
+        notified_ok = Queue(maxsize=thread_count)
         latch = CountDownLatch(thread_count)
 
-        def fn(msg: MessageId):
+        def fn(msg: MessageId, notified_ok: Queue):
             try:
                 LOG.debug('Thread started')
                 herald.notify_delivered(msg)
@@ -168,10 +169,10 @@ class TestDeliveryHeraldAny(unittest.TestCase):
 
             except:
                 logging.exception('*** ERROR ***')
-                notified_ok = False
+                notified_ok.put(False)
 
         threads = [
-            Thread(target=fn, args=(MessageId(100, i + 1), ))
+            Thread(target=fn, args=(MessageId(100, i + 1), notified_ok))
             for i in range(thread_count)
         ]
 
@@ -189,17 +190,17 @@ class TestDeliveryHeraldAny(unittest.TestCase):
         finally:
             for t in threads:
                 t.join()
-        self.assertTrue(notified_ok,
+        self.assertTrue(notified_ok.qsize() == 0,
                         'Unexpected exception appeared in notifier thread')
         self.assertEqual(0, len(herald.unsorted_deliveries.keys()))
 
     def test_if_delivered_earlier_than_awaited_works_immediately(self):
         herald = DeliveryHerald()
-        notified_ok = True
         thread_count = 1
+        notified_ok = Queue(maxsize=thread_count)
         latch = CountDownLatch(thread_count)
 
-        def fn(msg: MessageId):
+        def fn(msg: MessageId, notified_ok: Queue):
             try:
                 LOG.debug('Thread started')
                 herald.notify_delivered(msg)
@@ -209,10 +210,10 @@ class TestDeliveryHeraldAny(unittest.TestCase):
 
             except:
                 logging.exception('*** ERROR ***')
-                notified_ok = False
+                notified_ok.put(False)
 
         threads = [
-            Thread(target=fn, args=(MessageId(100, i + 1), ))
+            Thread(target=fn, args=(MessageId(100, i + 1), notified_ok))
             for i in range(thread_count)
         ]
 
@@ -232,7 +233,7 @@ class TestDeliveryHeraldAny(unittest.TestCase):
         finally:
             for t in threads:
                 t.join()
-        self.assertTrue(notified_ok,
+        self.assertTrue(notified_ok.qsize() == 0,
                         'Unexpected exception appeared in notifier thread')
         self.assertLess(
             finished - started, 5,
@@ -242,11 +243,11 @@ class TestDeliveryHeraldAny(unittest.TestCase):
 
     def test_if_delivered_earlier_than_awaited_wait_many(self):
         herald = DeliveryHerald()
-        notified_ok = True
         thread_count = 6
+        notified_ok = Queue(maxsize=thread_count)
         latch = CountDownLatch(thread_count)
 
-        def fn(msg: MessageId):
+        def fn(msg: MessageId, notified_ok: Queue):
             try:
                 LOG.debug('Thread started')
                 herald.notify_delivered(msg)
@@ -256,10 +257,10 @@ class TestDeliveryHeraldAny(unittest.TestCase):
 
             except:
                 logging.exception('*** ERROR ***')
-                notified_ok = False
+                notified_ok.put(False)
 
         threads = [
-            Thread(target=fn, args=(MessageId(100, i + 1), ))
+            Thread(target=fn, args=(MessageId(100, i + 1), notified_ok))
             for i in range(thread_count)
         ]
 
@@ -278,7 +279,7 @@ class TestDeliveryHeraldAny(unittest.TestCase):
         finally:
             for t in threads:
                 t.join()
-        self.assertTrue(notified_ok,
+        self.assertTrue(notified_ok.qsize() == 0,
                         'Unexpected exception appeared in notifier thread')
         self.assertEqual(4, len(herald.unsorted_deliveries.keys()))
 
@@ -296,38 +297,38 @@ class TestDeliveryHeraldAll(unittest.TestCase):
 
     def test_it_works(self):
         herald = DeliveryHerald()
-        notified_ok = True
+        notified_ok = Queue(maxsize=1)
 
-        def fn():
+        def fn(notified_ok: Queue):
             try:
                 sleep(1.5)
                 herald.notify_delivered(MessageId(halink_ctx=100, tag=1))
             except:
                 logging.exception('*** ERROR ***')
-                notified_ok = False
+                notified_ok.put(False)
 
-        t = Thread(target=fn)
+        t = Thread(target=fn, args=(notified_ok,))
         t.start()
 
         m = MessageId
         herald.wait_for_all(HaLinkMessagePromise([m(100, 1)]), timeout_sec=5)
         t.join()
-        self.assertTrue(notified_ok,
+        self.assertTrue(notified_ok.qsize() == 0,
                         'Unexpected exception appeared in notifier thread')
 
     def test_exception_raised_if_not_all_delivered(self):
         herald = DeliveryHerald()
-        notified_ok = True
+        notified_ok = Queue(maxsize=1)
 
-        def fn():
+        def fn(notified_ok: Queue):
             try:
                 sleep(1.5)
                 herald.notify_delivered(MessageId(halink_ctx=42, tag=3))
             except:
                 logging.exception('*** ERROR ***')
-                notified_ok = False
+                notified_ok.put(False)
 
-        t = Thread(target=fn)
+        t = Thread(target=fn, args=(notified_ok,))
         t.start()
 
         m = MessageId
@@ -339,23 +340,23 @@ class TestDeliveryHeraldAll(unittest.TestCase):
         finally:
             t.join()
 
-        self.assertTrue(notified_ok,
+        self.assertTrue(notified_ok.qsize() == 0,
                         'Unexpected exception appeared in notifier thread')
 
     def test_works_if_all_messages_confirmed(self):
         herald = DeliveryHerald()
-        notified_ok = True
+        notified_ok = Queue(maxsize=1)
 
-        def fn():
+        def fn(notified_ok: Queue):
             try:
                 sleep(1.5)
                 herald.notify_delivered(MessageId(halink_ctx=42, tag=3))
                 herald.notify_delivered(MessageId(halink_ctx=42, tag=1))
             except:
                 logging.exception('*** ERROR ***')
-                notified_ok = False
+                notified_ok.put(False)
 
-        t = Thread(target=fn)
+        t = Thread(target=fn, args=(notified_ok,))
         t.start()
 
         m = MessageId
@@ -365,23 +366,23 @@ class TestDeliveryHeraldAll(unittest.TestCase):
                                 timeout_sec=5)
         finally:
             t.join()
-        self.assertTrue(notified_ok,
+        self.assertTrue(notified_ok.qsize() == 0,
                         'Unexpected exception appeared in notifier thread')
 
     def test_works_under_load(self):
         herald = DeliveryHerald()
-        notified_ok = True
+        notified_ok = Queue(maxsize=32)
 
-        def fn(msg: MessageId):
+        def fn(msg: MessageId, notified_ok: Queue):
             try:
                 sleep(1.5)
                 herald.notify_delivered(msg)
             except:
                 logging.exception('*** ERROR ***')
-                notified_ok = False
+                notified_ok.put(False)
 
         threads = [
-            Thread(target=fn, args=(MessageId(100, i), ))
+            Thread(target=fn, args=(MessageId(100, i), notified_ok))
             for i in range(1, 32)
         ]
         for t in threads:
@@ -397,16 +398,16 @@ class TestDeliveryHeraldAll(unittest.TestCase):
         finally:
             for t in threads:
                 t.join()
-        self.assertTrue(notified_ok,
+        self.assertTrue(notified_ok.qsize() == 0,
                         'Unexpected exception appeared in notifier thread')
 
     def test_if_delivered_earlier_than_awaited_wait_works(self):
         herald = DeliveryHerald()
-        notified_ok = True
         thread_count = 1
+        notified_ok = Queue(maxsize=thread_count)
         latch = CountDownLatch(thread_count)
 
-        def fn(msg: MessageId):
+        def fn(msg: MessageId, notified_ok: Queue):
             try:
                 LOG.debug('Thread started')
                 herald.notify_delivered(msg)
@@ -416,10 +417,10 @@ class TestDeliveryHeraldAll(unittest.TestCase):
 
             except:
                 logging.exception('*** ERROR ***')
-                notified_ok = False
+                notified_ok.put(False)
 
         threads = [
-            Thread(target=fn, args=(MessageId(100, i + 1), ))
+            Thread(target=fn, args=(MessageId(100, i + 1), notified_ok))
             for i in range(thread_count)
         ]
 
@@ -437,17 +438,17 @@ class TestDeliveryHeraldAll(unittest.TestCase):
         finally:
             for t in threads:
                 t.join()
-        self.assertTrue(notified_ok,
+        self.assertTrue(notified_ok.qsize() == 0,
                         'Unexpected exception appeared in notifier thread')
         self.assertEqual(0, len(herald.unsorted_deliveries.keys()))
 
     def test_if_delivered_earlier_than_awaited_wait_many(self):
         herald = DeliveryHerald()
-        notified_ok = True
         thread_count = 6
+        notified_ok = Queue(maxsize=thread_count)
         latch = CountDownLatch(thread_count)
 
-        def fn(msg: MessageId):
+        def fn(msg: MessageId, notified_ok: Queue):
             try:
                 LOG.debug('Thread started')
                 herald.notify_delivered(msg)
@@ -457,10 +458,10 @@ class TestDeliveryHeraldAll(unittest.TestCase):
 
             except:
                 logging.exception('*** ERROR ***')
-                notified_ok = False
+                notified_ok.put(False)
 
         threads = [
-            Thread(target=fn, args=(MessageId(100, i + 1), ))
+            Thread(target=fn, args=(MessageId(100, i + 1), notified_ok))
             for i in range(thread_count)
         ]
 
@@ -479,17 +480,17 @@ class TestDeliveryHeraldAll(unittest.TestCase):
         finally:
             for t in threads:
                 t.join()
-        self.assertTrue(notified_ok,
+        self.assertTrue(notified_ok.qsize() == 0,
                         'Unexpected exception appeared in notifier thread')
         self.assertEqual(4, len(herald.unsorted_deliveries.keys()))
 
     def test_if_delivered_earlier_than_awaited_notified_immediately(self):
         herald = DeliveryHerald()
-        notified_ok = True
         thread_count = 1
+        notified_ok = Queue(maxsize=thread_count)
         latch = CountDownLatch(thread_count)
 
-        def fn(msg: MessageId):
+        def fn(msg: MessageId, notified_ok: Queue):
             try:
                 LOG.debug('Thread started')
                 herald.notify_delivered(msg)
@@ -499,10 +500,10 @@ class TestDeliveryHeraldAll(unittest.TestCase):
 
             except:
                 logging.exception('*** ERROR ***')
-                notified_ok = False
+                notified_ok.put(False)
 
         threads = [
-            Thread(target=fn, args=(MessageId(100, i + 1), ))
+            Thread(target=fn, args=(MessageId(100, i + 1), notified_ok))
             for i in range(thread_count)
         ]
 
@@ -523,7 +524,7 @@ class TestDeliveryHeraldAll(unittest.TestCase):
         finally:
             for t in threads:
                 t.join()
-        self.assertTrue(notified_ok,
+        self.assertTrue(notified_ok.qsize() == 0,
                         'Unexpected exception appeared in notifier thread')
         self.assertLess(
             finished - started, 5,

@@ -186,11 +186,11 @@ def consul_is_active_at(hostname: str) -> bool:
 def pcs_consul_is_active_at(hostname: str) -> bool:
     cmd = ssh_prefix(hostname) + \
         'sudo systemctl is-active --quiet hare-consul-agent*'
-    return subprocess.call(cmd, shell=True) == 0
+    return subprocess.call(cmd, shell=True) == 0  # nosec
 
 
 def exec_silent(cmd: str) -> bool:
-    return subprocess.call(cmd, shell=True) == 0
+    return subprocess.call(cmd, shell=True) == 0  # nosec
 
 
 def exec_custom(cmd: str, show_err: bool = True) -> None:
