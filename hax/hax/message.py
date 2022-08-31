@@ -76,6 +76,7 @@ class HaNvecGetEvent(BaseMessage):
     nvec: List[HaNote]
 
     def __repr__(self):
+        """Machine readable string representation of HaNvecGetEvent."""
         return f'HaNvecGetEvent(<{len(self.nvec)} items>)'
 
 

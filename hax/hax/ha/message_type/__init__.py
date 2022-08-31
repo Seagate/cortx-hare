@@ -16,4 +16,5 @@
 # please email opensource@seagate.com or cortx-questions@seagate.com.
 #
 
-# empty
+"""Module provides Message type interface and Health Message implementation to
+send health events to message bus topic `cortx_health_events`. """

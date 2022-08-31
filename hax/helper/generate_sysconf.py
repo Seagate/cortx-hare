@@ -49,6 +49,7 @@ class KVFile:
     """Helper to fetch data from Hare-Motr configuration key values file."""
 
     def __init__(self, kv_file: str, node: str) -> None:
+        """Loads Hare-Motr configuration in memory to generate sysconfig."""
         self.kv_file = kv_file
         self.kv_data = self._read_file()
         self.node = node
@@ -127,6 +128,7 @@ class ConsulKV:
     """
 
     def __init__(self, node: str) -> None:
+        """Initializes the Consul KV adapter."""
         self.kv = KVAdapter()
         self.node = node
 

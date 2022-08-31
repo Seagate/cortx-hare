@@ -171,17 +171,17 @@ class TestFailure(unittest.TestCase):
         herald.wait_for_any = Mock()
 
         bqprocessor = BQProcessor(planner, herald, motr, consul_util)
-        
+
         svc_name = 'hax'
         drive_fid = Fid(0x6b00000000000001, 0x11)
         hax_fid = Fid(0x7200000000000001, 0x6)
-        
+
         def fake_add(cmd):
             if isinstance(cmd, BroadcastHAStates):
                 motr.broadcast_ha_states(cmd.states, kv_cache=consul_cache)
             if hasattr(cmd, 'reply_to') and cmd.reply_to:
                 cmd.reply_to.put([MessageId(0, 0)])
-                
+
         planner.add_command = Mock(side_effect=fake_add)
 
         payload = {

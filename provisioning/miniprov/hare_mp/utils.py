@@ -42,9 +42,7 @@ LOG_DIR_EXT = '/hare/log/'
 
 
 def func_enter(func):
-    """
-    Logs function entry point.
-    """
+    """Logs function entry point."""
     func_name = func.__qualname__
     func_line = func.__code__.co_firstlineno
     func_filename = func.__code__.co_filename
@@ -53,9 +51,7 @@ def func_enter(func):
 
 
 def func_leave(func):
-    """
-    Logs function exit point.
-    """
+    """Logs function exit point."""
     logging.info('Leaving %s', func.__qualname__)
 
 
@@ -73,6 +69,7 @@ def func_log(before=func_enter, after=func_leave):
 
 class Utils:
     def __init__(self, provider: ValueProvider):
+        """Initializes value provider like ConfStore."""
         self.provider = provider
         self.kv = KVAdapter()
 
@@ -393,6 +390,7 @@ class Utils:
 
 class LogWriter:
     def __init__(self, logger: logging.Logger, logging_handler):
+        """Initialize LogWriter object with Logger and LoggingHandler obj."""
         self.logger = logger
         self.logging_handler = logging_handler
 

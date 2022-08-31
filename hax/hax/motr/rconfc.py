@@ -20,6 +20,7 @@ class RconfcStarter(StoppableThread):
     can happen when Motr is initialized in hax).
     """
     def __init__(self, motr: Motr, consul_util: ConsulUtil):
+        """Rconfc starter's thread constructor."""
         super().__init__(target=self._execute,
                          name='rconfc-starter',
                          args=(motr, ))

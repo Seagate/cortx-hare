@@ -380,7 +380,7 @@ def validate_cdf_schema(cdf: str, cdf_path: str, schema_path: str) -> None:
                        input=cdf)
     except CliException as e:
         die(
-            f'{cdf_path}: Invalid cluster description\n' + e.stderr +
+            f"{cdf_path}: Invalid cluster description\n" + e.stderr +
             f"\n\nTo learn more, run '{sys.argv[0]} --help-schema'.")
 
 
