@@ -1443,6 +1443,7 @@ def service_types(proc_t: ProcT,
     ts.append(SvcT.M0_CST_RMS)
     if proc_t in [ProcT.m0_client_other, ProcT.m0_client_s3]:
         ts.append(SvcT.M0_CST_DTM0)
+        ts.append(SvcT.M0_CST_FIS)
     if proc_t is ProcT.m0_server:
         assert proc_desc is not None
         if proc_desc.get('runs_confd'):
@@ -1457,6 +1458,7 @@ def service_types(proc_t: ProcT,
                        SvcT.M0_CST_CAS,
                        SvcT.M0_CST_ISCS,
                        SvcT.M0_CST_FDMI,
+                       SvcT.M0_CST_FIS,
                        SvcT.M0_CST_DTM0])
     return ts
 
