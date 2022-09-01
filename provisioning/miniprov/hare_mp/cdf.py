@@ -378,6 +378,7 @@ class CdfGenerator:
 
         params_text = str(
             ClusterDesc(create_aux=Maybe(create_aux, 'Bool'),
+                        generate_formulaic_pvers=Maybe(False, 'Bool'),
                         node_info=DList(nodes, 'List NodeInfo'),
                         pool_info=DList(pools, 'List PoolInfo'),
                         profile_info=DList(profiles, 'List ProfileInfo'),

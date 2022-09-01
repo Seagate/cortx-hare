@@ -44,6 +44,7 @@ nodes:
     #     port: 41500
     #   m0_client_s3: 42500
 create_aux: false # optional; supported values: "false" (default), "true"
+generate_formulaic_pvers: false # optional; supported values: "false" (default), "true"
 pools:
   - name: the pool
     type: sns  # optional; supported values: "sns" (default), "dix", "md"

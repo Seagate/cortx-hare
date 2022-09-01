@@ -77,6 +77,7 @@ let ProfileInfo =
 
 let ClusterInfo =
       { create_aux : Optional Bool
+      , generate_formulaic_pvers: Optional Bool
       , node_info: List NodeInfo
       , pool_info: List PoolInfo
       , profile_info: List ProfileInfo
@@ -116,6 +117,7 @@ let genCdf
     : ClusterInfo -> T.ClusterDesc
     =     \(cluster_info : ClusterInfo)
       ->  { create_aux = cluster_info.create_aux
+          , generate_formulaic_pvers = cluster_info.generate_formulaic_pvers
           , nodes = Prelude.List.map NodeInfo T.NodeDesc toNodeDesc cluster_info.node_info
           , pools = Prelude.List.map PoolInfo T.PoolDesc toPoolDesc cluster_info.pool_info
           , profiles = Some cluster_info.profile_info
