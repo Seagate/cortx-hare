@@ -217,6 +217,7 @@ def tr_and(*matchers: TraceMatcher) -> TraceMatcher:
     return fn
 
 
+# pylint: disable=E0202
 class FakeFFI(HaxFFI):
     def __init__(self):
         self.traces: List[Invocation] = []

@@ -177,8 +177,8 @@ class DeliveryHerald:
     def notify_delivered(self, message_id: MessageId):
         # [KN] This function is expected to be called from Motr.
         with self.lock:
-            LOG.debug('received msg id %s, notify waiting clients %s',
-                      message_id, self.waiting_clients.items())
+            LOG.info('received msg id %s, notify waiting clients %s',
+                     message_id, self.waiting_clients.items())
             for promise, client in self.waiting_clients.items():
                 LOG.debug('waiting promise %s', promise)
                 if message_id in promise:

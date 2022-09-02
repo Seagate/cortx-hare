@@ -1,3 +1,4 @@
+"""Broadcast Queue Consumer implementation."""
 import json
 import logging
 from queue import Queue
@@ -27,6 +28,15 @@ class BQProcessor:
     """
     def __init__(self, planner: WorkPlanner, delivery_herald: DeliveryHerald,
                  motr: Motr, conf_obj_util: ConfObjUtil):
+        """Initialize pre requisites for Broadcast Queue Processor.
+
+        Args:
+            planner: work planner for Motr-aware threads (see ConsumerThread).
+            delivery_herald: Thread synchronizing block that ensures
+                delivery is confirmed.
+            motr: hax side foreign fucntion interface wrapper.
+            conf_obj_util: references KV(consul) adapter.
+        """
         self.planner = planner
         self.confobjutil = conf_obj_util
         self.herald = delivery_herald
@@ -34,15 +44,15 @@ class BQProcessor:
 
     def process(self, message: Tuple[int, Any]) -> None:
         (i, msg) = message
-        LOG.debug('Message #%d received: %s (type: %s)', i, msg,
-                  type(msg).__name__)
+        LOG.info('Message #%d received: %s (type: %s)', i, msg,
+                 type(msg).__name__)
         try:
             self.payload_process(msg)
         except Exception:
             LOG.exception(
                 'Failed to process a message #%d.'
                 ' The message is skipped.', i)
-        LOG.debug('Message #%d processed', i)
+        LOG.info('Message #%d processed', i)
 
     def payload_process(self, msg: str) -> None:
         data = None
@@ -79,8 +89,8 @@ class BQProcessor:
             return HAState(fid, status=state)
 
         hastate: Optional[HAState] = _get_ha_state()
-        LOG.debug('ProcessStateUpdate process fid: %s state: %s, type: %s',
-                  payload['fid'], payload['state'], payload['type'])
+        LOG.info('ProcessStateUpdate process fid: %s state: %s, type: %s',
+                 payload['fid'], payload['state'], payload['type'])
         self.planner.add_command(
             ProcessHaEvent(fid=Fid.parse(payload['fid']),
                            proc_type=getattr(m0HaProcessType,
@@ -92,12 +102,12 @@ class BQProcessor:
         # for objinfo in payload:
         hastate: Optional[HAState] = self.to_ha_state(payload)
         if not hastate:
-            LOG.debug('No ha states to broadcast.')
+            LOG.info('No ha states to broadcast.')
             return
 
         q: Queue = Queue(1)
-        LOG.debug('HA broadcast, node: %s device: %s state: %s',
-                  payload['node'], payload['device'], payload['state'])
+        LOG.info('HA broadcast, node: %s device: %s state: %s',
+                 payload['node'], payload['device'], payload['state'])
         self.planner.add_command(
             BroadcastHAStates(states=[hastate], reply_to=q))
         ids: List[MessageId] = q.get()
@@ -127,7 +137,7 @@ class BQProcessor:
             'disk-detach': create_handler(SnsDiskDetach),
         }
 
-        LOG.debug(f'process_sns_operation: {op_name}')
+        LOG.info(f'process_sns_operation: {op_name}')
         if op_name not in msg_factory:
             LOG.error('Invalid sns operation, (%s) ', op_name)
         message = msg_factory[op_name](payload)

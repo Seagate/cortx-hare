@@ -20,6 +20,7 @@ from hare_mp.store import ValueProvider
 
 class Validator:
     def __init__(self, provider: ValueProvider):
+        """Initializes value provider like conf store."""
         super().__init__()
         self.provider = provider
 

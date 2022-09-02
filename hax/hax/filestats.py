@@ -58,7 +58,7 @@ class FsStatsUpdater(StoppableThread):
                 stats = motr.get_filesystem_stats()
                 if not stats:
                     continue
-                LOG.debug('FS stats are as follows: %s', stats)
+                LOG.info('FS stats are as follows: %s', stats)
                 now_time = datetime.datetime.now()
                 data = FsStatsWithTime(stats=stats,
                                        timestamp=now_time.timestamp(),
@@ -66,10 +66,10 @@ class FsStatsUpdater(StoppableThread):
                 try:
                     self.consul.update_fs_stats(data)
                 except HAConsistencyException:
-                    LOG.debug('Failed to update Consul KV '
-                              'due to an intermittent error. The '
-                              'error is swallowed since new attempts '
-                              'will be made timely')
+                    LOG.info('Failed to update Consul KV '
+                             'due to an intermittent error. The '
+                             'error is swallowed since new attempts '
+                             'will be made timely')
                 wait_for_event(self.event, self.interval_sec)
         except InterruptedException:
             # No op. _sleep() has interrupted before the timeout exceeded:

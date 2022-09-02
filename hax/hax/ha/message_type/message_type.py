@@ -22,6 +22,7 @@ from hax.ha.message_interface.message_interface import MessageBusInterface
 
 class MessageType():
     def __init__(self):
+        """Message base class with abstract send method."""
         logging.debug('Inside MessageType')
 
     def send(self, event, util: ConsulUtil):
@@ -35,7 +36,7 @@ class HealthMessage(MessageType):
         logging.debug('Inside HealthMessage')
 
     def send(self, event, util: ConsulUtil):
-        logging.debug('Sending HealthMessage: %s', event)
+        logging.info('Sending HealthMessage: %s', event)
         for interface in self.topic_list.items():
             sender = interface[1](util)
             message_type = interface[0]

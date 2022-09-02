@@ -246,7 +246,6 @@ class TestWorkPlanner(unittest.TestCase):
 
     def test_entrypoint_request_processed_asap(self):
         planner = WorkPlanner()
-        group_idx = 0
         tracker = TimeTracker()
         thread_count = 4
         planner.add_command(broadcast())
@@ -257,10 +256,9 @@ class TestWorkPlanner(unittest.TestCase):
         for j in range(thread_count):
             planner.add_command(Die())
 
-        exc = None
+        excq = Queue(maxsize=thread_count)
 
-        def fn(planner: WorkPlanner):
-            nonlocal exc
+        def fn(planner: WorkPlanner, exc: Queue):
             try:
                 while True:
                     LOG.log(TRACE, "Requesting for a work")
@@ -282,18 +280,19 @@ class TestWorkPlanner(unittest.TestCase):
 
             except Exception as e:
                 LOG.exception('*** ERROR ***')
-                exc = e
+                exc.put(e)
 
         workers = [
-            Thread(target=fn, args=(planner, )) for t in range(thread_count)
+            Thread(target=fn, args=(planner, excq)) for t in range(thread_count)
         ]
         for t in workers:
             t.start()
 
         for t in workers:
             t.join()
-        if exc:
-            raise exc
+        # raises the first collected exception and test can be improved
+        if excq.qsize() != 0:
+            raise excq.get()
         tracks = tracker.get_tracks()
         cmd = tracks[0][0]
         self.assertTrue(isinstance(cmd, EntrypointRequest))

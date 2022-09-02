@@ -26,6 +26,7 @@ let Pool = ./PoolDesc.dhall
 
 in
 { create_aux : Optional Bool
+, generate_formulaic_pvers : Optional Bool
 , nodes : List Node
 , pools : List Pool
 , profiles : Optional (List ./PoolsRef.dhall)

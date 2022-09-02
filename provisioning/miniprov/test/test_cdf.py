@@ -29,9 +29,8 @@ import pkg_resources
 
 from hare_mp.cdf import CdfGenerator
 from hare_mp.store import ConfStoreProvider, ValueProvider
-from hare_mp.types import (DisksDesc, Disk, DList, M0ClientDesc, M0ServerDesc, Maybe,
-                           MissingKeyError, PoolDesc, PoolType, Protocol, Text,
-                           AllowedFailures, Layout)
+from hare_mp.types import (DisksDesc, DList, M0ClientDesc, M0ServerDesc, Maybe,
+                           PoolDesc, PoolType, Protocol, Text, Layout)
 from hare_mp.utils import Utils
 from hax.util import KVAdapter
 
@@ -223,7 +222,6 @@ class TestCDF(unittest.TestCase):
                 'tcp',
                 'cortx>motr>client_instances':
                 2,
-                'node>MACH_ID>num_cvg': 1,
                 'cluster>num_storage_set':
                 1,
                 'cluster>storage_set>server_node_count':
@@ -585,7 +583,6 @@ class TestCDF(unittest.TestCase):
 
         def ret_values(value: str) -> Any:
             data = {
-                'node>MACH_ID>num_cvg': 1,
                 'cluster>num_storage_set': 1,
                 'cluster>storage_set>server_node_count': 1,
                 'cluster>storage_set[0]>name': 'StorageSet-1',
@@ -670,10 +667,10 @@ class TestCDF(unittest.TestCase):
         cdf.generate()
 
     def test_invalid_storage_set_configuration_rejected(self):
-        ''' This test case checks whether exception will be raise if total
-            number of data devices are less than
-            data_units + parity_units + spare_units
-        '''
+        """This test case checks whether exception will be raise
+        if total number of data devices are less than
+        data_units + parity_units + spare_units.
+        """
         store = ValueProvider()
 
         def ret_values(value: str) -> Any:

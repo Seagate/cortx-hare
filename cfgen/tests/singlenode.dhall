@@ -23,6 +23,7 @@ let types = ../dhall/types.dhall
 
 in
 { create_aux = Some False
+, generate_formulaic_pvers = Some False
 , nodes =
     [ { hostname = "localhost"
       , machine_id = None Text

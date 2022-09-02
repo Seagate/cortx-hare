@@ -380,7 +380,7 @@ def validate_cdf_schema(cdf: str, cdf_path: str, schema_path: str) -> None:
                        input=cdf)
     except CliException as e:
         die(
-            f'{cdf_path}: Invalid cluster description\n' + e.stderr +
+            f"{cdf_path}: Invalid cluster description\n" + e.stderr +
             f"\n\nTo learn more, run '{sys.argv[0]} --help-schema'.")
 
 
@@ -1443,6 +1443,7 @@ def service_types(proc_t: ProcT,
     ts.append(SvcT.M0_CST_RMS)
     if proc_t in [ProcT.m0_client_other, ProcT.m0_client_s3]:
         ts.append(SvcT.M0_CST_DTM0)
+        ts.append(SvcT.M0_CST_FIS)
     if proc_t is ProcT.m0_server:
         assert proc_desc is not None
         if proc_desc.get('runs_confd'):
@@ -1457,6 +1458,7 @@ def service_types(proc_t: ProcT,
                        SvcT.M0_CST_CAS,
                        SvcT.M0_CST_ISCS,
                        SvcT.M0_CST_FDMI,
+                       SvcT.M0_CST_FIS,
                        SvcT.M0_CST_DTM0])
     return ts
 
@@ -2014,8 +2016,11 @@ class ConfPool(ToDhall):
             m0conf[parent].mdpool = pool_id
         else:
             assert t is PoolT.sns
-            for v in gen_allowances(tolerance):
-                ConfPverF.build(m0conf, pool_id, base=pver, allowance=v)
+            generate_formulaic_pvers: bool = cluster_desc.get(
+                                           'generate_formulaic_pvers', False)
+            if generate_formulaic_pvers:
+                for v in gen_allowances(tolerance):
+                    ConfPverF.build(m0conf, pool_id, base=pver, allowance=v)
 
         return pool_id
 

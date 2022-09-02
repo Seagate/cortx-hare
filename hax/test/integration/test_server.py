@@ -125,9 +125,11 @@ class ContainsStates:
         self.pattern = pattern
 
     def __repr__(self):
+        """Machine readable representation of list of HA states"""
         return str(self.pattern)
 
     def __eq__(self, value):
+        """Equality support for BroadcastHAStates."""
         if not isinstance(value, BroadcastHAStates):
             return False
         return self.pattern == value.states

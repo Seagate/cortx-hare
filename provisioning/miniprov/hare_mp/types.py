@@ -29,6 +29,7 @@ class DList(Sequence[T]):
     comment: str
 
     def __getitem__(self, ndx):
+        """Allows using [] operator."""
         return self.value[ndx]
 
     def __len__(self):
@@ -67,6 +68,7 @@ class DhallTuple:
                                 for k in fields(self)) + ' }'
 
     def __repr__(self):
+        """Machine readable str representation of the DhallTuple object."""
         return self.__str__()
 
 
@@ -190,6 +192,7 @@ class FdmiFilterDesc(DhallTuple):
 @dataclass(repr=False)
 class ClusterDesc(DhallTuple):
     create_aux: Maybe[bool]
+    generate_formulaic_pvers: Maybe[bool]
     node_info: DList[NodeDesc]
     pool_info: DList[PoolDesc]
     profile_info: DList[ProfileDesc]

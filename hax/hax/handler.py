@@ -253,7 +253,7 @@ class ConsumerThread(StoppableThread):
                         # Check if process node is online
                         proc_node_status: ObjHealth = (
                             cns.get_proc_node_health(state.fid))
-                        LOG.debug('Process node status: %s', proc_node_status)
+                        LOG.info('Process node status: %s', proc_node_status)
                         # If process node is online, we assume corresponding
                         # hax is also online. Let the local hax process it.
                         if proc_node_status == ObjHealth.OK:
@@ -326,7 +326,7 @@ class ConsumerThread(StoppableThread):
         self.consul.set_proc_restart_count(req.process_fid,
                                            restart_count + 1)
 
-    def _do_work(self, planner: WorkPlanner, motr: Motr):
+    def _do_work(self, planner: WorkPlanner, motr: Motr):  # noqa: MC0001
         LOG.info('Handler thread has started')
 
         try:
@@ -340,14 +340,14 @@ class ConsumerThread(StoppableThread):
                     if isinstance(item, FirstEntrypointRequest):
                         self._restart_notify(item, motr)
                         motr.send_entrypoint_request_reply(
-                             EntrypointRequest(
-                                 reply_context=item.reply_context,
-                                 req_id=item.req_id,
-                                 remote_rpc_endpoint=item.remote_rpc_endpoint,
-                                 process_fid=item.process_fid,
-                                 git_rev=item.git_rev,
-                                 pid=item.pid,
-                                 is_first_request=item.is_first_request))
+                            EntrypointRequest(
+                                reply_context=item.reply_context,
+                                req_id=item.req_id,
+                                remote_rpc_endpoint=item.remote_rpc_endpoint,
+                                process_fid=item.process_fid,
+                                git_rev=item.git_rev,
+                                pid=item.pid,
+                                is_first_request=item.is_first_request))
                     elif isinstance(item, EntrypointRequest):
                         # While replying any Exception is catched. In such a
                         # case, the motr process will receive EAGAIN and
@@ -368,7 +368,7 @@ class ConsumerThread(StoppableThread):
                             motr.broadcast_ha_states(item.states,
                                                      update_kv=False)
                             status = self.consul.objHealthToProcessEvent(
-                                        item.states[0].status)
+                                item.states[0].status)
                             # Account for received process status.
                             self.consul.update_process_status_local(
                                 ConfHaProcess(chp_event=status,

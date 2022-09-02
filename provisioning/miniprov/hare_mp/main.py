@@ -178,10 +178,10 @@ def logrotate_generic(url: str):
 
 @func_log(func_enter, func_leave)
 def logrotate(url: str):
-    ''' This function is kept incase needed in future.
-        This function configures logrotate based on
-        'setup_type' key from confstore
-    '''
+    """This function is kept incase needed in future.
+    This function configures logrotate based on
+    'setup_type' key from confstore
+    """
     try:
         server_type = get_server_type(url)
         logging.info('Server type (%s)', server_type)
@@ -908,7 +908,7 @@ def list2dict(
     for node in nodes_data_hctl:
         node_svc_info: Dict[str, List[str]] = {}
         for service in node['svcs']:
-            if not service['name'] in node_svc_info.keys():
+            if not service['name'] in node_svc_info:
                 node_svc_info[service['name']] = []
             if (service['status'] == 'started'):
                 node_svc_info[service['name']].append(service['status'])

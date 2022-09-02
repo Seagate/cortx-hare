@@ -103,8 +103,8 @@ def _setup_logging(opts: AppCtx):
 @click.pass_context
 def parse_opts(ctx, cdf: str, conf_dir: str, transport: str, log_dir: str,
                consul_server: bool, uuid: str, log_file: str):
-    """Generate Hare configuration according to the given CDF file.
-
+    """
+    Generate Hare configuration according to the given CDF file.
     CDF Full path to the Cluster Description File (CDF).
     """
     ctx.ensure_object(dict)
@@ -119,7 +119,20 @@ def parse_opts(ctx, cdf: str, conf_dir: str, transport: str, log_dir: str,
 
 
 class ConfGenerator:
+
+    """Generates confd.dhall from CDF file and uses m0confgen to generate motr
+       specific confd.xc.
+
+    confd.dhall is a pre-configuration file for Motr using dhall configuration
+    language which is an input to dhall utility that generates a list of motr
+    configuration objects corresponding to motr configuration obt structures
+    in a human readable format. This output is then passed as an input to
+    m0confgen to generate motr specific `confd.xc` that follows
+    motr xcode grammar.
+    """
+
     def __init__(self, context: AppCtx):
+        """Construct ConfGenerator with necessary context."""
         self.cdf_path = context.cdf_path
         self.conf_dir = context.conf_dir
         self.transport = context.transport
