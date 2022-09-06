@@ -353,7 +353,7 @@ static void __ha_failvec_reply_send(const struct hax_msg *hm,
 	hl = hm->hm_hl;
 	M0_PRE(hl != NULL);
 
-	M0_PRE(hl->hm_hc != NULL);
+	M0_PRE(hm->hm_hc != NULL);
 	hif = hm->hm_hc->hc_hi;
 
 	msg = &hm->hm_msg;
