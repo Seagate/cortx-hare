@@ -342,14 +342,21 @@ M0_INTERNAL void m0_ha_failvec_reply_send(unsigned long long hm,
 static void __ha_failvec_reply_send(const struct hax_msg *hm,
 				    struct m0_fid *pool_fid, uint32_t nr_notes)
 {
-	struct m0_ha_link *hl = hm->hm_hl;
-	struct m0_halon_interface *hif = hm->hm_hc->hc_hi;
-	const struct m0_ha_msg *msg = &hm->hm_msg;
+	struct m0_ha_link *hl = NULL;
+	struct m0_halon_interface *hif = NULL;
+	const struct m0_ha_msg *msg;
 	struct m0_ha_msg *repmsg;
 	uint64_t tag;
 
 	M0_PRE(hm != NULL);
+
+	hl = hm->hm_hl;
 	M0_PRE(hl != NULL);
+
+	M0_PRE(hl->hm_hc != NULL);
+	hif = hm->hm_hc->hc_hi;
+
+	msg = &hm->hm_msg;
 
 	M0_ALLOC_PTR(repmsg);
 	M0_ASSERT(repmsg != NULL);
@@ -412,11 +419,11 @@ static PyObject *nvec_to_list(const struct m0_ha_note *notes, uint32_t nr_notes)
 {
 	uint32_t i;
 	const struct m0_ha_note *note;
-	const char *obj_name;
 	PyObject *list = PyList_New(nr_notes);
 
 	PyObject *hax_mod = getModule("hax.types");
 	for (i = 0; i < nr_notes; ++i) {
+		const char *obj_name;
 		note = &notes[i];
 		PyObject *fid = PyObject_CallMethod(
 		    hax_mod, "FidStruct", "(KK)", note->no_id.f_container,
