@@ -259,6 +259,12 @@ class ConsumerThread(StoppableThread):
                         if proc_node_status == ObjHealth.OK:
                             self.process_groups.process_group_unlock(state.fid)
                             continue
+                        # Revoke dynamic fid locks held if its a Hax process
+                        # failure.
+                        if proc_status_remote.proc_type == (
+                                m0HaProcessType.M0_CONF_HA_PROCESS_HA):
+                            cns.revoke_all_dynamic_fidk_lock_for(
+                                state.fid)
                         # Probably process node failed, in such a
                         # case, only RC must be allowed to update
                         # the process's persistent state.

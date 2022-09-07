@@ -206,7 +206,8 @@ QW_F = 0xffffffffffffffff   # QW = QuadWord
 
 ObjTMaskMap = {
     # here for object key - higher 32 bits is masked for dynamic part.
-    ObjT.PROCESS: Fid(QW_F, DW_F)
+    ObjT.PROCESS: Fid(QW_F, DW_F),
+    ObjT.SERVICE: Fid(QW_F, DW_F)
 }
 
 

@@ -104,6 +104,7 @@ class TestFailure(unittest.TestCase):
         consul_util.get_node_encl_fid = Mock(return_value=encl_fid)
         consul_util.get_node_ctrl_fids = Mock(return_value=[ctrl_fid])
         consul_util.get_ioservice_ctrl_fid = Mock(return_value=ctrl_fid)
+        consul_util.get_obj_full_fid = Mock(return_value=service_fid)
 
         # These failure indications are here to trigger specific code paths for
         # node failure. Additional tests can cover different scenarios (e.g.
