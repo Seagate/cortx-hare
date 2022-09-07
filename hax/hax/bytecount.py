@@ -18,7 +18,6 @@
 
 import json
 import logging
-from math import ceil
 import re
 from threading import Event
 from typing import Dict, List, Optional, Tuple
@@ -105,20 +104,18 @@ class ByteCountUpdater(StoppableThread):
                 else:
                     pver_bc[pver_fid] = byte_count
 
-        LOG.info('Bytecount with parity buffer: %s', pver_bc)
+        LOG.info('ABK: Bytecount: %s', pver_bc)
 
         bc_without_parity: Dict[str, int] = {}
         for pver, bc in pver_bc.items():
             bc_without_parity[pver] = \
                 bc - self._get_parity_buffers(bc, pver_state[pver])
-        LOG.info('Bytecount without parity buffer: %s', bc_without_parity)
+        LOG.info('ABK: Bytecount without parity buffer: %s', bc_without_parity)
         return bc_without_parity
 
     def _get_parity_buffers(self, bc: int, state: PverInfo) -> int:
         """Calculate the parity buffer count based on pool configuration."""
-        tot_units = state.data_units + state.parity_units
-        bytes_per_unit = ceil(bc / tot_units)
-        return bytes_per_unit * state.parity_units
+        return 0
 
     @log_exception
     def _execute(self, motr: Motr):
