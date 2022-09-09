@@ -21,7 +21,7 @@ from hax.types import HAState, ObjHealth, ObjT, Fid
 from hax.ha.resource.node import Node
 from hax.ha.resource.resource import ResourceType
 from hax.ha.event.event import HaEvent
-from hax.util import ConsulUtil
+from hax.configmanager import ConfigManager
 from cortx.utils.conf_store import Conf
 
 LOG = logging.getLogger('hax')
@@ -32,7 +32,7 @@ Resource = NamedTuple('Resource', [('type', ResourceType), ('id', str),
 
 
 class Ha():
-    def __init__(self, util: ConsulUtil):
+    def __init__(self, util: ConfigManager):
         self.util = util
 
     def send_event(self, res: Resource):
@@ -71,6 +71,8 @@ class Ha():
 
             node_name = cns.get_process_node(ha_state.fid)
             node_fid = cns.get_node_fid(node_name)
+            # silence mypy
+            assert node_fid is not None
             state = cns.get_process_based_node_state(node_fid)
             LOG.debug('received node state=%s node=%s', state, node_name)
             # since the node event is not always for local node

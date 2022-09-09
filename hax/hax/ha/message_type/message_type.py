@@ -16,7 +16,7 @@
 # opensource@seagate.com or cortx-questions@seagate.com.
 
 import logging
-from hax.util import ConsulUtil
+from hax.configmanager import ConfigManager
 from hax.ha.message_interface.message_interface import MessageBusInterface
 
 
@@ -25,7 +25,7 @@ class MessageType():
         """Message base class with abstract send method."""
         logging.debug('Inside MessageType')
 
-    def send(self, event, util: ConsulUtil):
+    def send(self, event, util: ConfigManager):
         raise NotImplementedError()
 
 
@@ -35,8 +35,8 @@ class HealthMessage(MessageType):
     def __init__(self):
         logging.debug('Inside HealthMessage')
 
-    def send(self, event, util: ConsulUtil):
-        logging.info('Sending HealthMessage: %s', event)
+    def send(self, event, util: ConfigManager):
+        logging.debug('Sending HealthMessage: %s', event)
         for interface in self.topic_list.items():
             sender = interface[1](util)
             message_type = interface[0]

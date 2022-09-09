@@ -26,7 +26,8 @@ from typing import Dict, List, Tuple
 
 from consul import Consul
 from hax.common import di_configuration
-from hax.util import ConsulUtil, repeat_if_fails
+from hax.util import repeat_if_fails
+from hax.configmanager import ConsulConfigManager
 
 import utils
 
@@ -50,7 +51,7 @@ def _get_processes_for_cluster() -> Tuple[Dict[str, List[utils.Process]], str]:
 @repeat_if_fails()
 def _get_processes_for_node() -> Dict[str, List[utils.Process]]:
     cns = Consul()
-    cns_util = ConsulUtil(raw_client=cns)
+    cns_util = ConsulConfigManager(raw_client=cns)
     node = cns_util.get_local_nodename()
     processes = utils.processes_node(cns, node)
     return processes
@@ -58,7 +59,7 @@ def _get_processes_for_node() -> Dict[str, List[utils.Process]]:
 
 @repeat_if_fails()
 def erase_rc_leader() -> None:
-    cns_util = ConsulUtil()
+    cns_util = ConsulConfigManager()
     # fake leader value must match r'^elect[0-9]+$'
     logging.info('Making sure that RC leader can be re-elected next time')
     cns_util.kv.kv_put('leader', 'elect2805')

@@ -17,7 +17,7 @@
 
 import json
 from typing import Dict, List, Optional
-from hax.util import ConsulUtil
+from hax.configmanager import ConsulConfigManager
 
 cached_subscriber_list: List = []
 is_subscriber_list_cached: bool = False
@@ -27,12 +27,12 @@ class HaUtils:
     resource_types = ['node']
     interface_types = ['health_message']
 
-    def __init__(self, consul_util: ConsulUtil):
+    def __init__(self, consul_util: ConsulConfigManager):
         self.util = consul_util
         self.get_subscribers(self.util, None)
 
     # If resourse_type is None then all resource_types will be fetched
-    def get_subscribers(self, consul_util: ConsulUtil,
+    def get_subscribers(self, consul_util: ConsulConfigManager,
                         resourse_type: Optional[str]):
         global cached_subscriber_list, is_subscriber_list_cached
         subscriber_list: List = []

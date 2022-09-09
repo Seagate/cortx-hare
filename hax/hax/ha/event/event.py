@@ -18,7 +18,7 @@
 import logging
 from hax.ha.const import HEALTH_EVENT_SOURCES, NOT_DEFINED
 from hax.ha.utils import HaUtils
-from hax.util import ConsulUtil
+from hax.configmanager import ConsulConfigManager
 from cortx.utils.event_framework.health import HealthAttr, HealthEvent
 
 
@@ -56,7 +56,7 @@ class HaEvent():
     def send(self, util):
         raise NotImplementedError()
 
-    def get_subscribers(self, consul_util: ConsulUtil,
+    def get_subscribers(self, consul_util: ConsulConfigManager,
                         resourse_type: str):
         ha_util = HaUtils(consul_util)
         subscriber_list = ha_util.get_subscribers(consul_util, resourse_type)

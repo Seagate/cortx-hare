@@ -42,7 +42,8 @@ import yaml
 from cortx.utils.cortx import Const
 from hax.common import di_configuration
 from hax.types import KeyDelete, Fid
-from hax.util import ConsulUtil, repeat_if_fails, KVAdapter
+from hax.util import repeat_if_fails, KVAdapter
+from hax.configmanager import ConfigManager, ConsulConfigManager
 from helper.generate_sysconf import Generator
 
 from hare_mp.cdf import CdfGenerator
@@ -232,7 +233,8 @@ def has_process_stopped(proc_name: str) -> bool:
 
 
 @repeat_if_fails()
-def save_consul_node_name(cns_utils: ConsulUtil, consul_nodename: str,
+def save_consul_node_name(cns_utils: ConsulConfigManager,
+                          consul_nodename: str,
                           hostname: str):
     cns_utils.kv.kv_put(f'consul/node/{hostname}', consul_nodename)
 
@@ -250,7 +252,7 @@ def _start_consul(utils: Utils,
     provider = ConfStoreProvider(url)
     node_id = uuid.uuid4()
     num_ep = int(provider.get('cortx>external>consul>num_endpoints'))
-    cns_utils: ConsulUtil = ConsulUtil()
+    cns_utils: ConsulConfigManager = ConsulConfigManager()
     hostname = utils.get_local_hostname()
 
     # remove tcp://
@@ -367,7 +369,7 @@ def prepare(args):
     utils.save_node_facts()
     utils.save_drives_info()
     try:
-        util: ConsulUtil = ConsulUtil()
+        util: ConfigManager = ConsulConfigManager()
         sess = util.get_leader_session_no_wait()
         util.destroy_session(sess)
     except Exception:
@@ -376,7 +378,8 @@ def prepare(args):
     stop_consul_blocking(consul_starter)
 
 
-def get_hare_motr_s3_processes(utils: ConsulUtil) -> Dict[str, List[Fid]]:
+def get_hare_motr_s3_processes(
+        utils: ConsulConfigManager) -> Dict[str, List[Fid]]:
     nodes = utils.catalog.get_node_names()
     processes: Dict[str, List[Fid]] = {}
     for node in nodes:
@@ -507,7 +510,7 @@ def start_mkfs_parallel(hostname: str, hare_config_dir: str):
 
 @repeat_if_fails()
 def is_mkfs_done_on_all_nodes(utils: Utils,
-                              cns_utils: ConsulUtil,
+                              cns_utils: ConsulConfigManager,
                               nodes: List[str]) -> bool:
     for node in nodes:
         if not cns_utils.kv.kv_get(f'mkfs_done/{node}',
@@ -519,7 +522,7 @@ def is_mkfs_done_on_all_nodes(utils: Utils,
 
 @func_log(func_enter, func_leave)
 @repeat_if_fails()
-def cleanup_mkfs_state(utils: Utils, cns_utils: ConsulUtil):
+def cleanup_mkfs_state(utils: Utils, cns_utils: ConsulConfigManager):
     hostname = utils.get_local_hostname()
     keys: List[KeyDelete] = [
         KeyDelete(name=f'mkfs_done/{hostname}', recurse=True),
@@ -531,7 +534,7 @@ def cleanup_mkfs_state(utils: Utils, cns_utils: ConsulUtil):
 
 @func_log(func_enter, func_leave)
 @repeat_if_fails()
-def set_mkfs_done_for(node: str, cns_utils: ConsulUtil):
+def set_mkfs_done_for(node: str, cns_utils: ConsulConfigManager):
     cns_utils.kv.kv_put(f'mkfs_done/{node}', 'true')
 
 
@@ -542,7 +545,7 @@ def init(args):
 
         conf = ConfStoreProvider(url)
         utils = Utils(conf)
-        cns_utils = ConsulUtil()
+        cns_utils = ConsulConfigManager()
         stop_event = Event()
         config_dir = get_config_dir(url)
         log_dir = get_log_dir(url)
@@ -637,7 +640,7 @@ def reset(args):
 
 @func_log(func_enter, func_leave)
 @repeat_if_fails()
-def cleanup_node_facts(utils: Utils, cns_utils: ConsulUtil):
+def cleanup_node_facts(utils: Utils, cns_utils: ConsulConfigManager):
     hostname = utils.get_local_hostname()
     keys: List[KeyDelete] = [
         KeyDelete(name=f'{hostname}/facts', recurse=True),
@@ -649,7 +652,7 @@ def cleanup_node_facts(utils: Utils, cns_utils: ConsulUtil):
 
 @func_log(func_enter, func_leave)
 @repeat_if_fails()
-def cleanup_disks_info(utils: Utils, cns_utils: ConsulUtil):
+def cleanup_disks_info(utils: Utils, cns_utils: ConsulConfigManager):
     hostname = utils.get_local_hostname()
     keys: List[KeyDelete] = [
         KeyDelete(name=f'{hostname}/drives', recurse=True),
@@ -661,7 +664,7 @@ def cleanup_disks_info(utils: Utils, cns_utils: ConsulUtil):
 
 @func_log(func_enter, func_leave)
 def kv_cleanup(url):
-    util: ConsulUtil = ConsulUtil()
+    util: ConsulConfigManager = ConsulConfigManager()
     conf = ConfStoreProvider(url)
     utils = Utils(conf)
     cleanup_disks_info(utils, util)
@@ -886,7 +889,7 @@ def bootstrap_cluster(path_to_cdf: str, domkfs=False):
 
 
 def wait_for_cluster_start(url: str):
-    util: ConsulUtil = ConsulUtil()
+    util: ConsulConfigManager = ConsulConfigManager()
     processes: Dict[str, List[Fid]] = {}
     while not processes:
         processes = get_hare_motr_s3_processes(util)
