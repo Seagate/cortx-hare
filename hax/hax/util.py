@@ -18,6 +18,9 @@
 
 import inject
 import logging
+import json
+import re
+import os
 from base64 import b64encode
 from functools import wraps
 from typing import Any, Dict, List, NamedTuple, Optional, Tuple
@@ -30,6 +33,7 @@ from consul.base import ClientError
 from requests.exceptions import RequestException
 from urllib3.exceptions import HTTPError
 
+from hax.log import TRACE
 from hax.common import HaxGlobalState
 from hax.exception import HAConsistencyException, InterruptedException
 from hax.types import (ByteCountStats, ConfHaProcess, Fid, FsStatsWithTime,
@@ -2409,11 +2413,3 @@ class ConsulUtil:
         for client_type in json.loads(m0_client_types['Value']):
             client_types.append(client_type)
         return client_types
-
-
-def dump_json(obj) -> str:
-    """
-    Interface wrapper to automatically apply correct parameters for json
-    serialization obj.
-    """
-    return simplejson.dumps(obj, for_json=True)

@@ -34,7 +34,7 @@ from hax.queue.publish import EQPublisher, BQPublisher
 from hax.types import (ConfHaProcess, HAState, HaLinkMessagePromise,
                        MessageId, ObjT, ObjHealth, StoppableThread,
                        m0HaProcessEvent, m0HaProcessType)
-from hax.util import (ConsulUtil, ProcessGroup, dump_json, repeat_if_fails,
+from hax.util import (ProcessGroup, dump_json, repeat_if_fails,
                       ha_process_events)
 from hax.configmanager import ConfigManager, ConsulConfigManager
 from hax.ha import get_producer
