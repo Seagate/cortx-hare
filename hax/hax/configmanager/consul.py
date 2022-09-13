@@ -28,7 +28,7 @@ import simplejson
 from consul import Consul, ConsulException
 from requests.exceptions import RequestException
 
-import util
+from hax import util
 from hax.log import TRACE
 from hax.exception import HAConsistencyException
 from hax.types import (ByteCountStats, ConfHaProcess, Fid, FsStatsWithTime,
