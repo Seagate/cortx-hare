@@ -37,7 +37,7 @@ from urllib3.exceptions import HTTPError
 from hax.common import HaxGlobalState
 from hax.exception import HAConsistencyException, InterruptedException
 from hax.types import (ByteCountStats, ConfHaProcess, Fid, FsStatsWithTime,
-                       FidTypeToObjT, ObjT, ObjHealth, ObjTMaskMap,
+                       FidTypeToObjT, HAState, ObjT, ObjHealth, ObjTMaskMap,
                        Profile, PverInfo, PverState, m0HaProcessEvent,
                        m0HaProcessType, KeyDelete, HaNoteStruct, m0HaObjState)
 
@@ -206,6 +206,12 @@ def wait_for_event(event: Event, interval_sec) -> None:
         raise InterruptedException()
 
 
+def ha_state_to_json(state: HAState) -> str:
+    data = {'fid': str(state.fid),
+            'state': str(state.status.name)}
+    return dump_json(data)
+
+
 class KVAdapter:
     def __init__(self, cns: Optional[Consul] = None):
         self.cns = cns or Consul()
@@ -247,7 +253,7 @@ class KVAdapter:
             b64: bytes = b64encode(v.value.encode())
             b64_str = b64.decode()
 
-            if v.cas:
+            if v.cas is not None:
                 return {
                     'KV': {
                         'Key': v.key,
@@ -2280,6 +2286,22 @@ class ConsulUtil:
                 motr_processes_status[fid] = status
             LOG.info('Updated motr_processes_status: %s',
                      motr_processes_status)
+
+    def get_process_cached_key(self, proc_state: HAState) -> TxPutKV:
+        key = f'cached/{proc_state.fid}/{proc_state.status}'
+        return TxPutKV(key=key, value='True', cas=0)
+
+    def delete_process_cached_key(self, proc_state: HAState) -> None:
+        key = f'cached/{proc_state.fid}/{proc_state.status}'
+        # Deleting this key may fail when there isn't a node failure
+        # and process event wasn't cached.
+        present = self.kv.kv_get(key, allow_null=True)
+        if present:
+            keys: List[KeyDelete] = [
+                KeyDelete(name=key, recurse=False),
+            ]
+            self.kv.kv_delete_in_transaction(keys)
+            LOG.debug('Deleted cached key %s', key)
 
     @repeat_if_fails()
     def obj_dynamic_fidk_lock(self, objt: ObjT) -> bool:

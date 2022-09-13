@@ -71,6 +71,11 @@ class BroadcastHAStates(BaseMessage):
 
 
 @dataclass
+class ProcessKVUpdate(BaseMessage):
+    states: List[HAState]
+
+
+@dataclass
 class HaNvecGetEvent(BaseMessage):
     hax_msg: int
     nvec: List[HaNote]

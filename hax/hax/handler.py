@@ -25,17 +25,17 @@ from hax.message import (BroadcastHAStates, Die, EntrypointRequest,
                          SnsRebalanceStart, SnsRebalanceStatus,
                          SnsRebalanceStop, SnsRepairPause, SnsRepairResume,
                          SnsRepairStart, SnsRepairStatus, SnsRepairStop,
-                         StobIoqError)
+                         StobIoqError, ProcessKVUpdate)
 from hax.exception import HAConsistencyException, NotDelivered
 from hax.motr import Motr
 from hax.motr.delivery import DeliveryHerald
 from hax.motr.planner import WorkPlanner
 from hax.queue.publish import EQPublisher, BQPublisher
-from hax.types import (ConfHaProcess, HAState, HaLinkMessagePromise,
+from hax.types import (ConfHaProcess, Fid, HAState, HaLinkMessagePromise,
                        MessageId, ObjT, ObjHealth, StoppableThread,
                        m0HaProcessEvent, m0HaProcessType)
 from hax.util import (ConsulUtil, ProcessGroup, dump_json, repeat_if_fails,
-                      ha_process_events)
+                      ha_process_events, ha_state_to_json)
 from hax.ha import get_producer
 
 
@@ -68,6 +68,20 @@ class ConsumerThread(StoppableThread):
 
     def stop(self) -> None:
         self.is_stopped = True
+
+    def cache_process_event(self, state: HAState) -> None:
+        # cache the process state updates in EQ
+        payload = ha_state_to_json(state)
+        checks = self.consul.get_process_cached_key(state)
+        res = self.eq_publisher.publish_no_duplicate(
+            'process-kv-update', payload, str(state.fid), [checks])
+        LOG.debug('Event: %s, Added to EQ: %s', payload, res)
+
+    def _is_node_failure(self, proc_fid: Fid) -> bool:
+        cns = self.consul
+        proc_node = cns.get_process_node(proc_fid)
+        status = cns.get_node_health_status(proc_node)
+        return True if status != 'passing' else False
 
     def broadcast_process_state(self, event: ConfHaProcess):
         if event.fid == self.consul.get_hax_fid():
@@ -281,9 +295,22 @@ class ConsumerThread(StoppableThread):
                                 HAState(fid=state.fid,
                                         status=current_status))
                             self.broadcast_process_state(proc_event)
+                            # Only RC hax will be able to delete this key.
+                            cns.delete_process_cached_key(state)
                     else:
                         LOG.debug('Skipping event for fid: %s', state.fid)
                     self.process_groups.process_group_unlock(state.fid)
+                    # Cache the event in case of remote node failure
+                    # and if not already processed by RC node and
+                    # not updated in Consul KV.
+                    proc_status_kv = cns.get_process_status(state.fid)
+                    node_failure = self._is_node_failure(state.fid)
+                    LOG.debug('proc status in kv=%s, evaluated status=%s, '
+                              'node_fail=%s', proc_status_kv.proc_status,
+                              proc_status.name, node_failure)
+                    if (proc_status_kv.proc_status != proc_status.name
+                            and node_failure):
+                        self.cache_process_event(state)
                 else:
                     new_ha_states.append(state)
         except Exception as e:
@@ -415,6 +442,10 @@ class ConsumerThread(StoppableThread):
                                         ' is not available')
                         if item.reply_to:
                             item.reply_to.put(result)
+                    elif isinstance(item, ProcessKVUpdate):
+                        LOG.info('HA states cached: %s', item.states)
+                        self.update_process_failure(planner, motr,
+                                                    item.states)
                     elif isinstance(item, StobIoqError):
                         LOG.info('Stob IOQ: %s', item.fid)
                         payload = dump_json(item)
