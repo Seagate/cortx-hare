@@ -28,6 +28,7 @@ import simplejson
 from consul import Consul, ConsulException
 from requests.exceptions import RequestException
 
+import util
 from hax.log import TRACE
 from hax.exception import HAConsistencyException
 from hax.types import (ByteCountStats, ConfHaProcess, Fid, FsStatsWithTime,
@@ -460,8 +461,8 @@ class ConsulConfigManager(ConfigManager):
             # 'node/<node_name>/process/<process_fidk>/service/type'
             node_items = self.get_all_nodes_cached()
             # TODO [KN] This code is too cryptic. To be refactored.
-            keys = getattr(self, 'get_{}_keys'.format(obj_t.name.lower()))(
-                node_items, fidk)
+            func = getattr(util, "get_{}_keys".format(obj_t.name.lower()))
+            keys = func(node_items, fidk)
             if len(keys) != 1:
                 raise RuntimeError(f'XXX fidk:{fidk} len:{len(keys)}')
             key = keys[0].split('/')
