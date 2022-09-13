@@ -33,12 +33,13 @@ from hax.exception import HAConsistencyException
 from hax.types import (ByteCountStats, ConfHaProcess, Fid, FsStatsWithTime,
                        ObjT, ObjHealth, ObjTMaskMap, Profile, PverInfo,
                        PverState, m0HaProcessEvent, m0HaProcessType,
-                       KeyDelete, HaNoteStruct, m0HaObjState)
+                       KeyDelete, HaNoteStruct, m0HaObjState,
+                       FidTypeToObjT)
 from hax.util import (KVAdapter, CatalogAdapter, consul_to_local_nodename,
                       repeat_if_fails, mkServiceData, mk_fid, ServiceData,
-                      set_motr_processes_status,
-                      FidWithType, create_sdev_fid, get_service_keys,
-                      create_process_fid, ObjStatus, PutKV,
+                      set_motr_processes_status, ObjStatus, PutKV,
+                      FidWithType, create_sdev_fid,
+                      get_service_keys, create_process_fid,
                       ha_process_events, create_drive_fid,
                       MotrConsulProcInfo, get_process_base_fid,
                       ha_conf_obj_states, MotrConsulProcStatus,
@@ -56,6 +57,68 @@ class ConsulConfigManager(ConfigManager):
         self.cns: Consul = raw_client or Consul()
         self.kv = KVAdapter(cns=self.cns)
         self.catalog = CatalogAdapter(cns=self.cns)
+        self.all_node_items: Dict[Any, Any] = {}
+
+    @repeat_if_fails()
+    def get_process_full_fid(self, proc_base_fid: Fid) -> Optional[Fid]:
+        proc_fid = self.kv.kv_get(str(proc_base_fid), recurse=False)
+        if proc_fid is not None:
+            pfid: Fid = Fid.parse(json.loads(proc_fid['Value']))
+            return pfid
+        return proc_base_fid
+
+    @repeat_if_fails()
+    def process_dynamic_fidk_lock(self) -> bool:
+        # Acquire lock to update last_updated_base_fidk.
+        # This will block until lock is acquired.
+        # Will break if any other exception than
+        # HAConsistencyException occurs.
+        try:
+            while not self.kv.kv_put('fidk_update_lock', 'true', cas=0):
+                sleep(1)
+            return True
+        except Exception:
+            return False
+
+    @repeat_if_fails()
+    def process_dynamic_fidk_unlock(self):
+        # Release fidk_update_lock.
+        # This will block until released.
+        try:
+            keys: List[KeyDelete] = [
+                KeyDelete(name='fidk_update_lock', recurse=True),
+            ]
+            while not self.kv.kv_delete_in_transaction(keys):
+                sleep(1)
+        except Exception:
+            raise RuntimeError('Unreachable')
+
+    @repeat_if_fails()
+    def get_process_next_dynamic_fidk_lock(self) -> int:
+        if self.process_dynamic_fidk_lock():
+            fidk = self.kv.kv_get('last_dynamic_fid_key/process',
+                                  recurse=False)
+            new_fidk = int(json.loads(fidk['Value'])) + 1
+            # Update dynamic fid key.
+            while not self.kv.kv_put('last_dynamic_fid_key/process',
+                                     json.dumps(str(new_fidk))):
+                sleep(1)
+            self.process_dynamic_fidk_unlock()
+        return new_fidk
+
+    @repeat_if_fails()
+    def alloc_next_process_fid(self, process_fid: Fid) -> Fid:
+        next_fidk = self.get_process_next_dynamic_fidk_lock()
+        fid_mask: Fid = ObjTMaskMap[ObjT.PROCESS]
+        fid_cont = process_fid.container
+        fid_key = process_fid.key + ((fid_mask.key * next_fidk) + next_fidk)
+        new_proc_fid = Fid(fid_cont, fid_key)
+        base_fid = get_process_base_fid(new_proc_fid)
+        # Save base fid to actualy fid mapping in Consul.
+        while not self.kv.kv_put(f'{base_fid}',
+                                 json.dumps(str(new_proc_fid))):
+            sleep(1)
+        return new_proc_fid
 
     def get_consul_node(self, node: str) -> Optional[str]:
         LOG.debug('fetching consul node for node: %s', node)
@@ -82,6 +145,11 @@ class ConsulConfigManager(ConfigManager):
             f'No {svc_name!r} Consul service found at node {hostname!r}')
 
     def get_local_nodename(self) -> str:
+        """
+        Returns the logical name of the current node. This is the name that
+        Consul is aware of. In other words, whenever Consul references a node,
+        it will use the names that this function can return.
+        """
         try:
             local_nodename = os.environ.get('HARE_HAX_NODE_NAME') or \
                 self.cns.agent.self()['Config']['NodeName']
@@ -145,6 +213,13 @@ class ConsulConfigManager(ConfigManager):
 
     @repeat_if_fails()
     def get_leader_node(self) -> str:
+        """
+        Returns the node name of RC leader.
+        Note: in case when RC leader is not elected yet, the node name may be
+        just a randomly generated string (see hare-node-join script for
+        more details).
+        """
+
         leader = self.kv.kv_get('leader', allow_null=True)
         if leader is None:
             raise HAConsistencyException('No leader key exists yet')
@@ -156,6 +231,10 @@ class ConsulConfigManager(ConfigManager):
         return node.decode('utf-8')
 
     def get_leader_session_no_wait(self) -> str:
+        """
+        Returns the RC leader session. HAConsistencyException is raised
+        immediately if there is no RC leader selected at the moment.
+        """
         try:
             leader = self.kv.kv_get('leader')
             return str(leader['Session'])
@@ -174,6 +253,10 @@ class ConsulConfigManager(ConfigManager):
         return True
 
     def destroy_session(self, session: str) -> None:
+        """
+        Destroys the given Consul Session by name.
+        The method doesn't raise any exception if the session doesn't exist.
+        """
         try:
             self.cns.session.destroy(session)
         except (ConsulException, HTTPError, RequestException) as e:
@@ -187,6 +270,11 @@ class ConsulConfigManager(ConfigManager):
                                     recurse=True,
                                     kv_cache=kv_cache)
         return node_items
+
+    def get_all_nodes_cached(self):
+        if not self.all_node_items:
+            self.all_node_items = self.get_all_nodes()
+        return self.all_node_items
 
     def get_session_node(self, session_id: str) -> str:
         try:
@@ -205,6 +293,10 @@ class ConsulConfigManager(ConfigManager):
                          motr_services=None,
                          kv_cache=None
                          ) -> List[Tuple[ServiceData, ObjHealth]]:
+        """
+        Return the list of all Motr service statuses according to Consul
+        watchers.The following services are considered [default]: ios, confd.
+        """
         if not motr_services:
             motr_services = set(['ios'])
         result = []
@@ -293,7 +385,8 @@ class ConsulConfigManager(ConfigManager):
 
     @repeat_if_fails()
     def is_proc_client(self, process_fid: Fid) -> bool:
-        node_items = self.get_all_nodes()
+        node_items = self.get_all_nodes_cached()
+        client_types = self.get_m0_client_types()
         fidk = str(process_fid.key)
 
         # This is the RegExp to match the keys in Consul KV that describe
@@ -315,7 +408,7 @@ class ConsulConfigManager(ConfigManager):
             if not match_result:
                 continue
             srv_type = match_result.group(1)
-            if 'm0_client' in srv_type:
+            if srv_type in client_types:
                 return True
         return False
 
@@ -365,11 +458,10 @@ class ConsulConfigManager(ConfigManager):
         obj_state: int = HaNoteStruct.M0_NC_ONLINE
         if obj_t.name in (ObjT.PROCESS.name, ObjT.SERVICE.name):
             # 'node/<node_name>/process/<process_fidk>/service/type'
-            node_items = self.get_all_nodes(kv_cache=kv_cache)
-            if obj_t.name == ObjT.PROCESS.name:
-                keys = get_process_keys(node_items, fidk)
-            elif obj_t.name == ObjT.SERVICE.name:
-                keys = get_service_keys(node_items, fidk)
+            node_items = self.get_all_nodes_cached()
+            # TODO [KN] This code is too cryptic. To be refactored.
+            keys = getattr(self, 'get_{}_keys'.format(obj_t.name.lower()))(
+                node_items, fidk)
             if len(keys) != 1:
                 raise RuntimeError(f'XXX fidk:{fidk} len:{len(keys)}')
             key = keys[0].split('/')
@@ -392,7 +484,6 @@ class ConsulConfigManager(ConfigManager):
             obj_state = self.get_proc_svc_conf_obj_status(obj_t,
                                                           fidk,
                                                           kv_cache=kv_cache)
-
         elif obj_t.name in device_obj_types:
             obj_state = device_obj_types[obj_t.name](obj_t,
                                                      fidk,
@@ -402,6 +493,9 @@ class ConsulConfigManager(ConfigManager):
 
     @uses_consul_cache
     def is_node_alive(self, node: str, kv_cache=None) -> bool:
+        """
+        Checks via Consul Members API whether the given node is alive.
+        """
         try:
             # Returns data of the following kind:
             # [{
@@ -461,6 +555,10 @@ class ConsulConfigManager(ConfigManager):
 
     @uses_consul_cache
     def get_node_health_status(self, node: str, kv_cache=None) -> str:
+        """
+        Returns the node health status string returned by Consul.
+        Possible return values: passing, warning, critical
+        """
         try:
             node_data = self.get_node_health_details(node, kv_cache=kv_cache)
             # if not node_data or (not self.is_node_alive(node,
@@ -473,13 +571,35 @@ class ConsulConfigManager(ConfigManager):
                 f'Failed to get {node} node health') from e
 
     @repeat_if_fails()
+    def get_proc_node_health(self, proc_fid: Fid) -> ObjHealth:
+        node = self.get_process_node(proc_fid)
+        node_data = self.get_node_health_details(node)
+        if not node_data:
+            return ObjHealth.OFFLINE
+        LOG.debug('node data: %s', node_data)
+        node_status = str(node_data[0]['Status'])
+        if node_status != 'passing':
+            return ObjHealth.OFFLINE
+        return ObjHealth.OK
+
+    @repeat_if_fails()
     @uses_consul_cache
-    def get_node_fid(self, node: str, kv_cache=None) -> Optional[Fid]:
+    def get_node_fid(self, node: str, kv_cache=None,
+                     use_cache=True) -> Optional[Fid]:
+        """
+        Returns the fid of the given node.
+
+        Parameters:
+            node : hostname of the node.
+        """
         # Example,
         # m0conf/nodes/
         # 0x6e00000000000001:0x3:{"name": "ssc-vm-1623.colo.seagate.com",
         #                         "state": "M0_NC_UNKNOWN"}
-        node_items = self.get_all_nodes(kv_cache=kv_cache)
+        if not use_cache:
+            node_items = self.get_all_nodes(kv_cache=kv_cache)
+        else:
+            node_items = self.get_all_nodes_cached()
         for item in node_items:
             key = item['Key']
             key_split = key.split('/')
@@ -498,6 +618,10 @@ class ConsulConfigManager(ConfigManager):
     def get_node_name_by_fid(self,
                              node_fid: Fid,
                              kv_cache=None) -> Optional[str]:
+        """
+        Returns the node name by its FID value or None if the given FID doesn't
+        correspond to any node.
+        """
         node_data = self.kv.kv_get(f'm0conf/nodes/{node_fid}',
                                    kv_cache=kv_cache)
         if node_data:
@@ -512,6 +636,10 @@ class ConsulConfigManager(ConfigManager):
                                    machineid: str,
                                    kv_cache=None,
                                    allow_null=False) -> Optional[str]:
+        """
+        Returns the node name by its machine id value or None if the given
+        machine id doesn't correspond to any node.
+        """
         mid_key = self.kv.kv_get(machineid, kv_cache=kv_cache,
                                  allow_null=allow_null)
         if mid_key:
@@ -524,6 +652,10 @@ class ConsulConfigManager(ConfigManager):
                                   nodename: str,
                                   kv_cache=None,
                                   allow_null=False):
+        """
+        Returns the machine id by its node-name value or None if the given
+        node-name doesn't correspond to any node.
+        """
         node_key = self.kv.kv_get(nodename, kv_cache=kv_cache,
                                   allow_null=allow_null)
         if node_key:
@@ -536,6 +668,10 @@ class ConsulConfigManager(ConfigManager):
     def get_node_ctrl_fids(self,
                            node: str,
                            kv_cache=None) -> Optional[List[Fid]]:
+        """
+        Parameters:
+            node : hostname of the node.
+        """
         # Example,
         # [
         #    "key": "m0conf/sites/0x5300000000000001:0x1/
@@ -559,6 +695,13 @@ class ConsulConfigManager(ConfigManager):
         return list_fids
 
     def get_node_hare_motr_s3_fids(self, node: str) -> List[Fid]:
+        """
+        Parameters:
+            node : hostname of the node
+        response:
+            returns list of fids for hax, ioservices, confd and s3services
+            configured and running on @node.
+        """
         services = ['hax', 'ios', 'confd', 's3service']
         node_data = self.get_node_health_details(node)
         fids: List[Fid] = []
@@ -579,7 +722,7 @@ class ConsulConfigManager(ConfigManager):
         # Example key m0conf/nodes/0x6e00000000000001:0x3/processes/
         #   0x7200000000000001:0x15/services/0x7300000000000001:0x17/sdevs/
         #   0x6400000000000001:0x18:{"path": "/dev/sdc", "state": "offline"}
-        sdev_items = self.get_all_nodes(kv_cache=kv_cache)
+        sdev_items = self.get_all_nodes_cached()
         regex = re.compile(
             f'^m0conf\\/.*\\/processes\\/{ioservice_fid}\\/.*\\/sdevs\\/.*$')
         sdev_fids = []
@@ -618,6 +761,12 @@ class ConsulConfigManager(ConfigManager):
 
     @repeat_if_fails()
     def all_io_services_failed(self, node: str, kv_cache=None) -> bool:
+        """
+        Checks if all the IO services of given node are in failed state.
+
+        Parameters:
+            node : hostname of the node.
+        """
         node_fid = self.get_node_fid(node)
 
         # Example m0conf/nodes/0x6e00000000000001:0x3/processes/
@@ -702,6 +851,12 @@ class ConsulConfigManager(ConfigManager):
     @repeat_if_fails()
     @uses_consul_cache
     def get_node_encl_fid(self, node: str, kv_cache=None) -> Optional[Fid]:
+        """
+        Returns the fid of the enclosure for the given node.
+
+        Parameters:
+            node : hostname of the node.
+        """
         # Example,
         # {
         #    "key": "m0conf/sites/0x5300000000000001:0x1/
@@ -728,6 +883,19 @@ class ConsulConfigManager(ConfigManager):
                 return Fid.parse(encl_fid)
         return None
 
+    def ha_note_to_objhealth(self, state: int) -> ObjHealth:
+        ha_note_to_objhealth = {
+            HaNoteStruct.M0_NC_FAILED: ObjHealth.FAILED,
+            HaNoteStruct.M0_NC_ONLINE: ObjHealth.OK,
+            HaNoteStruct.M0_NC_TRANSIENT: ObjHealth.OFFLINE,
+            HaNoteStruct.M0_NC_DTM_RECOVERING: ObjHealth.RECOVERING,
+            HaNoteStruct.M0_NC_REPAIR: ObjHealth.REPAIR,
+            HaNoteStruct.M0_NC_REPAIRED: ObjHealth.REPAIRED,
+            HaNoteStruct.M0_NC_REBALANCE: ObjHealth.REBALANCE,
+            HaNoteStruct.M0_NC_UNKNOWN: ObjHealth.UNKNOWN
+        }
+        return ha_note_to_objhealth[state]
+
     @repeat_if_fails()
     def set_node_state(self,
                        node_fid: Fid,
@@ -739,7 +907,7 @@ class ConsulConfigManager(ConfigManager):
         #    "value": "{\"name\": \"srvnode-1.data.private\",
         #               \"state\": \"M0_NC_UNKNOWN\"}"
         # }
-        node_items = self.get_all_nodes(kv_cache=kv_cache)
+        node_items = self.get_all_nodes_cached()
         regex = re.compile(f'^m0conf/nodes/{node_fid}$')
         for node in node_items:
             match_result = re.match(regex, node['Key'])
@@ -818,14 +986,7 @@ class ConsulConfigManager(ConfigManager):
             val = json.loads(ctrl['Value'])
             state = val['state']
             LOG.debug('Controller=%s state=%s', ctrl_fid, state)
-            if state in (m0HaObjState.M0_NC_TRANSIENT.name,
-                         m0HaObjState.M0_NC_FAILED.name):
-                node = self.get_ctrl_node(ctrl_fid, kv_cache=kv_cache)
-                if (self.get_node_health_status(node, kv_cache=kv_cache) ==
-                        'passing'):
-                    return m0HaObjState.M0_NC_ONLINE
-            else:
-                return m0HaObjState.parse(state)
+            return m0HaObjState.parse(state)
         return m0HaObjState.M0_NC_ONLINE
 
     @repeat_if_fails()
@@ -843,14 +1004,7 @@ class ConsulConfigManager(ConfigManager):
             val = json.loads(encl['Value'])
             state = val['state']
             LOG.debug('Enclosure=%s state=%s', encl_fid, state)
-            if state in (m0HaObjState.M0_NC_TRANSIENT.name,
-                         m0HaObjState.M0_NC_FAILED.name):
-                node = self.get_encl_node(encl_fid, kv_cache=kv_cache)
-                if (self.get_node_health_status(node, kv_cache=kv_cache) ==
-                        'passing'):
-                    return m0HaObjState.M0_NC_ONLINE
-            else:
-                return m0HaObjState.parse(state)
+            return m0HaObjState.parse(state)
         return m0HaObjState.M0_NC_ONLINE
 
     @repeat_if_fails()
@@ -864,16 +1018,8 @@ class ConsulConfigManager(ConfigManager):
         if node:
             val = json.loads(node['Value'])
             state = val['state']
-            node_name = val['name']
             LOG.debug('Node=%s state=%s', node_fid, state)
-            if state in (m0HaObjState.M0_NC_TRANSIENT.name,
-                         m0HaObjState.M0_NC_FAILED.name):
-                if (self.get_node_health_status(node_name,
-                                                kv_cache=kv_cache) ==
-                        'passing'):
-                    return m0HaObjState.M0_NC_ONLINE
-            else:
-                return m0HaObjState.parse(state)
+            return m0HaObjState.parse(state)
         return m0HaObjState.M0_NC_ONLINE
 
     @repeat_if_fails()
@@ -912,9 +1058,13 @@ class ConsulConfigManager(ConfigManager):
         self.kv.kv_put('stats/filesystem', data_str)
 
     def update_pver_bc(self, data: ByteCountStats) -> None:
-        # Example: key= ioservices/0x7200000000000001:0xf/pvers/
-        #              0x7600000000000001:0x8/users/1
-        # value = {"bc":4096, "object_cnt":1}
+        """
+        Updates bytecount stats per pool versions for all pvers
+        under the ios service in consul kv.
+        Example: key= ioservices/0x7200000000000001:0xf/pvers/
+                      0x7600000000000001:0x8/users/1
+        value = {"bc":4096, "object_cnt":1}
+        """
         ios_fid = data.proc_fid
         for pver in data.pvers:
             value = json.dumps({'bc': pver.byte_count,
@@ -928,10 +1078,13 @@ class ConsulConfigManager(ConfigManager):
     def update_bc_for_dg_category(self,
                                   pver_bc: Dict[str, int],
                                   pver_state: Dict[str, PverInfo]):
-        # Bytecount data is stored in consul KV in key:value format
-        # ioservices/0x7200000000000001:0x20/pvers/
-        #     0x7600000000000001:0x6/users/1
-        # value = {"bc": 4096, "object_cnt": 1}
+        '''
+        This function will update bytecount for subsequent dg state/category
+        which will reflect on cluster status.
+        Bytecount data is stored in consul KV in key:value format
+        ioservices/0x7200000000000001:0x20/pvers/0x7600000000000001:0x6/users/1
+        value = {"bc": 4096, "object_cnt": 1}
+        '''
         pver_state_map = {
             PverState.M0_CPS_HEALTHY: 'healthy',
             PverState.M0_CPS_DEGRADED: 'degraded',
@@ -1056,7 +1209,11 @@ class ConsulConfigManager(ConfigManager):
                 continue
             val = json.loads(sdev['Value'])
             LOG.debug('Sdev=%s state=%s', str(sdev_fid), val['state'])
-            return drive_to_ha_state_map[str(val['state']).lower()]
+            if str(val['state']).lower() in ['unknown', 'm0_nc_unknown',
+                                             'dtm_recovering']:
+                return HaNoteStruct.M0_NC_ONLINE
+            else:
+                return drive_to_ha_state_map[str(val['state']).lower()]
 
         return HaNoteStruct.M0_NC_ONLINE
 
@@ -1130,7 +1287,7 @@ class ConsulConfigManager(ConfigManager):
         # 4. Create sdev fid from sdev fid key.
         # sdev_items = self.kv.kv_get('m0conf/nodes', recurse=True)
         node_fid = self.get_node_fid(node_name)
-        sdev_items = self.get_all_nodes()
+        sdev_items = self.get_all_nodes_cached()
         for x in sdev_items:
             if (f'm0conf/nodes/{node_fid}' in x['Key'] and
                     '/sdevs/' in x['Key']):
@@ -1150,7 +1307,7 @@ class ConsulConfigManager(ConfigManager):
                            fid: Fid,
                            proc_node=None,
                            kv_cache=None) -> MotrConsulProcInfo:
-        proc_base_fid = get_process_base_fid(fid)
+        proc_base_fid = self.get_base_fid(fid)
         key = f'processes/{proc_base_fid}'
         status = self.kv.kv_get(key, kv_cache=kv_cache, allow_null=True)
         if status:
@@ -1164,7 +1321,7 @@ class ConsulConfigManager(ConfigManager):
                                  fid: Fid,
                                  proc_node=None,
                                  kv_cache=None) -> MotrConsulProcInfo:
-        proc_base_fid = get_process_base_fid(fid)
+        proc_base_fid = self.get_base_fid(fid)
         this_node = self.get_local_nodename()
         key = f'{this_node}/processes/{proc_base_fid}'
         status = self.kv.kv_get(key, kv_cache=kv_cache, allow_null=True)
@@ -1175,12 +1332,13 @@ class ConsulConfigManager(ConfigManager):
             return MotrConsulProcInfo('Unknown', 'Unknown')
 
     @repeat_if_fails()
-    def get_process_full_fid(self, proc_base_fid: Fid) -> Optional[Fid]:
-        proc_fid = self.kv.kv_get(str(proc_base_fid), recurse=False)
-        if proc_fid is not None:
-            pfid: Fid = Fid.parse(json.loads(proc_fid['Value']))
-            return pfid
-        return proc_base_fid
+    def get_obj_full_fid(self, base_fid: Fid) -> Fid:
+        full_fid = self.kv.kv_get(str(base_fid), allow_null=True,
+                                  recurse=False)
+        if full_fid is not None:
+            fid: Fid = Fid.parse(json.loads(full_fid['Value']))
+            return fid
+        return base_fid
 
     @repeat_if_fails()
     def update_process_status_local(self, event: ConfHaProcess) -> None:
@@ -1202,7 +1360,7 @@ class ConsulConfigManager(ConfigManager):
     def drive_name_to_id(self, uid: str) -> str:
         drive_id = ''
         # 'm0conf/nodes/<node_name>/processes/<process_fidk>/disks/<disk_uuid>'
-        node_items = self.get_all_nodes()
+        node_items = self.get_all_nodes_cached()
         for x in node_items:
             if '/disks/' in x['Key'] and uid in x['Key']:
                 drive_id = x['Value']
@@ -1250,6 +1408,10 @@ class ConsulConfigManager(ConfigManager):
                            node: str,
                            svc_id: int,
                            kv_cache=None) -> ObjHealth:
+        """
+        Returns current status of a Consul service identified by the given
+        svc_id for a given node.
+        """
         # Maps consul service status and motr process status to the
         # corresponding ha status to be notified.
         # Respective values are for local and remote nodes.
@@ -1262,7 +1424,7 @@ class ConsulConfigManager(ConfigManager):
         svc_to_motr_status_map = {
             cur_consul_status('passing', 'M0_CONF_HA_PROCESS_STARTING'):
             local_remote_health_ret(ObjHealth.UNKNOWN,
-                                    ObjHealth.OFFLINE),
+                                    ObjHealth.UNKNOWN),
             cur_consul_status('passing', 'M0_CONF_HA_PROCESS_STOPPING'):
             local_remote_health_ret(ObjHealth.UNKNOWN,
                                     ObjHealth.OFFLINE),
@@ -1273,8 +1435,8 @@ class ConsulConfigManager(ConfigManager):
             local_remote_health_ret(ObjHealth.OK,
                                     ObjHealth.OK),
             cur_consul_status('passing', 'M0_CONF_HA_PROCESS_STOPPED'):
-            local_remote_health_ret(ObjHealth.OK,
-                                    ObjHealth.OFFLINE),
+            local_remote_health_ret(ObjHealth.UNKNOWN,
+                                    ObjHealth.UNKNOWN),
             cur_consul_status('passing', 'Unknown'):
             local_remote_health_ret(ObjHealth.UNKNOWN,
                                     ObjHealth.UNKNOWN),
@@ -1301,8 +1463,8 @@ class ConsulConfigManager(ConfigManager):
                 node, kv_cache=kv_cache)
             if not node_data:
                 return ObjHealth.OFFLINE
+            LOG.debug('node data: %s', node_data)
             node_status = str(node_data[0]['Status'])
-            # if node_status != 'passing' or (not self.is_node_alive(
             if node_status != 'passing':
                 return ObjHealth.OFFLINE
             status = ObjHealth.UNKNOWN
@@ -1315,9 +1477,10 @@ class ConsulConfigManager(ConfigManager):
                         return ObjHealth.OFFLINE
                     cns_status = self.get_process_status(pfid,
                                                          kv_cache=kv_cache)
-                    svc_health = svc_to_motr_status_map[MotrConsulProcStatus(
-                                         item['Status'],
-                                         cns_status.proc_status)]
+                    svc_health = svc_to_motr_status_map[
+                        MotrConsulProcStatus(
+                            item['Status'],
+                            cns_status.proc_status)]
                     LOG.debug('consul.status %s svc_health: %s',
                               cns_status, svc_health)
                     local_node = self.get_local_nodename()
@@ -1336,13 +1499,13 @@ class ConsulConfigManager(ConfigManager):
     @uses_consul_cache
     def get_process_node(self, proc_fid: Fid, kv_cache=None) -> str:
         try:
-            proc_base_fid = get_process_base_fid(proc_fid)
+            proc_base_fid = self.get_base_fid(proc_fid)
             fidk = proc_base_fid.key
             # 'node/<node_name>/process/<process_fidk>/service/type'
             # node_items = self.kv.kv_get('m0conf/nodes',
             #                             recurse=True,
             #                             kv_cache=kv_cache)
-            node_items = self.get_all_nodes(kv_cache=kv_cache)
+            node_items = self.get_all_nodes_cached()
             LOG.log(TRACE, 'node items: %s', node_items)
             if ObjT.PROCESS.value == proc_base_fid.container:
                 keys = get_process_keys(node_items, fidk)
@@ -1413,7 +1576,7 @@ class ConsulConfigManager(ConfigManager):
 
     def get_service_process_fid(self, svc_fid: Fid, kv_cache=None) -> Fid:
         assert ObjT.SERVICE.value == svc_fid.container
-        node_items = self.get_all_nodes(kv_cache=kv_cache)
+        node_items = self.get_all_nodes_cached()
         keys = get_service_keys(node_items, svc_fid.key)
         if len(keys) != 1:
             raise RuntimeError(f'svc_fid:{svc_fid} len:{len(keys)}')
@@ -1467,7 +1630,7 @@ class ConsulConfigManager(ConfigManager):
             if p_fid not in all_procs:
                 continue
             # Checking if status is M0_CONF_HA_PROCESS_STARTED
-            if all_procs[p_fid] == (
+            if all_procs[p_fid] in (
                     m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED.name,
                     m0HaProcessEvent.M0_CONF_HA_PROCESS_DTM_RECOVERED.name):
                 started_processes += 1
@@ -1480,12 +1643,54 @@ class ConsulConfigManager(ConfigManager):
             fin_state = 'offline'
         return fin_state
 
+    def objHealthToProcessEvent(self, health: ObjHealth):
+        healthToProcessEvent: dict = {
+            ObjHealth.RECOVERING: m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED,
+            ObjHealth.OK: m0HaProcessEvent.M0_CONF_HA_PROCESS_DTM_RECOVERED,
+            ObjHealth.FAILED: m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED,
+            ObjHealth.OFFLINE: m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED,
+            ObjHealth.UNKNOWN: m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED,
+            ObjHealth.STOPPED: m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED
+        }
+        return healthToProcessEvent[health]
+
+    def processEventToObjHealth(self, proc_type: m0HaProcessType,
+                                proc_event: m0HaProcessEvent) -> ObjHealth:
+        motr_to_svc_status = {
+            (m0HaProcessType.M0_CONF_HA_PROCESS_M0MKFS,
+                m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED): (
+                    ObjHealth.OK),
+            (m0HaProcessType.M0_CONF_HA_PROCESS_M0MKFS,
+                m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED): (
+                    ObjHealth.FAILED),
+            (m0HaProcessType.M0_CONF_HA_PROCESS_M0D,
+                m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED): (
+                    ObjHealth.RECOVERING),
+            (m0HaProcessType.M0_CONF_HA_PROCESS_M0D,
+                m0HaProcessEvent.M0_CONF_HA_PROCESS_DTM_RECOVERED): (
+                    ObjHealth.OK),
+            (m0HaProcessType.M0_CONF_HA_PROCESS_M0D,
+                m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED): (
+                    ObjHealth.FAILED),
+            (m0HaProcessType.M0_CONF_HA_PROCESS_OTHER,
+                m0HaProcessEvent.M0_CONF_HA_PROCESS_STARTED): (
+                    ObjHealth.RECOVERING),
+            (m0HaProcessType.M0_CONF_HA_PROCESS_OTHER,
+                m0HaProcessEvent.M0_CONF_HA_PROCESS_DTM_RECOVERED): (
+                    ObjHealth.OK),
+            (m0HaProcessType.M0_CONF_HA_PROCESS_OTHER,
+                m0HaProcessEvent.M0_CONF_HA_PROCESS_STOPPED): (
+                    ObjHealth.FAILED)}
+        LOG.debug('chp_type=%d chp_event=%d',
+                  proc_type, proc_event)
+        return motr_to_svc_status[(proc_type, proc_event)]
+
     @repeat_if_fails()
     def set_process_state(self,
                           process_fid: Fid,
                           state: ObjHealth) -> None:
-        LOG.debug('Setting process=%s in KV with state=%s',
-                  process_fid, state)
+        LOG.info('Setting process=%s in KV with state=%s',
+                 process_fid, state)
         process_state_map = {
             ObjHealth.OK: 'online',
             ObjHealth.FAILED: 'failed',
@@ -1494,12 +1699,12 @@ class ConsulConfigManager(ConfigManager):
             ObjHealth.STOPPED: 'stopped',
             ObjHealth.RECOVERING: 'dtm_recovering'
         }
-        proc_base_fid = get_process_base_fid(process_fid)
+        proc_base_fid = self.get_base_fid(process_fid)
 
         # Example key is as follows
         # m0conf/nodes/0x6e00000000000001:0x3/processes/0x7200000000000001:
         # 0x15:{"name": "m0_server", "state": "M0_NC_UNKNOWN"}
-        node_items = self.get_all_nodes()
+        node_items = self.get_all_nodes_cached()
         regex = re.compile(
             f'^m0conf\\/nodes\\/.*\\/processes\\/{proc_base_fid}$')
         for item in node_items:
@@ -1508,7 +1713,7 @@ class ConsulConfigManager(ConfigManager):
                 continue
             value = json.loads(item['Value'])
             value['state'] = process_state_map[state]
-            LOG.debug('set_process_state: %s', json.dumps(value))
+            LOG.info('set_process_state: %s', json.dumps(value))
             self.kv.kv_put(item['Key'], json.dumps(value))
 
     @repeat_if_fails()
@@ -1543,7 +1748,7 @@ class ConsulConfigManager(ConfigManager):
     @repeat_if_fails()
     def init_motr_processes_status(self):
         local_node = self.get_local_nodename()
-        fid = self.get_node_fid(local_node)
+        fid = self.get_node_fid(local_node, use_cache=False)
         if not fid or fid is None:
             raise HAConsistencyException(
                 f'node fid not available yet for {local_node}')
@@ -1565,25 +1770,30 @@ class ConsulConfigManager(ConfigManager):
                                       True)
 
     @repeat_if_fails()
-    def process_dynamic_fidk_lock(self) -> bool:
+    def obj_dynamic_fidk_lock(self, objt: ObjT) -> bool:
         # Acquire lock to update last_updated_base_fidk.
         # This will block until lock is acquired.
         # Will break if any other exception than
         # HAConsistencyException occurs.
+        hax_fid = self.get_hax_fid()
+        value = json.dumps({'owner': hax_fid})
         try:
-            while not self.kv.kv_put('fidk_update_lock', 'true', cas=0):
+            while not self.kv.kv_put(
+                          f'fidk_update_lock/{objt.name}',
+                          value, cas=0):
                 sleep(1)
             return True
         except Exception:
             return False
 
     @repeat_if_fails()
-    def process_dynamic_fidk_unlock(self):
+    def obj_dynamic_fidk_unlock(self, objt: ObjT):
         # Release fidk_update_lock.
         # This will block until released.
         try:
             keys: List[KeyDelete] = [
-                KeyDelete(name='fidk_update_lock', recurse=True),
+                KeyDelete(name=f'fidk_update_lock/{objt.name}',
+                          recurse=True),
             ]
             while not self.kv.kv_delete_in_transaction(keys):
                 sleep(1)
@@ -1591,28 +1801,72 @@ class ConsulConfigManager(ConfigManager):
             raise RuntimeError('Unreachable')
 
     @repeat_if_fails()
-    def get_process_next_dynamic_fidk_lock(self) -> int:
-        if self.process_dynamic_fidk_lock():
-            fidk = self.kv.kv_get('last_dynamic_fid_key/process',
+    def revoke_all_dynamic_fidk_lock_for(self, hax_fid: Fid):
+        try:
+            fidk_lock_items = self.kv.kv_get('fidk_update_lock',
+                                             allow_null=True,
+                                             recurse=True)
+            keys_to_del: List[KeyDelete] = []
+            for item in fidk_lock_items:
+                owner_data = json.loads(item['Value'])
+                owner_fid = Fid.parse(owner_data['owner'])
+                if owner_fid == hax_fid:
+                    keys_to_del.append(KeyDelete(name=item['Key'],
+                                       recurse=True))
+            while not self.kv.kv_delete_in_transaction(keys_to_del):
+                sleep(1)
+        except Exception:
+            raise RuntimeError('Unreachable')
+
+    @repeat_if_fails()
+    def get_obj_next_dynamic_fidk_lock(self, objt: ObjT) -> int:
+        if self.obj_dynamic_fidk_lock(objt):
+            fidk = self.kv.kv_get(f'last_dynamic_fid_key/{objt.name.lower()}',
                                   recurse=False)
             new_fidk = int(json.loads(fidk['Value'])) + 1
             # Update dynamic fid key.
-            while not self.kv.kv_put('last_dynamic_fid_key/process',
-                                     json.dumps(str(new_fidk))):
+            while not self.kv.kv_put(
+                          f'last_dynamic_fid_key/{objt.name.lower()}',
+                          json.dumps(str(new_fidk))):
                 sleep(1)
-            self.process_dynamic_fidk_unlock()
+            self.obj_dynamic_fidk_unlock(objt)
         return new_fidk
 
     @repeat_if_fails()
-    def alloc_next_process_fid(self, process_fid: Fid) -> Fid:
-        next_fidk = self.get_process_next_dynamic_fidk_lock()
-        fid_mask: Fid = ObjTMaskMap[ObjT.PROCESS]
-        fid_cont = process_fid.container
-        fid_key = process_fid.key + ((fid_mask.key * next_fidk) + next_fidk)
-        new_proc_fid = Fid(fid_cont, fid_key)
-        base_fid = get_process_base_fid(new_proc_fid)
+    def alloc_next_obj_fid(self, obj_fid: Fid) -> Fid:
+        objt: ObjT = FidTypeToObjT[obj_fid.container]
+        next_fidk = self.get_obj_next_dynamic_fidk_lock(objt)
+        fid_mask: Fid = ObjTMaskMap[objt]
+        fid_cont = obj_fid.container
+        fid_key = obj_fid.key + ((fid_mask.key * next_fidk) + next_fidk)
+        new_obj_fid = Fid(fid_cont, fid_key)
+        base_fid = self.get_base_fid(new_obj_fid)
         # Save base fid to actualy fid mapping in Consul.
         while not self.kv.kv_put(f'{base_fid}',
-                                 json.dumps(str(new_proc_fid))):
+                                 json.dumps(str(new_obj_fid))):
             sleep(1)
-        return new_proc_fid
+        return new_obj_fid
+
+    def update_process_fid(self, proc_fid: Fid) -> List[Fid]:
+        new_fids: List[Fid] = []
+        # First allocate new process fid.
+        new_fids.append(self.alloc_next_obj_fid(proc_fid))
+        service_list = self.get_services_by_parent_process(proc_fid)
+        for svc in service_list:
+            new_fids.append(self.alloc_next_obj_fid(svc.fid))
+        return new_fids
+
+    def get_base_fid(self, obj_fid: Fid) -> Fid:
+        objt: ObjT = FidTypeToObjT[obj_fid.container]
+        fid_mask: Fid = ObjTMaskMap[objt]
+        base_fid = Fid(obj_fid.container,
+                       (obj_fid.key & fid_mask.key))
+        return base_fid
+
+    @repeat_if_fails()
+    def get_m0_client_types(self) -> List[str]:
+        m0_client_types = self.kv.kv_get('m0_client_types')
+        client_types = []
+        for client_type in json.loads(m0_client_types['Value']):
+            client_types.append(client_type)
+        return client_types

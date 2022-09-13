@@ -21,6 +21,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional, Tuple
 from threading import Event
 
+from hax.log import TRACE
 from hax.exception import HAConsistencyException
 from hax.types import (ByteCountStats, ConfHaProcess, Fid, FsStatsWithTime,
                        ObjT, ObjHealth, Profile, PverInfo,
@@ -111,6 +112,10 @@ class ConfigManager(ABC):
 
     @abstractmethod
     def get_rm_fid(self, kv_cache=None) -> Fid:
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_proc_node_health(self, proc_fid: Fid) -> ObjHealth:
         raise NotImplementedError
 
     @abstractmethod
@@ -313,6 +318,14 @@ class ConfigManager(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def get_obj_full_fid(self, base_fid: Fid) -> Fid:
+        raise NotImplementedError
+
+    @abstractmethod
+    def ha_note_to_objhealth(self, state: int) -> ObjHealth:
+        raise NotImplementedError
+
+    @abstractmethod
     def update_process_status_local(self, event: ConfHaProcess) -> None:
         raise NotImplementedError
 
@@ -353,6 +366,15 @@ class ConfigManager(ABC):
 
     @abstractmethod
     def get_process_based_node_state(self, node_fid: Fid) -> str:
+        raise NotImplementedError
+
+    @abstractmethod
+    def objHealthToProcessEvent(self, health: ObjHealth):
+        raise NotImplementedError
+
+    @abstractmethod
+    def processEventToObjHealth(self, proc_type: m0HaProcessType,
+                                proc_event: m0HaProcessEvent) -> ObjHealth:
         raise NotImplementedError
 
     @abstractmethod
@@ -431,6 +453,10 @@ class ConfigManager(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def revoke_all_dynamic_fidk_lock_for(self, hax_fid: Fid):
+        raise NotImplementedError
+
+    @abstractmethod
     def fid_to_endpoint(self, proc_fid: Fid) -> Optional[str]:
         raise NotImplementedError
 
@@ -500,6 +526,7 @@ class ConfigManager(ABC):
         Blocking version of `get_leader_session_no_wait()`.
         The method either returns the RC leader session or blocks until the
         session becomes available.
+        todo: implement blocking call
         """
         return str(self.get_leader_session_no_wait())
 
@@ -597,7 +624,7 @@ class ConfigManager(ABC):
             ObjHealth.REPAIR: m0HaObjState.M0_NC_REPAIR,
             ObjHealth.REPAIRED: m0HaObjState.M0_NC_REPAIRED,
             ObjHealth.REBALANCE: m0HaObjState.M0_NC_REBALANCE
-            }
+        }
         return device_ha_state_map[status].name
 
     def is_proc_local(self, pfid: Fid) -> bool:
@@ -623,11 +650,8 @@ class ConfigManager(ABC):
             wait_for_event(event, 2)
 
     def m0ds_stopping(self) -> bool:
-        # statuses = self.get_m0d_statuses()
         statuses = self.get_m0d_statuses()
         LOG.debug('The following statuses received: %s', statuses)
-        # stopping = [v[1] in ('M0_CONF_HA_PROCESS_STOPPING',
-        #                      'M0_CONF_HA_PROCESS_STOPPED') for v in statuses]
         stopping = [v[1] in (ObjHealth.OFFLINE,
                              ObjHealth.STOPPED) for v in statuses]
         return all(stopping)
@@ -672,6 +696,8 @@ class ConfigManager(ABC):
         leader = self.get_leader_node()
         # The call doesn't communicate via Consul REST API
         this_node = self.get_local_nodename()
+        LOG.log(TRACE, 'am_i_rc: local node: %s leader: %s',
+                this_node, leader)
         return leader == this_node
 
     def get_local_node_status(self):
