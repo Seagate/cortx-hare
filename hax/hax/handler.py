@@ -1,4 +1,4 @@
-# Copyright (c) 2020 Seagate Technology LLC and/or its Affiliates
+# Copyright (c) 2020-2022 Seagate Technology LLC and/or its Affiliates
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 # please email opensource@seagate.com or cortx-questions@seagate.com.
 #
 
+import datetime
 import logging
 from typing import List, Any
 from hax.message import (BroadcastHAStates, Die, EntrypointRequest,
@@ -78,7 +79,10 @@ class ConsumerThread(StoppableThread):
                 'state': ha_process_events[event.chp_event],
                 'type': event_type}
         payload = dump_json(data)
-        res = self.bq_publisher.publish('PROCESS-STATE-UPDATE', payload)
+        now_time = str(datetime.datetime.now())
+        res = self.bq_publisher.publish(now_time,
+                                        'PROCESS-STATE-UPDATE',
+                                        payload)
         LOG.debug('PROCESS-STATE-UPDATE event JSON: %s res: %d',
                   payload, res)
 
