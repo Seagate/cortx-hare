@@ -6,7 +6,8 @@ from hax.util import KVAdapter, TxPutKV, repeat_if_fails
 # XXX do we want to make payload definition more strict?
 # E.g. there could be a type hierarchy for payload objects that depends
 # on the type name.
-Message = NamedTuple('Message', [('message_type', str),
+Message = NamedTuple('Message', [('timestamp', str),
+                                 ('message_type', str),
                                  ('payload', Dict[str, Any])])
 
 
@@ -22,10 +23,12 @@ class Publisher:
         self.epoch_key = epoch_key
 
     @repeat_if_fails(wait_seconds=0.1)
-    def publish(self, message_type: str, payload: str) -> int:
+    def publish(self, timestamp: str, message_type: str, payload: str) -> int:
         """Publishes the given message to the queue."""
         data = simplejson.loads(payload)
-        message = Message(message_type=message_type, payload=data)
+        message = Message(timestamp=timestamp,
+                          message_type=message_type,
+                          payload=data)
         data = simplejson.dumps(message)
 
         while True:
