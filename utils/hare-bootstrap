@@ -443,7 +443,15 @@ while read node _; do
         ssh_error_info "$node" "PATH=$PATH $(which update-consul-conf)" --server --xprt $xprt &
         pids+=($!)
     fi
-done < <(get_all_nodes | grep -vw $(node-name) || true)
+done < <(get_server_nodes | grep -vw $(node-name) || true)
+wait4 ${pids[@]}
+echo ' OK'
+
+while read node _; do
+    scp -qr /var/lib/hare/consul-kv.json $node:/var/lib/hare/
+    ssh_error_info "$node" "PATH=$PATH $(which update-consul-conf)" --xprt $xprt &
+    pids+=($!)
+done < <(get_client_nodes | grep -vw $(node-name) || true)
 wait4 ${pids[@]}
 echo ' OK'
 
