@@ -1,9 +1,9 @@
-[![Codacy Badge](https://app.codacy.com/project/badge/Grade/1635a7cc066040079cf59ccbb577f255)](https://www.codacy.com/gh/Seagate/cortx-hare/dashboard?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=Seagate/cortx-hare&amp;utm_campaign=Badge_Grade)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/Seagate/cortx-hare/blob/main/LICENSE)
 [![Slack](https://img.shields.io/badge/chat-on%20Slack-blue")](https://join.slack.com/t/cortxcommunity/shared_invite/zt-femhm3zm-yiCs5V9NBxh89a_709FFXQ?)
 [![YouTube](https://img.shields.io/badge/Video-YouTube-red)](https://cortx.link/videos)
 [![GitHub contributors](https://img.shields.io/github/contributors/Seagate/cortx-hare)](https://github.com/Seagate/cortx-hare/graphs/contributors/)
 
+# Disclaimer: This project is not maintained anymore
 # Hare User Guide
 
 ## What Hare does?
